@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`ALPHA_PILOT_RDS_INSTANCE_SYNC_UNVERIFIED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，新 RDS CA 已写入 `WP08_RDS_CA_PEM_B64`。应用 `deploy` 不执行 DNS 对账、Terraform plan/apply 或 CloudControl：只从加密 remote state 读取既有 ECS/RDS 定位值，再用 VPC API 临时添加并撤销当前 runner 的单一 `/32`。受控 mirror run `30063385826` 已把固定 Caddy 2.10.2 源 digest 复制到项目 GHCR，并验证目标 digest `sha256:b7c239fee65c44ac1dccfa76f88253f87e4d7a8ca27b92e419c86a967ecff171`。随后唯一 deploy run `30063847635` 成功拉取四个 GHCR 镜像，但第一次 Alembic 连接 RDS 时超时；SSH 已关闭且未重试。控制台同步已使派生主网卡 IP 出现，但唯一后续 audit run `30067829879` 因实例关联仍为 `IsLatest=false` 停止，所有 deploy 步骤跳过。migration、runtime grant、seed、应用容器、TLS 与 browser smoke 仍为 `NOT_RUN`。
+状态：`ALPHA_PILOT_CA_READABILITY_FIX_READY`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，新 RDS CA 已写入 `WP08_RDS_CA_PEM_B64`。2026-07-25 的人工只读核验确认 AllowList 派生 IP与 staging ECS 主网卡、活动安全组、RDS 实例及 VPC 一致；RDS 无公网地址，SSL 与强制加密已启用，SSH 关闭态只允许 loopback `/32`。随后唯一 deploy run `30109954801` 成功读取冻结 state、打开并关闭精确 runner `/32`、准备 bundle 并拉取四个 GHCR 镜像，但非 root API 容器在首次数据库连接前无法读取 root-only `0600` CA。migration、runtime grant、seed、应用容器、TLS 与 browser smoke 仍为 `NOT_RUN`；修复把公开 CA 设为 `0444` 并在 migration 前增加非 root 容器读取门禁，其他 secret 继续为 `0600`。新的 deploy 仍需修复合入主线后的独立授权。
 
 ## 1. 已锁定授权
 
@@ -33,7 +33,7 @@
 - DNS 精确纳管固定使用项目限定的 `dns:ListRecords` 读取现有子区：同时匹配 `@`、A、默认线路、TTL 600、已启用、`vNext staging` 备注和当前 ECS EIP，必须且只能得到一个 RecordID。RecordID 先加入 Actions mask，只用于同一 workflow 的 `terraform import`；不得写入 Git、artifact、公开证据或新增 Environment secret。已有 state 地址则必须核对完整 import identity，不允许覆盖或重绑。
 - TOS bucket 私有、版本化、默认 SSE-TOS AES-256；WP-08 只创建物理隔离资源，应用接入、presign 与扫描属于 WP-10。
 - Worker 以 `APP_ENV=staging` + `NOTIFICATION_ADAPTER=DISABLED` 运行并上报 heartbeat；notification outbox 不会被领取。`LOCAL_TEST` 在 staging 仍启动失败，真实飞书 adapter 属于 WP-11。
-- staging secret 的权威存储是 GitHub `staging` Environment；部署时经单次 SSH 加密通道落盘为 `0600`，不进入 Git、Actions artifact、Terraform CLI 参数或日志。Terraform 加密 TOS state 会保存 RDS account 的敏感属性，因此 state bucket 必须私有、版本化、仅 CI 子用户可读。
+- staging secret 的权威存储是 GitHub `staging` Environment；部署时经单次 SSH 加密通道落盘，密码和环境文件为 `0600`。RDS CA 是公开信任证书，以容器只读 `0444` 落盘，且必须在 migration 前由 UID 10001 的 API 容器成功读取；所有内容均不进入 Git、Actions artifact、Terraform CLI 参数或日志。Terraform 加密 TOS state 会保存 RDS account 的敏感属性，因此 state bucket 必须私有、版本化、仅 CI 子用户可读。
 - ECS 创建所需的 bootstrap password 由 Terraform `random_password` 一次生成，仅保存在上述私有、版本化、SSE 加密的 remote state，并且不声明 output、不进入 GitHub secret、Actions 日志或 cloud-init。实例用它满足创建 API 的必填凭据合同；cloud-init 写入 staging-only deploy 公钥后立即将 SSH 收敛为 key-only。密码遗失不恢复、不用于日常登录，实例替换时生成新的随机值。
 
 ## 3. 一次性主账号 Bootstrap
@@ -78,7 +78,7 @@ make wp08-staging-apply-check
 
 ## 5. 部署顺序与证据
 
-Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → migration → runtime grant → PII-free seed → Web/API/Worker/edge → TLS/route → VPC API 撤销精确 SSH 规则。
+Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → PII-free seed → Web/API/Worker/edge → TLS/route → VPC API 撤销精确 SSH 规则。
 
 三镜像必须使用 WP-07 已核验 digest，不能只用 tag。公开证据只记录 GitHub run ID、候选 SHA、门禁结果和非敏感资源类别；账号 ID、IP、DNS zone ID、RDS/TOS endpoint、SSH fingerprint、ACL 明细和截图只进入 `evidence/private/wp08` 或 90 天受控外部证据。
 

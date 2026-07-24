@@ -30,8 +30,13 @@ def test_prepare_writes_private_independent_environment_files(
     output = tmp_path / "bundle"
     prepare.prepare(output, "postgres.internal.example", 5432)
     assert stat.S_IMODE(output.stat().st_mode) == 0o700
-    for path in [*list((output / "secrets").iterdir()), output / ".deployment.env"]:
+    ca_path = output / "secrets" / "volcengine-rds-ca.pem"
+    private_paths = [
+        path for path in (output / "secrets").iterdir() if path != ca_path
+    ]
+    for path in [*private_paths, output / ".deployment.env"]:
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(ca_path.stat().st_mode) == 0o444
     assert "NOTIFICATION_ADAPTER=DISABLED" in (output / "secrets/worker.env").read_text()
     assert "ALLOW_FIXTURE_IDENTITY=false" in (output / "secrets/api.env").read_text()
     assert "Migration-Password" not in (output / "secrets/api.env").read_text()

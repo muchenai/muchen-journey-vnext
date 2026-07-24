@@ -26,11 +26,14 @@ docker compose version >/dev/null || fail "docker compose plugin is missing"
 for path in compose.yaml compose.migrate.yaml Caddyfile grant_runtime.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "$path must be a regular file"
 done
-for path in api.env migration.env worker.env web.env edge.env volcengine-rds-ca.pem; do
+for path in api.env migration.env worker.env web.env edge.env; do
   [[ -f "$SECRETS/$path" && ! -L "$SECRETS/$path" ]] || fail "secret file $path is missing"
   [[ "$(stat -c '%a' "$SECRETS/$path")" == "600" ]] || fail "secret file $path must be mode 0600"
 done
-openssl x509 -in "$SECRETS/volcengine-rds-ca.pem" -noout -checkend 2592000 >/dev/null || fail "RDS CA is invalid or expires within 30 days"
+ca_path="$SECRETS/volcengine-rds-ca.pem"
+[[ -f "$ca_path" && ! -L "$ca_path" ]] || fail "RDS CA file is missing"
+[[ "$(stat -c '%a' "$ca_path")" == "444" ]] || fail "RDS CA file must be mode 0444"
+openssl x509 -in "$ca_path" -noout -checkend 2592000 >/dev/null || fail "RDS CA is invalid or expires within 30 days"
 
 grep -qx 'APP_ENV=staging' "$SECRETS/api.env" || fail "API must run as staging"
 grep -qx 'ALLOW_FIXTURE_IDENTITY=false' "$SECRETS/api.env" || fail "fixture identity must be disabled"
@@ -40,6 +43,8 @@ grep -qx 'NOTIFICATION_ADAPTER=DISABLED' "$SECRETS/worker.env" || fail "WP-08 wo
 
 docker compose -f compose.yaml -f compose.migrate.yaml config --quiet
 docker compose pull
+docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api \
+  python -c "from pathlib import Path; Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
 
 previous=""
 if [[ -L "$ROOT/current" ]]; then

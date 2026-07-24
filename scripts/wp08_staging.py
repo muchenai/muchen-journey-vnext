@@ -166,16 +166,27 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet"
     )
     image_pull = "docker compose pull"
+    container_ca_check = (
+        "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
+    )
     migration = (
         "docker compose -f compose.yaml -f compose.migrate.yaml "
         "run --rm --no-deps api alembic upgrade head"
     )
-    if any(command not in script for command in (compose_check, image_pull, migration)):
+    if any(
+        command not in script
+        for command in (compose_check, image_pull, container_ca_check, migration)
+    ):
         raise StagingError("staging deploy preflight commands are incomplete")
-    if not script.index(compose_check) < script.index(image_pull) < script.index(migration):
+    if not (
+        script.index(compose_check)
+        < script.index(image_pull)
+        < script.index(container_ca_check)
+        < script.index(migration)
+    ):
         raise StagingError(
-            "staging deploy must validate Compose and pull all images "
-            "before database migration"
+            "staging deploy must validate Compose, pull all images, and verify "
+            "container CA readability before database migration"
         )
 
 

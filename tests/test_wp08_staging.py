@@ -203,6 +203,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet",
                 "docker compose pull",
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
+                "run --rm --no-deps api python -c \"from pathlib import Path; "
+                "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
+                "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api alembic upgrade head",
             )
         )
@@ -218,13 +221,30 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
         valid.replace(
             "docker compose pull\n"
             "docker compose -f compose.yaml -f compose.migrate.yaml "
+            "run --rm --no-deps api python -c \"from pathlib import Path; "
+            "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n"
+            "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head",
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head\n"
-            "docker compose pull",
+            "docker compose pull\n"
+            "docker compose -f compose.yaml -f compose.migrate.yaml "
+            "run --rm --no-deps api python -c \"from pathlib import Path; "
+            "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
         )
     )
     with pytest.raises(staging.StagingError, match="before database migration"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            "docker compose -f compose.yaml -f compose.migrate.yaml "
+            "run --rm --no-deps api python -c \"from pathlib import Path; "
+            "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n",
+            "",
+        )
+    )
+    with pytest.raises(staging.StagingError, match="preflight commands"):
         staging.validate_deploy_script(script)
 
 
