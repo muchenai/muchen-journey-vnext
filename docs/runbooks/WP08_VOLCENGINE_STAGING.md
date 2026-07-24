@@ -1,13 +1,13 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`ALPHA_PILOT_WEB_READINESS_FIX_READY / NO_DEPLOY_CANDIDATE`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，RDS TLS、schema ownership、migration `0001` 至 `0010`、runtime grant、seed 与 API health 已在 run `30117658292` 验证。该 run 因 Web 使用需身份的 `/ops` 作为健康探针而停止，edge/TLS 未启动，SSH 已关闭。修复新增独立 `/health/ready`，把匿名 `/ops = 401` 作为安全断言，并在首次部署失败时停止本轮容器但保留卷。历史候选 `670661…` 的 Web 镜像不含本修复，合入后必须生成并绑定新候选，当前不得再次 deploy。
+状态：`ALPHA_PILOT_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，RDS TLS、schema ownership、migration `0001` 至 `0010`、runtime grant、seed 与 API health 已在 run `30117658292` 验证。PR #39 已修正 Web readiness、匿名 `/ops` 拒绝及首次失败容器清理；主线候选流水线 `30120441674` 已为 `d407b5f…` 生成并验证三镜像摘要。当前只完成候选绑定，不包含 staging deploy 授权。
 
 ## 1. 已锁定授权
 
 - Provider：火山引擎；Region：华北2（北京），ID=`cn-beijing`；
 - 计费：全部按量计费（`PostPaid`）；月度硬上限：`¥800`；
 - 历史候选：`670661865f708a835997596ed5b74904809564a5`；已验证 Next.js 16.2.11 / sharp 0.35.3，但不含 Web readiness 修复，禁止再次 deploy；
-- 下一实际部署候选：本修复合入主线后由候选流水线生成，当前为 `PENDING`；候选绑定 PR 必须同步更新 config、artifact、三镜像 digest、deploy bundle 与确认词；
+- 当前候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`；canonical run `30120441674` 的 `registry_push=VERIFIED`，API/Web/Worker 均使用 artifact 中的不可变 digest；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -69,11 +69,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前没有可部署候选，以下步骤在新候选绑定 PR 合入前禁止执行。绑定完成后，在受保护 `main` 上通过同一 `.github/workflows/staging.yml` 完成部署；`phase=deploy` 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同，禁止新发布脚本与旧镜像混用：
+候选绑定 PR 合入前禁止执行以下步骤；合入也不自动构成部署授权。取得新的、指名完整候选 `d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff` 与 `phase=deploy` 的明确授权后，才可在受保护 `main` 上通过同一 `.github/workflows/staging.yml` 执行；workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. `phase=deploy` 使用新绑定的完整 candidate 与匹配确认词。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. `phase=deploy` 使用上述完整 candidate 与确认词 `DEPLOY_D407B5F_TO_VOLCENGINE_STAGING`。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 

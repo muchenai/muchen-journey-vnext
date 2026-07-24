@@ -17,6 +17,12 @@ def contract(tmp_path: Path, *, estimate=None) -> Path:
                 "monthly_budget_cny": 800,
                 "approved_monthly_estimate_cny": estimate,
                 "candidate_commit": "f" * 40,
+                "candidate_artifact_run_id": 123456,
+                "candidate_image_digests": {
+                    "api": "sha256:" + "a" * 64,
+                    "web": "sha256:" + "b" * 64,
+                    "worker": "sha256:" + "c" * 64,
+                },
                 "staging_origin": "https://staging-vnext.muchenai.com",
                 "resource_prefix": "journey-next-staging",
             }
@@ -86,6 +92,21 @@ def test_contract_locks_provider_region_budget_and_origin(tmp_path: Path):
     data = staging.load_contract(contract(tmp_path))
     assert data["region_id"] == "cn-beijing"
     assert data["monthly_budget_cny"] == 800
+    assert data["candidate_artifact_run_id"] == 123456
+
+
+def test_contract_requires_three_valid_candidate_digests(tmp_path: Path):
+    path = contract(tmp_path)
+    payload = json.loads(path.read_text())
+    del payload["candidate_image_digests"]["worker"]
+    path.write_text(json.dumps(payload))
+    with pytest.raises(staging.StagingError, match="api, web, and worker"):
+        staging.load_contract(path)
+
+    payload["candidate_image_digests"]["worker"] = "latest"
+    path.write_text(json.dumps(payload))
+    with pytest.raises(staging.StagingError, match="invalid digest"):
+        staging.load_contract(path)
 
 
 def test_apply_requires_quote_and_rejects_over_budget(tmp_path: Path):

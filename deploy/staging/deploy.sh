@@ -10,16 +10,16 @@ fail() {
 }
 
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "670661865f708a835997596ed5b74904809564a5" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${API_IMAGE#*@}" == "sha256:6d56dfdf31bfd26a6ca9f4f3547ab2df14899898f31f64c4428ea9d55bb0a3e4" ]] || fail "API digest differs from candidate manifest"
-[[ "${WEB_IMAGE#*@}" == "sha256:14597932f27bf106791c00a50e4126ab4981cad50ae468b68437e9fa361fdc03" ]] || fail "Web digest differs from candidate manifest"
-[[ "${WORKER_IMAGE#*@}" == "sha256:12666e53519e5dab0ac96593d49dddcefff4054468164424f3600abf9fff0ad4" ]] || fail "Worker digest differs from candidate manifest"
+[[ "${API_IMAGE#*@}" == "sha256:b51fc66af40c96e214b1e740b2676e9518a6a13c111c31c91861396c59a368ab" ]] || fail "API digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:c6b2602431bebecd647597e41214299c4445433940802e1cb84ba36f6fd7f631" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WORKER_IMAGE#*@}" == "sha256:979cbfa5a08f3b5ae292e317d03976503c10cc754c2e28140d8169c2f7c2b75a" ]] || fail "Worker digest differs from candidate manifest"
 
 command -v docker >/dev/null || fail "docker is missing"
 docker compose version >/dev/null || fail "docker compose plugin is missing"

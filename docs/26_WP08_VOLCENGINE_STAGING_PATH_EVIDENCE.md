@@ -1,8 +1,9 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
 日期：2026-07-25
-状态：`ALPHA_PILOT_WEB_READINESS_FIX_READY / NO_DEPLOY_CANDIDATE`
-历史候选：`670661865f708a835997596ed5b74904809564a5`（不得承载本次 Web 修复）
+状态：`ALPHA_PILOT_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`
+当前候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`
+历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
 整体发布：`NO_GO`
 
 ## 已关闭
@@ -33,7 +34,9 @@
 - 后续 deploy run `30116863700` 已越过 CA 门禁并建立 RDS TLS 连接，但因 `journey_next_migrator` 当时没有 `public` schema 的 ownership/`CREATE` 权限，在创建 Alembic version table 前停止；精确 schema ownership 修正后，唯一 deploy run [`30117658292`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30117658292) 已成功执行 `0001` 至 `0010` migration、runtime grant 与 seed，API 达到 healthy，SSH `/32` 已关闭。
 - run `30117658292` 的 Web 容器把需要身份的 `/ops` 当作 Compose healthcheck；staging 正确关闭 fixture identity 后，匿名探针被拒绝，Web 因而持续 unhealthy，edge/TLS 未启动。这是健康合同错误，不是数据库、网络或授权错误。首次部署没有 previous release 时，旧 rollback trap 也没有停止本轮已创建容器。
 - 修复新增不访问 API/数据库、返回当前 `APP_RELEASE` 且 `no-store` 的 `/health/ready`；Compose 与外部验证改用该路由，匿名 `/ops` 明确要求 HTTP 401；首次失败执行 `docker compose down --remove-orphans`，不删除卷。deploy 另从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同，防止新发布脚本与旧 Web 镜像混合发布。
-- 因本次修改 Web 源码，历史候选 `670661…` 的固定 Web digest 不含 readiness 路由，不能继续部署。PR 合入后必须从主线生成新候选、三镜像 digest 与候选 artifact，再通过独立候选绑定 PR 更新机器合同；在此之前 staging deployment、TLS、真实身份与真人 Alpha UAT 继续为 `NOT_RUN`，整体发布保持 `NO_GO`。
+- PR #39 已通过 required check 并合入受保护主线 `d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`。Mainline Candidate Gate [`30120441674`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30120441674) 完成完整 CI、候选打包、三镜像 SBOM、GHCR push 与远端 digest 验证；canonical artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`。
+- 新候选固定摘要为 API `sha256:b51fc66a…368ab`、Web `sha256:c6b26024…7f631`、Worker `sha256:979cbfa5…2b75a`。机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词同步绑定；旧候选 `670661…` 不能再进入 deploy。
+- 本轮用户授权范围是生成候选、镜像摘要和候选绑定 PR，不包含 staging deploy。绑定 PR 合入前不得 dispatch；合入后仍需一次新的、指名完整候选与 `phase=deploy` 的明确授权。staging TLS、真实身份与真人 Alpha UAT 继续为 `NOT_RUN`，整体发布保持 `NO_GO`。
 
 ## 2026-07-22 路径设计时未发生（历史快照）
 

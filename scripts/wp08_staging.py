@@ -29,6 +29,7 @@ WEB_READINESS_ROUTE = (
 WEB_PROXY = ROOT / "apps" / "web" / "src" / "proxy.ts"
 PRIVATE_EVIDENCE = ROOT / "evidence" / "private" / "wp08"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 EDGE_IMAGE = (
     "ghcr.io/muchenai2024-creator/muchen-journey-vnext-edge@"
     "sha256:b7c239fee65c44ac1dccfa76f88253f87e4d7a8ca27b92e419c86a967ecff171"
@@ -48,6 +49,8 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         "monthly_budget_cny",
         "approved_monthly_estimate_cny",
         "candidate_commit",
+        "candidate_artifact_run_id",
+        "candidate_image_digests",
         "staging_origin",
         "resource_prefix",
     }
@@ -64,6 +67,17 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         raise StagingError("WP-08 budget must be exactly CNY 800")
     if not FULL_SHA.fullmatch(str(data["candidate_commit"])):
         raise StagingError("candidate_commit must be one full lowercase SHA")
+    run_id = data["candidate_artifact_run_id"]
+    if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id < 1:
+        raise StagingError("candidate_artifact_run_id must be a positive integer")
+    digests = data["candidate_image_digests"]
+    if not isinstance(digests, dict) or set(digests) != {"api", "web", "worker"}:
+        raise StagingError("candidate_image_digests must contain api, web, and worker")
+    if any(
+        not isinstance(value, str) or not DIGEST.fullmatch(value)
+        for value in digests.values()
+    ):
+        raise StagingError("candidate_image_digests contains an invalid digest")
     origin = urlparse(str(data["staging_origin"]))
     if origin.scheme != "https" or origin.netloc != "staging-vnext.muchenai.com" or origin.path:
         raise StagingError("unexpected staging origin")
@@ -308,6 +322,45 @@ def validate_candidate(data: dict[str, object]) -> None:
         raise StagingError("candidate registry push is not VERIFIED")
     if external.get("deployment") != "NOT_RUN":
         raise StagingError("candidate deployment must remain NOT_RUN before WP-08 apply")
+    images = manifest.get("images", {})
+    expected_digests = data["candidate_image_digests"]
+    if not isinstance(images, dict) or not isinstance(expected_digests, dict):
+        raise StagingError("candidate image evidence is incomplete")
+    for component in ("api", "web", "worker"):
+        item = images.get(component, {})
+        if (
+            not isinstance(item, dict)
+            or item.get("registry_digest") != expected_digests[component]
+        ):
+            raise StagingError(f"{component} digest differs from the canonical candidate artifact")
+
+    commit = str(data["candidate_commit"])
+    run_id = str(data["candidate_artifact_run_id"])
+    confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
+    prepare = (ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
+    deploy = DEPLOY_SCRIPT.read_text()
+    workflow = WORKFLOW.read_text()
+    variables = (ROOT / "infra" / "staging" / "variables.tf").read_text()
+    required_markers = (
+        (prepare, commit, "deploy bundle candidate"),
+        (deploy, commit, "deploy preflight candidate"),
+        (variables, commit, "Terraform candidate"),
+        (workflow, commit, "workflow candidate"),
+        (workflow, f"wp07-candidate-{commit}", "workflow artifact name"),
+        (workflow, f"run-id: {run_id}", "workflow artifact run"),
+        (workflow, confirmation, "workflow confirmation"),
+    )
+    for source, marker, label in required_markers:
+        if marker not in source:
+            raise StagingError(f"{label} differs from the machine contract")
+    for component in ("api", "web", "worker"):
+        digest = str(expected_digests[component])
+        immutable = (
+            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+            f"{component}@{digest}"
+        )
+        if immutable not in prepare or digest not in deploy:
+            raise StagingError(f"{component} deploy binding differs from the machine contract")
 
 
 def validate_cost(data: dict[str, object], *, require_quote: bool) -> None:
