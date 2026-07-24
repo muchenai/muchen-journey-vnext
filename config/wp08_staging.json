@@ -23,7 +23,13 @@
     "source": "official_volcengine_calculator_console_and_pricing_docs",
     "private_evidence_reference": "PEV-WP08-20260722-QUOTE_REFRESH"
   },
-  "candidate_commit": "670661865f708a835997596ed5b74904809564a5",
+  "candidate_commit": "d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff",
+  "candidate_artifact_run_id": 30120441674,
+  "candidate_image_digests": {
+    "api": "sha256:b51fc66af40c96e214b1e740b2676e9518a6a13c111c31c91861396c59a368ab",
+    "web": "sha256:c6b2602431bebecd647597e41214299c4445433940802e1cb84ba36f6fd7f631",
+    "worker": "sha256:979cbfa5a08f3b5ae292e317d03976503c10cc754c2e28140d8169c2f7c2b75a"
+  },
   "staging_origin": "https://staging-vnext.muchenai.com",
   "resource_prefix": "journey-next-staging",
   "required_resources": [
