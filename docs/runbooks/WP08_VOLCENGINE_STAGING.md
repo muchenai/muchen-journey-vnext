@@ -1,12 +1,13 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`ALPHA_PILOT_CA_READABILITY_FIX_READY`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，新 RDS CA 已写入 `WP08_RDS_CA_PEM_B64`。2026-07-25 的人工只读核验确认 AllowList 派生 IP与 staging ECS 主网卡、活动安全组、RDS 实例及 VPC 一致；RDS 无公网地址，SSL 与强制加密已启用，SSH 关闭态只允许 loopback `/32`。随后唯一 deploy run `30109954801` 成功读取冻结 state、打开并关闭精确 runner `/32`、准备 bundle 并拉取四个 GHCR 镜像，但非 root API 容器在首次数据库连接前无法读取 root-only `0600` CA。migration、runtime grant、seed、应用容器、TLS 与 browser smoke 仍为 `NOT_RUN`；修复把公开 CA 设为 `0444` 并在 migration 前增加非 root 容器读取门禁，其他 secret 继续为 `0600`。新的 deploy 仍需修复合入主线后的独立授权。
+状态：`ALPHA_PILOT_WEB_READINESS_FIX_READY / NO_DEPLOY_CANDIDATE`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结，RDS TLS、schema ownership、migration `0001` 至 `0010`、runtime grant、seed 与 API health 已在 run `30117658292` 验证。该 run 因 Web 使用需身份的 `/ops` 作为健康探针而停止，edge/TLS 未启动，SSH 已关闭。修复新增独立 `/health/ready`，把匿名 `/ops = 401` 作为安全断言，并在首次部署失败时停止本轮容器但保留卷。历史候选 `670661…` 的 Web 镜像不含本修复，合入后必须生成并绑定新候选，当前不得再次 deploy。
 
 ## 1. 已锁定授权
 
 - Provider：火山引擎；Region：华北2（北京），ID=`cn-beijing`；
 - 计费：全部按量计费（`PostPaid`）；月度硬上限：`¥800`；
-- 实际部署候选：`670661865f708a835997596ed5b74904809564a5`；包含 Next.js 16.2.11 / sharp 0.35.3 修复；
+- 历史候选：`670661865f708a835997596ed5b74904809564a5`；已验证 Next.js 16.2.11 / sharp 0.35.3，但不含 Web readiness 修复，禁止再次 deploy；
+- 下一实际部署候选：本修复合入主线后由候选流水线生成，当前为 `PENDING`；候选绑定 PR 必须同步更新 config、artifact、三镜像 digest、deploy bundle 与确认词；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -68,17 +69,17 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-然后在受保护 `main` 上通过同一 `.github/workflows/staging.yml` 完成两阶段首次部署：
+当前没有可部署候选，以下步骤在新候选绑定 PR 合入前禁止执行。绑定完成后，在受保护 `main` 上通过同一 `.github/workflows/staging.yml` 完成部署；`phase=deploy` 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同，禁止新发布脚本与旧镜像混用：
 
-1. `phase=provision`，candidate 输入完整 SHA，confirmation 输入 `DEPLOY_670661_TO_VOLCENGINE_STAGING`。该阶段只创建审查过的隔离基础设施，SSH 保持关闭，不准备 secret bundle、不迁移数据库、不启动应用；
-2. provision 成功且 RDS SSL 已启用后，从新建实例下载当前 CA PEM，base64 后写入 `WP08_RDS_CA_PEM_B64`。不得复用旧实例或旧服务器上的 CA；
-3. `phase=deploy`，使用相同 candidate 与 confirmation。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
+2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
+3. `phase=deploy` 使用新绑定的完整 candidate 与匹配确认词。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
 ## 5. 部署顺序与证据
 
-Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → PII-free seed → Web/API/Worker/edge → TLS/route → VPC API 撤销精确 SSH 规则。
+Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行候选源码 Web 合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → PII-free seed → API/Worker → Web `/health/ready` → edge/TLS → 匿名 `/ops = 401` → VPC API 撤销精确 SSH 规则。
 
 三镜像必须使用 WP-07 已核验 digest，不能只用 tag。公开证据只记录 GitHub run ID、候选 SHA、门禁结果和非敏感资源类别；账号 ID、IP、DNS zone ID、RDS/TOS endpoint、SSH fingerprint、ACL 明细和截图只进入 `evidence/private/wp08` 或 90 天受控外部证据。
 

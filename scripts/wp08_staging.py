@@ -23,6 +23,10 @@ INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
+WEB_READINESS_ROUTE = (
+    ROOT / "apps" / "web" / "src" / "app" / "health" / "ready" / "route.ts"
+)
+WEB_PROXY = ROOT / "apps" / "web" / "src" / "proxy.ts"
 PRIVATE_EVIDENCE = ROOT / "evidence" / "private" / "wp08"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 EDGE_IMAGE = (
@@ -114,6 +118,10 @@ def validate_files() -> None:
         "deploy/staging/Caddyfile",
         "deploy/staging/grant_runtime.py",
         "deploy/staging/deploy.sh",
+        "apps/web/src/app/health/ready/route.ts",
+        "apps/web/src/lib/auth/cookies.ts",
+        "apps/web/src/proxy.ts",
+        "scripts/wp08_web_runtime_check.py",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
         "scripts/wp08_rds_network_audit.py",
@@ -154,6 +162,17 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
         raise StagingError("staging edge must use the verified project GHCR digest")
     if "image: caddy:" in compose or "docker.io/library/caddy" in compose:
         raise StagingError("staging edge must not pull Caddy from Docker Hub")
+    if "http://localhost:3000/health/ready" not in compose:
+        raise StagingError("staging Web healthcheck must use the readiness route")
+    if "http://localhost:3000/ops" in compose:
+        raise StagingError("staging Web healthcheck must not use an authenticated route")
+
+    readiness = WEB_READINESS_ROUTE.read_text()
+    if 'status: "ready"' not in readiness or '"Cache-Control": "no-store"' not in readiness:
+        raise StagingError("Web readiness route must be minimal and non-cacheable")
+    proxy = WEB_PROXY.read_text()
+    if 'code: "AUTH_REQUIRED"' not in proxy or "{ status: 401 }" not in proxy:
+        raise StagingError("anonymous /ops requests must fail closed with HTTP 401")
 
 
 def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
@@ -188,6 +207,12 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
             "staging deploy must validate Compose, pull all images, and verify "
             "container CA readability before database migration"
         )
+    first_release_cleanup = (
+        "WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE",
+        "docker compose down --remove-orphans",
+    )
+    if any(marker not in script for marker in first_release_cleanup):
+        raise StagingError("failed first deployment must stop partial application containers")
 
 
 def validate_infrastructure() -> None:
@@ -347,6 +372,14 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "terraform state pull | jq -er",
         'terraform apply -auto-approve "$plan_file"',
         '-var="deploy_cidr=127.0.0.1/32"',
+        "https://staging-vnext.muchenai.com/health/ready",
+        "https://staging-vnext.muchenai.com/ops",
+        "'%{http_code}'",
+        '= "401"',
+        'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
+        'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
+        'git show "$candidate:deploy/staging/compose.yaml"',
+        'git show "$candidate:apps/web/src/proxy.ts"',
     )
     for marker in required:
         if marker not in workflow:
@@ -357,6 +390,11 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow provision-only step count must be exactly 2")
     if workflow.count("if: inputs.phase == 'audit'") != 1:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
+    if (
+        workflow.count("git cat-file -e") != 1
+        or workflow.count('git show "$candidate:') != 2
+    ):
+        raise StagingError("deploy must verify the Web contract inside the candidate source")
     if workflow.count("scripts/wp08_plan_guard.py") != 1:
         raise StagingError("every WP-08 apply path must have one destructive-plan guard")
     if workflow.count("scripts/wp08_dns_record.py") != 1:

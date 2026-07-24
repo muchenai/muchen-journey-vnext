@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { SESSION_COOKIE } from "@/lib/auth/cookies";
+
+function withContentSecurityPolicy(response: NextResponse, policy: string) {
+  response.headers.set("Content-Security-Policy", policy);
+  return response;
+}
+
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
@@ -20,9 +27,20 @@ export function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+
+  const isOpsRoute =
+    request.nextUrl.pathname === "/ops" || request.nextUrl.pathname.startsWith("/ops/");
+  if (isOpsRoute && !request.cookies.get(SESSION_COOKIE)?.value) {
+    const response = NextResponse.json(
+      { error: { code: "AUTH_REQUIRED", message: "Authentication required." } },
+      { status: 401 },
+    );
+    response.headers.set("Cache-Control", "no-store");
+    return withContentSecurityPolicy(response, policy);
+  }
+
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set("Content-Security-Policy", policy);
-  return response;
+  return withContentSecurityPolicy(response, policy);
 }
 
 export const config = {
