@@ -1,8 +1,8 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
 日期：2026-07-25
-状态：`ALPHA_PILOT_CA_READABILITY_FIX_READY`
-候选：`670661865f708a835997596ed5b74904809564a5`
+状态：`ALPHA_PILOT_WEB_READINESS_FIX_READY / NO_DEPLOY_CANDIDATE`
+历史候选：`670661865f708a835997596ed5b74904809564a5`（不得承载本次 Web 修复）
 整体发布：`NO_GO`
 
 ## 已关闭
@@ -30,6 +30,10 @@
 - 用户精确授权后，主任务已在华北2（北京）对同一 AllowList 执行一次控制台“同步安全组”。控制台差异只把当前安全组关联 ECS 的主网卡 IP 纳入既有绑定，没有新增/删除 AllowList、实例、安全组或网络规则；同步后的只读详情已显示相同安全组、相同 `AssociateEcsIp` 模式和非空派生 IP。
 - 随后唯一只读 audit run `30067829879` 读取同一冻结 state；AllowList、安全组绑定、派生 IP、实例关联和 VPC 均已匹配，但 `AssociatedInstances[].IsLatest=false`，因此仍 fail closed。DNS、Terraform apply、SSH、数据库与 deploy 全部跳过，没有重试。火山引擎把“同步安全组”定义为取得最新安全组 IP，并用 `IsLatest` 表示最新白名单是否已同步到实例；这说明 IP 缺口已关闭，但实例侧传播尚未被证实，不能据此部署。
 - 现有 audit 只在控制台确认后的数秒内读取一次详情，不能区分异步传播窗口和持续失败。后续实现保留 `IsLatest=true` 硬门禁，同时在**同一次只读 audit** 内最多轮询 60 秒；任一结构、身份、IP、VPC 不一致立即失败，只有单独的 `IsLatest=false` 可等待，窗口耗尽仍失败。该修复不调用同步 API、不改变云资源，也不构成新的 audit 或 deploy 授权。官方参考：[同步安全组](https://docs.volcengine.com/docs/6438/1742797?lang=zh)、[DescribeAllowListDetail](https://docs.volcengine.com/docs/6438/1257389?lang=zh)。
+- 后续 deploy run `30116863700` 已越过 CA 门禁并建立 RDS TLS 连接，但因 `journey_next_migrator` 当时没有 `public` schema 的 ownership/`CREATE` 权限，在创建 Alembic version table 前停止；精确 schema ownership 修正后，唯一 deploy run [`30117658292`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30117658292) 已成功执行 `0001` 至 `0010` migration、runtime grant 与 seed，API 达到 healthy，SSH `/32` 已关闭。
+- run `30117658292` 的 Web 容器把需要身份的 `/ops` 当作 Compose healthcheck；staging 正确关闭 fixture identity 后，匿名探针被拒绝，Web 因而持续 unhealthy，edge/TLS 未启动。这是健康合同错误，不是数据库、网络或授权错误。首次部署没有 previous release 时，旧 rollback trap 也没有停止本轮已创建容器。
+- 修复新增不访问 API/数据库、返回当前 `APP_RELEASE` 且 `no-store` 的 `/health/ready`；Compose 与外部验证改用该路由，匿名 `/ops` 明确要求 HTTP 401；首次失败执行 `docker compose down --remove-orphans`，不删除卷。deploy 另从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同，防止新发布脚本与旧 Web 镜像混合发布。
+- 因本次修改 Web 源码，历史候选 `670661…` 的固定 Web digest 不含 readiness 路由，不能继续部署。PR 合入后必须从主线生成新候选、三镜像 digest 与候选 artifact，再通过独立候选绑定 PR 更新机器合同；在此之前 staging deployment、TLS、真实身份与真人 Alpha UAT 继续为 `NOT_RUN`，整体发布保持 `NO_GO`。
 
 ## 2026-07-22 路径设计时未发生（历史快照）
 

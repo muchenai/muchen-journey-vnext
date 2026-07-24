@@ -56,6 +56,7 @@ web-static:
 
 web-check: web-static
 	cd apps/web && npm run build
+	python3 scripts/wp08_web_runtime_check.py
 
 openapi-check:
 	docker compose run --rm --no-deps api python -c 'import json; from pathlib import Path; from journey_api.main import app; expected=json.loads(Path("contracts/openapi.json").read_text()); assert app.openapi() == expected, "runtime OpenAPI differs from contracts/openapi.json"'

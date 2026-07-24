@@ -56,6 +56,9 @@ rollback() {
   if [[ -n "$previous" && "$previous" != "$PWD" && -f "$previous/compose.yaml" ]]; then
     printf 'WP08_ROLLBACK=START previous=%s\n' "$previous" >&2
     (cd "$previous" && docker compose up -d --remove-orphans --wait) || true
+  else
+    printf 'WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE\n' >&2
+    docker compose down --remove-orphans || true
   fi
   exit "$code"
 }

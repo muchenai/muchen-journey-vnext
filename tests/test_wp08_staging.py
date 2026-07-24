@@ -207,6 +207,8 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api alembic upgrade head",
+                "WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE",
+                "docker compose down --remove-orphans",
             )
         )
     )
@@ -247,6 +249,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     with pytest.raises(staging.StagingError, match="preflight commands"):
         staging.validate_deploy_script(script)
 
+    script.write_text(valid.replace("docker compose down --remove-orphans", ""))
+    with pytest.raises(staging.StagingError, match="stop partial application containers"):
+        staging.validate_deploy_script(script)
+
 
 def test_edge_mirror_workflow_is_manual_and_digest_pinned(tmp_path: Path):
     workflow = tmp_path / "edge-mirror.yml"
@@ -269,10 +275,34 @@ def test_edge_mirror_workflow_is_manual_and_digest_pinned(tmp_path: Path):
         staging.validate_edge_mirror_workflow(workflow)
 
 
-def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path):
+def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypatch):
+    readiness = tmp_path / "route.ts"
+    readiness.write_text('status: "ready"\n"Cache-Control": "no-store"\n')
+    proxy = tmp_path / "proxy.ts"
+    proxy.write_text('code: "AUTH_REQUIRED"\n{ status: 401 }\n')
+    monkeypatch.setattr(staging, "WEB_READINESS_ROUTE", readiness)
+    monkeypatch.setattr(staging, "WEB_PROXY", proxy)
     compose = tmp_path / "compose.yaml"
-    compose.write_text(f"services:\n  edge:\n    image: {staging.EDGE_IMAGE}\n")
+    compose.write_text(
+        "services:\n"
+        "  web:\n"
+        "    healthcheck:\n"
+        "      test: http://localhost:3000/health/ready\n"
+        "  edge:\n"
+        f"    image: {staging.EDGE_IMAGE}\n"
+    )
     staging.validate_staging_compose(compose)
+
+    compose.write_text(
+        "services:\n"
+        "  web:\n"
+        "    healthcheck:\n"
+        "      test: http://localhost:3000/ops\n"
+        "  edge:\n"
+        f"    image: {staging.EDGE_IMAGE}\n"
+    )
+    with pytest.raises(staging.StagingError, match="readiness route"):
+        staging.validate_staging_compose(compose)
 
     compose.write_text(
         "services:\n  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
@@ -293,6 +323,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "          - deploy",
             "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
             "id: terraform_init",
+            'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
+            'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
+            'git show "$candidate:deploy/staging/compose.yaml"',
+            'git show "$candidate:apps/web/src/proxy.ts"',
             "      - name: Audit frozen ECS to RDS allowlist binding",
             "        if: inputs.phase == 'audit'",
             "terraform -chdir=infra/staging state pull >\"$state_file\"",
@@ -320,6 +354,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "if: inputs.phase == 'deploy'",
             "      - name: Verify external TLS and release surface",
             "if: inputs.phase == 'deploy'",
+            "https://staging-vnext.muchenai.com/health/ready",
+            "https://staging-vnext.muchenai.com/ops",
+            "'%{http_code}'",
+            '= "401"',
             "      - name: Close SSH ingress",
             "if: always() && inputs.phase == 'deploy' && steps.frozen_infrastructure.outputs.security_group_id != ''",
             "python3 -m scripts.wp08_security_group close",

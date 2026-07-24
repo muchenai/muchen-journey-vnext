@@ -2,11 +2,11 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-export type Role = "LEARNER" | "REVIEWER" | "OPERATOR";
+import { CSRF_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
-export const SESSION_COOKIE = "journey_next_session";
-export const JOIN_COOKIE = "journey_next_join";
-export const CSRF_COOKIE = "journey_next_csrf";
+export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
+
+export type Role = "LEARNER" | "REVIEWER" | "OPERATOR";
 
 export type CurrentAction = {
   action_type: string;
