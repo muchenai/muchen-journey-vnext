@@ -151,7 +151,9 @@ def prepare(output: Path, host: str, port: int) -> None:
         raise PrepareError("decoded RDS CA is not PEM")
     ca_path = secrets / "volcengine-rds-ca.pem"
     ca_path.write_bytes(ca_bytes)
-    ca_path.chmod(0o600)
+    # The CA certificate is public trust material and must be readable by the
+    # non-root API/worker user inside the bind-mounted container.
+    ca_path.chmod(0o444)
     write_env(
         output / ".deployment.env",
         {
@@ -160,9 +162,22 @@ def prepare(output: Path, host: str, port: int) -> None:
             **IMAGES,
         },
     )
-    for path in (*secrets.iterdir(), output / ".deployment.env"):
+    private_paths = (
+        secrets / "api.env",
+        secrets / "migration.env",
+        secrets / "worker.env",
+        secrets / "web.env",
+        secrets / "edge.env",
+        output / ".deployment.env",
+    )
+    expected_secret_paths = {*private_paths[:-1], ca_path}
+    if set(secrets.iterdir()) != expected_secret_paths:
+        raise PrepareError("deploy bundle contains an unexpected secret file")
+    for path in private_paths:
         if stat.S_IMODE(path.stat().st_mode) != 0o600:
             raise PrepareError(f"incorrect mode for {path.name}")
+    if stat.S_IMODE(ca_path.stat().st_mode) != 0o444:
+        raise PrepareError("incorrect mode for volcengine-rds-ca.pem")
     print(f"WP08_DEPLOY_BUNDLE=READY path={output} secret_files=6")
 
 

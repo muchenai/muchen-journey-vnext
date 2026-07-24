@@ -1,7 +1,7 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
-日期：2026-07-24
-状态：`ALPHA_PILOT_RDS_INSTANCE_SYNC_UNVERIFIED`
+日期：2026-07-25
+状态：`ALPHA_PILOT_CA_READABILITY_FIX_READY`
 候选：`670661865f708a835997596ed5b74904809564a5`
 整体发布：`NO_GO`
 
@@ -13,9 +13,9 @@
 - `wp08_staging.py` 将 provider/region/budget/candidate/origin 和同日报价设为 fail-closed 合同；
 - staging Worker 使用显式 `DISABLED` adapter，只跳过 notification event，保留真实进程/heartbeat，且 production/LOCAL_TEST 继续拒绝；
 - 候选三镜像部署引用固定为 WP-07 已核验 GHCR digest；Caddy 镜像固定 digest；
-- deploy bundle 的 secret 文件为 `0600`，私有目录为 `0700`，旧域名/旧部署标识和 `LOCAL_TEST` 被拒绝。
+- deploy bundle 的密码与环境文件为 `0600`，私有目录为 `0700`；公开 CA 信任证书为容器只读所需的 `0444`，旧域名/旧部署标识和 `LOCAL_TEST` 被拒绝。
 
-## 当前事实（2026-07-24）
+## 当前事实（2026-07-25）
 
 - 独立 staging 项目中的部分 IAM、VPC、安全组、ECS、RDS/TOS 与 DNS 资源已由唯一受审 workflow 创建或纳管；资源和 remote state 的逐项事实以私有证据为准，公开仓库不记录账号、资源 ID、endpoint、IP、凭据或人员信息；
 - 第二次 provision run `29945430858` 在无 destroy/replacement 的门禁通过后停止；RDS AllowList 与 DNS 查询权限的代码侧修复已由 PR #17 合并到主线 `1791ea6d89a290cf4ff41e5c4a9e27fb64d7213c`，required check 通过；
@@ -192,3 +192,11 @@
 - DNS reconcile 与 Terraform plan/apply 按 deploy phase 跳过。四个 GHCR 镜像全部拉取成功，已知 Docker Hub 阻塞关闭；Compose 创建了 release network 和空附件 volume，随后第一次 Alembic 连接 RDS 即以 `psycopg ConnectionTimeout` 停止；
 - 未观察到 migration 执行、runtime grant、seed、应用容器启动、部署成功标记、TLS 或 browser smoke。本次 release 目录、缓存镜像、Compose network 和空附件 volume 可能保留在 ECS，清理或复用需要新的受控操作；
 - `always()` 清理输出 `WP08_SSH_INGRESS=CLOSED`，运行后没有活动 staging run。当前必须先只读核验 ECS 与 RDS 的 VPC/子网、私网 endpoint、有效 AllowList/安全组绑定及 TCP 5432 路径；不得把连接超时误判为凭据或 TLS 错误，也不得自动重试 deploy。真实身份、真人 UAT 与 WP-09 继续为 `NOT_RUN`，整体发布继续为 `NO_GO`。
+
+## 2026-07-25 人工网络核验与 CA 容器权限修复
+
+- 主任务在火山引擎控制台只读核验现有 staging 资源：AllowList 的派生 IP、活动安全组、RDS 实例与 VPC 均一致；该 IP 与 staging ECS 主网卡一致。RDS 公网地址为空，SSL、强制加密与 TLS 1.2/1.3 已启用；活动安全组的 SSH 关闭态仍只允许 loopback `/32`，公网仅保留 80/443。公开证据不记录 IP、资源 ID 或 endpoint；
+- 用户授权“人工核验 + 现有资源最小部署”后，只触发一次 `phase=deploy`：run [`30109954801`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30109954801)，workflow HEAD `08f6b728f6f03e15ac53d78272db29ff1c7e85e7`，候选仍为 `670661865f708a835997596ed5b74904809564a5`；没有重试；
+- `audit`、DNS reconcile 与 Terraform plan/apply 按 phase 跳过；冻结 state、精确 runner `/32`、私有 bundle 与四个 GHCR 镜像拉取均通过。首次 Alembic 连接前，非 root API 容器无法读取 `/run/secrets/volcengine-rds-ca.pem`，因此未建立数据库连接、未执行 migration、runtime grant、seed、应用启动或 TLS smoke；`always()` 输出 `WP08_SSH_INGRESS=CLOSED`；
+- 根因是公开 CA 证书与密码文件共用 root-only `0600` 策略，而 API/Worker 镜像固定以 UID 10001 运行。修复仅把 CA 文件设为只读 `0444`，密码、环境文件和部署元数据继续为 `0600`；镜像、候选、IAM、网络、RDS 和 Terraform 均不改变；
+- 发布脚本在镜像 pull 后、migration 前增加真实 API 容器 CA 读取检查。定向测试 15 项、完整 API/迁移测试 126 项、workflow、traceability、isolation、gitleaks 与 UID 10001 容器读取复验均通过。本节只代表修复就绪；新的 deploy 仍需在修复合入受保护主线后取得独立授权，当前 deployment、TLS、真实身份与真人 UAT 继续为 `NOT_RUN`，整体发布继续为 `NO_GO`。
