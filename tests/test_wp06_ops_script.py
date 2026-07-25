@@ -1,9 +1,16 @@
 import copy
+import json
 
 import pytest
 
 import scripts.wp06_ops as ops
-from scripts.wp06_ops import EXTERNAL_BLOCKERS, OpsError, alert_decisions, evaluate_release_gate
+from scripts.wp06_ops import (
+    EXTERNAL_BLOCKERS,
+    OpsError,
+    alert_decisions,
+    evaluate_release_gate,
+    release_gate,
+)
 
 
 def evidence(status: str = "PASS") -> dict[str, object]:
@@ -41,6 +48,16 @@ def test_release_gate_requires_strict_known_schema_and_preserves_external_blocke
     unknown["checks"]["invented_approval"] = "PASS"  # type: ignore[index]
     with pytest.raises(OpsError):
         evaluate_release_gate(unknown)
+
+
+def test_expect_no_go_allows_completed_external_checks_while_other_blockers_remain(tmp_path):
+    document = evidence("PASS")
+    document["checks"]["real_human_uat"] = "NOT_RUN"  # type: ignore[index]
+    document["checks"]["physical_acl_validation"] = "FAIL"  # type: ignore[index]
+    path = tmp_path / "release-gate.json"
+    path.write_text(json.dumps(document))
+
+    assert release_gate(path, expect_no_go=True) == 0
 
 
 def test_alert_policy_detects_worker_queue_and_revision_failures():

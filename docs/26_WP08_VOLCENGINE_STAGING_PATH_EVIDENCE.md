@@ -1,9 +1,9 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
 日期：2026-07-25
-状态：`ALPHA_PILOT_CSP_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`
+状态：`ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`
 当前候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`
-已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）；`dad44cc679184a1978b0f69e3632cb95de7f1b8e`（唯一 deploy 已落地但浏览器复验失败，禁止重试）
+已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）；`dad44cc679184a1978b0f69e3632cb95de7f1b8e`（唯一 deploy 已落地但浏览器复验失败，禁止重试）；`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`（唯一 deploy 成功，授权已消费）
 历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
 整体发布：`NO_GO`
 
@@ -38,6 +38,14 @@
 - PR #39 已通过 required check 并合入受保护主线 `d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`。Mainline Candidate Gate [`30120441674`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30120441674) 完成完整 CI、候选打包、三镜像 SBOM、GHCR push 与远端 digest 验证；canonical artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`。
 - 新候选固定摘要为 API `sha256:b51fc66a…368ab`、Web `sha256:c6b26024…7f631`、Worker `sha256:979cbfa5…2b75a`。机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词同步绑定；旧候选 `670661…` 不能再进入 deploy。
 - 本轮用户授权范围是生成候选、镜像摘要和候选绑定 PR，不包含 staging deploy。绑定 PR 合入前不得 dispatch；合入后仍需一次新的、指名完整候选与 `phase=deploy` 的明确授权。staging TLS、真实身份与真人 Alpha UAT 继续为 `NOT_RUN`，整体发布保持 `NO_GO`。
+
+## 2026-07-25 14c9ba0 候选成功部署与运行面复验
+
+- 用户精确授权候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa` 基于主线 `73cf07f2ec6849036611cd2ba75772b7f94da5de`，在华北2（北京）冻结基础设施上只执行一次 `phase=deploy`。唯一 run [`30161121353`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30161121353) 成功，没有重试；
+- 候选/artifact/四镜像固定摘要、冻结 state、精确 runner `/32`、私有 bundle、RDS TLS migration、runtime grant、PII-free seed、API/Web/Worker/Edge 健康、外部 TLS/readiness、匿名 `/ops = 401` 全部通过；`always()` 输出 `WP08_SSH_INGRESS=CLOSED`；
+- 真实 Chromium 随后在 1440/768/390 三档视口复验公开根页：无 console error/warning、无水平 overflow、hydration 与键盘焦点正常；受保护 `/ops` 匿名访问仍为 401，readiness 返回精确 release 且 `no-store`；
+- 部署证明 Alpha staging 运行面及 ECS→RDS 实际 TLS 路径可用。但随后唯一只读 audit run [`30162196135`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30162196135) 在 AllowList 结构、精确安全组/IP、实例和 VPC 均匹配后，因 API 响应未返回可用的 `IsLatest` 字段而 fail closed；该 run 没有部署或云写入，不重试；
+- 本记录不把缺失字段篡改为 `true`，也不把它误判为已证实的网络故障。当前决策是停止继续修补 provider/audit 路径，将其作为正式发布前必须关闭的物理 ACL 证据债；阶段结论为 `ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`，不是 `STAGING_ISOLATION_VERIFIED`，整体发布继续 `NO_GO`。
 
 ## 2026-07-22 路径设计时未发生（历史快照）
 
