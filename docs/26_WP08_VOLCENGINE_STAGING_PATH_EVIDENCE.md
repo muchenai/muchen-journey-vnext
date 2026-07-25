@@ -207,3 +207,12 @@
 - `audit`、DNS reconcile 与 Terraform plan/apply 按 phase 跳过；冻结 state、精确 runner `/32`、私有 bundle 与四个 GHCR 镜像拉取均通过。首次 Alembic 连接前，非 root API 容器无法读取 `/run/secrets/volcengine-rds-ca.pem`，因此未建立数据库连接、未执行 migration、runtime grant、seed、应用启动或 TLS smoke；`always()` 输出 `WP08_SSH_INGRESS=CLOSED`；
 - 根因是公开 CA 证书与密码文件共用 root-only `0600` 策略，而 API/Worker 镜像固定以 UID 10001 运行。修复仅把 CA 文件设为只读 `0444`，密码、环境文件和部署元数据继续为 `0600`；镜像、候选、IAM、网络、RDS 和 Terraform 均不改变；
 - 发布脚本在镜像 pull 后、migration 前增加真实 API 容器 CA 读取检查。定向测试 15 项、完整 API/迁移测试 126 项、workflow、traceability、isolation、gitleaks 与 UID 10001 容器读取复验均通过。本节只代表修复就绪；新的 deploy 仍需在修复合入受保护主线后取得独立授权，当前 deployment、TLS、真实身份与真人 UAT 继续为 `NOT_RUN`，整体发布继续为 `NO_GO`。
+
+## 2026-07-25 d407 候选 Deploy 与 Worker 配置边界
+
+- PR #40 已把候选 `d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`、canonical artifact run `30120441674` 与三项 registry digest 原子绑定到受保护主线 `82cac3b771a48985a4f5d7195aabdaef9b1f274e`；PR required check 与合入后 Mainline Candidate Gate `30122196338` 均通过；
+- 用户精确授权后只派发一次 `phase=deploy`：run [`30138363837`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30138363837)，没有重试。候选合同、artifact、预算、冻结 TOS state、四个 GHCR 镜像、CA 容器读取、migration `0010`、runtime grant、合成 seed、API 与 Web health 均通过；DNS、Terraform plan/apply/import 和 CloudControl 按 deploy phase 跳过；
+- Worker 容器在写 heartbeat 前退出，Compose 因而将其判为 unhealthy；外部 TLS 步骤未执行。首次发布失败清理移除了 API/Web/Worker/Edge 容器与 release network，`always()` 输出 `WP08_SSH_INGRESS=CLOSED`，没有遗留 runner SSH 放行；
+- 本地使用同一 staging 配置复现：Worker 导入 `journey_api.db` 时会加载完整 API `Settings`，而最小权限 `worker.env` 不含 `SESSION_SECRET`、`INVITE_SECRET`、`IMPORT_SIGNING_KEY`，因此在数据库连接和 heartbeat 之前被 API secret 校验拒绝；
+- 修复不把三个无关高权限 secret 扩散给 Worker。数据库层改用只含 `DATABASE_URL` 的 `DatabaseSettings`；API 入口继续加载完整 `Settings` 并在 staging 缺少独立身份 secret 时 fail closed。新的子进程测试同时锁定这两个边界，真实 `APP_ENV=staging` + `NOTIFICATION_ADAPTER=DISABLED` Worker 启动路径已在本地 PostgreSQL 通过；
+- 本次 `d407…` 部署授权已消费且禁止重试。修复必须经 PR、主线 Candidate Gate、新候选与新的候选绑定后，才可另行申请一次 staging deploy。当前状态为 `ALPHA_PILOT_WORKER_CONFIG_FIX_PENDING_CANDIDATE`；WP-09、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。

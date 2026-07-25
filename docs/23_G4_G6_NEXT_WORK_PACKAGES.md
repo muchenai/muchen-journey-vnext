@@ -137,7 +137,7 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 2026-07-22 用户进一步锁定火山引擎、华北2（北京）`cn-beijing`、按量计费、独立 IAM/VPC/SG/ECS/RDS/TOS/staging 域名。首次 ¥500/月尝试因成本超限停止；用户随后将预算提高为 ¥800/月并保留托管 RDS，完成 Next.js 16.2.11 / sharp 0.35.3 安全修复。主线候选 `670661865f708a835997596ed5b74904809564a5` 的 CI、候选打包和 GHCR digest 均通过，并获精确创建与部署授权；同日刷新后的月预测为 ¥656.26，距上限余 ¥143.74。
 
-截至 2026-07-24，独立 staging 基础资源、RDS CA 和 remote state 已收敛。受控 mirror run `30063385826` 已把固定 Caddy 源 digest 复制到项目 GHCR 并验证目标 digest，Compose 已固定该目标。唯一 deploy run `30063847635` 成功拉取四个 GHCR 镜像，但第一次 Alembic 连接 RDS 时超时；migration、runtime grant、seed、应用容器和 TLS 均未执行，SSH 已关闭且没有重试。只读 run `30066942906` 发现目标 `AssociateEcsIp` 绑定的有效 `IpList` 缺失；获得精确授权后执行的一次控制台同步已使派生 IP 出现。随后唯一 audit run `30067829879` 证明 AllowList、绑定、IP、实例和 VPC 匹配，但实例 `IsLatest=false`，所有部署步骤跳过且没有重试。当前状态为 `ALPHA_PILOT_RDS_INSTANCE_SYNC_UNVERIFIED`；审计将保留 `IsLatest=true` 硬门禁并在单次只读执行内做最多 60 秒有界等待，只有新的明确授权才可再次运行 audit，deploy 仍需另行授权。真实身份、真人 UAT 与 WP-09 不得提前启动或转绿。
+截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛，RDS 网络/CA、migration、runtime grant、seed、API 与 Web health 均已有物理证据。候选 `d407b5f…` 的唯一 deploy run `30138363837` 在 Worker 启动阶段失败：Worker 的数据库模块错误加载完整 API Settings，而最小权限 `worker.env` 不持有 Session/Invite/Import secret；首次失败容器清理和 SSH 撤销均通过，外部 TLS 未运行且没有重试。修复保持最小权限，把数据库设置与 API 身份设置解耦，并以 staging Worker 正向、API 缺 secret 负向子进程测试锁定。当前状态为 `ALPHA_PILOT_WORKER_CONFIG_FIX_PENDING_CANDIDATE`；必须先通过 PR、主线门禁、新候选及绑定，再另行取得精确 deploy 授权。真实身份、真人 UAT 与 WP-09 不得提前启动或转绿。
 
 ### 交付物
 

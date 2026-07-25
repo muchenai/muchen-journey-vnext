@@ -5,6 +5,21 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
+class DatabaseSettings(BaseSettings):
+    """Configuration shared by API and worker database clients only.
+
+    Keeping this narrow prevents the worker from needing API identity and import
+    secrets merely to construct its SQLAlchemy engine.
+    """
+
+    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+
+    database_url: str = (
+        "postgresql+psycopg://journey_next:journey_next_dev@"
+        "localhost:5432/journey_next_dev"
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
@@ -74,3 +89,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+@lru_cache
+def get_database_settings() -> DatabaseSettings:
+    return DatabaseSettings()
