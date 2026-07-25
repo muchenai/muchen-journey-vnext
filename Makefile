@@ -73,7 +73,7 @@ secret-scan:
 	docker run --rm -v "$(CURDIR):/repo:ro" $(WP07_GITLEAKS_IMAGE) dir /repo --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1
 
 dependency-audit:
-	cd apps/web && npm audit --audit-level=low
+	python3 scripts/web_dependency_audit.py
 	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off -r /src/requirements.lock'
 
 ci-fast:

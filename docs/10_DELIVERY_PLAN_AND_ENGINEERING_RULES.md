@@ -106,6 +106,7 @@
 5. **Ops Greenfield 兼容**：每个工作包开工和收尾分别运行 `muchen-journey-ops` V0.3+ 的 `doctor` 与适用的 `status/gates`；必须识别 `greenfield-vnext`，并诚实保留候选不一致、`NOT_RUN` 和 `NO_GO`。不得复制旧 P1 marker、Make target 或 runbook 绕过识别，也不得建立第二套部署路径。
 6. **Public 仓库证据边界**：Public Git 只保存非敏感资源代号、状态、不可逆哈希和私有证据引用；真实人员/名册、tenant/app ID、未公开域名/IP、ACL 明细、secret 路径内容、运行截图和业务数据进入访问受控的私有证据存储。开工前明确私有证据位置、Owner、访问范围、保留期和公开引用格式；提交前运行 secret/PII 扫描。
 7. **IaC 破坏性计划门禁**：所有 staging `terraform apply` 必须消费同一次生成、机器解析并通过的 saved plan；JSON plan 中任一资源动作包含 `delete`（包括 `delete/create` 与 `create/delete` 两种 replacement）立即停止，不得 apply、自动重试或通过关闭 deletion protection 绕过。plan JSON 只允许在 CI 内存/临时目录处理，不进入 Git、artifact 或日志。
+8. **依赖例外必须机器化且到期**：dependency audit 的网络/解析错误始终 fail closed。若上游尚无兼容修复，只允许按 advisory URL 精确登记、证明所有受影响 lockfile 节点均为 dev-only、设置不超过 45 天的到期日并保留真实 lint/build 兼容复验；任何新 advisory、production 节点、范围扩大或到期立即阻断。禁止使用 `--omit=dev`、降低全局 severity 或宽泛 ignore 隐藏未知漏洞。
 
 ### 耗时口径与 WP-01 回写
 
