@@ -13,9 +13,9 @@
     "local_alert_and_rollback_drills": "PASS",
     "real_human_uat": "NOT_RUN",
     "real_external_notification": "NOT_RUN",
-    "staging_validation": "NOT_RUN",
+    "staging_validation": "PASS",
     "production_preflight": "NOT_RUN",
-    "physical_acl_validation": "NOT_RUN",
+    "physical_acl_validation": "FAIL",
     "off_host_backup_restore": "NOT_RUN",
     "release_approvals": "NOT_RUN",
     "real_observation_window": "NOT_RUN"

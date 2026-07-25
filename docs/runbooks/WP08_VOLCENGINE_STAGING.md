@@ -71,11 +71,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 锁定修复候选 `14c9ba0…`，并拒绝已消费的 `dad44cc…` 与 `d407…`；绑定只描述部署合同，不构成 deploy 授权。候选绑定 PR 合入受保护主线后，仍须取得指名完整 SHA、届时绑定主线与 `phase=deploy` 的明确授权，才可通过同一 `.github/workflows/staging.yml` 执行。workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播与动态渲染合同：
+当前 workflow/config 锁定修复候选 `14c9ba0…`，并拒绝早期已消费的 `dad44cc…` 与 `d407…`；绑定只描述部署合同，不构成 deploy 授权。`14c9ba0…` 的单次 deploy 授权已由 run `30161121353` 成功消费，不得以相同确认词重新 dispatch；任何后续部署都需新候选/主线绑定和当轮精确授权。workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播与动态渲染合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. `phase=deploy` 必须使用确认词 `DEPLOY_14C9BA0_TO_VOLCENGINE_STAGING`；已消费的 `DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING` 与 `DEPLOY_D407B5F_TO_VOLCENGINE_STAGING` 均不得复用。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. 历史 `phase=deploy` 确认词 `DEPLOY_14C9BA0_TO_VOLCENGINE_STAGING`、`DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING` 与 `DEPLOY_D407B5F_TO_VOLCENGINE_STAGING` 均已消费，不得复用。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 

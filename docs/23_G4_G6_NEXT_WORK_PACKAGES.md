@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。当前唯一活跃工作包为 WP-08；WP-09～WP-15 均未激活。外部权限、真人、时间窗口和生产写入仍须遵守各工作包的精确授权边界，计划批准不得替代这些授权。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。当前唯一活跃工作包仍为 WP-08；其 Alpha staging 运行面已验证，物理 ACL 证据仍有一项未关闭，WP-09～WP-15 尚未激活。外部权限、真人、时间窗口和生产写入仍须遵守各工作包的精确授权边界，计划批准不得替代这些授权。
 
 ## 1. 结论
 
@@ -137,7 +137,7 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 2026-07-22 用户进一步锁定火山引擎、华北2（北京）`cn-beijing`、按量计费、独立 IAM/VPC/SG/ECS/RDS/TOS/staging 域名。首次 ¥500/月尝试因成本超限停止；用户随后将预算提高为 ¥800/月并保留托管 RDS，完成 Next.js 16.2.11 / sharp 0.35.3 安全修复。主线候选 `670661865f708a835997596ed5b74904809564a5` 的 CI、候选打包和 GHCR digest 均通过，并获精确创建与部署授权；同日刷新后的月预测为 ¥656.26，距上限余 ¥143.74。
 
-截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛。候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e` 的唯一 deploy run `30157449832` 已实际部署，但发布后真实 Chromium 发现响应 CSP nonce 未进入 Next.js scripts，15 条 CSP 错误阻断 hydration。PR #43 已合入请求 CSP、动态渲染、每请求 nonce 与 canonical browser smoke 修复；Mainline Candidate Gate `30158877647` 为新候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa` 完成完整 CI、SBOM、GHCR push 与三摘要验证，机器合同已原子绑定且没有再次部署。当前状态为 `ALPHA_PILOT_CSP_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`；`dad44…` 禁止重试，新候选必须在绑定 PR 合入后另行取得精确 deploy 授权。真实身份、真人 UAT 与 WP-09 不得提前启动或转绿。
+截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛。唯一 deploy run `30161121353` 已在冻结基础设施上部署精确候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；migration/runtime grant/seed、API/Web/Worker/Edge、外部 TLS/readiness、匿名 `/ops = 401`、SSH 撤销和三档真实 Chromium smoke 均通过。当前状态为 `ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`；只读 audit `30162196135` 已确认 AllowList 的结构、IP、实例和 VPC 匹配，但火山引擎实际响应未返回 `IsLatest`。不重试 audit，不再修补当前 provider 路径；该缺口作为生产发布前必须关闭的证据债，WP-09 仍待 WP-08 退出词关闭后激活。
 
 ### 交付物
 
