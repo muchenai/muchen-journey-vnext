@@ -1,8 +1,8 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
 日期：2026-07-25
-状态：`ALPHA_PILOT_DEPLOYED / CSP_FIX_PENDING_CANDIDATE`
-当前候选：尚未生成
+状态：`ALPHA_PILOT_CSP_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`
+当前候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`
 已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）；`dad44cc679184a1978b0f69e3632cb95de7f1b8e`（唯一 deploy 已落地但浏览器复验失败，禁止重试）
 历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
 整体发布：`NO_GO`
@@ -232,3 +232,9 @@
 - 发布后真实 Chromium 打开公开 `/` 时返回 200 且存在可聚焦控件，但控制台出现 15 条 CSP 错误，Next.js framework/page scripts 因缺少匹配 nonce 被浏览器拒绝，页面未 hydration。根因是 proxy 只把 nonce 写入 `x-nonce` 与响应 CSP，没有把 CSP 传给 Next.js 请求头；RootLayout 同时可静态渲染，无法为每个请求给 framework scripts 注入 nonce；
 - 最小修复把同一 CSP 写入请求头，并以 `connection()` 强制请求时渲染；生产 runtime test 锁定 root 脚本 nonce 与响应 CSP 一致且每请求变化。canonical browser smoke 改为在公开 `/` 检查三档视口、console、overflow、focus/键盘，并单独对匿名 `/ops` 断言 401；本地隔离生产构建与真实 Chromium 已通过；
 - 当前 staging 仍运行 `dad44…`，因此只能记为“应用已部署、发布验证失败”，不是 `STAGING_ISOLATION_VERIFIED`。CSP 修复必须经 PR、主线 Candidate Gate、新候选和候选绑定后，再取得新的精确 deploy 授权；`dad44…` 禁止重试，WP-09、真实身份与真人 UAT 不得提前启动或转绿。
+
+## 2026-07-25 CSP 修复候选绑定
+
+- PR #43 已通过 required check 并以仓库允许的 squash 方式合入受保护主线 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；PR Fast Gate run `30158813946` 与 Mainline Candidate Gate [`30158877647`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30158877647) 均通过；
+- canonical artifact 未过期且标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`。修复候选固定摘要为 API `sha256:4f205e46…c949`、Web `sha256:ce05e4d4…8ff6`、Worker `sha256:25451ac5…48cc`；机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词 `DEPLOY_14C9BA0_TO_VOLCENGINE_STAGING` 原子绑定；
+- 本候选绑定不包含 staging dispatch、云资源写入或 `dad44…` 重试。只有绑定 PR 合入受保护主线后，才能另行取得指名完整候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`、届时绑定主线、冻结基础设施、失败不重试的精确 `phase=deploy` 授权；当前 staging 仍运行 `dad44…`，WP-09、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。

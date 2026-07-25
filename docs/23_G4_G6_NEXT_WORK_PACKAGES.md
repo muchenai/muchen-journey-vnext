@@ -137,7 +137,7 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 2026-07-22 用户进一步锁定火山引擎、华北2（北京）`cn-beijing`、按量计费、独立 IAM/VPC/SG/ECS/RDS/TOS/staging 域名。首次 ¥500/月尝试因成本超限停止；用户随后将预算提高为 ¥800/月并保留托管 RDS，完成 Next.js 16.2.11 / sharp 0.35.3 安全修复。主线候选 `670661865f708a835997596ed5b74904809564a5` 的 CI、候选打包和 GHCR digest 均通过，并获精确创建与部署授权；同日刷新后的月预测为 ¥656.26，距上限余 ¥143.74。
 
-截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛。候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e` 的唯一 deploy run `30157449832` 已实际部署：唯一 job 的 migration、runtime grant、seed、API、Worker、Web、Edge、TLS/readiness、匿名 `/ops = 401` 与 SSH 撤销全部成功，公开只读复验也通过；GitHub run 顶层 failure 与唯一 job success 的不一致保留为聚合异常。发布后真实 Chromium 发现响应 CSP nonce 未进入 Next.js scripts，15 条 CSP 错误阻断 hydration；本地最小修复已让请求 CSP、动态渲染、每请求 nonce 和 canonical browser smoke 通过。当前状态为 `ALPHA_PILOT_DEPLOYED / CSP_FIX_PENDING_CANDIDATE`；`dad44…` 授权已消费且禁止重试，必须经修复 PR、主线 Candidate Gate、新候选、绑定和新精确 deploy 授权。真实身份、真人 UAT 与 WP-09 不得提前启动或转绿。
+截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛。候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e` 的唯一 deploy run `30157449832` 已实际部署，但发布后真实 Chromium 发现响应 CSP nonce 未进入 Next.js scripts，15 条 CSP 错误阻断 hydration。PR #43 已合入请求 CSP、动态渲染、每请求 nonce 与 canonical browser smoke 修复；Mainline Candidate Gate `30158877647` 为新候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa` 完成完整 CI、SBOM、GHCR push 与三摘要验证，机器合同已原子绑定且没有再次部署。当前状态为 `ALPHA_PILOT_CSP_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`；`dad44…` 禁止重试，新候选必须在绑定 PR 合入后另行取得精确 deploy 授权。真实身份、真人 UAT 与 WP-09 不得提前启动或转绿。
 
 ### 交付物
 
