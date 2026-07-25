@@ -57,6 +57,13 @@ class JoinContextStatus(str, enum.Enum):
     REVOKED = "REVOKED"
 
 
+class IdentityLinkStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    CONSUMED = "CONSUMED"
+    REVOKED = "REVOKED"
+    EXPIRED = "EXPIRED"
+
+
 class AssignmentStatus(str, enum.Enum):
     AVAILABLE = "AVAILABLE"
     IN_PROGRESS = "IN_PROGRESS"
@@ -168,6 +175,8 @@ class ExternalIdentity(Base):
     provider: Mapped[str] = mapped_column(String(40))
     subject: Mapped[str] = mapped_column(String(180))
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revision: Mapped[int] = mapped_column(default=1)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Invite(Base):
@@ -214,6 +223,9 @@ class IdentitySession(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    external_identity_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("external_identities.id"), nullable=True, index=True
+    )
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     csrf_token_hash: Mapped[str] = mapped_column(String(64))
@@ -250,6 +262,46 @@ class AuthRateLimit(Base):
     subject_hash: Mapped[str] = mapped_column(String(64))
     window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(default=1)
+
+
+class ExternalIdentityLink(Base):
+    __tablename__ = "external_identity_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False))
+    provider: Mapped[str] = mapped_column(String(40))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    status: Mapped[IdentityLinkStatus] = mapped_column(
+        Enum(IdentityLinkStatus, native_enum=False), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OAuthLoginState(Base):
+    __tablename__ = "oauth_login_states"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40))
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    browser_token_hash: Mapped[str] = mapped_column(String(64))
+    identity_link_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("external_identity_links.id"), nullable=True, index=True
+    )
+    return_to: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class TaskDefinition(Base):

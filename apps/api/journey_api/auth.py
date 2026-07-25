@@ -5,14 +5,21 @@ from datetime import UTC, datetime
 from hmac import compare_digest
 
 from fastapi import Depends, Header, Request
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
-from journey_api.models import IdentitySession, Role, RoleAssignment, User, UserStatus
+from journey_api.models import (
+    ExternalIdentity,
+    IdentitySession,
+    Role,
+    RoleAssignment,
+    User,
+    UserStatus,
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +48,10 @@ def get_actor(
                 (RoleAssignment.user_id == IdentitySession.user_id)
                 & (RoleAssignment.role == IdentitySession.role),
             )
+            .outerjoin(
+                ExternalIdentity,
+                ExternalIdentity.id == IdentitySession.external_identity_id,
+            )
             .where(
                 IdentitySession.token_hash == token_hash,
                 IdentitySession.revoked_at.is_(None),
@@ -48,6 +59,15 @@ def get_actor(
                 User.status == UserStatus.ACTIVE,
                 User.organization_id == IdentitySession.organization_id,
                 RoleAssignment.organization_id == IdentitySession.organization_id,
+                or_(
+                    IdentitySession.external_identity_id.is_(None),
+                    and_(
+                        ExternalIdentity.revoked_at.is_(None),
+                        ExternalIdentity.user_id == IdentitySession.user_id,
+                        ExternalIdentity.organization_id
+                        == IdentitySession.organization_id,
+                    ),
+                ),
             )
         ).first()
         if row is None:

@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import ipaddress
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -16,6 +17,7 @@ from journey_api.models import AuditEntry, AuthRateLimit
 SESSION_COOKIE = "journey_next_session"
 JOIN_COOKIE = "journey_next_join"
 CSRF_COOKIE = "journey_next_csrf"
+OAUTH_COOKIE = "journey_next_oauth"
 
 
 def utc_now() -> datetime:
@@ -34,6 +36,14 @@ def derive_invite_token(
     *, secret: str, actor_id: uuid.UUID, idempotency_key: str, request_hash: str
 ) -> str:
     material = f"invite-create-v1:{actor_id}:{idempotency_key}:{request_hash}".encode()
+    digest = hmac.new(secret.encode(), material, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+
+def derive_identity_link_token(
+    *, secret: str, actor_id: uuid.UUID, idempotency_key: str, request_hash: str
+) -> str:
+    material = f"identity-link-create-v1:{actor_id}:{idempotency_key}:{request_hash}".encode()
     digest = hmac.new(secret.encode(), material, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
@@ -94,6 +104,28 @@ def clear_session_cookies(response: Response) -> None:
     response.delete_cookie(CSRF_COOKIE, path="/", secure=secure, httponly=False, samesite="lax")
 
 
+def set_oauth_cookie(response: Response, browser_token: str, max_age: int) -> None:
+    response.set_cookie(
+        OAUTH_COOKIE,
+        browser_token,
+        max_age=max_age,
+        path="/auth/feishu",
+        secure=cookie_secure(),
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def clear_oauth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        OAUTH_COOKIE,
+        path="/auth/feishu",
+        secure=cookie_secure(),
+        httponly=True,
+        samesite="lax",
+    )
+
+
 def add_audit(
     session,
     *,
@@ -121,17 +153,36 @@ def add_audit(
     )
 
 
-def enforce_invite_exchange_limit(request: Request) -> None:
-    settings = get_settings()
+def client_address(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
+    if forwarded:
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            pass
+    direct = request.client.host if request.client else "unknown"
+    try:
+        return str(ipaddress.ip_address(direct))
+    except ValueError:
+        return direct[:200] if direct else "unknown"
+
+
+def enforce_auth_limit(
+    request: Request,
+    *,
+    scope: str,
+    secret: str,
+    limit: int,
+    message: str,
+) -> None:
     now = utc_now()
     window_started = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
-    client_host = request.client.host if request.client else "unknown"
-    subject_hash = credential_hash(settings.invite_secret, "rate-limit-client", client_host)
+    subject_hash = credential_hash(secret, "rate-limit-client", client_address(request))
     statement = (
         insert(AuthRateLimit)
         .values(
             id=uuid.uuid4(),
-            scope="invite.exchange",
+            scope=scope,
             subject_hash=subject_hash,
             window_started_at=window_started,
             attempts=1,
@@ -144,12 +195,23 @@ def enforce_invite_exchange_limit(request: Request) -> None:
     )
     with SessionLocal.begin() as rate_session:
         attempts = rate_session.scalar(statement)
-    if attempts is not None and attempts > settings.invite_exchange_limit:
+    if attempts is not None and attempts > limit:
         retry_after = int((window_started + timedelta(minutes=5) - now).total_seconds()) + 1
         raise ApiError(
             429,
             "RATE_LIMITED",
-            "邀请验证尝试过多，请稍后再试。",
+            message,
             details={"retry_after_seconds": max(1, retry_after)},
             retryable=True,
         )
+
+
+def enforce_invite_exchange_limit(request: Request) -> None:
+    settings = get_settings()
+    enforce_auth_limit(
+        request,
+        scope="invite.exchange",
+        secret=settings.invite_secret,
+        limit=settings.invite_exchange_limit,
+        message="邀请验证尝试过多，请稍后再试。",
+    )

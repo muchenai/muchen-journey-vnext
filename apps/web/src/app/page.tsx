@@ -1,6 +1,18 @@
 import Link from "next/link";
 
-export default function Home() {
+const AUTH_ERRORS: Record<string, string> = {
+  IDENTITY_NOT_LINKED: "该飞书身份尚未获得访问权限，请联系运营获取一次性绑定链接。",
+  IDENTITY_REVOKED: "该飞书身份已撤销，请联系运营确认权限。",
+  IDENTITY_PROVIDER_DISABLED: "飞书登录尚未完成环境配置。",
+  IDENTITY_PROVIDER_UNAVAILABLE: "飞书登录暂时不可用，请稍后重新开始。",
+};
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ auth_error?: string }>;
+}) {
+  const authError = (await searchParams).auth_error;
   return (
     <section className="hero">
       <p className="eyebrow">探索营 · P0</p>
@@ -15,16 +27,21 @@ export default function Home() {
         <Link className="button secondary" href="/app">
           已加入，进入当前行动
         </Link>
-        <Link className="button secondary" href="/review">
-          进入主管评审
+        <Link className="button secondary" href="/auth/feishu?return_to=%2Freview">
+          飞书登录进入主管评审
         </Link>
-        <Link className="button secondary" href="/ops">
-          查看本地运营状态
+        <Link className="button secondary" href="/auth/feishu?return_to=%2Fops">
+          飞书登录进入运营
         </Link>
       </div>
+      {authError ? (
+        <p className="inline-error" role="alert">
+          {AUTH_ERRORS[authError] ?? "身份登录没有完成，请重新开始或联系运营。"}
+        </p>
+      ) : null}
       <aside className="notice" aria-label="环境说明">
-        已启用 vNext 邀请与独立会话；local/test 仍保留显式 fixture 供 walking skeleton 验证。
-        真人 UAT、真实外部通知与物理发布证据尚未运行；发布门禁保持 NO_GO。
+        Alpha 试点仅限受邀参与者。新人使用邀请加入；主管和运营使用飞书登录。
+        如无法进入，请联系试点运营。
       </aside>
     </section>
   );

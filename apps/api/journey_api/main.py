@@ -12,6 +12,7 @@ from journey_api.errors import ApiError
 from journey_api.identity_routes import router as identity_router
 from journey_api.outcome_routes import router as outcome_router
 from journey_api.ops_routes import router as ops_router
+from journey_api.oauth_routes import router as oauth_router
 from journey_api.review_routes import router as review_router
 from journey_api.routes import router
 from journey_api.submission_routes import router as submission_router
@@ -87,3 +88,4 @@ app.include_router(identity_router)
 app.include_router(review_router)
 app.include_router(outcome_router)
 app.include_router(ops_router)
+app.include_router(oauth_router)

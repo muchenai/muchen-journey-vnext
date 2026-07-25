@@ -311,6 +311,9 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
     monkeypatch.setattr(staging, "WEB_READINESS_ROUTE", readiness)
     monkeypatch.setattr(staging, "WEB_PROXY", proxy)
     monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
+    caddyfile = tmp_path / "Caddyfile"
+    caddyfile.write_text("log_skip /auth/feishu*\n")
+    monkeypatch.setattr(staging, "STAGING_CADDYFILE", caddyfile)
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
@@ -350,6 +353,9 @@ def test_staging_web_requires_dynamic_per_request_csp_nonce(tmp_path: Path, monk
     monkeypatch.setattr(staging, "WEB_READINESS_ROUTE", readiness)
     monkeypatch.setattr(staging, "WEB_PROXY", proxy)
     monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
+    caddyfile = tmp_path / "Caddyfile"
+    caddyfile.write_text("log_skip /auth/feishu*\n")
+    monkeypatch.setattr(staging, "STAGING_CADDYFILE", caddyfile)
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"

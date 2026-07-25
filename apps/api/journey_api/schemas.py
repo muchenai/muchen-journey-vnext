@@ -297,6 +297,68 @@ class IdentityConfirmResponse(StrictModel):
     request_id: str
 
 
+class CreateIdentityLinkCommand(StrictModel):
+    target_user_id: UUID
+    role: Literal["REVIEWER", "OPERATOR"]
+    expires_in_minutes: int = Field(default=30, ge=5, le=60)
+
+
+class IdentityLinkOut(StrictModel):
+    id: UUID
+    target_user_id: UUID
+    role: Literal["REVIEWER", "OPERATOR"]
+    status: str
+    expires_at: datetime
+    revision: int
+    link_token: str
+    start_path: str
+    idempotency_replay: bool = False
+
+
+class IdentityLinkResponse(StrictModel):
+    data: IdentityLinkOut
+    request_id: str
+
+
+class RevokeIdentityLinkCommand(RevisionCommand):
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class RevokeExternalIdentityCommand(RevisionCommand):
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class OAuthStartCommand(StrictModel):
+    return_to: Literal["/review", "/ops"]
+    link_token: str | None = Field(default=None, min_length=32, max_length=256)
+
+
+class OAuthStartOut(StrictModel):
+    authorization_url: str
+    expires_at: datetime
+
+
+class OAuthStartResponse(StrictModel):
+    data: OAuthStartOut
+    request_id: str
+
+
+class OAuthCallbackCommand(StrictModel):
+    code: str = Field(min_length=1, max_length=512)
+    state: str = Field(min_length=32, max_length=256)
+
+
+class OAuthCallbackOut(StrictModel):
+    safe_entry: Literal["/review", "/ops"]
+    expires_at: datetime
+    csrf_token: str
+
+
+class OAuthCallbackResponse(StrictModel):
+    data: OAuthCallbackOut
+    request_id: str
+
+
 class SessionOut(StrictModel):
     user_id: UUID
     organization_id: UUID

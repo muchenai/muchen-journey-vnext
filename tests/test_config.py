@@ -19,6 +19,11 @@ def test_nonlocal_identity_requires_distinct_vnext_secrets():
             session_secret="same-secret-value-that-is-long-enough-12345",
             invite_secret="same-secret-value-that-is-long-enough-12345",
             import_signing_key="staging-import-signing-key-example-123456",
+            identity_subject_secret="staging-identity-subject-key-example-123456",
+            feishu_oauth_enabled=True,
+            feishu_app_id="cli_staging",
+            feishu_app_secret="staging-feishu-secret-123",
+            feishu_oauth_redirect_uri="https://staging.example.test/auth/feishu/callback",
         )
     configured = Settings(
         app_env="production",
@@ -26,6 +31,11 @@ def test_nonlocal_identity_requires_distinct_vnext_secrets():
         session_secret="production-session-secret-example-123456",
         invite_secret="production-invite-secret-example-1234567",
         import_signing_key="production-import-signing-key-example-123456",
+        identity_subject_secret="production-identity-subject-key-example-123456",
+        feishu_oauth_enabled=True,
+        feishu_app_id="cli_production",
+        feishu_app_secret="production-feishu-secret-123",
+        feishu_oauth_redirect_uri="https://journey.example.test/auth/feishu/callback",
     )
     assert configured.allow_fixture_identity is False
 

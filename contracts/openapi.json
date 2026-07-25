@@ -534,6 +534,37 @@
         "title": "CompleteAttachmentCommand",
         "type": "object"
       },
+      "CreateIdentityLinkCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_minutes": {
+            "default": 30,
+            "maximum": 60.0,
+            "minimum": 5.0,
+            "title": "Expires In Minutes",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "REVIEWER",
+              "OPERATOR"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_user_id",
+          "role"
+        ],
+        "title": "CreateIdentityLinkCommand",
+        "type": "object"
+      },
       "CreateInviteCommand": {
         "additionalProperties": false,
         "properties": {
@@ -1209,6 +1240,85 @@
         "title": "IdentityConfirmResponse",
         "type": "object"
       },
+      "IdentityLinkOut": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_replay": {
+            "default": false,
+            "title": "Idempotency Replay",
+            "type": "boolean"
+          },
+          "link_token": {
+            "title": "Link Token",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "REVIEWER",
+              "OPERATOR"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "start_path": {
+            "title": "Start Path",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target_user_id",
+          "role",
+          "status",
+          "expires_at",
+          "revision",
+          "link_token",
+          "start_path"
+        ],
+        "title": "IdentityLinkOut",
+        "type": "object"
+      },
+      "IdentityLinkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IdentityLinkOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "IdentityLinkResponse",
+        "type": "object"
+      },
       "InviteListOut": {
         "additionalProperties": false,
         "properties": {
@@ -1447,6 +1557,145 @@
           "delivered_at"
         ],
         "title": "NotificationDeliveryOut",
+        "type": "object"
+      },
+      "OAuthCallbackCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "maxLength": 256,
+            "minLength": 32,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "OAuthCallbackCommand",
+        "type": "object"
+      },
+      "OAuthCallbackOut": {
+        "additionalProperties": false,
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "safe_entry": {
+            "enum": [
+              "/review",
+              "/ops"
+            ],
+            "title": "Safe Entry",
+            "type": "string"
+          }
+        },
+        "required": [
+          "safe_entry",
+          "expires_at",
+          "csrf_token"
+        ],
+        "title": "OAuthCallbackOut",
+        "type": "object"
+      },
+      "OAuthCallbackResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OAuthCallbackOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "OAuthCallbackResponse",
+        "type": "object"
+      },
+      "OAuthStartCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "link_token": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Token"
+          },
+          "return_to": {
+            "enum": [
+              "/review",
+              "/ops"
+            ],
+            "title": "Return To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "return_to"
+        ],
+        "title": "OAuthStartCommand",
+        "type": "object"
+      },
+      "OAuthStartOut": {
+        "additionalProperties": false,
+        "properties": {
+          "authorization_url": {
+            "title": "Authorization Url",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_url",
+          "expires_at"
+        ],
+        "title": "OAuthStartOut",
+        "type": "object"
+      },
+      "OAuthStartResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OAuthStartOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "OAuthStartResponse",
         "type": "object"
       },
       "PresignAttachmentCommand": {
@@ -2414,6 +2663,50 @@
           "expected_revision"
         ],
         "title": "RevisionCommand",
+        "type": "object"
+      },
+      "RevokeExternalIdentityCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "RevokeExternalIdentityCommand",
+        "type": "object"
+      },
+      "RevokeIdentityLinkCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "RevokeIdentityLinkCommand",
         "type": "object"
       },
       "RevokeInviteCommand": {
@@ -4021,6 +4314,82 @@
         "summary": "Download Attachment"
       }
     },
+    "/api/v1/auth/feishu/callback": {
+      "post": {
+        "operationId": "complete_feishu_oauth_api_v1_auth_feishu_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCallbackCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthCallbackResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Feishu Oauth"
+      }
+    },
+    "/api/v1/auth/feishu/start": {
+      "post": {
+        "operationId": "start_feishu_oauth_api_v1_auth_feishu_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthStartCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Feishu Oauth"
+      }
+    },
     "/api/v1/identity/confirm": {
       "post": {
         "operationId": "confirm_identity_api_v1_identity_confirm_post",
@@ -4955,6 +5324,221 @@
           }
         },
         "summary": "Assign Reviewer"
+      }
+    },
+    "/api/v1/ops/external-identities/{identity_id}/revoke": {
+      "post": {
+        "operationId": "revoke_external_identity_api_v1_ops_external_identities__identity_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeExternalIdentityCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke External Identity"
+      }
+    },
+    "/api/v1/ops/identity-links": {
+      "post": {
+        "operationId": "create_identity_link_api_v1_ops_identity_links_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdentityLinkCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Identity Link"
+      }
+    },
+    "/api/v1/ops/identity-links/{link_id}/revoke": {
+      "post": {
+        "operationId": "revoke_identity_link_api_v1_ops_identity_links__link_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeIdentityLinkCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Identity Link"
       }
     },
     "/api/v1/ops/invites": {

@@ -35,6 +35,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
+EXPECTED_MIGRATION_HEAD = "0011_wp09_feishu_identity"
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",
@@ -300,8 +301,8 @@ def migration_check() -> Path:
             "api", "alembic", "upgrade", "head",
         )
         upgraded = database_facts("db-test", database)
-        if upgraded["migration_revision"] != "0010_wp06_governance":
-            raise OpsError("persistent migration drill did not reach WP-06 head")
+        if upgraded["migration_revision"] != EXPECTED_MIGRATION_HEAD:
+            raise OpsError("persistent migration drill did not reach the current head")
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "alembic", "downgrade", "0009_notification_scope",
@@ -565,7 +566,7 @@ def alert_decisions(metrics: dict[str, Any]) -> list[str]:
         alerts.append("NOTIFICATION_DEAD")
     if metrics.get("api_release") != metrics.get("worker_release"):
         alerts.append("RELEASE_REVISION_MISMATCH")
-    if metrics.get("migration_revision") != "0010_wp06_governance":
+    if metrics.get("migration_revision") != EXPECTED_MIGRATION_HEAD:
         alerts.append("MIGRATION_REVISION_MISMATCH")
     return alerts
 
@@ -693,7 +694,7 @@ def alert_simulation() -> Path:
             "notification_dead": 0,
             "api_release": "candidate",
             "worker_release": "candidate",
-            "migration_revision": "0010_wp06_governance",
+            "migration_revision": EXPECTED_MIGRATION_HEAD,
         },
         "worker_and_queue_failure": {
             "worker_stale": True,

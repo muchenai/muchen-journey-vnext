@@ -26,6 +26,9 @@ SECRET_NAMES = (
     "WP08_SESSION_SECRET",
     "WP08_INVITE_SECRET",
     "WP08_IMPORT_SIGNING_KEY",
+    "WP09_IDENTITY_SUBJECT_SECRET",
+    "WP09_FEISHU_APP_ID",
+    "WP09_FEISHU_APP_SECRET",
     "WP08_RDS_CA_PEM_B64",
 )
 
@@ -49,17 +52,24 @@ def required_environment() -> dict[str, str]:
         values["WP08_SESSION_SECRET"],
         values["WP08_INVITE_SECRET"],
         values["WP08_IMPORT_SIGNING_KEY"],
+        values["WP09_IDENTITY_SUBJECT_SECRET"],
+        values["WP09_FEISHU_APP_SECRET"],
     }
-    if len(independent) != 5:
+    if len(independent) != 7:
         raise PrepareError("database and application secrets must all be independent")
     minimum_length_secrets = (
         "WP08_SESSION_SECRET",
         "WP08_INVITE_SECRET",
         "WP08_IMPORT_SIGNING_KEY",
+        "WP09_IDENTITY_SUBJECT_SECRET",
     )
     for name in minimum_length_secrets:
         if len(values[name]) < 32:
             raise PrepareError(f"{name} must contain at least 32 characters")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,100}", values["WP09_FEISHU_APP_ID"]):
+        raise PrepareError("WP09_FEISHU_APP_ID is invalid")
+    if len(values["WP09_FEISHU_APP_SECRET"]) < 16:
+        raise PrepareError("WP09_FEISHU_APP_SECRET must contain at least 16 characters")
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", values["WP08_ACME_EMAIL"]):
         raise PrepareError("WP08_ACME_EMAIL is invalid")
     return values
@@ -109,6 +119,11 @@ def prepare(output: Path, host: str, port: int) -> None:
         "SESSION_SECRET": values["WP08_SESSION_SECRET"],
         "INVITE_SECRET": values["WP08_INVITE_SECRET"],
         "IMPORT_SIGNING_KEY": values["WP08_IMPORT_SIGNING_KEY"],
+        "IDENTITY_SUBJECT_SECRET": values["WP09_IDENTITY_SUBJECT_SECRET"],
+        "FEISHU_OAUTH_ENABLED": "true",
+        "FEISHU_APP_ID": values["WP09_FEISHU_APP_ID"],
+        "FEISHU_APP_SECRET": values["WP09_FEISHU_APP_SECRET"],
+        "FEISHU_OAUTH_REDIRECT_URI": f"https://{STAGING_HOST}/auth/feishu/callback",
         "ATTACHMENT_STORAGE_ROOT": "/srv/journey-next-staging/attachments",
     }
     write_env(secrets / "api.env", {**shared_api, "DATABASE_URL": runtime_url})
