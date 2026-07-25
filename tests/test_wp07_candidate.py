@@ -16,8 +16,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0010_wp06_governance",
-        "revision_count": 10,
+        "head": "0011_wp09_feishu_identity",
+        "revision_count": 11,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 1)
@@ -87,15 +87,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0010_wp06_governance",
-        "revision_count": 10,
+        "head": "0011_wp09_feishu_identity",
+        "revision_count": 11,
     }
     assert config_schema() == 1
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0010_wp06_governance"
+    assert migration()["head"] == "0011_wp09_feishu_identity"
     assert config_schema() == 1
 
 

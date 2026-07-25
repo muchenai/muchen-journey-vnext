@@ -23,6 +23,7 @@ INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
+STAGING_CADDYFILE = ROOT / "deploy" / "staging" / "Caddyfile"
 WEB_READINESS_ROUTE = (
     ROOT / "apps" / "web" / "src" / "app" / "health" / "ready" / "route.ts"
 )
@@ -182,6 +183,8 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
         raise StagingError("staging Web healthcheck must use the readiness route")
     if "http://localhost:3000/ops" in compose:
         raise StagingError("staging Web healthcheck must not use an authenticated route")
+    if "log_skip /auth/feishu*" not in STAGING_CADDYFILE.read_text():
+        raise StagingError("staging edge must suppress OAuth callback query logs")
 
     readiness = WEB_READINESS_ROUTE.read_text()
     if 'status: "ready"' not in readiness or '"Cache-Control": "no-store"' not in readiness:

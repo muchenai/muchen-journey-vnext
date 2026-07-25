@@ -14,6 +14,9 @@ def configure(monkeypatch: pytest.MonkeyPatch) -> None:
         "WP08_SESSION_SECRET": "session-secret-independent-000000001",
         "WP08_INVITE_SECRET": "invite-secret-independent-0000000002",
         "WP08_IMPORT_SIGNING_KEY": "import-key-independent-00000000003",
+        "WP09_IDENTITY_SUBJECT_SECRET": "identity-subject-secret-independent-004",
+        "WP09_FEISHU_APP_ID": "cli_test_independent",
+        "WP09_FEISHU_APP_SECRET": "feishu-app-secret-independent-05",
         "WP08_RDS_CA_PEM_B64": base64.b64encode(
             b"-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"
         ).decode(),
@@ -39,6 +42,11 @@ def test_prepare_writes_private_independent_environment_files(
     assert stat.S_IMODE(ca_path.stat().st_mode) == 0o444
     assert "NOTIFICATION_ADAPTER=DISABLED" in (output / "secrets/worker.env").read_text()
     assert "ALLOW_FIXTURE_IDENTITY=false" in (output / "secrets/api.env").read_text()
+    assert "FEISHU_OAUTH_ENABLED=true" in (output / "secrets/api.env").read_text()
+    assert (
+        "FEISHU_OAUTH_REDIRECT_URI=https://staging-vnext.muchenai.com/auth/feishu/callback"
+        in (output / "secrets/api.env").read_text()
+    )
     assert "Migration-Password" not in (output / "secrets/api.env").read_text()
     deployment = (output / ".deployment.env").read_text()
     assert f"CANDIDATE_COMMIT={prepare.CANDIDATE}" in deployment

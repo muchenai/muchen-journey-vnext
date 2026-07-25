@@ -32,14 +32,14 @@ export default async function RootLayout({
           </Link>
           <nav aria-label="主要导航">
             <Link href="/app">新人当前行动</Link>
-            <Link href="/review">主管评审</Link>
-            <Link href="/ops">本地运营</Link>
+            <Link href="/auth/feishu?return_to=%2Freview">主管评审</Link>
+            <Link href="/auth/feishu?return_to=%2Fops">运营</Link>
           </nav>
         </header>
         <main id="main-content" className="page-shell">
           {children}
         </main>
-        <footer className="site-footer">vNext Greenfield · WP-06 本地候选 · 发布 NO_GO</footer>
+        <footer className="site-footer">Muchen Journey vNext · Alpha</footer>
       </body>
     </html>
   );
