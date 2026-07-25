@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config" / "wp08_staging.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "staging.yml"
 EDGE_MIRROR_WORKFLOW = ROOT / ".github" / "workflows" / "wp08-edge-mirror.yml"
+WP09_BOOTSTRAP_WORKFLOW = ROOT / ".github" / "workflows" / "wp09-operator-bootstrap.yml"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
@@ -506,6 +507,57 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     print("WP08_STAGING_WORKFLOW=PASS phases=audit,provision,frozen-alpha-deploy")
 
 
+def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> None:
+    workflow = path.read_text()
+    candidate = str(load_contract()["candidate_commit"])
+    confirmation = f"CREATE_15M_OPERATOR_LINK_{candidate[:7].upper()}"
+    required = (
+        "workflow_dispatch:",
+        candidate,
+        confirmation,
+        "recipient_public_key_b64",
+        "group: wp08-volcengine-staging",
+        "environment: staging",
+        "terraform output -raw staging_public_ip",
+        "terraform output -raw staging_security_group_id",
+        "python3 -m scripts.wp08_security_group open",
+        "python3 -m scripts.wp08_security_group close",
+        "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
+        "python -m journey_api.wp09_bootstrap",
+        "--expires-in-minutes 15",
+        "--confirm CREATE_STAGING_OPERATOR_LINK",
+        "openssl pkeyutl -encrypt",
+        "rsa_padding_mode:oaep",
+        "rsa_oaep_md:sha256",
+        "rsa_mgf1_md:sha256",
+        "wp09-operator-link.json.enc",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "if: always() && steps.frozen_infrastructure.outputs.security_group_id != ''",
+    )
+    for marker in required:
+        if marker not in workflow:
+            raise StagingError(f"WP-09 bootstrap workflow is missing marker: {marker}")
+    forbidden = (
+        "terraform plan",
+        "terraform apply",
+        "terraform import",
+        "echo \"$bootstrap_json\"",
+        "cat \"$RUNNER_TEMP/wp09-operator-link.json.enc\"",
+    )
+    for marker in forbidden:
+        if marker in workflow:
+            raise StagingError(f"WP-09 bootstrap workflow contains forbidden marker: {marker}")
+    if not re.search(r"^\s*retention-days:\s*1\s*$", workflow, re.MULTILINE):
+        raise StagingError("WP-09 bootstrap ciphertext retention must be exactly one day")
+    if workflow.count("scripts.wp08_security_group") != 2:
+        raise StagingError("WP-09 bootstrap must open and close one exact SSH rule")
+    if workflow.count("journey_api.wp09_bootstrap") != 1:
+        raise StagingError("WP-09 bootstrap link must be created exactly once")
+    if workflow.count("actions/upload-artifact@") != 1:
+        raise StagingError("WP-09 bootstrap must upload exactly one ciphertext artifact")
+    print("WP09_OPERATOR_BOOTSTRAP_WORKFLOW=PASS encrypted_artifact=RSA4096_OAEP_SHA256")
+
+
 def command_output(*args: str) -> str:
     result = subprocess.run(
         args,
@@ -562,6 +614,7 @@ def main() -> None:
         elif args.command == "workflow-check":
             validate_workflow()
             validate_edge_mirror_workflow()
+            validate_wp09_bootstrap_workflow()
         else:
             record_evidence(args.status, args.reference)
     except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError, StagingError) as error:

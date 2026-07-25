@@ -80,6 +80,8 @@ make wp08-staging-apply-check
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
+WP-09 首个 Operator 绑定链接只允许在候选部署成功后，通过独立的 `.github/workflows/wp09-operator-bootstrap.yml` 生成一次。该 workflow 与 staging deploy 共用同一 concurrency group，只从冻结 state 读取现有 ECS/安全组，临时开放同一个 runner `/32`，核对服务器实际运行候选后调用受审 bootstrap CLI。15 分钟链接的明文不得进入日志或公开 artifact：执行者必须临时生成 RSA-4096 密钥对，只把公钥作为 workflow input；Actions 仅上传 OAEP-SHA256 密文且保留 1 天，私钥与解密明文只在本地临时目录存活，最终链接只进入本机剪贴板。该路径不发送飞书消息、不读取通讯录、不执行 Terraform plan/apply/import，也不构成 deploy 重试。
+
 ## 5. 部署顺序与证据
 
 Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行候选源码 Web 合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → PII-free seed → API/Worker → Web `/health/ready` → edge/TLS → 匿名 `/ops = 401` → VPC API 撤销精确 SSH 规则。

@@ -450,6 +450,56 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
         staging.validate_workflow(workflow)
 
 
+def test_wp09_operator_bootstrap_workflow_encrypts_the_only_link(tmp_path: Path, monkeypatch):
+    bootstrap = tmp_path / "wp09-operator-bootstrap.yml"
+    source = "\n".join(
+        (
+            "workflow_dispatch:",
+            "26d56010125024ca2dbc6e85f7dfeb59857f93dd",
+            "CREATE_15M_OPERATOR_LINK_26D5601",
+            "recipient_public_key_b64",
+            "group: wp08-volcengine-staging",
+            "environment: staging",
+            "terraform output -raw staging_public_ip",
+            "terraform output -raw staging_security_group_id",
+            "python3 -m scripts.wp08_security_group open",
+            "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
+            "python -m journey_api.wp09_bootstrap",
+            "--expires-in-minutes 15",
+            "--confirm CREATE_STAGING_OPERATOR_LINK",
+            "openssl pkeyutl -encrypt",
+            "rsa_padding_mode:oaep",
+            "rsa_oaep_md:sha256",
+            "rsa_mgf1_md:sha256",
+            "wp09-operator-link.json.enc",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "retention-days: 1",
+            "if: always() && steps.frozen_infrastructure.outputs.security_group_id != ''",
+            "python3 -m scripts.wp08_security_group close",
+        )
+    )
+    bootstrap.write_text(source)
+    monkeypatch.setattr(staging, "WP09_BOOTSTRAP_WORKFLOW", bootstrap)
+
+    staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source.replace("rsa_oaep_md:sha256", "rsa_oaep_md:sha1"))
+    with pytest.raises(staging.StagingError, match="missing marker"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source.replace("retention-days: 1", "retention-days: 14"))
+    with pytest.raises(staging.StagingError, match="exactly one day"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source + '\nrun: echo "$bootstrap_json"\n')
+    with pytest.raises(staging.StagingError, match="forbidden marker"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source.replace("python -m journey_api.wp09_bootstrap", "python -m journey_api.wp09_bootstrap\npython -m journey_api.wp09_bootstrap"))
+    with pytest.raises(staging.StagingError, match="exactly once"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+
 def test_infrastructure_requires_serial_rds_exclusive_operations(
     tmp_path: Path, monkeypatch
 ):
