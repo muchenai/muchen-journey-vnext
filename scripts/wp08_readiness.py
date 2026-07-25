@@ -96,6 +96,10 @@ def browser_spec(path: Path) -> dict[str, Any]:
         raise ReadinessError("browser spec must pin Chromium revision 1232")
     if spec.get("evidence_directory") != "output/playwright/wp08":
         raise ReadinessError("browser evidence directory must be canonical")
+    if spec.get("path") != "/" or spec.get("protected_path") != "/ops":
+        raise ReadinessError(
+            "browser spec must separate the public UI from the protected ops route"
+        )
     expected = {
         ("desktop", 1440, 900),
         ("tablet", 768, 1024),
@@ -107,7 +111,13 @@ def browser_spec(path: Path) -> dict[str, Any]:
     }
     if actual != expected:
         raise ReadinessError("browser spec must contain the three canonical viewports")
-    required_checks = {"http_status", "console_error", "horizontal_overflow", "focus_keyboard"}
+    required_checks = {
+        "http_status",
+        "console_error",
+        "horizontal_overflow",
+        "focus_keyboard",
+        "anonymous_protected_status",
+    }
     if set(spec.get("checks", [])) != required_checks:
         raise ReadinessError("browser spec is missing a canonical smoke check")
     return spec

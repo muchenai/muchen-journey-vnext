@@ -57,8 +57,12 @@ pwcli() {
     bash "$PLAYWRIGHT_CLI" -s="$session_name" "$@"
 }
 
-pwcli open "${BROWSER_BASE_URL%/}/ops" --config "$runtime_config"
+page_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["path"])' "$spec_path")
+protected_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["protected_path"])' "$spec_path")
+pwcli open "${BROWSER_BASE_URL%/}${page_path}" --config "$runtime_config"
 pwcli snapshot >snapshot-initial.txt
+pwcli --raw eval "() => fetch('${protected_path}', {redirect: 'manual'}).then(response => response.status)" >protected-status.txt
+grep -Eq '(^|[^0-9])401([^0-9]|$)' protected-status.txt
 
 python3 - "$spec_path" <<'PY' | while IFS=' ' read -r name width height; do
 import json

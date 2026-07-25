@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import time
@@ -16,6 +17,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 STANDALONE = ROOT / "apps" / "web" / ".next" / "standalone"
 RELEASE = "wp08-web-runtime-check"
+SCRIPT_NONCE = re.compile(rb"<script\b[^>]*\bnonce=[\"']([^\"']+)", re.IGNORECASE)
+SCRIPT_TAG = re.compile(rb"<script\b", re.IGNORECASE)
+POLICY_NONCE = re.compile(r"(?:^|;\s*)script-src[^;]*'nonce-([^']+)'")
 
 
 def unused_port() -> int:
@@ -95,6 +99,26 @@ def main() -> None:
             raise RuntimeError(f"anonymous /ops returned HTTP {ops_status}")
         if "no-store" not in ops_headers.get("cache-control", ""):
             raise RuntimeError("anonymous /ops denial is cacheable")
+
+        root_status, root_body, root_headers = request(f"{base_url}/")
+        if root_status != 200:
+            raise RuntimeError(f"root page returned HTTP {root_status}")
+        policy = root_headers.get("content-security-policy", "")
+        policy_nonce = POLICY_NONCE.search(policy)
+        if policy_nonce is None:
+            raise RuntimeError("root response CSP has no script nonce")
+        script_count = len(SCRIPT_TAG.findall(root_body))
+        script_nonces = {
+            nonce.decode("ascii") for nonce in SCRIPT_NONCE.findall(root_body)
+        }
+        if script_count < 1 or script_nonces != {policy_nonce.group(1)}:
+            raise RuntimeError("root scripts do not share the response CSP nonce")
+        _, _, second_headers = request(f"{base_url}/")
+        second_nonce = POLICY_NONCE.search(
+            second_headers.get("content-security-policy", "")
+        )
+        if second_nonce is None or second_nonce.group(1) == policy_nonce.group(1):
+            raise RuntimeError("CSP nonce is not unique per request")
     except Exception as error:
         process.terminate()
         output = process.communicate(timeout=5)[0]
@@ -108,7 +132,10 @@ def main() -> None:
                 process.kill()
                 process.wait(timeout=5)
 
-    print("WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401")
+    print(
+        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401"
+        " root=200 csp_nonce=per-request"
+    )
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
   "browser": "chromium",
   "browser_revision": "1232",
   "evidence_directory": "output/playwright/wp08",
-  "path": "/ops",
+  "path": "/",
+  "protected_path": "/ops",
   "viewports": [
     {"name": "desktop", "width": 1440, "height": 900},
     {"name": "tablet", "width": 768, "height": 1024},
@@ -13,6 +14,7 @@
     "http_status",
     "console_error",
     "horizontal_overflow",
-    "focus_keyboard"
+    "focus_keyboard",
+    "anonymous_protected_status"
   ]
 }

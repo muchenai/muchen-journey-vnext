@@ -1,9 +1,9 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
 日期：2026-07-25
-状态：`ALPHA_PILOT_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`
-当前候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`
-已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）
+状态：`ALPHA_PILOT_DEPLOYED / CSP_FIX_PENDING_CANDIDATE`
+当前候选：尚未生成
+已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）；`dad44cc679184a1978b0f69e3632cb95de7f1b8e`（唯一 deploy 已落地但浏览器复验失败，禁止重试）
 历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
 整体发布：`NO_GO`
 
@@ -223,3 +223,12 @@
 - PR #41 已通过 required check 并合入受保护主线 `dad44cc679184a1978b0f69e3632cb95de7f1b8e`。Mainline Candidate Gate [`30139385352`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30139385352) 完成完整 CI、候选打包、三镜像 SBOM、GHCR push 与远端 digest 验证；artifact 未过期且标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`；
 - 新候选固定摘要为 API `sha256:6ccc4bdb…d886`、Web `sha256:44d3fa66…30c5`、Worker `sha256:77c611d1…95bf`。机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词 `DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING` 原子绑定；
 - 绑定变更不包含 staging dispatch、云资源写入或旧候选重试。只有绑定 PR 合入受保护主线后，才能另行取得指名完整候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e`、基于届时绑定主线、冻结基础设施、失败不重试的精确 `phase=deploy` 授权。当前 deployment、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。
+
+## 2026-07-25 dad44 候选部署与浏览器 CSP 复验
+
+- 用户精确授权候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e` 基于主线 `58b2428a45fa4d848d8438dcc24dfc2c0a79fc5c`，在华北2（北京）冻结基础设施上只执行一次 `phase=deploy`，失败不重试。唯一 run [`30157449832`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30157449832) 已消费该授权，没有第二次 dispatch；
+- 唯一 job `89677528525` 的候选/artifact 合同、冻结 state、精确 runner `/32`、私有 bundle、固定 GHCR digest、migration/runtime grant/seed、API/Worker/Web/Edge、外部 TLS/readiness、匿名 `/ops = 401` 与 SSH 撤销步骤全部为 success。公开只读复验再次得到 root 200、readiness 200、release 精确匹配、匿名 `/ops = 401`、`Cache-Control: no-store` 与 TLS verified；PII-free 物理部署证据写入私有引用 `evidence/private/wp08/physical-deployed.json`；
+- GitHub workflow run 与 check suite 顶层结论却为 failure，而唯一 job/check-run 为 success，且所有 job steps 均成功；唯一 annotation 是 Node 20 deprecation。本记录把它保留为 GitHub 聚合异常，不把顶层 failure 擅自改写成成功，也不以此触发重试；
+- 发布后真实 Chromium 打开公开 `/` 时返回 200 且存在可聚焦控件，但控制台出现 15 条 CSP 错误，Next.js framework/page scripts 因缺少匹配 nonce 被浏览器拒绝，页面未 hydration。根因是 proxy 只把 nonce 写入 `x-nonce` 与响应 CSP，没有把 CSP 传给 Next.js 请求头；RootLayout 同时可静态渲染，无法为每个请求给 framework scripts 注入 nonce；
+- 最小修复把同一 CSP 写入请求头，并以 `connection()` 强制请求时渲染；生产 runtime test 锁定 root 脚本 nonce 与响应 CSP 一致且每请求变化。canonical browser smoke 改为在公开 `/` 检查三档视口、console、overflow、focus/键盘，并单独对匿名 `/ops` 断言 401；本地隔离生产构建与真实 Chromium 已通过；
+- 当前 staging 仍运行 `dad44…`，因此只能记为“应用已部署、发布验证失败”，不是 `STAGING_ISOLATION_VERIFIED`。CSP 修复必须经 PR、主线 Candidate Gate、新候选和候选绑定后，再取得新的精确 deploy 授权；`dad44…` 禁止重试，WP-09、真实身份与真人 UAT 不得提前启动或转绿。
