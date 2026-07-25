@@ -3,9 +3,11 @@ import {
   apiRequest,
   OpsAuditEntry,
   OpsEnrollment,
+  OpsIdentityAccess,
   OpsTaskDefinition,
   RuntimeStatus,
 } from "@/lib/server/api";
+import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -22,23 +24,27 @@ export default async function OpsPage({
 }: {
   searchParams: Promise<{ updated?: string }>;
 }) {
-  const [query, tasks, enrollments, audit, runtime] = await Promise.all([
+  const [query, tasks, enrollments, audit, runtime, identityAccess] = await Promise.all([
     searchParams,
     apiRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
     apiRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
     apiRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
     apiRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
+    apiRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
   ]);
+  const isStaging = runtime.environment === "staging";
 
   return (
     <section className="ops-page">
-      <p className="eyebrow">Operator · local/test only</p>
+      <p className="eyebrow">Operator · {runtime.environment}</p>
       <h1>受控运营与运行状态</h1>
       <p className="lede">
         这里没有通用状态编辑器。所有写入都绑定组织、对象、角色、expected revision、幂等键与理由。
       </p>
       <p className="notice">
-        当前仅为本地候选：真人 UAT、真实通知、staging/production、物理 ACL、异机恢复与发布签署均为 NOT_RUN，发布判定必须 NO_GO。
+        {isStaging
+          ? "当前为 Alpha staging；真人身份/UAT、真实通知、物理 ACL 证据、异机恢复与发布签署未闭环前，production 仍必须 NO_GO。"
+          : "当前为本地/测试环境；真人 UAT、真实通知与发布签署不在此环境中成立，发布判定必须 NO_GO。"}
       </p>
       {query.updated ? <p className="success-text" role="status">受控命令已写入并记录审计。</p> : null}
 
@@ -123,6 +129,15 @@ export default async function OpsPage({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel ops-section" aria-labelledby="identity-heading">
+        <p className="section-label">REAL IDENTITY / MINIMUM ACCESS</p>
+        <h2 id="identity-heading">飞书身份访问</h2>
+        <p>
+          仅管理 Reviewer 与 Operator 的真实身份入口。绑定链接仅显示一次；撤销身份会立即使其现有会话失效。
+        </p>
+        <IdentityAccessPanel items={identityAccess.items} />
       </section>
 
       <section className="panel ops-section" aria-labelledby="audit-heading">

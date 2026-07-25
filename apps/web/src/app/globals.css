@@ -195,6 +195,12 @@ fieldset { margin: 24px 0; padding: 20px; border: 1px solid var(--border-default
 .ops-command-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 12px; align-items: end; padding-top: 12px; border-top: 1px solid var(--border-default); }
 .ops-command-form label { min-width: 0; }
 .ops-command-form input { margin-bottom: 0 !important; }
+.identity-create-form { grid-template-columns: minmax(0, 1fr) auto; }
+.identity-create-form > p { margin: 0; color: var(--text-secondary); }
+.identity-create-form > .inline-error { grid-column: 1 / -1; margin: 0; }
+.identity-link-result { display: grid; justify-items: start; gap: 10px; padding: 14px; background: #f0f7ff; border-left: 4px solid var(--action-primary); border-radius: 8px; }
+.identity-link-result p { margin: 0; }
+.identity-link-result code { max-width: 100%; overflow-wrap: anywhere; }
 .audit-table-wrap { min-width: 0; max-width: 100%; overflow-x: auto; }
 table { width: 100%; min-width: 760px; border-collapse: collapse; }
 th, td { padding: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-default); }

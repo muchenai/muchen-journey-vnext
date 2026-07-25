@@ -320,6 +320,37 @@ class IdentityLinkResponse(StrictModel):
     request_id: str
 
 
+class IdentityAccessOut(StrictModel):
+    user_id: UUID
+    display_name: str
+    role: Literal["REVIEWER", "OPERATOR"]
+    identity_id: UUID | None
+    identity_status: Literal["UNLINKED", "LINKED", "REVOKED"]
+    identity_revision: int | None
+    identity_verified_at: datetime | None
+    is_current_actor: bool
+    link_id: UUID | None
+    link_status: str | None
+    link_revision: int | None
+    link_expires_at: datetime | None
+    allowed_commands: list[
+        Literal[
+            "create_identity_link",
+            "revoke_identity_link",
+            "revoke_external_identity",
+        ]
+    ]
+
+
+class IdentityAccessListOut(StrictModel):
+    items: list[IdentityAccessOut]
+
+
+class IdentityAccessListResponse(StrictModel):
+    data: IdentityAccessListOut
+    request_id: str
+
+
 class RevokeIdentityLinkCommand(RevisionCommand):
     reason: str = Field(min_length=10, max_length=500)
 

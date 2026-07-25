@@ -44,6 +44,9 @@ from journey_api.schemas import (
     CommandOut,
     CommandResponse,
     CreateIdentityLinkCommand,
+    IdentityAccessListOut,
+    IdentityAccessListResponse,
+    IdentityAccessOut,
     IdentityLinkOut,
     IdentityLinkResponse,
     OAuthCallbackCommand,
@@ -91,6 +94,117 @@ def ensure_revision(actual: int, expected: int) -> None:
 def require_feishu_enabled() -> None:
     if not get_settings().feishu_oauth_enabled:
         raise ApiError(503, "IDENTITY_PROVIDER_DISABLED", "真实身份登录尚未配置。")
+
+
+@router.get("/ops/identity-access", response_model=IdentityAccessListResponse)
+def list_identity_access(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    role_rows = session.execute(
+        select(User, RoleAssignment.role)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role.in_([Role.REVIEWER, Role.OPERATOR]),
+        )
+        .order_by(User.display_name, User.id, RoleAssignment.role)
+        .limit(100)
+    ).all()
+    user_ids = {user.id for user, _role in role_rows}
+    identities = (
+        session.scalars(
+            select(ExternalIdentity).where(
+                ExternalIdentity.organization_id == actor.organization_id,
+                ExternalIdentity.provider == PROVIDER,
+                ExternalIdentity.user_id.in_(user_ids),
+            )
+        ).all()
+        if user_ids
+        else []
+    )
+    links = (
+        session.scalars(
+            select(ExternalIdentityLink).where(
+                ExternalIdentityLink.organization_id == actor.organization_id,
+                ExternalIdentityLink.provider == PROVIDER,
+                ExternalIdentityLink.user_id.in_(user_ids),
+            )
+        ).all()
+        if user_ids
+        else []
+    )
+
+    identities_by_user: dict[uuid.UUID, ExternalIdentity] = {}
+    for identity in identities:
+        current = identities_by_user.get(identity.user_id)
+        if current is None or (
+            current.revoked_at is not None and identity.revoked_at is None
+        ) or (
+            current.revoked_at is not None
+            and identity.revoked_at is not None
+            and identity.verified_at > current.verified_at
+        ):
+            identities_by_user[identity.user_id] = identity
+
+    links_by_user_role: dict[tuple[uuid.UUID, Role], ExternalIdentityLink] = {}
+    for link in links:
+        key = (link.user_id, link.role)
+        current = links_by_user_role.get(key)
+        if current is None or (link.created_at, link.id) > (current.created_at, current.id):
+            links_by_user_role[key] = link
+
+    now = utc_now()
+    items: list[IdentityAccessOut] = []
+    for user, role in role_rows:
+        identity = identities_by_user.get(user.id)
+        link = links_by_user_role.get((user.id, role))
+        active_identity = identity is not None and identity.revoked_at is None
+        active_link = (
+            link is not None
+            and link.status == IdentityLinkStatus.PENDING
+            and link.expires_at > now
+        )
+        if active_identity:
+            identity_status = "LINKED"
+            allowed_commands = (
+                [] if user.id == actor.id else ["revoke_external_identity"]
+            )
+        elif active_link:
+            identity_status = "REVOKED" if identity is not None else "UNLINKED"
+            allowed_commands = ["revoke_identity_link"]
+        else:
+            identity_status = "REVOKED" if identity is not None else "UNLINKED"
+            allowed_commands = ["create_identity_link"]
+        link_status = None
+        if link is not None:
+            link_status = (
+                IdentityLinkStatus.EXPIRED.value
+                if link.status == IdentityLinkStatus.PENDING and link.expires_at <= now
+                else link.status.value
+            )
+        items.append(
+            IdentityAccessOut(
+                user_id=user.id,
+                display_name=user.display_name,
+                role=role.value,
+                identity_id=identity.id if identity else None,
+                identity_status=identity_status,
+                identity_revision=identity.revision if identity else None,
+                identity_verified_at=identity.verified_at if identity else None,
+                is_current_actor=user.id == actor.id,
+                link_id=link.id if link else None,
+                link_status=link_status,
+                link_revision=link.revision if link else None,
+                link_expires_at=link.expires_at if link else None,
+                allowed_commands=allowed_commands,
+            )
+        )
+    return envelope(request, IdentityAccessListOut(items=items))
 
 
 @router.post("/ops/identity-links", response_model=IdentityLinkResponse)
