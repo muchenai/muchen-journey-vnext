@@ -1,0 +1,156 @@
+name: WP-09 Staging Operator Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact deployed 40-character candidate SHA
+        required: true
+        type: string
+      confirmation:
+        description: Type CREATE_15M_OPERATOR_LINK_26D5601
+        required: true
+        type: string
+      recipient_public_key_b64:
+        description: Base64-encoded RSA-4096 public key used only to encrypt the link artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: WP-09 / encrypted first-Operator link
+    if: >-
+      inputs.candidate == '26d56010125024ca2dbc6e85f7dfeb59857f93dd' &&
+      inputs.confirmation == 'CREATE_15M_OPERATOR_LINK_26D5601'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Verify bootstrap contract and recipient key
+        env:
+          WP09_RECIPIENT_PUBLIC_KEY_B64: ${{ inputs.recipient_public_key_b64 }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "${{ inputs.candidate }}" = "$(jq -r .candidate_commit config/wp08_staging.json)"
+          umask 077
+          recipient_key="$RUNNER_TEMP/wp09-recipient.pem"
+          printf '%s' "$WP09_RECIPIENT_PUBLIC_KEY_B64" | base64 --decode >"$recipient_key"
+          openssl pkey -pubin -in "$recipient_key" -text -noout | grep -Fq 'Public-Key: (4096 bit)'
+          printf '{"probe":"wp09-bootstrap-recipient-key"}' | openssl pkeyutl -encrypt \
+            -pubin -inkey "$recipient_key" \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -pkeyopt rsa_mgf1_md:sha256 >/dev/null
+      - name: Read frozen staging infrastructure
+        id: frozen_infrastructure
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          for value in "$public_ip" "$security_group_id"; do
+            test -n "$value"
+            echo "::add-mask::$value"
+          done
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP08_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open exact runner SSH ingress
+        run: |
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
+            --cidr "$WP08_RUNNER_CIDR"
+      - name: Generate and encrypt the 15-minute Operator link
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          umask 077
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$RUNNER_TEMP/wp09-bootstrap-key"
+          ssh_opts=(-i "$RUNNER_TEMP/wp09-bootstrap-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp09-known-hosts")
+          bootstrap_json=$(
+            ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+              "CANDIDATE='${{ inputs.candidate }}' AUTHORIZATION_REF='gha:$GITHUB_RUN_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          test "$(cat /srv/journey-next-staging/DEPLOYED_CANDIDATE)" = "$CANDIDATE"
+          release=$(readlink -f /srv/journey-next-staging/current)
+          test -n "$release" && test -f "$release/compose.yaml"
+          cd "$release"
+          operator_id=$(docker compose exec -T api python -c 'from journey_api.fixtures import OPERATOR_ID; print(OPERATOR_ID)' | tr -d '\r\n')
+          docker compose exec -T api python -m journey_api.wp09_bootstrap \
+            --target-user-id "$operator_id" \
+            --authorization-reference "$AUTHORIZATION_REF" \
+            --expires-in-minutes 15 \
+            --confirm CREATE_STAGING_OPERATOR_LINK
+          REMOTE
+          )
+          echo "::add-mask::$bootstrap_json"
+          printf '%s' "$bootstrap_json" | jq -e '
+            type == "object" and
+            .expires_in_minutes == 15 and
+            (.link_id | type == "string") and
+            (.expires_at | type == "string") and
+            (.start_path | type == "string" and startswith("/auth/feishu?return_to=%2Fops&link_token="))
+          ' >/dev/null
+          byte_count=$(printf '%s' "$bootstrap_json" | wc -c | tr -d ' ')
+          test "$byte_count" -le 400
+          printf '%s' "$bootstrap_json" | openssl pkeyutl -encrypt \
+            -pubin -inkey "$RUNNER_TEMP/wp09-recipient.pem" \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -pkeyopt rsa_mgf1_md:sha256 \
+            -out "$RUNNER_TEMP/wp09-operator-link.json.enc"
+          test -s "$RUNNER_TEMP/wp09-operator-link.json.enc"
+      - name: Upload ciphertext only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp09-operator-link-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp09-operator-link.json.enc
+          if-no-files-found: error
+          retention-days: 1
+      - name: Close SSH ingress
+        if: always() && steps.frozen_infrastructure.outputs.security_group_id != ''
+        run: |
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
+            --cidr "$WP08_RUNNER_CIDR"
+      - name: Remove transient key material
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/wp09-recipient.pem" "$RUNNER_TEMP/wp09-bootstrap-key"
