@@ -1,7 +1,7 @@
 # 27｜WP-09 真实身份与会话构建证据
 
 状态：`LOCAL_IDENTITY_IMPLEMENTATION_VERIFIED / REAL_IDENTITY_NOT_RUN`
-日期：2026-07-25
+日期：2026-07-26
 当前发布判断：`NO_GO`
 
 ## 1. 结论
@@ -16,6 +16,7 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 - OAuth state 与 path-scoped HttpOnly browser cookie 双绑定、短时有效且一次消费；
 - `/review`、`/ops` 是唯一允许的返回入口，拒绝开放重定向和角色错配；
 - Operator 通过一次性绑定链接把已有内部 Reviewer/Operator 绑定到飞书；首次 Operator 只能通过 staging-only、显式确认、可审计的受控命令建立，不开放公共 bootstrap API；
+- Operator `/ops` 提供最小身份访问清单：仅列出同组织的有效 Reviewer/Operator，服务端返回可执行命令；支持一次性链接生成/撤销和外部身份撤销，不返回原始 subject 或 token，且拒绝当前 Operator 自我撤销；
 - 新登录轮换同用户同角色旧 session；外部身份撤销、用户停用或角色移除立即使 session 失效；
 - mutating Operator 命令使用 revision 和 idempotency；跨 organization、对象和角色范围 fail closed；
 - Next Route Handler 把含 code/state 的浏览器 GET 转为无查询串的 API POST；Caddy 对 `/auth/feishu*` 跳过 access log，审计记录不包含 token、原始飞书 subject 或业务正文；
@@ -23,11 +24,11 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 
 ## 3. 机器证据
 
-- `make api-test`：148 项通过；
+- `make api-test`：150 项通过；
 - `npm run lint && npm run typecheck && npm run build`：通过，两个 OAuth Route Handler 均为动态路由；
 - `make openapi-check`、`make traceability-check`、`make wp08-workflow-check`、`make isolation-check`：通过；
-- 迁移 head：`0011_wp09_feishu_identity`；OpenAPI 已包含 identity link、revoke、OAuth start/callback 合同；
-- 正负向覆盖：state replay、browser mismatch、provider failure、未绑定/已撤销身份、角色错配、跨 organization、停用用户、移除角色、会话轮换、撤销幂等、client IP 限流及审计脱敏。
+- 迁移 head：`0011_wp09_feishu_identity`；OpenAPI 已包含 identity access/list、link/revoke、OAuth start/callback 合同；
+- 正负向覆盖：state replay、browser mismatch、provider failure、未绑定/已撤销身份、角色错配、跨 organization、停用用户、移除角色、会话轮换、撤销幂等、client IP 限流、Operator-only 清单、原始 subject/token 不出现在响应中及审计脱敏。
 
 ## 4. 外部边界与下一动作
 

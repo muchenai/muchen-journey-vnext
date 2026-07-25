@@ -16,7 +16,9 @@
 - WP-05：评审通过后原子生成不可变 Outcome 与唯一 Handoff，事务 Outbox、本地 NotificationDelivery worker 的租约/重试/去重/死信合同，按 organization/owner/object 裁剪的跨域时间线，以及完整 Learner 结果页；
 - WP-06：版本化 Task/config 只读运营视图，带角色/组织/对象 scope、原因、幂等键与 expected revision 的 reviewer assignment / enrollment cancel 命令，安全裁剪审计，revision/health/worker/observability 状态，签名离线 fixture 导入，以及本地加密备份、隔离恢复、回滚/告警模拟和 fail-closed 发布门禁；
 - WP-07：候选基线、CODEOWNERS、分层 CI、固定摘要的基础/扫描镜像、依赖/secret/旧引用扫描、三进程 SPDX SBOM，以及绑定完整 Git SHA、OpenAPI hash、migration head、config schema 和 TaskVersion 清单的 release manifest；远端 mainline 已向三个 canonical GHCR package 推送精确 SHA tag、验证 immutable digest 并上传工件。仓库按用户明确决策设为 Public，`main` 强制 PR、`WP-07 / quick`、线性历史、会话解决并禁止 force-push/删除，管理员同样受约束；
-- 未实施生产/预发布部署、真实旧系统数据导入、真实 Feishu/邮件/告警、物理 ACL、异机/生产恢复、真人 UAT 或发布签署；这些项目仍为 `NOT_RUN`，当前发布判定必须是 `NO_GO`。
+- WP-08：火山引擎华北2（北京）冻结 staging 资源上的 Alpha 运行面已验证，TLS/readiness/API/Web/Worker/匿名权限与真实浏览器 smoke 通过；RDS `IsLatest` 供应商字段证据债保留到 RC/production 前关闭；
+- WP-09：独立飞书 OAuth、HMAC 外部身份、一次性绑定、独立可撤销会话、Operator 最小身份访问清单及负向安全合同已在代码和本地机器证据中通过；真实飞书应用、secrets 和真人身份 UAT 仍未执行；
+- 未实施 production 部署、真实旧系统数据导入、真实飞书/邮件/告警、异机/生产恢复、真人 UAT 或发布签署；物理 ACL 仍有证据债。当前发布判定必须是 `NO_GO`。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
 
@@ -44,7 +46,7 @@ Reviewer 工作台以服务端 `allowed_commands` 为唯一动作来源。`GET /
 
 Compose worker 只实现 `LOCAL_TEST` 通知适配器，具备 pending/processing/sent-or-failed、attempt、指数退避、lease、死信和 dedupe receipt；`local/test` 之外会 fail closed。页面上的 `DELIVERED` 只表示本地测试适配器已处理，始终同时显示 `external_delivery_confirmed=false`，不得解读为飞书或邮件已真实送达。真实 Feishu、邮件和 AI 服务均为 `NOT_RUN`。
 
-`/ops` 是 WP-06 本地 Operator 入口。它不提供通用状态编辑器：TaskVersion 只读且发布后不可变；Enrollment 只能执行服务端返回的 `allowed_commands`，写入必须带原因、幂等键和 expected revision，存在评审事实时拒绝更换主管或取消。`GET /api/v1/ops/audit` 仅返回同组织、最多 31 天/100 条的安全字段，敏感详情只列出被裁剪字段名；`GET /api/v1/ops/runtime-status` 暴露 release、config schema、migration、API/DB/worker heartbeat、队列/死信和本地可观测模式，并明确 `external_observability_confirmed=false`。
+`/ops` 是受控 Operator 入口。它不提供通用状态编辑器：TaskVersion 只读且发布后不可变；Enrollment 只能执行服务端返回的 `allowed_commands`，写入必须带原因、幂等键和 expected revision，存在评审事实时拒绝更换主管或取消。身份区只列出同组织有效 Reviewer/Operator 的安全状态，原始外部 subject/token 不进入清单响应；一次性绑定链接只显示一次，撤销身份会同步撤销活动会话。`GET /api/v1/ops/audit` 仅返回同组织、最多 31 天/100 条的安全字段，敏感详情只列出被裁剪字段名；`GET /api/v1/ops/runtime-status` 暴露 release、config schema、migration、API/DB/worker heartbeat、队列/死信和可观测模式，并明确 `external_observability_confirmed=false`。
 
 离线导入是本地 CLI 合同，不是 HTTP 上传接口，也不连接旧系统。它只在 `local/test` 接受 HMAC 签名、SHA-256 校验、严格 manifest/NDJSON schema 的 `SYNTHETIC_VNEXT_FIXTURE` 包，先 dry-run，再以 package/source key 幂等应用；重放、跨包冲突和隔离原因写入不可变 ledger，报告不含记录标识符。示例命令：
 
@@ -71,7 +73,7 @@ make release-gate      # 当前预期非零并输出 NO_GO
 make verify
 ```
 
-该命令精确重建测试数据库，执行空库迁移/种子/51 个 API 与领域测试、带既有事实的 0009↔0010 升降级、Web lint/类型/生产构建、Greenfield 隔离扫描、真实 Compose HTTP 权限负向矩阵，并验证发布门禁保持 `NO_GO`。历史事实保留在 16–21 号 As-Built 中，不会被 WP-06 改写；本轮实现、失败重试、浏览器/灾备证据和 `NOT_RUN` 边界见 [WP-06 As-Built](docs/22_WP06_CONTROLLED_OPERATIONS_IMPORT_RECOVERY_RELEASE_EVIDENCE.md)。依赖安全审计单独运行：
+该命令精确重建测试数据库，执行空库迁移/种子、API 与领域测试、迁移升降级、Web lint/类型/生产构建、Greenfield 隔离扫描、真实 Compose HTTP 权限负向矩阵，并验证发布门禁保持 `NO_GO`。各工作包证据分别见 16–27 号 As-Built。依赖安全审计单独运行：
 
 ```bash
 cd apps/web && npm audit --audit-level=low

@@ -239,6 +239,24 @@ export type OpsEnrollment = {
   allowed_commands: string[];
 };
 
+export type OpsIdentityAccess = {
+  user_id: string;
+  display_name: string;
+  role: "REVIEWER" | "OPERATOR";
+  identity_id: string | null;
+  identity_status: "UNLINKED" | "LINKED" | "REVOKED";
+  identity_revision: number | null;
+  identity_verified_at: string | null;
+  is_current_actor: boolean;
+  link_id: string | null;
+  link_status: string | null;
+  link_revision: number | null;
+  link_expires_at: string | null;
+  allowed_commands: Array<
+    "create_identity_link" | "revoke_identity_link" | "revoke_external_identity"
+  >;
+};
+
 export type OpsAuditEntry = {
   id: string;
   actor_id: string | null;

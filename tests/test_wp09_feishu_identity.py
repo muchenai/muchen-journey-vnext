@@ -476,6 +476,70 @@ def test_identity_link_rejects_role_mismatch_and_can_be_revoked(
     assert denied.status_code == 410
 
 
+def test_operator_identity_access_lists_safe_state_and_available_commands(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    reviewer_id = create_role_user(Role.REVIEWER)
+    operator = client_for("wp09-identity-access-operator")
+
+    initial_response = operator.get(
+        "/api/v1/ops/identity-access",
+        headers=OPERATOR_HEADERS,
+    )
+    initial = assert_ok(initial_response)
+    item = next(
+        candidate
+        for candidate in initial["items"]
+        if candidate["user_id"] == str(reviewer_id)
+    )
+    assert item["identity_status"] == "UNLINKED"
+    assert item["allowed_commands"] == ["create_identity_link"]
+    assert "subject" not in initial_response.text
+    assert "token" not in initial_response.text
+
+    link = create_link(Role.REVIEWER, reviewer_id)
+    pending_response = operator.get(
+        "/api/v1/ops/identity-access",
+        headers=OPERATOR_HEADERS,
+    )
+    pending = assert_ok(pending_response)
+    item = next(
+        candidate
+        for candidate in pending["items"]
+        if candidate["user_id"] == str(reviewer_id)
+    )
+    assert item["link_status"] == "PENDING"
+    assert item["allowed_commands"] == ["revoke_identity_link"]
+    assert str(link["link_token"]) not in pending_response.text
+
+    raw_subject = f"ou_access_{uuid.uuid4().hex}"
+    oauth_provider.subjects["identity-access-code"] = raw_subject
+    reviewer = client_for("wp09-identity-access-reviewer")
+    state = begin_oauth(reviewer, "/review", str(link["link_token"]))
+    assert_ok(callback(reviewer, "identity-access-code", state))
+
+    linked_response = operator.get(
+        "/api/v1/ops/identity-access",
+        headers=OPERATOR_HEADERS,
+    )
+    linked = assert_ok(linked_response)
+    item = next(
+        candidate
+        for candidate in linked["items"]
+        if candidate["user_id"] == str(reviewer_id)
+    )
+    assert item["identity_status"] == "LINKED"
+    assert item["identity_id"]
+    assert item["allowed_commands"] == ["revoke_external_identity"]
+    assert raw_subject not in linked_response.text
+
+    denied = client_for("wp09-identity-access-reviewer-denied").get(
+        "/api/v1/ops/identity-access",
+        headers={"X-Fixture-Role": "REVIEWER"},
+    )
+    assert denied.status_code == 403
+
+
 def test_first_operator_bootstrap_is_audited_and_token_hashed():
     secret = "test-subject-secret-independent-0000004"
     operator_id = create_role_user(Role.OPERATOR)

@@ -439,3 +439,73 @@ export async function cancelEnrollment(data: FormData) {
   revalidatePath("/ops");
   redirect("/ops?updated=cancelled");
 }
+
+export type IdentityLinkActionState = {
+  error?: string;
+  requestId?: string;
+  startPath?: string;
+  expiresAt?: string;
+};
+
+export async function createIdentityLink(
+  _previousState: IdentityLinkActionState,
+  data: FormData,
+): Promise<IdentityLinkActionState> {
+  const targetUserId = requiredUuid(data, "target_user_id");
+  const role = data.get("role");
+  if (role !== "REVIEWER" && role !== "OPERATOR") {
+    return { error: "身份角色无效。请刷新页面后重试。" };
+  }
+  try {
+    const result = await apiRequest<{ start_path: string; expires_at: string }>(
+      "/api/v1/ops/identity-links",
+      "OPERATOR",
+      {
+        method: "POST",
+        headers: commandHeaders(),
+        body: JSON.stringify({
+          target_user_id: targetUserId,
+          role,
+          expires_in_minutes: 30,
+        }),
+      },
+    );
+    return { startPath: result.start_path, expiresAt: result.expires_at };
+  } catch (error) {
+    return submissionError(error);
+  }
+}
+
+export async function revokeIdentityLink(data: FormData) {
+  const linkId = requiredUuid(data, "link_id");
+  const expectedRevision = requiredRevision(data);
+  await apiRequest(`/api/v1/ops/identity-links/${linkId}/revoke`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: expectedRevision,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=identity-link-revoked");
+}
+
+export async function revokeExternalIdentity(data: FormData) {
+  const identityId = requiredUuid(data, "identity_id");
+  const expectedRevision = requiredRevision(data);
+  await apiRequest(
+    `/api/v1/ops/external-identities/${identityId}/revoke`,
+    "OPERATOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        expected_revision: expectedRevision,
+        reason: requiredReason(data),
+      }),
+    },
+  );
+  revalidatePath("/ops");
+  redirect("/ops?updated=external-identity-revoked");
+}

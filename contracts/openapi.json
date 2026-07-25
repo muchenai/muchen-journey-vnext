@@ -1142,6 +1142,186 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "IdentityAccessListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IdentityAccessOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "IdentityAccessListOut",
+        "type": "object"
+      },
+      "IdentityAccessListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IdentityAccessListOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "IdentityAccessListResponse",
+        "type": "object"
+      },
+      "IdentityAccessOut": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_commands": {
+            "items": {
+              "enum": [
+                "create_identity_link",
+                "revoke_identity_link",
+                "revoke_external_identity"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Commands",
+            "type": "array"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "identity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Id"
+          },
+          "identity_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Revision"
+          },
+          "identity_status": {
+            "enum": [
+              "UNLINKED",
+              "LINKED",
+              "REVOKED"
+            ],
+            "title": "Identity Status",
+            "type": "string"
+          },
+          "identity_verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Verified At"
+          },
+          "is_current_actor": {
+            "title": "Is Current Actor",
+            "type": "boolean"
+          },
+          "link_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Expires At"
+          },
+          "link_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Id"
+          },
+          "link_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Revision"
+          },
+          "link_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Status"
+          },
+          "role": {
+            "enum": [
+              "REVIEWER",
+              "OPERATOR"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "role",
+          "identity_id",
+          "identity_status",
+          "identity_revision",
+          "identity_verified_at",
+          "is_current_actor",
+          "link_id",
+          "link_status",
+          "link_revision",
+          "link_expires_at",
+          "allowed_commands"
+        ],
+        "title": "IdentityAccessOut",
+        "type": "object"
+      },
       "IdentityConfirmCommand": {
         "additionalProperties": false,
         "properties": {
@@ -5399,6 +5579,52 @@
           }
         },
         "summary": "Revoke External Identity"
+      }
+    },
+    "/api/v1/ops/identity-access": {
+      "get": {
+        "operationId": "list_identity_access_api_v1_ops_identity_access_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityAccessListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Identity Access"
       }
     },
     "/api/v1/ops/identity-links": {
