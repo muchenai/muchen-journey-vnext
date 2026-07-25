@@ -27,6 +27,10 @@ export function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  // Next.js extracts the nonce from the request CSP while dynamically
+  // rendering framework and page scripts. The response header alone only
+  // instructs the browser and leaves those generated scripts un-nonced.
+  requestHeaders.set("Content-Security-Policy", policy);
 
   const isOpsRoute =
     request.nextUrl.pathname === "/ops" || request.nextUrl.pathname.startsWith("/ops/");

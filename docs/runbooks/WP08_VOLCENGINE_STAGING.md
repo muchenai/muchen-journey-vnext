@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`ALPHA_PILOT_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。候选 `d407b5f…` 的唯一 deploy run `30138363837` 因 Worker 错误加载完整 API secret 配置而失败，首次失败容器清理和 SSH 撤销均通过且没有重试。PR #41 已合入 database-only 配置边界；主线 Candidate Gate `30139385352` 已为新候选 `dad44cc…` 完成完整 CI、SBOM、GHCR push 与三摘要验证。机器合同现绑定该新候选，但不构成部署授权。
+状态：`ALPHA_PILOT_DEPLOYED / CSP_FIX_PENDING_CANDIDATE`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。候选 `dad44cc…` 的唯一 deploy run `30157449832` 已把 API/Web/Worker/Edge 部署到 staging，服务端 TLS、readiness 与匿名 `/ops = 401` 通过；但发布后真实 Chromium 发现响应 CSP nonce 没有进入 Next.js 脚本，浏览器 hydration 被阻断，因此 WP-08 尚未关闭。该授权已消费且不得重试；最小 CSP 修复必须经 PR、主线 Candidate Gate、新候选与候选绑定后另行申请 deploy。
 
 ## 1. 已锁定授权
 
@@ -8,7 +8,8 @@
 - 计费：全部按量计费（`PostPaid`）；月度硬上限：`¥800`；
 - 历史候选：`670661865f708a835997596ed5b74904809564a5`；已验证 Next.js 16.2.11 / sharp 0.35.3，但不含 Web readiness 修复，禁止再次 deploy；
 - 已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`；唯一 deploy run `30138363837` 已失败且禁止重试；
-- 当前候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；当前未获 deploy 授权；
+- 已消费候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，唯一 deploy run `30157449832` 已实际部署但浏览器 CSP/hydration 复验失败，禁止重试；
+- 当前候选：尚未生成；必须包含 CSP 请求头传播、动态渲染与生产浏览器回归修复；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -70,11 +71,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 锁定新候选 `dad44cc…`，并拒绝已消费的 `d407…`；绑定本身不构成 deploy 授权。候选绑定 PR 合入受保护主线后，仍须取得指名新候选完整 SHA、届时绑定主线与 `phase=deploy` 的明确授权，才可通过同一 `.github/workflows/staging.yml` 执行；workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针和 `/ops` 拒绝合同：
+当前 workflow/config 仍物理绑定已消费的 `dad44cc…`，不得再次派发；绑定只描述部署合同，不构成 deploy 授权。CSP 修复 PR 合入并生成新候选后，必须再由候选绑定 PR 原子更新完整 SHA、artifact run、三个镜像 digest 与确认词；随后仍须取得指名新候选完整 SHA、届时绑定主线与 `phase=deploy` 的明确授权，才可通过同一 `.github/workflows/staging.yml` 执行。workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播与动态渲染合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. `phase=deploy` 必须使用确认词 `DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING`；不得复用已消费的 `DEPLOY_D407B5F_TO_VOLCENGINE_STAGING`。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. 已消费的确认词 `DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING` 与 `DEPLOY_D407B5F_TO_VOLCENGINE_STAGING` 均不得复用。新候选必须使用新确认词；该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
@@ -84,7 +85,7 @@ Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state 
 
 三镜像必须使用 WP-07 已核验 digest，不能只用 tag。公开证据只记录 GitHub run ID、候选 SHA、门禁结果和非敏感资源类别；账号 ID、IP、DNS zone ID、RDS/TOS endpoint、SSH fingerprint、ACL 明细和截图只进入 `evidence/private/wp08` 或 90 天受控外部证据。
 
-部署成功后运行 staging browser smoke，并由主任务复验：Web/API/Worker revision、migration head、fixture/LOCAL_TEST fail-closed、旧凭证拒绝、旧私网不可路由、RDS/TOS/secret ACL 和空库合成路径。全部通过前退出词仍不是 `STAGING_ISOLATION_VERIFIED`。
+服务端部署步骤成功后必须立即运行真实 staging browser smoke；公开 `/` 承担三档视口、hydration、console、overflow 与键盘焦点检查，受保护 `/ops` 单独断言匿名 401，不能用 401 JSON 页面代替 UI 验证。主任务还要复验 Web/API/Worker revision、migration head、fixture/LOCAL_TEST fail-closed、旧凭证拒绝、旧私网不可路由、RDS/TOS/secret ACL 和空库合成路径。全部通过前退出词仍不是 `STAGING_ISOLATION_VERIFIED`。
 
 ## 6. 回滚与停止
 

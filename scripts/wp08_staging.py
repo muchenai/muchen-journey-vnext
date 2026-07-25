@@ -27,6 +27,7 @@ WEB_READINESS_ROUTE = (
     ROOT / "apps" / "web" / "src" / "app" / "health" / "ready" / "route.ts"
 )
 WEB_PROXY = ROOT / "apps" / "web" / "src" / "proxy.ts"
+WEB_LAYOUT = ROOT / "apps" / "web" / "src" / "app" / "layout.tsx"
 PRIVATE_EVIDENCE = ROOT / "evidence" / "private" / "wp08"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -135,6 +136,7 @@ def validate_files() -> None:
         "apps/web/src/app/health/ready/route.ts",
         "apps/web/src/lib/auth/cookies.ts",
         "apps/web/src/proxy.ts",
+        "apps/web/src/app/layout.tsx",
         "scripts/wp08_web_runtime_check.py",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -187,6 +189,11 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
     proxy = WEB_PROXY.read_text()
     if 'code: "AUTH_REQUIRED"' not in proxy or "{ status: 401 }" not in proxy:
         raise StagingError("anonymous /ops requests must fail closed with HTTP 401")
+    if 'requestHeaders.set("Content-Security-Policy", policy)' not in proxy:
+        raise StagingError("Next.js must receive the per-request CSP nonce")
+    layout = WEB_LAYOUT.read_text()
+    if 'import { connection } from "next/server"' not in layout or "await connection()" not in layout:
+        raise StagingError("nonce-protected pages must be dynamically rendered")
 
 
 def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:

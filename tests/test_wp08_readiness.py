@@ -42,6 +42,9 @@ def test_browser_spec_is_pinned_and_complete():
     assert spec["browser_revision"] == "1232"
     assert {item["name"] for item in spec["viewports"]} == {"desktop", "tablet", "mobile"}
     assert "focus_keyboard" in spec["checks"]
+    assert spec["path"] == "/"
+    assert spec["protected_path"] == "/ops"
+    assert "anonymous_protected_status" in spec["checks"]
 
 
 def test_browser_preflight_rejects_insecure_staging_url(tmp_path, monkeypatch):

@@ -300,9 +300,17 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
     readiness = tmp_path / "route.ts"
     readiness.write_text('status: "ready"\n"Cache-Control": "no-store"\n')
     proxy = tmp_path / "proxy.ts"
-    proxy.write_text('code: "AUTH_REQUIRED"\n{ status: 401 }\n')
+    proxy.write_text(
+        'code: "AUTH_REQUIRED"\n{ status: 401 }\n'
+        'requestHeaders.set("Content-Security-Policy", policy)\n'
+    )
+    layout = tmp_path / "layout.tsx"
+    layout.write_text(
+        'import { connection } from "next/server"\nawait connection()\n'
+    )
     monkeypatch.setattr(staging, "WEB_READINESS_ROUTE", readiness)
     monkeypatch.setattr(staging, "WEB_PROXY", proxy)
+    monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
@@ -329,6 +337,37 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
         "services:\n  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
     )
     with pytest.raises(staging.StagingError, match="project GHCR digest"):
+        staging.validate_staging_compose(compose)
+
+
+def test_staging_web_requires_dynamic_per_request_csp_nonce(tmp_path: Path, monkeypatch):
+    readiness = tmp_path / "route.ts"
+    readiness.write_text('status: "ready"\n"Cache-Control": "no-store"\n')
+    proxy = tmp_path / "proxy.ts"
+    proxy.write_text('code: "AUTH_REQUIRED"\n{ status: 401 }\n')
+    layout = tmp_path / "layout.tsx"
+    layout.write_text('export default function Layout() {}\n')
+    monkeypatch.setattr(staging, "WEB_READINESS_ROUTE", readiness)
+    monkeypatch.setattr(staging, "WEB_PROXY", proxy)
+    monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
+    compose = tmp_path / "compose.yaml"
+    compose.write_text(
+        "services:\n"
+        "  web:\n"
+        "    healthcheck:\n"
+        "      test: http://localhost:3000/health/ready\n"
+        "  edge:\n"
+        f"    image: {staging.EDGE_IMAGE}\n"
+    )
+
+    with pytest.raises(staging.StagingError, match="receive the per-request CSP nonce"):
+        staging.validate_staging_compose(compose)
+
+    proxy.write_text(
+        'code: "AUTH_REQUIRED"\n{ status: 401 }\n'
+        'requestHeaders.set("Content-Security-Policy", policy)\n'
+    )
+    with pytest.raises(staging.StagingError, match="dynamically rendered"):
         staging.validate_staging_compose(compose)
 
 
