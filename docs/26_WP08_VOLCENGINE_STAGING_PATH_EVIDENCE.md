@@ -2,7 +2,8 @@
 
 日期：2026-07-25
 状态：`ALPHA_PILOT_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`
-当前候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`
+当前候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`
+已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）
 历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
 整体发布：`NO_GO`
 
@@ -215,4 +216,10 @@
 - Worker 容器在写 heartbeat 前退出，Compose 因而将其判为 unhealthy；外部 TLS 步骤未执行。首次发布失败清理移除了 API/Web/Worker/Edge 容器与 release network，`always()` 输出 `WP08_SSH_INGRESS=CLOSED`，没有遗留 runner SSH 放行；
 - 本地使用同一 staging 配置复现：Worker 导入 `journey_api.db` 时会加载完整 API `Settings`，而最小权限 `worker.env` 不含 `SESSION_SECRET`、`INVITE_SECRET`、`IMPORT_SIGNING_KEY`，因此在数据库连接和 heartbeat 之前被 API secret 校验拒绝；
 - 修复不把三个无关高权限 secret 扩散给 Worker。数据库层改用只含 `DATABASE_URL` 的 `DatabaseSettings`；API 入口继续加载完整 `Settings` 并在 staging 缺少独立身份 secret 时 fail closed。新的子进程测试同时锁定这两个边界，真实 `APP_ENV=staging` + `NOTIFICATION_ADAPTER=DISABLED` Worker 启动路径已在本地 PostgreSQL 通过；
-- 本次 `d407…` 部署授权已消费且禁止重试。修复必须经 PR、主线 Candidate Gate、新候选与新的候选绑定后，才可另行申请一次 staging deploy。当前状态为 `ALPHA_PILOT_WORKER_CONFIG_FIX_PENDING_CANDIDATE`；WP-09、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。
+- 本次 `d407…` 部署授权已消费且禁止重试。当次状态为 `ALPHA_PILOT_WORKER_CONFIG_FIX_PENDING_CANDIDATE`；修复必须经 PR、主线 Candidate Gate、新候选与新的候选绑定后，才可另行申请一次 staging deploy。WP-09、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。
+
+## 2026-07-25 Worker 修复候选绑定
+
+- PR #41 已通过 required check 并合入受保护主线 `dad44cc679184a1978b0f69e3632cb95de7f1b8e`。Mainline Candidate Gate [`30139385352`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30139385352) 完成完整 CI、候选打包、三镜像 SBOM、GHCR push 与远端 digest 验证；artifact 未过期且标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`；
+- 新候选固定摘要为 API `sha256:6ccc4bdb…d886`、Web `sha256:44d3fa66…30c5`、Worker `sha256:77c611d1…95bf`。机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词 `DEPLOY_DAD44CC_TO_VOLCENGINE_STAGING` 原子绑定；
+- 绑定变更不包含 staging dispatch、云资源写入或旧候选重试。只有绑定 PR 合入受保护主线后，才能另行取得指名完整候选 `dad44cc679184a1978b0f69e3632cb95de7f1b8e`、基于届时绑定主线、冻结基础设施、失败不重试的精确 `phase=deploy` 授权。当前 deployment、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。
