@@ -1,12 +1,12 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`FIRST_OPERATOR_BOUND / OAUTH_RETURN_FIX_DEPLOYED / HUMAN_RECHECK_REQUIRED`
+状态：`FIRST_OPERATOR_BOUND / OAUTH_RETURN_HUMAN_PASS / REAL_ACCESS_MATRIX_REQUIRED`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
 ## 1. 结论
 
-WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定、cookie session 建立并进入 staging `/ops`。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 现已部署到冻结 staging，并通过公网 readiness、身份入口和匿名拒绝机器复验。真人尚未报告修复后的自动回跳结果，因此不能把完整 OAuth 浏览器闭环或完整权限矩阵记为 PASS。
+WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定和 cookie session 建立。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 已部署到冻结 staging，通过公网 readiness、身份入口和匿名拒绝机器复验，Environment Owner 随后从指定飞书登录入口完成真实登录并报告已进入 `/ops`。自动回跳子项现为真人 `PASS`，但 Reviewer/Operator 完整权限与撤销矩阵仍未执行，WP-09 尚未关闭。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -62,11 +62,11 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - 修复已通过 PR #52 合入主线候选 `2ea51c0aba272769af8bd8f298242b35326d79ea`；Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、SBOM、GHCR push 与三摘要验证。attempt 1 仅因 GitHub runner 拉取固定 Syft 镜像时 Docker Hub 网络超时而停止，代码与真实回跳响应测试均已通过；没有触碰 staging。
 - 用户精确授权该候选基于绑定主线 `2992841f375d101afdd90ff44117245bc72e55d6`，在火山引擎华北2（北京）冻结基础设施执行一次 `phase=deploy`，失败不重试。唯一 run [`30187687813`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30187687813) 在 18 分 56 秒内成功；候选/摘要合同、冻结 state、临时 SSH `/32`、私有 bundle、精确镜像部署、外部 TLS 与 release surface 全部通过，`always()` SSH 清理通过，未执行 audit、DNS reconcile、Terraform apply 或第二次部署。
 - 独立公网复验返回 `health/ready.status=ready` 且 release 精确等于 `2ea51c0…`；根页为 `200`，匿名 `/ops` 为 `401`，身份入口以 `303` 跳转到飞书官方授权端点，回调仍固定为 staging canonical URL。该机器证据证明修复已部署且入口合同正确，但不能替代真人完成飞书授权后的浏览器落点。
+- 2026-07-26T05:48:48Z，Environment Owner 在本任务中报告“已进入”，并提供登录完成后的 staging Operator 页面截图。截图人工核对显示 canonical staging 域名、`OPERATOR · STAGING`、候选 `2ea51c0…` 与 migration `0011_wp09_feishu_identity`；私有截图只以 SHA-256 `c1b91fbcf3ea786537866647005ad4e5dc7b2bf3d43059ad384022ed25afa390` 引用，不复制进 Public Git，不记录账号、cookie、飞书 subject 或 token。该证据把“修复后自动进入 `/ops`”记为真人 `PASS`，不外推其他真人权限场景。
 
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
-1. 同一真实 Operator 重新登录并确认 callback 自动进入 `/ops`；
-2. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
-3. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
+1. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
+2. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。完成前 WP-09 不关闭，WP-10 不激活，整体发布保持 `NO_GO`。
