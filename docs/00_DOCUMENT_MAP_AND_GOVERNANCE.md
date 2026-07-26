@@ -42,7 +42,7 @@
 | 24 | [WP-07 候选基线与软件供应链构建证据](24_WP07_CANDIDATE_BASELINE_SUPPLY_CHAIN_EVIDENCE.md) | 本地候选、分层 CI、扫描、SBOM 与 release manifest 实际证明了什么？ | 候选、远端 CI、GHCR digest 与受保护 main 已复验；staging/production 仍不在该证据范围 |
 | 25 | [WP-08 Definition of Ready 构建证据](25_WP08_DEFINITION_OF_READY_EVIDENCE.md) | 物理 staging 写入前的 Git、浏览器、迁移、fixture、冷启动、Ops 与证据边界是否真实可重复？ | 本地 DoR 证据可复现；不等同于物理 staging 已创建、部署或通过隔离验收 |
 | 26 | [WP-08 火山引擎 Staging 实施路径证据](26_WP08_VOLCENGINE_STAGING_PATH_EVIDENCE.md) | 已锁定 provider/region/budget 后，唯一 IaC/CI/secret/回滚路径是什么，云端是否已经写入？ | 冻结基础设施上的候选 `14c9ba0…` 已成功完成 migration、seed、完整服务健康、TLS 与真实浏览器 smoke；物理 ACL 结构匹配，但 API 未返回 `IsLatest`，整体发布仍 `NO_GO` |
-| 27 | [WP-09 真实身份与会话构建证据](27_WP09_REAL_IDENTITY_SESSION_EVIDENCE.md) | 飞书身份绑定、真实会话和撤销边界在代码与物理环境分别证明了什么？ | 独立飞书应用、首位 Operator 绑定和同源回跳修复候选已在 staging 落地；完整真人回跳与 Reviewer/Operator 权限矩阵仍 `NOT_RUN` |
+| 27 | [WP-09 真实身份与会话构建证据](27_WP09_REAL_IDENTITY_SESSION_EVIDENCE.md) | 飞书身份绑定、真实会话和撤销边界在代码与物理环境分别证明了什么？ | 独立飞书应用、首位 Operator 绑定和真人自动回跳已通过；Reviewer/Operator 对象、组织、旧会话与撤销矩阵仍 `NOT_RUN` |
 
 ## 3. 权威顺序
 
