@@ -1,12 +1,12 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`STAGING_IDENTITY_DEPLOYED / FIRST_OPERATOR_LINK_BLOCKED / REAL_IDENTITY_NOT_RUN`
+状态：`STAGING_IDENTITY_DEPLOYED / FIRST_OPERATOR_BOUND / REAL_OPERATOR_PARTIAL_PASS / OAUTH_RETURN_DEFECT`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
 ## 1. 结论
 
-WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。当前证据只证明实现和本地负向合同，不证明真实飞书应用、真实人员或 staging 权限矩阵已经通过。
+WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定、cookie session 建立并进入 staging `/ops`。完整 OAuth 浏览器闭环尚未通过：callback 成功后曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`，真人通过手工打开 canonical `/ops` 完成访问验证。该结果只关闭身份、会话和 Operator 路由访问三个子项，不能把自动回跳或完整权限矩阵记为 PASS。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -24,7 +24,7 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 
 ## 3. 机器证据
 
-- `make api-test`：150 项通过；
+- `make api-test`：151 项通过；
 - `npm run lint && npm run typecheck && npm run build`：通过，两个 OAuth Route Handler 均为动态路由；
 - `make openapi-check`、`make traceability-check`、`make wp08-workflow-check`、`make isolation-check`：通过；
 - 迁移 head：`0011_wp09_feishu_identity`；OpenAPI 已包含 identity access/list、link/revoke、OAuth start/callback 合同；
@@ -48,14 +48,23 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 `.deployment.env`，因镜像变量缺失而停止。修复后的 run `30181508821` 成功加载环境，但第一个
 `docker compose exec -T` 继承并消费了 SSH heredoc 的剩余 stdin，后续 bootstrap 命令未执行，空输出在
 JSON 校验处失败。两次 run 均未执行 `journey_api.wp09_bootstrap`、未创建绑定记录、未上传密文，并已撤销
-SSH。当前修复要求两个 Compose 调用显式从 `/dev/null` 读取 stdin，并以机器门禁固定；不得把任一失败
-当作已生成链接。
+SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 stdin，CLI 只创建一个 15 分钟链接，
+密文上传后临时 SSH 关闭，本地解密复制后私钥、明文和密文均删除。Owner 随后报告可进入 staging
+`/ops`；不记录真人标识、cookie、飞书 subject 或一次性 token。
+
+## 5. 首次真人 Operator 结果与缺陷边界
+
+- `PASS`：真实飞书授权完成；一次性 Operator link 被消费；staging session cookie 生效；同一浏览器直接访问 canonical `/ops` 获准；
+- `FAIL`：callback 后的自动站内跳转使用 Next standalone 内部 request origin，浏览器收到 `https://0.0.0.0:3000/ops`；
+- 根因：Web Route Handler 使用 `new URL(safe_entry, request.url)` 生成同源返回地址，而 standalone runtime 的 `request.url` 不构成可信公网 Origin；
+- 修复合同：所有站内 OAuth 成功/失败跳转只允许 `/` 起始且拒绝 `//`、CR/LF 的 root-relative `Location`；只有飞书官方授权地址允许绝对 HTTPS URL；真实 standalone 响应测试必须同时验证 `/ops` 相对跳转和 session cookie 透传；
+- 当前真人会话已证明绑定成功，无需也不得重复生成首次绑定链接。修复候选重新部署后仍需复验“点击登录到自动进入 `/ops`”，并执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵。
 
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
-1. 通过 PR 合入 Operator bootstrap 的 Compose 环境加载修复并完成主线门禁；
-2. 用修复后的受控命令生成首个 Operator 15 分钟一次性绑定链接；
-3. 真实 Operator 与 Reviewer 执行登录、对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
+1. 通过 PR 合入 OAuth 同源相对跳转修复，生成新候选并部署到冻结 staging；
+2. 同一真实 Operator 重新登录并确认 callback 自动进入 `/ops`；
+3. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
 4. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。完成前 WP-09 不关闭，WP-10 不激活，整体发布保持 `NO_GO`。
