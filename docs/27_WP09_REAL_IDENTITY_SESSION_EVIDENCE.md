@@ -1,6 +1,6 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`LOCAL_IDENTITY_IMPLEMENTATION_VERIFIED / REAL_IDENTITY_NOT_RUN`
+状态：`STAGING_IDENTITY_DEPLOYED / FIRST_OPERATOR_LINK_BLOCKED / REAL_IDENTITY_NOT_RUN`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
@@ -32,13 +32,27 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 
 ## 4. 外部边界与下一动作
 
+以下外部事实已经完成，并且只以非敏感元数据记录：
+
+- 当前飞书租户已创建独立企业自建应用 `Muchen Journey vNext Staging`；没有修改其他飞书应用；
+- Owner 已确认飞书安全设置保存精确 callback；GitHub `staging` Environment 已存在
+  `WP09_FEISHU_APP_ID`、`WP09_FEISHU_APP_SECRET` 与新生成的独立
+  `WP09_IDENTITY_SUBJECT_SECRET`；只复验 secret 名称和更新时间，未读取、输出或落盘 secret 值；
+- App ID/App Secret 已通过飞书官方租户鉴权端点验证；返回 token 未输出或落盘；
+- 唯一 staging deploy run `30181022690` 已成功部署候选
+  `26d56010125024ca2dbc6e85f7dfeb59857f93dd`；外部 TLS/readiness 返回同一 release，匿名
+  `/ops` 返回 `401`，临时 SSH `/32` 已撤销；
+- 未启用机器人、消息发送或全量通讯录能力，未发送飞书消息。
+
+首次 Operator 链接 run `30181111242` 在进入 bootstrap CLI 前失败：远端 Compose 调用未先加载
+`.deployment.env`，因镜像变量缺失而停止。该 run 未执行 `journey_api.wp09_bootstrap`、未创建绑定记录、
+未上传密文，并已撤销 SSH。修复已增加“Compose 前加载部署环境”的机器门禁；不得把该失败当作已生成链接。
+
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
-1. 创建 vNext 独立飞书企业自建应用并锁定 Owner/测试租户；
-2. 配置精确 callback：`https://staging-vnext.muchenai.com/auth/feishu/callback`；
-3. 将独立 App ID、App Secret、subject secret 写入 GitHub `staging` Environment；
-4. 用受控命令生成首个 Operator 15 分钟一次性绑定链接；
-5. 真实 Operator 与 Reviewer 执行登录、对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
-6. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
+1. 通过 PR 合入 Operator bootstrap 的 Compose 环境加载修复并完成主线门禁；
+2. 用修复后的受控命令生成首个 Operator 15 分钟一次性绑定链接；
+3. 真实 Operator 与 Reviewer 执行登录、对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
+4. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。完成前 WP-09 不关闭，WP-10 不激活，整体发布保持 `NO_GO`。
