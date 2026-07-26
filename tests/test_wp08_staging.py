@@ -464,6 +464,8 @@ def test_wp09_operator_bootstrap_workflow_encrypts_the_only_link(tmp_path: Path,
             "terraform output -raw staging_security_group_id",
             "python3 -m scripts.wp08_security_group open",
             "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
+            ". ./.deployment.env",
+            "operator_id=$(docker compose exec",
             "python -m journey_api.wp09_bootstrap",
             "--expires-in-minutes 15",
             "--confirm CREATE_STAGING_OPERATOR_LINK",
@@ -497,6 +499,10 @@ def test_wp09_operator_bootstrap_workflow_encrypts_the_only_link(tmp_path: Path,
 
     bootstrap.write_text(source.replace("python -m journey_api.wp09_bootstrap", "python -m journey_api.wp09_bootstrap\npython -m journey_api.wp09_bootstrap"))
     with pytest.raises(staging.StagingError, match="exactly once"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source.replace(". ./.deployment.env", ":"))
+    with pytest.raises(staging.StagingError, match="deployed image environment"):
         staging.validate_wp09_bootstrap_workflow(bootstrap)
 
 

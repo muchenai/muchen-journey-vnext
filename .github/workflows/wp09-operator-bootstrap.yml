@@ -112,6 +112,9 @@ jobs:
           release=$(readlink -f /srv/journey-next-staging/current)
           test -n "$release" && test -f "$release/compose.yaml"
           cd "$release"
+          set -a
+          . ./.deployment.env
+          set +a
           operator_id=$(docker compose exec -T api python -c 'from journey_api.fixtures import OPERATOR_ID; print(OPERATOR_ID)' | tr -d '\r\n')
           docker compose exec -T api python -m journey_api.wp09_bootstrap \
             --target-user-id "$operator_id" \

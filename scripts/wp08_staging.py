@@ -555,6 +555,12 @@ def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> No
         raise StagingError("WP-09 bootstrap link must be created exactly once")
     if workflow.count("actions/upload-artifact@") != 1:
         raise StagingError("WP-09 bootstrap must upload exactly one ciphertext artifact")
+    deployment_env = workflow.find(". ./.deployment.env")
+    operator_lookup = workflow.find("operator_id=$(docker compose exec")
+    if deployment_env < 0 or operator_lookup < 0 or deployment_env >= operator_lookup:
+        raise StagingError(
+            "WP-09 bootstrap must load the deployed image environment before Compose"
+        )
     print("WP09_OPERATOR_BOOTSTRAP_WORKFLOW=PASS encrypted_artifact=RSA4096_OAEP_SHA256")
 
 
