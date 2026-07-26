@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       confirmation:
-        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_26D5601_TO_VOLCENGINE_STAGING
+        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_2EA51C0_TO_VOLCENGINE_STAGING
         required: true
         type: string
 
@@ -33,9 +33,9 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == '26d56010125024ca2dbc6e85f7dfeb59857f93dd' &&
+      inputs.candidate == '2ea51c0aba272769af8bd8f298242b35326d79ea' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_26D5601_TO_VOLCENGINE_STAGING'))
+      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_2EA51C0_TO_VOLCENGINE_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -80,10 +80,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-26d56010125024ca2dbc6e85f7dfeb59857f93dd
+          name: wp07-candidate-2ea51c0aba272769af8bd8f298242b35326d79ea
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 30167972728
+          run-id: 30183059038
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
@@ -94,6 +94,10 @@ jobs:
             git show "$candidate:deploy/staging/compose.yaml" | \
               grep -Fq "http://localhost:3000/health/ready"
             git show "$candidate:apps/web/src/proxy.ts" | grep -Fq 'code: "AUTH_REQUIRED"'
+            git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts" | \
+              grep -Fq "sameOriginIdentityRedirect"
+            git show "$candidate:scripts/wp08_web_runtime_check.py" | \
+              grep -Fq "oauth_redirect=root-relative"
           fi
           make wp08-staging-apply-check
           echo "TF_VAR_approved_monthly_estimate_cny=$(jq -r .approved_monthly_estimate_cny config/wp08_staging.json)" >>"$GITHUB_ENV"

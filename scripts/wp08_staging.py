@@ -444,6 +444,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
         'git show "$candidate:deploy/staging/compose.yaml"',
         'git show "$candidate:apps/web/src/proxy.ts"',
+        'git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts"',
+        'git show "$candidate:scripts/wp08_web_runtime_check.py"',
     )
     for marker in required:
         if marker not in workflow:
@@ -456,7 +458,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 1
-        or workflow.count('git show "$candidate:') != 2
+        or workflow.count('git show "$candidate:') != 4
     ):
         raise StagingError("deploy must verify the Web contract inside the candidate source")
     if workflow.count("scripts/wp08_plan_guard.py") != 1:
@@ -509,11 +511,16 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
 
 def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> None:
     workflow = path.read_text()
-    candidate = str(load_contract()["candidate_commit"])
-    confirmation = f"CREATE_15M_OPERATOR_LINK_{candidate[:7].upper()}"
+    bootstrap_candidate = "26d56010125024ca2dbc6e85f7dfeb59857f93dd"
+    current_candidate = str(load_contract()["candidate_commit"])
+    if current_candidate == bootstrap_candidate:
+        raise StagingError(
+            "consumed WP-09 first-Operator bootstrap candidate must remain retired"
+        )
+    confirmation = "CREATE_15M_OPERATOR_LINK_26D5601"
     required = (
         "workflow_dispatch:",
-        candidate,
+        bootstrap_candidate,
         confirmation,
         "recipient_public_key_b64",
         "group: wp08-volcengine-staging",
@@ -565,7 +572,10 @@ def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> No
         raise StagingError(
             "WP-09 bootstrap Compose calls must not consume the remote script stdin"
         )
-    print("WP09_OPERATOR_BOOTSTRAP_WORKFLOW=PASS encrypted_artifact=RSA4096_OAEP_SHA256")
+    print(
+        "WP09_OPERATOR_BOOTSTRAP_WORKFLOW=PASS state=retired"
+        " encrypted_artifact=RSA4096_OAEP_SHA256"
+    )
 
 
 def command_output(*args: str) -> str:
