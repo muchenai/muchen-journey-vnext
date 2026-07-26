@@ -1,6 +1,6 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`LOCAL_IDENTITY_IMPLEMENTATION_VERIFIED / REAL_IDENTITY_NOT_RUN`
+状态：`LOCAL_IDENTITY_IMPLEMENTATION_VERIFIED / REAL_APP_CREATED / STAGING_SECRETS_PARTIAL / REAL_IDENTITY_NOT_RUN`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
@@ -32,12 +32,21 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 
 ## 4. 外部边界与下一动作
 
+以下外部事实已经完成，并且只以非敏感元数据记录：
+
+- 当前飞书租户已创建独立企业自建应用 `Muchen Journey vNext Staging`；没有修改其他飞书应用；
+- GitHub `staging` Environment 已存在 `WP09_FEISHU_APP_ID` 与新生成的独立
+  `WP09_IDENTITY_SUBJECT_SECRET`；只复验 secret 名称和更新时间，未读取、输出或落盘 secret 值；
+- 未启用机器人、消息发送或全量通讯录能力，未发送飞书消息。
+
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
-1. 创建 vNext 独立飞书企业自建应用并锁定 Owner/测试租户；
-2. 配置精确 callback：`https://staging-vnext.muchenai.com/auth/feishu/callback`；
-3. 将独立 App ID、App Secret、subject secret 写入 GitHub `staging` Environment；
-4. 用受控命令生成首个 Operator 15 分钟一次性绑定链接；
+1. 在飞书安全设置中保存并复验精确 callback：
+   `https://staging-vnext.muchenai.com/auth/feishu/callback`；
+2. 将该独立应用的 `WP09_FEISHU_APP_SECRET` 写入 GitHub `staging` Environment，并复验三项
+   secret 名称和更新时间；
+3. 在冻结基础设施上部署精确候选并通过 TLS/readiness/匿名拒绝检查；
+4. 部署成功后，用受控命令生成首个 Operator 15 分钟一次性绑定链接；
 5. 真实 Operator 与 Reviewer 执行登录、对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
 6. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
 
