@@ -561,6 +561,10 @@ def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> No
         raise StagingError(
             "WP-09 bootstrap must load the deployed image environment before Compose"
         )
+    if workflow.count("< /dev/null") != 2:
+        raise StagingError(
+            "WP-09 bootstrap Compose calls must not consume the remote script stdin"
+        )
     print("WP09_OPERATOR_BOOTSTRAP_WORKFLOW=PASS encrypted_artifact=RSA4096_OAEP_SHA256")
 
 
