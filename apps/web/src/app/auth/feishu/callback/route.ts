@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { identityRedirect, postIdentityApi } from "@/lib/server/oauth-proxy";
+import {
+  postIdentityApi,
+  sameOriginIdentityRedirect,
+} from "@/lib/server/oauth-proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +14,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = request.nextUrl.searchParams.get("code") ?? "";
   const state = request.nextUrl.searchParams.get("state") ?? "";
   if (!OAUTH_VALUE.test(code) || state.length < 32 || !OAUTH_VALUE.test(state)) {
-    return NextResponse.redirect(new URL("/?auth_error=OAUTH_CALLBACK_INVALID", request.url), 303);
+    return sameOriginIdentityRedirect("/?auth_error=OAUTH_CALLBACK_INVALID");
   }
   const result = await postIdentityApi<{ safe_entry: string }>(
     request,
@@ -20,10 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   );
   if (result instanceof NextResponse) return result;
   if (!SAFE_ENTRIES.has(result.data.safe_entry)) {
-    return NextResponse.redirect(
-      new URL("/?auth_error=IDENTITY_PROVIDER_INVALID", request.url),
-      303,
-    );
+    return sameOriginIdentityRedirect("/?auth_error=IDENTITY_PROVIDER_INVALID");
   }
-  return identityRedirect(new URL(result.data.safe_entry, request.url), result.response);
+  return sameOriginIdentityRedirect(result.data.safe_entry, result.response);
 }

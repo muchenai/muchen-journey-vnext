@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 type ApiErrorEnvelope = { error?: { code?: string } };
 
 const SAFE_ERROR = /^[A-Z0-9_]{3,80}$/;
+const SAFE_SAME_ORIGIN_LOCATION = /^\/(?!\/)[^\r\n]*$/;
 
 function apiBaseUrl(): string {
   return process.env.API_INTERNAL_URL ?? "http://localhost:8000";
@@ -21,13 +22,9 @@ function appendSetCookies(source: Response, target: NextResponse): void {
   for (const value of values) target.headers.append("Set-Cookie", value);
 }
 
-function safeErrorRedirect(request: NextRequest, code: string): NextResponse {
-  const target = new URL("/", request.url);
-  target.searchParams.set("auth_error", SAFE_ERROR.test(code) ? code : "IDENTITY_LOGIN_FAILED");
-  const response = NextResponse.redirect(target, 303);
-  response.headers.set("Cache-Control", "no-store");
-  response.headers.set("Referrer-Policy", "no-referrer");
-  return response;
+function safeErrorRedirect(code: string): NextResponse {
+  const safeCode = SAFE_ERROR.test(code) ? code : "IDENTITY_LOGIN_FAILED";
+  return sameOriginIdentityRedirect(`/?auth_error=${safeCode}`);
 }
 
 export async function postIdentityApi<T>(
@@ -53,21 +50,35 @@ export async function postIdentityApi<T>(
   try {
     payload = (await response.json()) as { data?: T } & ApiErrorEnvelope;
   } catch {
-    return safeErrorRedirect(request, "IDENTITY_PROVIDER_UNAVAILABLE");
+    return safeErrorRedirect("IDENTITY_PROVIDER_UNAVAILABLE");
   }
   if (!response.ok || !payload.data) {
-    return safeErrorRedirect(request, payload.error?.code ?? "IDENTITY_LOGIN_FAILED");
+    return safeErrorRedirect(payload.error?.code ?? "IDENTITY_LOGIN_FAILED");
   }
   return { data: payload.data, response };
 }
 
-export function identityRedirect(
-  location: URL | string,
-  upstream: Response,
-): NextResponse {
-  const response = NextResponse.redirect(location, 303);
-  appendSetCookies(upstream, response);
+function secureRedirect(response: NextResponse, upstream?: Response): NextResponse {
+  if (upstream) appendSetCookies(upstream, response);
   response.headers.set("Cache-Control", "no-store");
   response.headers.set("Referrer-Policy", "no-referrer");
   return response;
+}
+
+export function sameOriginIdentityRedirect(
+  location: string,
+  upstream?: Response,
+): NextResponse {
+  if (!SAFE_SAME_ORIGIN_LOCATION.test(location)) {
+    throw new Error("same-origin identity redirect must be a root-relative path");
+  }
+  return secureRedirect(
+    new NextResponse(null, { status: 303, headers: { Location: location } }),
+    upstream,
+  );
+}
+
+export function identityRedirect(location: URL, upstream: Response): NextResponse {
+  const response = NextResponse.redirect(location, 303);
+  return secureRedirect(response, upstream);
 }

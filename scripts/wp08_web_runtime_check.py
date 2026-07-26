@@ -8,9 +8,11 @@ import os
 import re
 import socket
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
@@ -20,6 +22,37 @@ RELEASE = "wp08-web-runtime-check"
 SCRIPT_NONCE = re.compile(rb"<script\b[^>]*\bnonce=[\"']([^\"']+)", re.IGNORECASE)
 SCRIPT_TAG = re.compile(rb"<script\b", re.IGNORECASE)
 POLICY_NONCE = re.compile(r"(?:^|;\s*)script-src[^;]*'nonce-([^']+)'")
+
+
+class IdentityApiHandler(BaseHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:
+        del format, args
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        if self.path != "/api/v1/auth/feishu/callback":
+            self.send_error(404)
+            return
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = json.loads(self.rfile.read(length))
+        if payload != {"code": "runtime-code", "state": "s" * 32}:
+            self.send_error(400)
+            return
+        body = json.dumps({"data": {"safe_entry": "/ops"}}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header(
+            "Set-Cookie",
+            "journey_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
+        )
+        self.end_headers()
+        self.wfile.write(body)
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        del req, fp, code, msg, headers, newurl
+        return None
 
 
 def unused_port() -> int:
@@ -44,17 +77,41 @@ def request(url: str) -> tuple[int, bytes, dict[str, str]]:
         )
 
 
+def request_without_redirect(
+    url: str, headers: dict[str, str]
+) -> tuple[int, bytes, dict[str, str]]:
+    opener = urllib.request.build_opener(NoRedirect)
+    request_value = urllib.request.Request(url, headers=headers)
+    try:
+        with opener.open(request_value, timeout=2) as response:
+            return (
+                response.status,
+                response.read(),
+                {key.lower(): value for key, value in response.headers.items()},
+            )
+    except urllib.error.HTTPError as error:
+        return (
+            error.code,
+            error.read(),
+            {key.lower(): value for key, value in error.headers.items()},
+        )
+
+
 def main() -> None:
     server = STANDALONE / "server.js"
     if not server.is_file():
         raise SystemExit("WP08_WEB_RUNTIME_ERROR: production build is missing")
 
     port = unused_port()
+    identity_api = ThreadingHTTPServer(("127.0.0.1", 0), IdentityApiHandler)
+    identity_api_thread = threading.Thread(target=identity_api.serve_forever, daemon=True)
+    identity_api_thread.start()
+    identity_api_port = int(identity_api.server_address[1])
     environment = os.environ.copy()
     environment.update(
         {
             "ALLOW_FIXTURE_IDENTITY": "false",
-            "API_INTERNAL_URL": "http://127.0.0.1:1",
+            "API_INTERNAL_URL": f"http://127.0.0.1:{identity_api_port}",
             "APP_ENV": "staging",
             "APP_RELEASE": RELEASE,
             "HOSTNAME": "127.0.0.1",
@@ -119,6 +176,34 @@ def main() -> None:
         )
         if second_nonce is None or second_nonce.group(1) == policy_nonce.group(1):
             raise RuntimeError("CSP nonce is not unique per request")
+
+        proxy_headers = {
+            "Host": "staging-vnext.muchenai.com",
+            "X-Forwarded-Host": "staging-vnext.muchenai.com",
+            "X-Forwarded-Proto": "https",
+        }
+        callback_status, _, callback_headers = request_without_redirect(
+            f"{base_url}/auth/feishu/callback?code=runtime-code&state={'s' * 32}",
+            proxy_headers,
+        )
+        if callback_status != 303:
+            raise RuntimeError(f"OAuth callback returned HTTP {callback_status}")
+        if callback_headers.get("location") != "/ops":
+            raise RuntimeError(
+                "OAuth callback did not return a root-relative /ops redirect: "
+                f"{callback_headers.get('location')!r}"
+            )
+        if "journey_session=runtime-only" not in callback_headers.get("set-cookie", ""):
+            raise RuntimeError("OAuth callback did not preserve the upstream session cookie")
+
+        invalid_status, _, invalid_headers = request_without_redirect(
+            f"{base_url}/auth/feishu/callback?code=invalid",
+            proxy_headers,
+        )
+        if invalid_status != 303 or invalid_headers.get("location") != (
+            "/?auth_error=OAUTH_CALLBACK_INVALID"
+        ):
+            raise RuntimeError("invalid OAuth callback did not fail to a same-origin path")
     except Exception as error:
         process.terminate()
         output = process.communicate(timeout=5)[0]
@@ -131,10 +216,13 @@ def main() -> None:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+        identity_api.shutdown()
+        identity_api.server_close()
+        identity_api_thread.join(timeout=5)
 
     print(
         "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401"
-        " root=200 csp_nonce=per-request"
+        " root=200 csp_nonce=per-request oauth_redirect=root-relative"
     )
 
 
