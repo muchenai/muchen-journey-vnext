@@ -115,12 +115,12 @@ jobs:
           set -a
           . ./.deployment.env
           set +a
-          operator_id=$(docker compose exec -T api python -c 'from journey_api.fixtures import OPERATOR_ID; print(OPERATOR_ID)' | tr -d '\r\n')
+          operator_id=$(docker compose exec -T api python -c 'from journey_api.fixtures import OPERATOR_ID; print(OPERATOR_ID)' < /dev/null | tr -d '\r\n')
           docker compose exec -T api python -m journey_api.wp09_bootstrap \
             --target-user-id "$operator_id" \
             --authorization-reference "$AUTHORIZATION_REF" \
             --expires-in-minutes 15 \
-            --confirm CREATE_STAGING_OPERATOR_LINK
+            --confirm CREATE_STAGING_OPERATOR_LINK < /dev/null
           REMOTE
           )
           echo "::add-mask::$bootstrap_json"

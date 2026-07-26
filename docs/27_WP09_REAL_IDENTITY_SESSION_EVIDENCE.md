@@ -45,8 +45,11 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
 - 未启用机器人、消息发送或全量通讯录能力，未发送飞书消息。
 
 首次 Operator 链接 run `30181111242` 在进入 bootstrap CLI 前失败：远端 Compose 调用未先加载
-`.deployment.env`，因镜像变量缺失而停止。该 run 未执行 `journey_api.wp09_bootstrap`、未创建绑定记录、
-未上传密文，并已撤销 SSH。修复已增加“Compose 前加载部署环境”的机器门禁；不得把该失败当作已生成链接。
+`.deployment.env`，因镜像变量缺失而停止。修复后的 run `30181508821` 成功加载环境，但第一个
+`docker compose exec -T` 继承并消费了 SSH heredoc 的剩余 stdin，后续 bootstrap 命令未执行，空输出在
+JSON 校验处失败。两次 run 均未执行 `journey_api.wp09_bootstrap`、未创建绑定记录、未上传密文，并已撤销
+SSH。当前修复要求两个 Compose 调用显式从 `/dev/null` 读取 stdin，并以机器门禁固定；不得把任一失败
+当作已生成链接。
 
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
