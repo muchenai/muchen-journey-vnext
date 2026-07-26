@@ -393,6 +393,8 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
             'git show "$candidate:deploy/staging/compose.yaml"',
             'git show "$candidate:apps/web/src/proxy.ts"',
+            'git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts"',
+            'git show "$candidate:scripts/wp08_web_runtime_check.py"',
             "      - name: Audit frozen ECS to RDS allowlist binding",
             "        if: inputs.phase == 'audit'",
             "terraform -chdir=infra/staging state pull >\"$state_file\"",
@@ -508,6 +510,17 @@ def test_wp09_operator_bootstrap_workflow_encrypts_the_only_link(tmp_path: Path,
 
     bootstrap.write_text(source.replace("python -m journey_api.wp09_bootstrap < /dev/null", "python -m journey_api.wp09_bootstrap"))
     with pytest.raises(staging.StagingError, match="remote script stdin"):
+        staging.validate_wp09_bootstrap_workflow(bootstrap)
+
+    bootstrap.write_text(source)
+    monkeypatch.setattr(
+        staging,
+        "load_contract",
+        lambda: {
+            "candidate_commit": "26d56010125024ca2dbc6e85f7dfeb59857f93dd"
+        },
+    )
+    with pytest.raises(staging.StagingError, match="must remain retired"):
         staging.validate_wp09_bootstrap_workflow(bootstrap)
 
 

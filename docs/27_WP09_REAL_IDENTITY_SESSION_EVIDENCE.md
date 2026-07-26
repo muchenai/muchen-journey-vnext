@@ -1,6 +1,6 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`STAGING_IDENTITY_DEPLOYED / FIRST_OPERATOR_BOUND / REAL_OPERATOR_PARTIAL_PASS / OAUTH_RETURN_DEFECT`
+状态：`FIRST_OPERATOR_BOUND / REAL_OPERATOR_PARTIAL_PASS / OAUTH_RETURN_FIX_CANDIDATE_READY`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
@@ -59,6 +59,7 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - 根因：Web Route Handler 使用 `new URL(safe_entry, request.url)` 生成同源返回地址，而 standalone runtime 的 `request.url` 不构成可信公网 Origin；
 - 修复合同：所有站内 OAuth 成功/失败跳转只允许 `/` 起始且拒绝 `//`、CR/LF 的 root-relative `Location`；只有飞书官方授权地址允许绝对 HTTPS URL；真实 standalone 响应测试必须同时验证 `/ops` 相对跳转和 session cookie 透传；
 - 当前真人会话已证明绑定成功，无需也不得重复生成首次绑定链接。修复候选重新部署后仍需复验“点击登录到自动进入 `/ops`”，并执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵。
+- 修复已通过 PR #52 合入主线候选 `2ea51c0aba272769af8bd8f298242b35326d79ea`；Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、SBOM、GHCR push 与三摘要验证。attempt 1 仅因 GitHub runner 拉取固定 Syft 镜像时 Docker Hub 网络超时而停止，代码与真实回跳响应测试均已通过；没有触碰 staging。新候选仍待精确 deploy 授权。
 
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 

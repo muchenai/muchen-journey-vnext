@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP09_IDENTITY_CANDIDATE_BINDING / DEPLOY_AUTHORIZED_AFTER_FEISHU_PREFLIGHT`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `14c9ba0…`；WP-09 身份候选 `26d5601…` 的 Mainline Candidate Gate `30167972728` 已完成完整 CI、SBOM、GHCR push 与三摘要验证。机器合同绑定只为用户本轮精确授权准备，不会单独触发部署。
+状态：`WP09_OAUTH_RETURN_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `26d5601…`；OAuth 同源回跳修复候选 `2ea51c0…` 的 Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、真实 standalone 回跳响应测试、SBOM、GHCR push 与三摘要验证。机器合同绑定不构成新候选的部署授权。
 
 ## 1. 已锁定授权
 
@@ -9,8 +9,9 @@
 - 历史候选：`670661865f708a835997596ed5b74904809564a5`；已验证 Next.js 16.2.11 / sharp 0.35.3，但不含 Web readiness 修复，禁止再次 deploy；
 - 已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`；唯一 deploy run `30138363837` 已失败且禁止重试；
 - 已消费候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，唯一 deploy run `30157449832` 已实际部署但浏览器 CSP/hydration 复验失败，禁止重试；
-- 当前运行候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；唯一 deploy 已成功消费；
-- 当前待部署候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；canonical run `30167972728` 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；仅在独立飞书 Staging 应用与三项 GitHub Environment secret 配置复验通过后，按本轮授权执行一次 deploy，失败不重试；
+- 已消费候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；唯一 deploy 已成功消费；
+- 当前运行候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；唯一 deploy run `30181022690` 成功，真实 Operator 已完成绑定、会话和 canonical `/ops` 访问；callback 自动回跳缺陷仍存在；
+- 当前待授权候选：`2ea51c0aba272769af8bd8f298242b35326d79ea`；canonical run `30183059038` attempt 2 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；该候选只修复 OAuth 同源回跳并补充真实 standalone 响应回归，尚未取得 deploy 授权；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -72,15 +73,15 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 锁定 WP-09 身份候选 `26d5601…`，并拒绝早期已消费候选；绑定只描述部署合同。用户已精确授权该候选在飞书配置复验通过后，使用冻结基础设施执行一次 `phase=deploy`，失败不重试。workflow 还必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播与动态渲染合同：
+当前 workflow/config 锁定 OAuth 同源回跳修复候选 `2ea51c0…`，并拒绝早期已消费候选；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect 与真实 standalone 响应测试合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. 本轮 `phase=deploy` 只接受新确认词 `DEPLOY_26D5601_TO_VOLCENGINE_STAGING`；历史确认词均已消费，不得复用。该阶段只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. `phase=deploy` 只接受绑定候选的确认词 `DEPLOY_2EA51C0_TO_VOLCENGINE_STAGING`；该确认词目前尚未获 Owner 授权，不得 dispatch。历史确认词均已消费，不得复用。获得精确授权后，该阶段仍只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
-WP-09 首个 Operator 绑定链接只允许在候选部署成功后，通过独立的 `.github/workflows/wp09-operator-bootstrap.yml` 生成一次。该 workflow 与 staging deploy 共用同一 concurrency group，只从冻结 state 读取现有 ECS/安全组，临时开放同一个 runner `/32`，核对服务器实际运行候选后调用受审 bootstrap CLI。15 分钟链接的明文不得进入日志或公开 artifact：执行者必须临时生成 RSA-4096 密钥对，只把公钥作为 workflow input；Actions 仅上传 OAEP-SHA256 密文且保留 1 天，私钥与解密明文只在本地临时目录存活，最终链接只进入本机剪贴板。该路径不发送飞书消息、不读取通讯录、不执行 Terraform plan/apply/import，也不构成 deploy 重试。
+WP-09 首个 Operator 绑定链接已由 run `30181942549` 成功生成并消费；`.github/workflows/wp09-operator-bootstrap.yml` 只保留为该次受控流程的历史合同。它仍绑定已消费候选 `26d5601…`，而当前 staging 部署合同必须绑定不同的新候选，因此执行前的 candidate/config 等值检查必然 fail closed。机器门禁明确拒绝把当前候选回退为 bootstrap 候选，禁止为新候选更新该 workflow 或重复生成“首个 Operator”链接。后续 Reviewer/Operator 链接只能由已绑定 Operator 在 `/ops` 的受权 UI 中生成。
 
 ## 5. 部署顺序与证据
 
