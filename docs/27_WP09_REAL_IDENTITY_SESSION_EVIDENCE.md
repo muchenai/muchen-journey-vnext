@@ -1,12 +1,12 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`FIRST_OPERATOR_BOUND / REAL_OPERATOR_PARTIAL_PASS / OAUTH_RETURN_FIX_CANDIDATE_READY`
+状态：`FIRST_OPERATOR_BOUND / OAUTH_RETURN_FIX_DEPLOYED / HUMAN_RECHECK_REQUIRED`
 日期：2026-07-26
 当前发布判断：`NO_GO`
 
 ## 1. 结论
 
-WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定、cookie session 建立并进入 staging `/ops`。完整 OAuth 浏览器闭环尚未通过：callback 成功后曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`，真人通过手工打开 canonical `/ops` 完成访问验证。该结果只关闭身份、会话和 Operator 路由访问三个子项，不能把自动回跳或完整权限矩阵记为 PASS。
+WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定、cookie session 建立并进入 staging `/ops`。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 现已部署到冻结 staging，并通过公网 readiness、身份入口和匿名拒绝机器复验。真人尚未报告修复后的自动回跳结果，因此不能把完整 OAuth 浏览器闭环或完整权限矩阵记为 PASS。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -39,7 +39,7 @@ WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段�
   `WP09_FEISHU_APP_ID`、`WP09_FEISHU_APP_SECRET` 与新生成的独立
   `WP09_IDENTITY_SUBJECT_SECRET`；只复验 secret 名称和更新时间，未读取、输出或落盘 secret 值；
 - App ID/App Secret 已通过飞书官方租户鉴权端点验证；返回 token 未输出或落盘；
-- 唯一 staging deploy run `30181022690` 已成功部署候选
+- 首次身份 staging deploy run `30181022690` 已成功部署候选
   `26d56010125024ca2dbc6e85f7dfeb59857f93dd`；外部 TLS/readiness 返回同一 release，匿名
   `/ops` 返回 `401`，临时 SSH `/32` 已撤销；
 - 未启用机器人、消息发送或全量通讯录能力，未发送飞书消息。
@@ -59,13 +59,14 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - 根因：Web Route Handler 使用 `new URL(safe_entry, request.url)` 生成同源返回地址，而 standalone runtime 的 `request.url` 不构成可信公网 Origin；
 - 修复合同：所有站内 OAuth 成功/失败跳转只允许 `/` 起始且拒绝 `//`、CR/LF 的 root-relative `Location`；只有飞书官方授权地址允许绝对 HTTPS URL；真实 standalone 响应测试必须同时验证 `/ops` 相对跳转和 session cookie 透传；
 - 当前真人会话已证明绑定成功，无需也不得重复生成首次绑定链接。修复候选重新部署后仍需复验“点击登录到自动进入 `/ops`”，并执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵。
-- 修复已通过 PR #52 合入主线候选 `2ea51c0aba272769af8bd8f298242b35326d79ea`；Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、SBOM、GHCR push 与三摘要验证。attempt 1 仅因 GitHub runner 拉取固定 Syft 镜像时 Docker Hub 网络超时而停止，代码与真实回跳响应测试均已通过；没有触碰 staging。新候选仍待精确 deploy 授权。
+- 修复已通过 PR #52 合入主线候选 `2ea51c0aba272769af8bd8f298242b35326d79ea`；Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、SBOM、GHCR push 与三摘要验证。attempt 1 仅因 GitHub runner 拉取固定 Syft 镜像时 Docker Hub 网络超时而停止，代码与真实回跳响应测试均已通过；没有触碰 staging。
+- 用户精确授权该候选基于绑定主线 `2992841f375d101afdd90ff44117245bc72e55d6`，在火山引擎华北2（北京）冻结基础设施执行一次 `phase=deploy`，失败不重试。唯一 run [`30187687813`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30187687813) 在 18 分 56 秒内成功；候选/摘要合同、冻结 state、临时 SSH `/32`、私有 bundle、精确镜像部署、外部 TLS 与 release surface 全部通过，`always()` SSH 清理通过，未执行 audit、DNS reconcile、Terraform apply 或第二次部署。
+- 独立公网复验返回 `health/ready.status=ready` 且 release 精确等于 `2ea51c0…`；根页为 `200`，匿名 `/ops` 为 `401`，身份入口以 `303` 跳转到飞书官方授权端点，回调仍固定为 staging canonical URL。该机器证据证明修复已部署且入口合同正确，但不能替代真人完成飞书授权后的浏览器落点。
 
 以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
 
-1. 通过 PR 合入 OAuth 同源相对跳转修复，生成新候选并部署到冻结 staging；
-2. 同一真实 Operator 重新登录并确认 callback 自动进入 `/ops`；
-3. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
-4. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
+1. 同一真实 Operator 重新登录并确认 callback 自动进入 `/ops`；
+2. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
+3. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。完成前 WP-09 不关闭，WP-10 不激活，整体发布保持 `NO_GO`。
