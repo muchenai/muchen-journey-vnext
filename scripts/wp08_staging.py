@@ -438,8 +438,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '-var="deploy_cidr=127.0.0.1/32"',
         "https://staging-vnext.muchenai.com/health/ready",
         "https://staging-vnext.muchenai.com/ops",
+        "https://staging-vnext.muchenai.com/review",
         "'%{http_code}'",
         '= "401"',
+        "expired_reviewer=explicit-relogin",
         'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
         'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
         'git show "$candidate:deploy/staging/compose.yaml"',
@@ -458,7 +460,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 1
-        or workflow.count('git show "$candidate:') != 4
+        or workflow.count('git show "$candidate:') != 5
     ):
         raise StagingError("deploy must verify the Web contract inside the candidate source")
     if workflow.count("scripts/wp08_plan_guard.py") != 1:

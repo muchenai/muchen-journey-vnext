@@ -98,6 +98,8 @@ jobs:
               grep -Fq "sameOriginIdentityRedirect"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
               grep -Fq "oauth_redirect=root-relative"
+            git show "$candidate:scripts/wp08_web_runtime_check.py" | \
+              grep -Fq "expired_reviewer=explicit-relogin"
           fi
           make wp08-staging-apply-check
           echo "TF_VAR_approved_monthly_estimate_cny=$(jq -r .approved_monthly_estimate_cny config/wp08_staging.json)" >>"$GITHUB_ENV"
@@ -236,6 +238,8 @@ jobs:
               '.status == "ready" and .release == $release' >/dev/null
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/ops)" = "401"
+          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            https://staging-vnext.muchenai.com/review)" = "401"
       - name: Close SSH ingress
         if: always() && inputs.phase == 'deploy' && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |

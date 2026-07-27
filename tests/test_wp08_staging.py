@@ -395,6 +395,8 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git show "$candidate:apps/web/src/proxy.ts"',
             'git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts"',
             'git show "$candidate:scripts/wp08_web_runtime_check.py"',
+            'git show "$candidate:scripts/wp08_web_runtime_check.py"',
+            "expired_reviewer=explicit-relogin",
             "      - name: Audit frozen ECS to RDS allowlist binding",
             "        if: inputs.phase == 'audit'",
             "terraform -chdir=infra/staging state pull >\"$state_file\"",
@@ -424,6 +426,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "if: inputs.phase == 'deploy'",
             "https://staging-vnext.muchenai.com/health/ready",
             "https://staging-vnext.muchenai.com/ops",
+            "https://staging-vnext.muchenai.com/review",
             "'%{http_code}'",
             '= "401"',
             "      - name: Close SSH ingress",
@@ -433,6 +436,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
     )
     workflow.write_text(source)
     staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("expired_reviewer=explicit-relogin", "missing-expiry-contract"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
 
     workflow.write_text(source.replace("scripts/wp08_plan_guard.py", "scripts/missing.py", 1))
     with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
