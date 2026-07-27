@@ -271,10 +271,35 @@ export type OpsAuditEntry = {
   occurred_at: string;
 };
 
+export type OpsNotificationEndpoint = {
+  id: string;
+  user_id: string;
+  channel: "FEISHU";
+  receive_id_type: "open_id";
+  status: "ACTIVE" | "REVOKED";
+  source: "OPERATOR_CONFIG";
+  revision: number;
+  updated_at: string;
+};
+
+export type OpsNotificationDelivery = {
+  id: string;
+  recipient_user_id: string;
+  channel: string;
+  status: string;
+  attempt_count: number;
+  redrive_count: number;
+  revision: number;
+  last_error_code: string | null;
+  next_attempt_at: string | null;
+  delivered_at: string | null;
+  external_receipt_recorded: boolean;
+};
+
 export type RuntimeStatus = {
   environment: "local" | "test" | "staging" | "production";
   release: string;
-  config_schema_version: 2;
+  config_schema_version: 3;
   migration_revision: string;
   api: { status: string; release: string | null };
   database: { status: string };
@@ -284,11 +309,13 @@ export type RuntimeStatus = {
     last_seen_at: string | null;
     stale: boolean | null;
   };
-  observability_mode: "LOCAL_STRUCTURED_STDOUT";
+  observability_mode: "STRUCTURED_STDOUT";
   external_observability_confirmed: false;
   metrics: {
     outbox_backlog: number;
+    notification_retry_wait: number;
     notification_dead: number;
+    oldest_pending_seconds: number;
     permission_denials_24h: number;
   };
 };

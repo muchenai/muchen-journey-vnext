@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "status": "ENGINEERING_CONTRACT_ONLY",
+  "external_collection": "NOT_RUN",
+  "log_source": {
+    "format": "JSON_LINES",
+    "services": ["api", "worker"],
+    "transport": "CONTAINER_STDOUT",
+    "forbidden_fields": [
+      "authorization",
+      "cookie",
+      "request_body",
+      "response_body",
+      "receive_id",
+      "recipient_fingerprint",
+      "provider_message_id",
+      "submission_body",
+      "token"
+    ]
+  },
+  "dashboard_contract": [
+    "http_success_rate_by_route",
+    "http_latency_by_route",
+    "current_action_route_health",
+    "submission_route_health",
+    "review_finalize_route_health",
+    "permission_denials_24h",
+    "outbox_backlog",
+    "oldest_pending_seconds",
+    "notification_retry_wait",
+    "notification_dead",
+    "database_ready",
+    "worker_heartbeat"
+  ],
+  "alert_contract": [
+    {
+      "name": "notification_dead_present",
+      "condition": "notification_dead > 0",
+      "severity": "P1",
+      "owner": "Pilot Operator",
+      "detection_slo_minutes": 15
+    },
+    {
+      "name": "outbox_oldest_pending",
+      "condition": "oldest_pending_seconds > 900",
+      "severity": "P1",
+      "owner": "Pilot Operator",
+      "detection_slo_minutes": 15
+    },
+    {
+      "name": "worker_stale",
+      "condition": "worker.stale = true",
+      "severity": "P1",
+      "owner": "Pilot Operator",
+      "detection_slo_minutes": 5
+    },
+    {
+      "name": "permission_denial_spike",
+      "condition": "permission_denials_24h >= 10",
+      "severity": "P2",
+      "owner": "Security Owner",
+      "detection_slo_minutes": 60
+    }
+  ],
+  "approved_external_target": "VOLCENGINE_TLS_AND_CLOUD_MONITOR",
+  "external_route": "UNCONFIGURED",
+  "drill_evidence": "NOT_RUN"
+}

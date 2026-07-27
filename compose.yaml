@@ -38,7 +38,7 @@ services:
     environment:
       APP_ENV: local
       APP_RELEASE: wp06-local-no-head
-      CONFIG_SCHEMA_VERSION: 2
+      CONFIG_SCHEMA_VERSION: 3
       DATABASE_URL: postgresql+psycopg://journey_next:journey_next_dev@db:5432/journey_next_dev
       ALLOWED_HOSTS: localhost,127.0.0.1,api
       ALLOW_FIXTURE_IDENTITY: "true"
@@ -65,7 +65,7 @@ services:
     environment:
       APP_ENV: local
       APP_RELEASE: wp06-local-no-head
-      CONFIG_SCHEMA_VERSION: 2
+      CONFIG_SCHEMA_VERSION: 3
       DATABASE_URL: postgresql+psycopg://journey_next:journey_next_dev@db:5432/journey_next_dev
       NOTIFICATION_ADAPTER: LOCAL_TEST
       LOCAL_NOTIFICATION_BEHAVIOR: success
@@ -93,7 +93,7 @@ services:
     environment:
       APP_ENV: local
       APP_RELEASE: wp06-local-no-head
-      CONFIG_SCHEMA_VERSION: 2
+      CONFIG_SCHEMA_VERSION: 3
       API_INTERNAL_URL: http://api:8000
       ALLOW_FIXTURE_IDENTITY: "true"
     depends_on:

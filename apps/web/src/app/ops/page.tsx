@@ -1,9 +1,17 @@
-import { assignEnrollmentReviewer, cancelEnrollment } from "@/app/actions";
+import {
+  assignEnrollmentReviewer,
+  cancelEnrollment,
+  configureNotificationEndpoint,
+  redriveNotificationDelivery,
+  revokeNotificationEndpoint,
+} from "@/app/actions";
 import {
   identityPageRequest,
   OpsAuditEntry,
   OpsEnrollment,
   OpsIdentityAccess,
+  OpsNotificationDelivery,
+  OpsNotificationEndpoint,
   OpsTaskDefinition,
   RuntimeStatus,
 } from "@/lib/server/api";
@@ -24,13 +32,30 @@ export default async function OpsPage({
 }: {
   searchParams: Promise<{ updated?: string }>;
 }) {
-  const [query, tasks, enrollments, audit, runtime, identityAccess] = await Promise.all([
+  const [
+    query,
+    tasks,
+    enrollments,
+    audit,
+    runtime,
+    identityAccess,
+    notificationEndpoints,
+    notificationDeliveries,
+  ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
     identityPageRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
     identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
     identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
     identityPageRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
+    identityPageRequest<{ items: OpsNotificationEndpoint[] }>(
+      "/api/v1/ops/notification-endpoints",
+      "OPERATOR",
+    ),
+    identityPageRequest<{ items: OpsNotificationDelivery[] }>(
+      "/api/v1/ops/notification-deliveries?status=DEAD",
+      "OPERATOR",
+    ),
   ]);
   const isStaging = runtime.environment === "staging";
 
@@ -65,7 +90,8 @@ export default async function OpsPage({
           <div><dt>API / DB</dt><dd>{runtime.api.status} / {runtime.database.status}</dd></div>
           <div><dt>Worker revision</dt><dd>{runtime.worker.release ?? "未知"}</dd></div>
           <div><dt>Worker heartbeat</dt><dd>{formatTime(runtime.worker.last_seen_at)}</dd></div>
-          <div><dt>Outbox / dead</dt><dd>{runtime.metrics.outbox_backlog} / {runtime.metrics.notification_dead}</dd></div>
+          <div><dt>Outbox / retry / dead</dt><dd>{runtime.metrics.outbox_backlog} / {runtime.metrics.notification_retry_wait} / {runtime.metrics.notification_dead}</dd></div>
+          <div><dt>Oldest pending</dt><dd>{runtime.metrics.oldest_pending_seconds}s</dd></div>
           <div><dt>Observability</dt><dd>{runtime.observability_mode} · external=false</dd></div>
         </dl>
       </section>
@@ -126,6 +152,91 @@ export default async function OpsPage({
                   <button className="button secondary compact" type="submit">受控取消 Enrollment</button>
                 </form>
               ) : null}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="panel ops-section" aria-labelledby="notification-heading">
+        <p className="section-label">RECIPIENT / DELIVERY / REDRIVE</p>
+        <h2 id="notification-heading">飞书通知受控处置</h2>
+        <p>
+          open_id 仅在提交时进入服务端加密流程，页面不会回显。真实发送仍由 Worker 配置门禁控制；DEAD 只能保留历史后人工重驱。
+        </p>
+        <ul className="ops-list">
+          {enrollments.items.map((enrollment) => {
+            const endpoint = notificationEndpoints.items.find(
+              (item) => item.user_id === enrollment.learner_id,
+            );
+            return (
+              <li key={`notification-${enrollment.id}`} className="ops-enrollment">
+                <div className="ops-enrollment-heading">
+                  <div>
+                    <strong>{enrollment.learner_display_name}</strong>
+                    <span>
+                      {endpoint
+                        ? `${endpoint.status} · revision ${endpoint.revision} · updated ${formatTime(endpoint.updated_at)}`
+                        : "尚无飞书通知接收人"}
+                    </span>
+                  </div>
+                  <span className="badge">FEISHU / open_id</span>
+                </div>
+                <form action={configureNotificationEndpoint} className="ops-command-form">
+                  <input type="hidden" name="user_id" value={enrollment.learner_id} />
+                  <input type="hidden" name="revision" value={endpoint?.revision ?? 0} />
+                  <label>
+                    新 open_id（提交后不回显）
+                    <input
+                      type="password"
+                      name="receive_id"
+                      required
+                      pattern="ou_[A-Za-z0-9_-]{8,120}"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>
+                    配置理由
+                    <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                  </label>
+                  <button className="button secondary compact" type="submit">
+                    {endpoint ? "替换并启用接收人" : "配置接收人"}
+                  </button>
+                </form>
+                {endpoint?.status === "ACTIVE" ? (
+                  <form action={revokeNotificationEndpoint} className="ops-command-form">
+                    <input type="hidden" name="endpoint_id" value={endpoint.id} />
+                    <input type="hidden" name="revision" value={endpoint.revision} />
+                    <label>
+                      撤销理由
+                      <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                    </label>
+                    <button className="button secondary compact" type="submit">撤销接收人</button>
+                  </form>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        <h3>DEAD 投递</h3>
+        {notificationDeliveries.items.length === 0 ? <p>当前没有 DEAD 通知。</p> : null}
+        <ul className="ops-list">
+          {notificationDeliveries.items.map((delivery) => (
+            <li key={delivery.id} className="ops-enrollment">
+              <div>
+                <strong>{delivery.channel} · {delivery.status}</strong>
+                <span>
+                  attempts {delivery.attempt_count} · redrives {delivery.redrive_count} · {delivery.last_error_code ?? "无错误码"}
+                </span>
+              </div>
+              <form action={redriveNotificationDelivery} className="ops-command-form">
+                <input type="hidden" name="delivery_id" value={delivery.id} />
+                <input type="hidden" name="revision" value={delivery.revision} />
+                <label>
+                  重驱理由
+                  <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                </label>
+                <button className="button secondary compact" type="submit">受控人工重驱</button>
+              </form>
             </li>
           ))}
         </ul>

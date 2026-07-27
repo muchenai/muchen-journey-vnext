@@ -1,5 +1,7 @@
 import logging
+import json
 import re
+import time
 import uuid
 
 from fastapi import FastAPI, Request
@@ -18,7 +20,8 @@ from journey_api.routes import router
 from journey_api.submission_routes import router as submission_router
 
 settings = get_settings()
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("journey_api")
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,100}$")
 
 docs_enabled = settings.app_env in {"local", "test"}
@@ -34,6 +37,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
+    started = time.monotonic()
     supplied_request_id = request.headers.get("X-Request-ID", "")
     request_id = (
         supplied_request_id
@@ -46,6 +50,24 @@ async def request_context(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", "UNMATCHED")
+    logger.info(
+        json.dumps(
+            {
+                "service": "api",
+                "event": "http.request",
+                "release": settings.app_release,
+                "request_id": request_id,
+                "method": request.method,
+                "route": route_path,
+                "status": response.status_code,
+                "duration_ms": round((time.monotonic() - started) * 1000),
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+    )
     return response
 
 

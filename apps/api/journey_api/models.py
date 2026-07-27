@@ -123,6 +123,11 @@ class NotificationAttemptStatus(str, enum.Enum):
     LEASE_EXPIRED = "LEASE_EXPIRED"
 
 
+class NotificationEndpointStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
 class AttachmentStatus(str, enum.Enum):
     PENDING_UPLOAD = "PENDING_UPLOAD"
     UPLOADED = "UPLOADED"
@@ -904,6 +909,23 @@ class NotificationDelivery(Base):
             name="uq_notification_deliveries_dedupe",
         ),
         CheckConstraint("attempt_count >= 0", name="ck_notification_deliveries_attempts"),
+        CheckConstraint("revision >= 1", name="ck_notification_deliveries_revision"),
+        CheckConstraint(
+            "redrive_count >= 0 AND attempt_offset >= 0 AND attempt_offset <= attempt_count",
+            name="ck_notification_deliveries_redrive",
+        ),
+        CheckConstraint(
+            "(status = 'PENDING' AND attempt_count = attempt_offset AND delivered_at IS NULL) "
+            "OR (status = 'SENDING' AND attempt_count > attempt_offset AND delivered_at IS NULL) "
+            "OR (status = 'DELIVERED' AND attempt_count >= 1 AND delivered_at IS NOT NULL) "
+            "OR (status = 'RETRY_WAIT' AND attempt_count > attempt_offset "
+            "AND next_attempt_at IS NOT NULL AND last_error_code IS NOT NULL "
+            "AND delivered_at IS NULL) "
+            "OR (status = 'DEAD' AND attempt_count > attempt_offset "
+            "AND next_attempt_at IS NULL AND last_error_code IS NOT NULL "
+            "AND delivered_at IS NULL)",
+            name="ck_notification_deliveries_state_fields",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -931,6 +953,66 @@ class NotificationDelivery(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    revision: Mapped[int] = mapped_column(default=1)
+    redrive_count: Mapped[int] = mapped_column(default=0)
+    attempt_offset: Mapped[int] = mapped_column(default=0)
+
+
+class NotificationEndpoint(Base):
+    __tablename__ = "notification_endpoints"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_notification_endpoints_user_scope",
+        ),
+        UniqueConstraint(
+            "organization_id",
+            "user_id",
+            "channel",
+            name="uq_notification_endpoint_user_channel",
+        ),
+        CheckConstraint("channel = 'FEISHU'", name="ck_notification_endpoint_channel"),
+        CheckConstraint(
+            "receive_id_type = 'open_id'",
+            name="ck_notification_endpoint_receive_id_type",
+        ),
+        CheckConstraint("key_version = 1", name="ck_notification_endpoint_key_version"),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'REVOKED')",
+            name="ck_notification_endpoint_status",
+        ),
+        CheckConstraint(
+            "source = 'OPERATOR_CONFIG'", name="ck_notification_endpoint_source"
+        ),
+        CheckConstraint("revision >= 1", name="ck_notification_endpoint_revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    channel: Mapped[NotificationChannel] = mapped_column(
+        Enum(NotificationChannel, native_enum=False)
+    )
+    receive_id_type: Mapped[str] = mapped_column(String(24))
+    encrypted_receive_id: Mapped[str] = mapped_column(Text)
+    recipient_fingerprint: Mapped[str] = mapped_column(String(64))
+    key_version: Mapped[int] = mapped_column(default=1)
+    status: Mapped[NotificationEndpointStatus] = mapped_column(
+        Enum(NotificationEndpointStatus, native_enum=False), index=True
+    )
+    source: Mapped[str] = mapped_column(String(40), default="OPERATOR_CONFIG")
+    revision: Mapped[int] = mapped_column(default=1)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 
@@ -970,6 +1052,30 @@ class LocalNotificationReceipt(Base):
     delivery_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("notification_deliveries.id")
     )
+    dedupe_key: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ExternalNotificationReceipt(Base):
+    __tablename__ = "external_notification_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "delivery_id", name="uq_external_notification_receipt_delivery"
+        ),
+        UniqueConstraint(
+            "dedupe_key", name="uq_external_notification_receipt_dedupe"
+        ),
+        CheckConstraint("provider = 'FEISHU'", name="ck_external_receipt_provider"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    delivery_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notification_deliveries.id"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(40))
+    provider_message_id: Mapped[str] = mapped_column(String(200))
     dedupe_key: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

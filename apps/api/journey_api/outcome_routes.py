@@ -17,8 +17,10 @@ from journey_api.models import (
     Decision,
     Enrollment,
     Evaluation,
+    ExternalNotificationReceipt,
     Handoff,
     NotificationAttempt,
+    NotificationChannel,
     NotificationDelivery,
     NotificationStatus,
     Outcome,
@@ -60,6 +62,8 @@ def envelope(request: Request, data: object) -> dict[str, object]:
 
 def notification_out(
     delivery: NotificationDelivery | None,
+    *,
+    external_confirmed: bool,
 ) -> NotificationDeliveryOut:
     if delivery is None:
         return NotificationDeliveryOut(
@@ -70,14 +74,25 @@ def notification_out(
             next_attempt_at=None,
             last_error_code=None,
             delivered_at=None,
+            delivery_scope="LOCAL_TEST_ONLY",
+            external_delivery_confirmed=False,
         )
-    labels = {
-        NotificationStatus.PENDING: "通知任务已排队，尚未由本地测试适配器处理。",
-        NotificationStatus.SENDING: "本地测试适配器正在处理；这不代表外部送达。",
-        NotificationStatus.DELIVERED: "本地测试适配器已处理；不代表飞书或邮件真实送达。",
-        NotificationStatus.RETRY_WAIT: "本地测试适配器处理失败，正在等待安全重试。",
-        NotificationStatus.DEAD: "本地测试适配器已停止自动重试；核心结果不受影响。",
-    }
+    if delivery.channel == NotificationChannel.LOCAL_TEST:
+        labels = {
+            NotificationStatus.PENDING: "通知任务已排队，尚未由本地测试适配器处理。",
+            NotificationStatus.SENDING: "本地测试适配器正在处理；这不代表外部送达。",
+            NotificationStatus.DELIVERED: "本地测试适配器已处理；不代表飞书真实送达。",
+            NotificationStatus.RETRY_WAIT: "本地测试适配器处理失败，正在等待安全重试。",
+            NotificationStatus.DEAD: "本地测试适配器已停止自动重试；核心结果不受影响。",
+        }
+    else:
+        labels = {
+            NotificationStatus.PENDING: "飞书通知任务已排队，核心结果以本页为准。",
+            NotificationStatus.SENDING: "飞书通知正在处理，尚未确认外部回执。",
+            NotificationStatus.DELIVERED: "飞书服务已接受通知请求。",
+            NotificationStatus.RETRY_WAIT: "飞书通知暂未成功，正在等待安全重试。",
+            NotificationStatus.DEAD: "飞书通知已停止自动重试；核心结果不受影响。",
+        }
     return NotificationDeliveryOut(
         status=delivery.status.value,
         channel=delivery.channel.value,
@@ -86,6 +101,12 @@ def notification_out(
         next_attempt_at=delivery.next_attempt_at,
         last_error_code=delivery.last_error_code,
         delivered_at=delivery.delivered_at,
+        delivery_scope=(
+            "LOCAL_TEST_ONLY"
+            if delivery.channel == NotificationChannel.LOCAL_TEST
+            else "FEISHU"
+        ),
+        external_delivery_confirmed=external_confirmed,
     )
 
 
@@ -124,7 +145,14 @@ def result(
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
     row = session.execute(
-        select(Outcome, Handoff, Evaluation, User, NotificationDelivery)
+        select(
+            Outcome,
+            Handoff,
+            Evaluation,
+            User,
+            NotificationDelivery,
+            ExternalNotificationReceipt,
+        )
         .join(Enrollment, Enrollment.id == Outcome.enrollment_id)
         .join(
             Handoff,
@@ -150,6 +178,10 @@ def result(
             & (NotificationDelivery.organization_id == Outcome.organization_id)
             & (NotificationDelivery.recipient_user_id == Outcome.learner_id),
         )
+        .outerjoin(
+            ExternalNotificationReceipt,
+            ExternalNotificationReceipt.delivery_id == NotificationDelivery.id,
+        )
         .where(
             Outcome.organization_id == actor.organization_id,
             Outcome.learner_id == actor.id,
@@ -160,7 +192,7 @@ def result(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "当前还没有最终结果。")
-    outcome, handoff, evaluation, owner, delivery = row
+    outcome, handoff, evaluation, owner, delivery, receipt = row
     if evaluation.decision != Decision.PASS:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少有效的通过结论。")
     return envelope(
@@ -189,7 +221,9 @@ def result(
                 instructions=handoff.instructions,
                 created_at=handoff.created_at,
             ),
-            notification=notification_out(delivery),
+            notification=notification_out(
+                delivery, external_confirmed=receipt is not None
+            ),
             ai_summary=AiSummaryOut(
                 message="P0 未启用 AI 摘要；本页直接展示主管的最终人工评价。"
             ),
@@ -376,6 +410,15 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
         )
     ).all()
     delivery_ids: list[uuid.UUID] = []
+    receipt_delivery_ids = set(
+        session.scalars(
+            select(ExternalNotificationReceipt.delivery_id).where(
+                ExternalNotificationReceipt.delivery_id.in_(
+                    [delivery.id for _event, delivery, _outcome in notification_rows]
+                )
+            )
+        ).all()
+    ) if notification_rows else set()
     for event, delivery, _outcome in notification_rows:
         delivery_ids.append(delivery.id)
         items.append(
@@ -389,7 +432,7 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
                 details={
                     "channel": delivery.channel.value,
                     "template_version": delivery.template_version,
-                    "external_delivery_confirmed": False,
+                    "external_delivery_confirmed": delivery.id in receipt_delivery_ids,
                 },
             )
         )
@@ -416,7 +459,9 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
                         "attempt_number": attempt.attempt_number,
                         "result": attempt.status.value,
                         "error_code": attempt.error_code,
-                        "external_delivery_confirmed": False,
+                        "external_delivery_confirmed": (
+                            attempt.delivery_id in receipt_delivery_ids
+                        ),
                     },
                 )
             )

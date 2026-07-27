@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import insert
@@ -14,20 +16,37 @@ from sqlalchemy.orm import Session
 
 from journey_api.db import SessionLocal
 from journey_api.models import (
+    ExternalNotificationReceipt,
     LocalNotificationReceipt,
     NotificationAttempt,
     NotificationAttemptStatus,
     NotificationChannel,
     NotificationDelivery,
+    NotificationEndpoint,
+    NotificationEndpointStatus,
     NotificationStatus,
     OutboxEvent,
     OutboxStatus,
     WorkerHeartbeat,
 )
+from journey_api.notification_recipients import decrypt_open_id
+from journey_worker.feishu import FeishuDeliveryError, deliver as deliver_feishu
 
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("journey_worker")
+
+
+def log_event(level: int, event: str, **fields: object) -> None:
+    logger.log(
+        level,
+        json.dumps(
+            {"service": "worker", "event": event, **fields},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+    )
 
 
 def positive_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -52,6 +71,11 @@ class WorkerSettings:
     lease_seconds: int
     poll_seconds: int
     crash_after_delivery: bool
+    recipient_key: str
+    feishu_app_id: str
+    feishu_app_secret: str
+    app_result_url: str
+    provider_timeout_seconds: int
 
     @classmethod
     def from_env(cls) -> "WorkerSettings":
@@ -66,15 +90,45 @@ class WorkerSettings:
             poll_seconds=positive_int("WORKER_POLL_SECONDS", 2, minimum=1),
             crash_after_delivery=os.getenv("WORKER_TEST_CRASH_AFTER_DELIVERY", "false").lower()
             == "true",
+            recipient_key=os.getenv("NOTIFICATION_RECIPIENT_KEY", ""),
+            feishu_app_id=os.getenv("FEISHU_NOTIFICATION_APP_ID", ""),
+            feishu_app_secret=os.getenv("FEISHU_NOTIFICATION_APP_SECRET", ""),
+            app_result_url=os.getenv(
+                "NOTIFICATION_RESULT_URL", "http://localhost:3000/me/result"
+            ),
+            provider_timeout_seconds=positive_int(
+                "NOTIFICATION_PROVIDER_TIMEOUT_SECONDS", 10, minimum=1
+            ),
         )
         if settings.app_env not in {"local", "test", "staging", "production"}:
             raise ValueError("APP_ENV must be local, test, staging, or production")
-        if settings.adapter not in {"LOCAL_TEST", "DISABLED"}:
-            raise ValueError("NOTIFICATION_ADAPTER must be LOCAL_TEST or DISABLED")
+        if settings.adapter not in {"LOCAL_TEST", "DISABLED", "FEISHU"}:
+            raise ValueError("NOTIFICATION_ADAPTER must be LOCAL_TEST, FEISHU, or DISABLED")
         if settings.adapter == "LOCAL_TEST" and settings.app_env not in {"local", "test"}:
             raise ValueError("LOCAL_TEST notification adapter is disabled outside local/test")
         if settings.adapter == "DISABLED" and settings.app_env != "staging":
             raise ValueError("DISABLED notification adapter is staging-only")
+        if settings.adapter == "FEISHU":
+            if settings.app_env not in {"staging", "production"}:
+                raise ValueError("FEISHU notification adapter is nonlocal only")
+            if not settings.feishu_app_id or len(settings.feishu_app_secret) < 16:
+                raise ValueError("dedicated Feishu notification credentials are required")
+            from journey_api.notification_recipients import decode_recipient_key
+
+            decode_recipient_key(settings.recipient_key)
+            result_url = urlsplit(settings.app_result_url)
+            if (
+                result_url.scheme != "https"
+                or not result_url.hostname
+                or result_url.path != "/me/result"
+                or result_url.query
+                or result_url.fragment
+                or result_url.username
+                or result_url.password
+            ):
+                raise ValueError("NOTIFICATION_RESULT_URL must be an exact HTTPS result URL")
+        if not 1 <= settings.provider_timeout_seconds <= 20:
+            raise ValueError("NOTIFICATION_PROVIDER_TIMEOUT_SECONDS must be between 1 and 20")
         if settings.local_behavior not in {"success", "fail_once", "always_fail"}:
             raise ValueError("LOCAL_NOTIFICATION_BEHAVIOR is invalid")
         if settings.crash_after_delivery and settings.app_env not in {"local", "test"}:
@@ -109,11 +163,20 @@ class ClaimedEvent:
     event_type: str
     lock_token: uuid.UUID
     attempt_number: int
+    cycle_attempt_number: int
     dedupe_key: str
 
 
 class LocalDeliveryError(RuntimeError):
     code = "LOCAL_ADAPTER_UNAVAILABLE"
+    retryable = True
+
+
+class RecipientDeliveryError(RuntimeError):
+    def __init__(self, code: str, *, retryable: bool) -> None:
+        super().__init__(code)
+        self.code = code
+        self.retryable = retryable
 
 
 def notification_for_update(session: Session, event_id: uuid.UUID) -> NotificationDelivery | None:
@@ -217,6 +280,11 @@ def claim_next(
             event_type=event.event_type,
             lock_token=event.lock_token,
             attempt_number=event.attempt_count,
+            cycle_attempt_number=(
+                event.attempt_count - delivery.attempt_offset
+                if delivery is not None
+                else event.attempt_count
+            ),
             dedupe_key=event.dedupe_key or f"event:{event.id}",
         )
 
@@ -242,13 +310,86 @@ def deliver_local_notification(
         if existing is not None:
             return True
         if settings.local_behavior == "always_fail" or (
-            settings.local_behavior == "fail_once" and claimed.attempt_number == 1
+            settings.local_behavior == "fail_once" and claimed.cycle_attempt_number == 1
         ):
             raise LocalDeliveryError("local test adapter failure")
         session.add(
             LocalNotificationReceipt(
                 id=uuid.uuid4(),
                 delivery_id=delivery.id,
+                dedupe_key=claimed.dedupe_key,
+            )
+        )
+    return False
+
+
+def deliver_feishu_notification(
+    claimed: ClaimedEvent, settings: WorkerSettings
+) -> bool:
+    with SessionLocal() as session:
+        delivery = session.scalar(
+            select(NotificationDelivery).where(
+                NotificationDelivery.event_id == claimed.id
+            )
+        )
+        if delivery is None or delivery.channel != NotificationChannel.FEISHU:
+            raise RecipientDeliveryError(
+                "NOTIFICATION_CONTRACT_INVALID", retryable=False
+            )
+        existing = session.scalar(
+            select(ExternalNotificationReceipt.id).where(
+                ExternalNotificationReceipt.dedupe_key == claimed.dedupe_key
+            )
+        )
+        if existing is not None:
+            return True
+        endpoint = session.scalar(
+            select(NotificationEndpoint).where(
+                NotificationEndpoint.organization_id == delivery.organization_id,
+                NotificationEndpoint.user_id == delivery.recipient_user_id,
+                NotificationEndpoint.channel == NotificationChannel.FEISHU,
+                NotificationEndpoint.status == NotificationEndpointStatus.ACTIVE,
+            )
+        )
+        if endpoint is None:
+            raise RecipientDeliveryError("RECIPIENT_UNAVAILABLE", retryable=False)
+        try:
+            receive_id = decrypt_open_id(
+                endpoint.encrypted_receive_id,
+                key_value=settings.recipient_key,
+                organization_id=endpoint.organization_id,
+                user_id=endpoint.user_id,
+            )
+        except ValueError as exc:
+            raise RecipientDeliveryError(
+                "RECIPIENT_CIPHERTEXT_INVALID", retryable=False
+            ) from exc
+        delivery_id = delivery.id
+    try:
+        receipt = deliver_feishu(
+            app_id=settings.feishu_app_id,
+            app_secret=settings.feishu_app_secret,
+            receive_id=receive_id,
+            dedupe_key=claimed.dedupe_key,
+            app_result_url=settings.app_result_url,
+            timeout_seconds=settings.provider_timeout_seconds,
+        )
+    except FeishuDeliveryError as exc:
+        raise RecipientDeliveryError(exc.code, retryable=exc.retryable) from exc
+    with SessionLocal.begin() as session:
+        existing = session.scalar(
+            select(ExternalNotificationReceipt.id).where(
+                ExternalNotificationReceipt.dedupe_key == claimed.dedupe_key
+            )
+        )
+        if existing is not None:
+            return True
+        session.add(
+            ExternalNotificationReceipt(
+                id=uuid.uuid4(),
+                delivery_id=delivery_id,
+                provider="FEISHU",
+                provider_message_id=receipt.message_id,
                 dedupe_key=claimed.dedupe_key,
             )
         )
@@ -290,17 +431,22 @@ def finalize_success(claimed: ClaimedEvent, *, deduplicated: bool) -> bool:
                 error_code=None,
                 attempted_at=now,
             )
-    logger.info(
-        "outbox processed event_type=%s attempt=%s deduplicated=%s",
-        claimed.event_type,
-        claimed.attempt_number,
-        deduplicated,
+    log_event(
+        logging.INFO,
+        "outbox.processed",
+        event_type=claimed.event_type,
+        attempt=claimed.attempt_number,
+        deduplicated=deduplicated,
     )
     return True
 
 
 def finalize_failure(
-    claimed: ClaimedEvent, settings: WorkerSettings, *, error_code: str
+    claimed: ClaimedEvent,
+    settings: WorkerSettings,
+    *,
+    error_code: str,
+    force_final: bool = False,
 ) -> bool:
     now = datetime.now(UTC)
     with SessionLocal.begin() as session:
@@ -316,8 +462,10 @@ def finalize_failure(
         if event is None:
             return False
         delivery = notification_for_update(session, event.id)
-        is_final = claimed.attempt_number >= settings.max_attempts
-        delay = settings.retry_base_seconds * (2 ** max(claimed.attempt_number - 1, 0))
+        is_final = force_final or claimed.cycle_attempt_number >= settings.max_attempts
+        delay = settings.retry_base_seconds * (
+            2 ** max(claimed.cycle_attempt_number - 1, 0)
+        )
         next_attempt = None if is_final else now + timedelta(seconds=min(delay, 3600))
         event.status = OutboxStatus.FAILED
         event.processed_at = now if is_final else None
@@ -344,12 +492,13 @@ def finalize_failure(
                 error_code=error_code,
                 attempted_at=now,
             )
-    logger.warning(
-        "outbox attempt failed event_type=%s attempt=%s final=%s error_code=%s",
-        claimed.event_type,
-        claimed.attempt_number,
-        is_final,
-        error_code,
+    log_event(
+        logging.WARNING,
+        "outbox.failed",
+        event_type=claimed.event_type,
+        attempt=claimed.attempt_number,
+        final=is_final,
+        error_code=error_code,
     )
     return True
 
@@ -358,10 +507,18 @@ def process_claimed(claimed: ClaimedEvent, settings: WorkerSettings) -> bool:
     if claimed.event_type != "notification.requested.v1":
         return finalize_success(claimed, deduplicated=False)
     try:
-        deduplicated = deliver_local_notification(claimed, settings)
-    except LocalDeliveryError:
+        if settings.adapter == "LOCAL_TEST":
+            deduplicated = deliver_local_notification(claimed, settings)
+        elif settings.adapter == "FEISHU":
+            deduplicated = deliver_feishu_notification(claimed, settings)
+        else:
+            raise RecipientDeliveryError("NOTIFICATION_ADAPTER_DISABLED", retryable=False)
+    except (LocalDeliveryError, RecipientDeliveryError) as exc:
         return finalize_failure(
-            claimed, settings, error_code=LocalDeliveryError.code
+            claimed,
+            settings,
+            error_code=exc.code,
+            force_final=not exc.retryable,
         )
     if settings.crash_after_delivery:
         raise RuntimeError("local/test worker crash injection after adapter commit")
@@ -389,7 +546,12 @@ def process_batch(
 
 def run() -> None:
     settings = WorkerSettings.from_env()
-    logger.info("worker started adapter=%s", settings.adapter)
+    log_event(
+        logging.INFO,
+        "worker.started",
+        adapter=settings.adapter,
+        release=settings.app_release,
+    )
     record_heartbeat(settings, "RUNNING")
     while True:
         processed = process_batch(settings=settings)
@@ -415,7 +577,12 @@ def main() -> None:
             limit=args.limit, event_id=args.event_id, settings=settings
         )
         record_heartbeat(settings, "IDLE")
-        logger.info("worker once complete processed=%s", processed)
+        log_event(
+            logging.INFO,
+            "worker.once_complete",
+            processed=processed,
+            release=settings.app_release,
+        )
         return
     if args.event_id is not None:
         parser.error("--event-id requires --once")

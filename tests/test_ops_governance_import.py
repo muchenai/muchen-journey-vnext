@@ -307,13 +307,15 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
     )
     assert hidden.status_code == 404
     runtime = assert_ok(client.get("/api/v1/ops/runtime-status", headers=operator_headers))
-    assert runtime["migration_revision"] == "0012_wp10_file_security"
-    assert runtime["config_schema_version"] == 2
+    assert runtime["migration_revision"] == "0013_wp11_notify_observability"
+    assert runtime["config_schema_version"] == 3
     assert runtime["external_observability_confirmed"] is False
-    assert runtime["observability_mode"] == "LOCAL_STRUCTURED_STDOUT"
+    assert runtime["observability_mode"] == "STRUCTURED_STDOUT"
     assert set(runtime["metrics"]) == {
         "outbox_backlog",
+        "notification_retry_wait",
         "notification_dead",
+        "oldest_pending_seconds",
         "permission_denials_24h",
     }
 
@@ -431,6 +433,9 @@ def test_offline_import_rejects_tampering_and_nonlocal_runtime(tmp_path, monkeyp
         tos_region="cn-beijing",
         tos_bucket="journey-private-test",
         tos_ecs_role_name="journey-runtime-test",
+        notification_channel="FEISHU",
+        notification_recipients_enabled=True,
+        notification_recipient_key="bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
     )
     monkeypatch.setattr(offline_import, "get_settings", lambda: production)
     with pytest.raises(offline_import.PackageError, match="disabled outside local/test"):

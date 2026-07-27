@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     app_env: str = "local"
     app_release: str = "dev"
-    config_schema_version: int = 2
+    config_schema_version: int = 3
     database_url: str = "postgresql+psycopg://journey_next:journey_next_dev@localhost:5432/journey_next_dev"
     allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
     allow_fixture_identity: bool = False
@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     clamav_host: str = "clamav"
     clamav_port: int = 3310
     clamav_timeout_seconds: int = 15
+    notification_channel: str = "LOCAL_TEST"
+    notification_recipients_enabled: bool = False
+    notification_recipient_key: str = ""
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod
@@ -120,6 +123,18 @@ class Settings(BaseSettings):
             raise ValueError("ATTACHMENT_STORAGE_BACKEND must be LOCAL or TOS")
         if self.attachment_scanner_backend not in {"TEST", "CLAMAV"}:
             raise ValueError("ATTACHMENT_SCANNER_BACKEND must be TEST or CLAMAV")
+        if self.notification_channel not in {"LOCAL_TEST", "FEISHU"}:
+            raise ValueError("NOTIFICATION_CHANNEL must be LOCAL_TEST or FEISHU")
+        if self.app_env in {"local", "test"} and self.notification_channel != "LOCAL_TEST":
+            raise ValueError("local/test notification channel must use LOCAL_TEST")
+        if self.app_env in {"staging", "production"} and self.notification_channel != "FEISHU":
+            raise ValueError("nonlocal notification channel must use FEISHU")
+        if self.notification_recipients_enabled:
+            from journey_api.notification_recipients import decode_recipient_key
+
+            decode_recipient_key(self.notification_recipient_key)
+        if self.app_env == "production" and not self.notification_recipients_enabled:
+            raise ValueError("production notification recipients must be enabled")
         if not 60 <= self.attachment_upload_ttl_seconds <= 900:
             raise ValueError("ATTACHMENT_UPLOAD_TTL_SECONDS must be between 60 and 900")
         if not 30 <= self.attachment_download_ttl_seconds <= 300:
@@ -157,8 +172,8 @@ class Settings(BaseSettings):
                 raise ValueError("Feishu callback must use HTTPS outside local/test")
             if self.app_env in {"local", "test"} and redirect.scheme not in {"http", "https"}:
                 raise ValueError("Feishu callback must use HTTP or HTTPS")
-        if self.config_schema_version != 2:
-            raise ValueError("CONFIG_SCHEMA_VERSION must be the approved version 2")
+        if self.config_schema_version != 3:
+            raise ValueError("CONFIG_SCHEMA_VERSION must be the approved version 3")
         return self
 
 

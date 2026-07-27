@@ -43,7 +43,7 @@ def test_prepare_writes_private_independent_environment_files(
     assert "NOTIFICATION_ADAPTER=DISABLED" in (output / "secrets/worker.env").read_text()
     assert "ALLOW_FIXTURE_IDENTITY=false" in (output / "secrets/api.env").read_text()
     assert "FEISHU_OAUTH_ENABLED=true" in (output / "secrets/api.env").read_text()
-    assert "CONFIG_SCHEMA_VERSION=2" in (output / "secrets/api.env").read_text()
+    assert "CONFIG_SCHEMA_VERSION=3" in (output / "secrets/api.env").read_text()
     assert "ATTACHMENTS_ENABLED=false" in (output / "secrets/api.env").read_text()
     assert (
         "FEISHU_OAUTH_REDIRECT_URI=https://staging-vnext.muchenai.com/auth/feishu/callback"

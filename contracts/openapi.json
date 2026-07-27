@@ -534,6 +534,34 @@
         "title": "CompleteAttachmentCommand",
         "type": "object"
       },
+      "ConfigureNotificationEndpointCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "receive_id": {
+            "pattern": "^ou_[A-Za-z0-9_-]{8,120}$",
+            "title": "Receive Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "receive_id",
+          "reason"
+        ],
+        "title": "ConfigureNotificationEndpointCommand",
+        "type": "object"
+      },
       "CreateIdentityLinkCommand": {
         "additionalProperties": false,
         "properties": {
@@ -1684,8 +1712,10 @@
             "title": "Delivered At"
           },
           "delivery_scope": {
-            "const": "LOCAL_TEST_ONLY",
-            "default": "LOCAL_TEST_ONLY",
+            "enum": [
+              "LOCAL_TEST_ONLY",
+              "FEISHU"
+            ],
             "title": "Delivery Scope",
             "type": "string"
           },
@@ -1694,8 +1724,6 @@
             "type": "string"
           },
           "external_delivery_confirmed": {
-            "const": false,
-            "default": false,
             "title": "External Delivery Confirmed",
             "type": "boolean"
           },
@@ -1734,10 +1762,282 @@
           "attempt_count",
           "next_attempt_at",
           "last_error_code",
-          "delivered_at"
+          "delivered_at",
+          "delivery_scope",
+          "external_delivery_confirmed"
         ],
         "title": "NotificationDeliveryOut",
         "type": "object"
+      },
+      "NotificationEndpointListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationEndpointOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "NotificationEndpointListOut",
+        "type": "object"
+      },
+      "NotificationEndpointListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationEndpointListOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NotificationEndpointListResponse",
+        "type": "object"
+      },
+      "NotificationEndpointOut": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "const": "FEISHU",
+            "title": "Channel",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_replay": {
+            "default": false,
+            "title": "Idempotency Replay",
+            "type": "boolean"
+          },
+          "receive_id_type": {
+            "const": "open_id",
+            "title": "Receive Id Type",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source": {
+            "const": "OPERATOR_CONFIG",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "REVOKED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "channel",
+          "receive_id_type",
+          "status",
+          "source",
+          "revision",
+          "updated_at"
+        ],
+        "title": "NotificationEndpointOut",
+        "type": "object"
+      },
+      "NotificationEndpointResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationEndpointOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NotificationEndpointResponse",
+        "type": "object"
+      },
+      "NotificationOpsDeliveryListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationOpsDeliveryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "NotificationOpsDeliveryListOut",
+        "type": "object"
+      },
+      "NotificationOpsDeliveryListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationOpsDeliveryListOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NotificationOpsDeliveryListResponse",
+        "type": "object"
+      },
+      "NotificationOpsDeliveryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_count": {
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "external_receipt_recorded": {
+            "title": "External Receipt Recorded",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "recipient_user_id": {
+            "format": "uuid",
+            "title": "Recipient User Id",
+            "type": "string"
+          },
+          "redrive_count": {
+            "title": "Redrive Count",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "recipient_user_id",
+          "channel",
+          "status",
+          "attempt_count",
+          "redrive_count",
+          "revision",
+          "last_error_code",
+          "next_attempt_at",
+          "delivered_at",
+          "external_receipt_recorded"
+        ],
+        "title": "NotificationOpsDeliveryOut",
+        "type": "object"
+      },
+      "NotificationOpsDeliveryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationOpsDeliveryOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NotificationOpsDeliveryResponse",
+        "type": "object"
+      },
+      "NotificationStatus": {
+        "enum": [
+          "PENDING",
+          "SENDING",
+          "DELIVERED",
+          "RETRY_WAIT",
+          "DEAD"
+        ],
+        "title": "NotificationStatus",
+        "type": "string"
       },
       "OAuthCallbackCommand": {
         "additionalProperties": false,
@@ -2194,6 +2494,28 @@
           "reviewed_by"
         ],
         "title": "PublishTaskVersionCommand",
+        "type": "object"
+      },
+      "RedriveNotificationCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "RedriveNotificationCommand",
         "type": "object"
       },
       "ResultEvaluationOut": {
@@ -2925,6 +3247,28 @@
         "title": "RevokeInviteCommand",
         "type": "object"
       },
+      "RevokeNotificationEndpointCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "RevokeNotificationEndpointCommand",
+        "type": "object"
+      },
       "RubricDimensionInput": {
         "additionalProperties": false,
         "properties": {
@@ -3146,6 +3490,14 @@
             "title": "Notification Dead",
             "type": "integer"
           },
+          "notification_retry_wait": {
+            "title": "Notification Retry Wait",
+            "type": "integer"
+          },
+          "oldest_pending_seconds": {
+            "title": "Oldest Pending Seconds",
+            "type": "integer"
+          },
           "outbox_backlog": {
             "title": "Outbox Backlog",
             "type": "integer"
@@ -3157,7 +3509,9 @@
         },
         "required": [
           "outbox_backlog",
+          "notification_retry_wait",
           "notification_dead",
+          "oldest_pending_seconds",
           "permission_denials_24h"
         ],
         "title": "RuntimeMetricsOut",
@@ -3170,7 +3524,7 @@
             "$ref": "#/components/schemas/RuntimeComponentOut"
           },
           "config_schema_version": {
-            "const": 2,
+            "const": 3,
             "title": "Config Schema Version",
             "type": "integer"
           },
@@ -3201,7 +3555,7 @@
             "type": "string"
           },
           "observability_mode": {
-            "const": "LOCAL_STRUCTURED_STDOUT",
+            "const": "STRUCTURED_STDOUT",
             "title": "Observability Mode",
             "type": "string"
           },
@@ -5965,6 +6319,264 @@
         "summary": "Revoke Invite"
       }
     },
+    "/api/v1/ops/notification-deliveries": {
+      "get": {
+        "operationId": "list_notification_deliveries_api_v1_ops_notification_deliveries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/NotificationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationOpsDeliveryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notification Deliveries"
+      }
+    },
+    "/api/v1/ops/notification-deliveries/{delivery_id}/redrive": {
+      "post": {
+        "operationId": "redrive_notification_delivery_api_v1_ops_notification_deliveries__delivery_id__redrive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "delivery_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Delivery Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedriveNotificationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationOpsDeliveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redrive Notification Delivery"
+      }
+    },
+    "/api/v1/ops/notification-endpoints": {
+      "get": {
+        "operationId": "list_notification_endpoints_api_v1_ops_notification_endpoints_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEndpointListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notification Endpoints"
+      }
+    },
+    "/api/v1/ops/notification-endpoints/{endpoint_id}/revoke": {
+      "post": {
+        "operationId": "revoke_notification_endpoint_api_v1_ops_notification_endpoints__endpoint_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Endpoint Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeNotificationEndpointCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEndpointResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Notification Endpoint"
+      }
+    },
     "/api/v1/ops/runtime-status": {
       "get": {
         "operationId": "runtime_status_api_v1_ops_runtime_status_get",
@@ -6193,6 +6805,81 @@
           }
         },
         "summary": "Publish Task Version"
+      }
+    },
+    "/api/v1/ops/users/{user_id}/notification-endpoint": {
+      "put": {
+        "operationId": "configure_notification_endpoint_api_v1_ops_users__user_id__notification_endpoint_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureNotificationEndpointCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEndpointResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure Notification Endpoint"
       }
     },
     "/api/v1/reviews": {
