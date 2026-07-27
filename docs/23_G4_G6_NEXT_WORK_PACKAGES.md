@@ -1,13 +1,13 @@
 # 23｜G4–G6 下一批工作包定义
 
 状态：`APPROVED_FOR_BUILD`
-版本：V0.7
+版本：V0.8
 日期：2026-07-27
 建议 Owner：Product Owner + Tech Lead + QA/UAT Owner + Release/Ops Owner  
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 Alpha 运行面已验证。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`，不占工程 WIP。WP-10 的 TOS/ClamAV 工程路径已完成，但 staging 文件路径在扫描运行时、IAM/CORS/ACL/恢复证据关闭前保持禁用。当前唯一工程 WIP 为 WP-11；真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。WP-10 的 TOS/ClamAV 工程路径已完成，但 staging 文件路径在扫描运行时、IAM/CORS/ACL/恢复证据关闭前保持禁用。WP-11 工程实现已合入，真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。WP-12 在剩余证据债关闭前不激活。
 
 ## 1. 结论
 
@@ -137,7 +137,7 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 2026-07-22 用户进一步锁定火山引擎、华北2（北京）`cn-beijing`、按量计费、独立 IAM/VPC/SG/ECS/RDS/TOS/staging 域名。首次 ¥500/月尝试因成本超限停止；用户随后将预算提高为 ¥800/月并保留托管 RDS，完成 Next.js 16.2.11 / sharp 0.35.3 安全修复。主线候选 `670661865f708a835997596ed5b74904809564a5` 的 CI、候选打包和 GHCR digest 均通过，并获精确创建与部署授权；同日刷新后的月预测为 ¥656.26，距上限余 ¥143.74。
 
-截至 2026-07-25，独立 staging 基础资源、RDS CA 和 remote state 已收敛。唯一 deploy run `30161121353` 已在冻结基础设施上部署精确候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；migration/runtime grant/seed、API/Web/Worker/Edge、外部 TLS/readiness、匿名 `/ops = 401`、SSH 撤销和三档真实 Chromium smoke 均通过。当前状态为 `ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`；只读 audit `30162196135` 已确认 AllowList 的结构、IP、实例和 VPC 匹配，但火山引擎实际响应未返回 `IsLatest`。不重试 audit，不再修补当前 provider 路径；该缺口作为 RC/production 前必须关闭的证据债。为了尽快验证真实用户问题，允许 WP-09 的代码实现和受控 Alpha 身份验证继续，但不得据此宣称 `STAGING_ISOLATION_VERIFIED` 或发布 GO。
+截至 2026-07-27，独立 staging 基础资源、RDS CA 和 remote state 已收敛。唯一 deploy run `30161121353` 已在冻结基础设施上部署精确候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；migration/runtime grant/seed、API/Web/Worker/Edge、外部 TLS/readiness、匿名 `/ops = 401`、SSH 撤销和三档真实 Chromium smoke 均通过。只读 audit `30162196135` 已确认 AllowList 的结构、IP、实例和 VPC 匹配；随后控制台人工复验确认当前非默认 AllowList 仅含预期安全组派生的单一非空主机地址、关联 ECS IP 模式、预期实例和 staging VPC。供应商不再展示 `IsLatest`，因此以控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接组成等价物理证据。当前状态升级为 `STAGING_ISOLATION_VERIFIED / PHYSICAL_ACL_EVIDENCE_CLOSED`，但不得据此宣称发布 GO。
 
 ### 交付物
 
@@ -423,7 +423,7 @@ Agent 只能准备脚本、环境和证据模板，不能代替真人点击、�
 
 本文件已升级为 `APPROVED_FOR_BUILD`，代表 WP-07～WP-15 的编号、范围、Owner 组合、顺序与单一 WIP 协议已锁定。执行仍遵循：
 
-1. 当前只激活 WP-11；WP-09 的真人提示复验和 WP-10 的物理文件路径证据作为显式债保留，不并行占用工程 WIP。WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN`、WP-09 的 `WAITING_FOR_HUMAN_UAT` 与 WP-10 的 `PHYSICAL_EVIDENCE_OPEN` 必须在 WP-12 RC 冻结或任何 production 行为前关闭；
+1. WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 已于 2026-07-27 关闭。当前按单一 WIP 逐项关闭 WP-09 的 `WAITING_FOR_HUMAN_UAT`、WP-10 的 `PHYSICAL_EVIDENCE_OPEN` 与 WP-11 的真实通知/外部可观测证据；三者全部关闭前不激活 WP-12 RC 冻结，也不执行任何 production 行为；
 2. 第 2 节未关闭的物理执行输入必须在对应工作包开工前补齐；
 3. 外部资源、角色或权限变更每次只按已说明的供应商、环境、动作与范围执行，不从计划批准推定；
 4. WP-13、WP-14 的真人与时间证据不可由机器替代；
