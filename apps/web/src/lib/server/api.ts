@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { CSRF_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
@@ -356,6 +357,25 @@ export async function apiRequest<T>(
     throw new ApiRequestError(code, message, payload.request_id, response.status);
   }
   return payload.data;
+}
+
+export async function identityPageRequest<T>(
+  path: string,
+  role: "REVIEWER" | "OPERATOR",
+): Promise<T> {
+  try {
+    return await apiRequest<T>(path, role);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      const returnTo = role === "REVIEWER" ? "/review" : "/ops";
+      const query = new URLSearchParams({
+        auth_error: "SESSION_EXPIRED",
+        return_to: returnTo,
+      });
+      redirect(`/?${query.toString()}`);
+    }
+    throw error;
+  }
 }
 
 export async function anonymousApiRequest<T>(

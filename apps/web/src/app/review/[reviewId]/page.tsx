@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 
-import { apiRequest, ReviewDetail } from "@/lib/server/api";
+import { identityPageRequest, ReviewDetail } from "@/lib/server/api";
 import { ReviewWorkbench } from "./review-workbench";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export default async function ReviewPage({
 }) {
   const { reviewId } = await params;
   const query = await searchParams;
-  const review = await apiRequest<ReviewDetail>(
+  const review = await identityPageRequest<ReviewDetail>(
     `/api/v1/reviews/${encodeURIComponent(reviewId)}`,
     "REVIEWER",
   );
