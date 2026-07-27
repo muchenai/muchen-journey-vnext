@@ -37,8 +37,15 @@ openssl x509 -in "$ca_path" -noout -checkend 2592000 >/dev/null || fail "RDS CA 
 
 grep -qx 'APP_ENV=staging' "$SECRETS/api.env" || fail "API must run as staging"
 grep -qx 'ALLOW_FIXTURE_IDENTITY=false' "$SECRETS/api.env" || fail "fixture identity must be disabled"
+grep -qx 'NOTIFICATION_RECIPIENTS_ENABLED=true' "$SECRETS/api.env" || fail "staging notification recipients must be enabled"
 grep -qx 'APP_ENV=staging' "$SECRETS/worker.env" || fail "Worker must run as staging"
-grep -qx 'NOTIFICATION_ADAPTER=DISABLED' "$SECRETS/worker.env" || fail "WP-08 worker must not use LOCAL_TEST or a real external adapter"
+grep -qx 'NOTIFICATION_ADAPTER=FEISHU' "$SECRETS/worker.env" || fail "WP-11 worker must use the dedicated Feishu adapter"
+grep -qx 'NOTIFICATION_RESULT_URL=https://staging-vnext.muchenai.com/app/result' "$SECRETS/worker.env" || fail "WP-11 notification result URL is not canonical"
+grep -qx 'OBSERVABILITY_SNAPSHOT_SECONDS=60' "$SECRETS/worker.env" || fail "WP-11 observability snapshot cadence is not canonical"
+api_recipient_key=$(sed -n 's/^NOTIFICATION_RECIPIENT_KEY=//p' "$SECRETS/api.env")
+worker_recipient_key=$(sed -n 's/^NOTIFICATION_RECIPIENT_KEY=//p' "$SECRETS/worker.env")
+[[ -n "$api_recipient_key" && "$api_recipient_key" == "$worker_recipient_key" ]] || fail "API and Worker recipient keys must be identical and non-empty"
+unset api_recipient_key worker_recipient_key
 ! grep -R -E 'journey\.muchenai\.com|muchen-journey-production|LOCAL_TEST' "$SECRETS"/*.env >/dev/null || fail "legacy or local-only configuration found"
 
 docker compose -f compose.yaml -f compose.migrate.yaml config --quiet

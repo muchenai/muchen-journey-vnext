@@ -25,7 +25,7 @@ from journey_api.models import (
 )
 from journey_api.notification_recipients import decrypt_open_id, encrypt_open_id
 from journey_worker.feishu import FeishuDeliveryError, FeishuReceipt, deliver
-from journey_worker.main import WorkerSettings, process_batch
+from journey_worker.main import WorkerSettings, process_batch, runtime_metrics_snapshot
 
 
 RECIPIENT_KEY = "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4"
@@ -75,12 +75,59 @@ def test_observability_contract_is_explicit_and_external_status_is_not_faked():
     }.issubset(contract["dashboard_contract"])
     forbidden = set(contract["log_source"]["forbidden_fields"])
     assert {"receive_id", "provider_message_id", "token", "submission_body"} <= forbidden
+    assert contract["log_source"]["snapshot_interval_seconds"] == 60
+    assert {
+        "outbox_backlog",
+        "oldest_pending_seconds",
+        "notification_dead",
+        "permission_denials_24h",
+    } <= set(contract["log_source"]["indexed_fields"]["long"])
     dead_alert = next(
         alert
         for alert in contract["alert_contract"]
         if alert["name"] == "notification_dead_present"
     )
     assert dead_alert["detection_slo_minutes"] <= 240
+    stale_alert = next(
+        alert
+        for alert in contract["alert_contract"]
+        if alert["name"] == "worker_stale"
+    )
+    assert stale_alert["condition"] == "count(runtime.snapshot in 5m) = 0"
+    cloud_monitor_alerts = {
+        alert["name"]: alert
+        for alert in contract["alert_contract"]
+        if alert.get("source") == "VOLCENGINE_CLOUD_MONITOR_ECS_BASIC"
+    }
+    assert set(cloud_monitor_alerts) == {
+        "ecs_cpu_sustained",
+        "ecs_basic_metrics_missing",
+    }
+    assert cloud_monitor_alerts["ecs_basic_metrics_missing"]["condition"] == (
+        "no data for 5x1m"
+    )
+
+
+def test_runtime_snapshot_exposes_only_aggregate_alert_inputs():
+    flow = wp05.approve(f"wp11-runtime-snapshot-{uuid.uuid4()}")
+    snapshot = runtime_metrics_snapshot()
+    assert set(snapshot) == {
+        "database_ready",
+        "worker_stale",
+        "outbox_backlog",
+        "notification_retry_wait",
+        "notification_dead",
+        "oldest_pending_seconds",
+        "permission_denials_24h",
+    }
+    assert snapshot["database_ready"] is True
+    assert snapshot["worker_stale"] is False
+    assert snapshot["outbox_backlog"] >= 1
+    assert all(
+        isinstance(value, (bool, int))
+        for value in snapshot.values()
+    )
+    assert str(flow["evaluation_id"]) not in json.dumps(snapshot)
 
 
 def test_notification_recipient_encryption_is_scoped_and_tamper_evident():
@@ -136,7 +183,7 @@ def test_feishu_provider_uses_minimal_template_stable_uuid_and_safe_errors():
         app_secret=SYNTHETIC_APP_CREDENTIAL,
         receive_id="ou_learner_test_123",
         dedupe_key="notification:stable-dedupe",
-        app_result_url="https://staging-vnext.muchenai.com/me/result",
+        app_result_url="https://staging-vnext.muchenai.com/app/result",
         timeout_seconds=7,
         connection_factory=lambda timeout: next(connections),
     )
@@ -149,7 +196,7 @@ def test_feishu_provider_uses_minimal_template_stable_uuid_and_safe_errors():
     request_body = json.loads(body)
     content = json.loads(request_body["content"])
     assert request_body["receive_id"] == "ou_learner_test_123"
-    assert "https://staging-vnext.muchenai.com/me/result" in content["text"]
+    assert "https://staging-vnext.muchenai.com/app/result" in content["text"]
     for forbidden in ("decision", "feedback", "filename", "learner"):
         assert forbidden not in content["text"].lower()
 
@@ -160,7 +207,7 @@ def test_feishu_provider_uses_minimal_template_stable_uuid_and_safe_errors():
             app_secret=SYNTHETIC_APP_CREDENTIAL,
             receive_id="ou_learner_test_123",
             dedupe_key="notification:rate-limit",
-            app_result_url="https://staging-vnext.muchenai.com/me/result",
+            app_result_url="https://staging-vnext.muchenai.com/app/result",
             timeout_seconds=7,
             connection_factory=lambda timeout: rate_limited,
         )
@@ -361,8 +408,9 @@ def test_feishu_worker_records_one_private_receipt_without_changing_outcome(
         recipient_key=RECIPIENT_KEY,
         feishu_app_id="cli_notification",
         feishu_app_secret=SYNTHETIC_APP_CREDENTIAL,
-        app_result_url="https://staging-vnext.muchenai.com/me/result",
+        app_result_url="https://staging-vnext.muchenai.com/app/result",
         provider_timeout_seconds=7,
+        observability_snapshot_seconds=60,
     )
     assert process_batch(event_id=event.id, settings=settings) == 1
     assert calls[0]["receive_id"] == "ou_learner_worker_123"
@@ -379,3 +427,45 @@ def test_feishu_worker_records_one_private_receipt_without_changing_outcome(
     assert result["outcome_id"] == str(outcome.id)
     assert result["notification"]["delivery_scope"] == "FEISHU"
     assert result["notification"]["external_delivery_confirmed"] is True
+    timeline = wp04.assert_ok(flow["learner"].get("/api/v1/me/timeline?limit=100"))
+    delivered_item = next(
+        item
+        for item in timeline["items"]
+        if item["event_type"] == "NOTIFICATION_DELIVERED"
+    )
+    assert delivered_item["title"] == "飞书通知已被服务接受"
+    assert delivered_item["details"]["channel"] == "FEISHU"
+    assert delivered_item["details"]["external_delivery_confirmed"] is True
+
+
+def test_feishu_worker_waits_for_an_active_recipient_without_consuming_history():
+    flow = wp05.approve(f"wp11-feishu-wait-{uuid.uuid4()}")
+    _, _, delivery, event = wp05.notification_state(flow["evaluation_id"])
+    with SessionLocal.begin() as session:
+        stored_delivery = session.get(NotificationDelivery, delivery.id)
+        stored_delivery.channel = NotificationChannel.FEISHU
+    settings = WorkerSettings(
+        app_env="staging",
+        app_release="wp11-test",
+        adapter="FEISHU",
+        local_behavior="success",
+        max_attempts=3,
+        retry_base_seconds=5,
+        lease_seconds=30,
+        poll_seconds=1,
+        crash_after_delivery=False,
+        recipient_key=RECIPIENT_KEY,
+        feishu_app_id="cli_notification",
+        feishu_app_secret=SYNTHETIC_APP_CREDENTIAL,
+        app_result_url="https://staging-vnext.muchenai.com/app/result",
+        provider_timeout_seconds=7,
+        observability_snapshot_seconds=60,
+    )
+    assert process_batch(event_id=event.id, settings=settings) == 0
+    with SessionLocal() as session:
+        stored_event = session.get(OutboxEvent, event.id)
+        stored_delivery = session.get(NotificationDelivery, delivery.id)
+        assert stored_event.status == OutboxStatus.PENDING
+        assert stored_event.attempt_count == 0
+        assert stored_delivery.status == NotificationStatus.PENDING
+        assert stored_delivery.attempt_count == 0

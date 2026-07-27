@@ -410,6 +410,9 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
         )
     ).all()
     delivery_ids: list[uuid.UUID] = []
+    delivery_channels = {
+        delivery.id: delivery.channel for _event, delivery, _outcome in notification_rows
+    }
     receipt_delivery_ids = set(
         session.scalars(
             select(ExternalNotificationReceipt.delivery_id).where(
@@ -443,12 +446,17 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
             .order_by(NotificationAttempt.attempted_at, NotificationAttempt.id)
         ).all()
         for attempt in attempts:
+            channel = delivery_channels[attempt.delivery_id]
             items.append(
                 timeline_item(
                     item_id=f"notification-attempt:{attempt.id}",
                     event_type=f"NOTIFICATION_{attempt.status.value}",
                     title=(
-                        "本地测试通知已处理"
+                        (
+                            "本地测试通知已处理"
+                            if channel == NotificationChannel.LOCAL_TEST
+                            else "飞书通知已被服务接受"
+                        )
                         if attempt.status.value == "DELIVERED"
                         else "通知尝试未成功"
                     ),
@@ -457,6 +465,7 @@ def learner_timeline(session: Session, actor: Actor) -> list[TimelineItemOut]:
                     object_id=attempt.delivery_id,
                     details={
                         "attempt_number": attempt.attempt_number,
+                        "channel": channel.value,
                         "result": attempt.status.value,
                         "error_code": attempt.error_code,
                         "external_delivery_confirmed": (

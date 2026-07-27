@@ -46,7 +46,7 @@ Reviewer 工作台以服务端 `allowed_commands` 为唯一动作来源。`GET /
 
 `APPROVE` 现在在同一数据库事务中写入最终 `Outcome(HANDOFF_READY)`、唯一 `Handoff(READY)`、最小化 Outbox 事件和 `NotificationDelivery`。`GET /api/v1/me/result` 返回服务端最终结论、结构化人工反馈、交接、通知状态与明确的本地范围；`GET /api/v1/me/timeline` 返回授权裁剪的 SubmissionVersion→Review/Evaluation→Outcome/Handoff→Notification 事实。两者都是无副作用读取。
 
-Compose worker 在 `local/test` 使用 `LOCAL_TEST`，并实现仅允许 `staging/production` 的 `FEISHU` 适配器。飞书路径固定官方域名，使用独立通知凭据、加密 `open_id`、10 秒默认超时、稳定 provider UUID、最小无 PII 模板、指数退避、DEAD、最多三次人工重驱与私有 provider receipt；外部失败不会回滚 Outcome/Handoff。当前 staging 仍设置 `NOTIFICATION_ADAPTER=DISABLED`，因此工程能力不等于真实送达证据；只有存在外部回执时结果页才返回 `external_delivery_confirmed=true`。
+Compose worker 在 `local/test` 使用 `LOCAL_TEST`，并实现仅允许 `staging/production` 的 `FEISHU` 适配器。飞书路径固定官方域名，使用独立通知凭据、加密 `open_id`、10 秒默认超时、稳定 provider UUID、最小无 PII 模板、指数退避、DEAD、最多三次人工重驱与私有 provider receipt；外部失败不会回滚 Outcome/Handoff。下一次 staging 部署包已要求独立通知 App、32-byte 接收人密钥、API/Worker 同钥与 canonical result URL，缺失或复用即 fail closed；禁用模式不再领取通知事件，FEISHU 模式也只领取已有活动接收人的事件。当前运行中的 staging 仍为 `NOTIFICATION_ADAPTER=DISABLED`，因此工程接线不等于真实送达证据；只有存在外部回执时结果页才返回 `external_delivery_confirmed=true`。
 
 `/ops` 是受控 Operator 入口。它不提供通用状态编辑器：TaskVersion 只读且发布后不可变；Enrollment 只能执行服务端返回的 `allowed_commands`，写入必须带原因、幂等键和 expected revision，存在评审事实时拒绝更换主管或取消。身份区只列出同组织有效 Reviewer/Operator 的安全状态；通知区只显示接收人状态与版本，不回显密文、指纹、`open_id` 或 provider message ID。一次性身份链接只显示一次，撤销身份会同步撤销活动会话。`GET /api/v1/ops/audit` 仅返回同组织、最多 31 天/100 行的安全字段；`GET /api/v1/ops/runtime-status` 暴露 release、config schema、migration、API/DB/worker heartbeat、backlog/retry/DEAD/最老待处理时长，并明确 `external_observability_confirmed=false`。
 

@@ -6,6 +6,12 @@
     "format": "JSON_LINES",
     "services": ["api", "worker"],
     "transport": "CONTAINER_STDOUT",
+    "snapshot_interval_seconds": 60,
+    "indexed_fields": {
+      "text": ["service", "event", "release", "method", "route", "event_type", "error_code"],
+      "long": ["status", "duration_ms", "attempt", "outbox_backlog", "oldest_pending_seconds", "notification_retry_wait", "notification_dead", "permission_denials_24h"],
+      "boolean": ["final", "deduplicated", "database_ready", "worker_stale"]
+    },
     "forbidden_fields": [
       "authorization",
       "cookie",
@@ -30,7 +36,9 @@
     "notification_retry_wait",
     "notification_dead",
     "database_ready",
-    "worker_heartbeat"
+    "worker_heartbeat",
+    "ecs_basic_cpu",
+    "ecs_basic_metric_presence"
   ],
   "alert_contract": [
     {
@@ -49,7 +57,7 @@
     },
     {
       "name": "worker_stale",
-      "condition": "worker.stale = true",
+      "condition": "count(runtime.snapshot in 5m) = 0",
       "severity": "P1",
       "owner": "Pilot Operator",
       "detection_slo_minutes": 5
@@ -60,6 +68,22 @@
       "severity": "P2",
       "owner": "Security Owner",
       "detection_slo_minutes": 60
+    },
+    {
+      "name": "ecs_cpu_sustained",
+      "source": "VOLCENGINE_CLOUD_MONITOR_ECS_BASIC",
+      "condition": "out_of_band_cpu_utilization average > 85% for 10x1m",
+      "severity": "P2",
+      "owner": "Pilot Operator",
+      "detection_slo_minutes": 10
+    },
+    {
+      "name": "ecs_basic_metrics_missing",
+      "source": "VOLCENGINE_CLOUD_MONITOR_ECS_BASIC",
+      "condition": "no data for 5x1m",
+      "severity": "P1",
+      "owner": "Pilot Operator",
+      "detection_slo_minutes": 5
     }
   ],
   "approved_external_target": "VOLCENGINE_TLS_AND_CLOUD_MONITOR",

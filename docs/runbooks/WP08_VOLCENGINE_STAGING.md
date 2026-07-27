@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP09_SESSION_EXPIRED_UX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `2ea51c0…`；明确会话失效提示候选 `2ab2658…` 的 Mainline Candidate Gate `30237677350` 已完成完整 CI、真实 standalone 失效会话响应测试、SBOM、GHCR push 与三摘要验证。机器合同绑定不构成新候选的部署授权。
+状态：`WP11_STAGING_WIRING_READY / EXTERNAL_WRITES_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `2ab2658…`，唯一部署 run `30242231558` 已成功；该候选不得再部署。WP-11 工程接线尚未合入新候选，也未授权外部配置或部署。
 
 ## 1. 已锁定授权
 
@@ -11,7 +11,7 @@
 - 已消费候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，唯一 deploy run `30157449832` 已实际部署但浏览器 CSP/hydration 复验失败，禁止重试；
 - 已消费候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；唯一 deploy 已成功消费；
 - 历史身份候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；唯一 deploy run `30181022690` 成功，真实 Operator 完成绑定与会话；随后已由 OAuth 同源回跳修复候选 `2ea51c0…` 成功部署并取代，不得再次 deploy；
-- 当前待授权候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；该候选只收口 WP-09 真人证据并修复撤销/失效会话的明确重新登录体验，尚未取得 deploy 授权；
+- 当前运行中已消费候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，唯一 deploy run `30242231558` 已成功。该候选不得重试；WP-11 必须在工程 PR 合入后产生新候选并通过独立绑定 PR；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -37,7 +37,7 @@
 - DNS API 返回 `AlreadyExists` 时，先只读核验记录内容与归属，再把唯一目标记录精确 import 到同一 remote state；禁止先删记录、扩大 DNS 权限或用第二条部署路径绕过。
 - DNS 精确纳管固定使用项目限定的 `dns:ListRecords` 读取现有子区：同时匹配 `@`、A、默认线路、TTL 600、已启用、`vNext staging` 备注和当前 ECS EIP，必须且只能得到一个 RecordID。RecordID 先加入 Actions mask，只用于同一 workflow 的 `terraform import`；不得写入 Git、artifact、公开证据或新增 Environment secret。已有 state 地址则必须核对完整 import identity，不允许覆盖或重绑。
 - TOS bucket 私有、版本化、默认 SSE-TOS AES-256；WP-08 只创建物理隔离资源，应用接入、presign 与扫描属于 WP-10。
-- Worker 以 `APP_ENV=staging` + `NOTIFICATION_ADAPTER=DISABLED` 运行并上报 heartbeat；notification outbox 不会被领取。`LOCAL_TEST` 在 staging 仍启动失败，真实飞书 adapter 属于 WP-11。
+- WP-08 基线曾以 `APP_ENV=staging` + `NOTIFICATION_ADAPTER=DISABLED` 运行并上报 heartbeat。WP-11 合入后，部署包要求独立通知 App、32-byte 接收人加密密钥、`NOTIFICATION_ADAPTER=FEISHU` 与 canonical result URL；缺任一 secret、复用身份 App 或 API/Worker 密钥不一致均在部署前 fail closed。`LOCAL_TEST` 在 staging 始终启动失败；未经精确授权不得执行真实发送。
 - staging secret 的权威存储是 GitHub `staging` Environment；部署时经单次 SSH 加密通道落盘，密码和环境文件为 `0600`。RDS CA 是公开信任证书，以容器只读 `0444` 落盘，且必须在 migration 前由 UID 10001 的 API 容器成功读取；所有内容均不进入 Git、Actions artifact、Terraform CLI 参数或日志。Terraform 加密 TOS state 会保存 RDS account 的敏感属性，因此 state bucket 必须私有、版本化、仅 CI 子用户可读。
 - ECS 创建所需的 bootstrap password 由 Terraform `random_password` 一次生成，仅保存在上述私有、版本化、SSE 加密的 remote state，并且不声明 output、不进入 GitHub secret、Actions 日志或 cloud-init。实例用它满足创建 API 的必填凭据合同；cloud-init 写入 staging-only deploy 公钥后立即将 SSH 收敛为 key-only。密码遗失不恢复、不用于日常登录，实例替换时生成新的随机值。
 
@@ -73,11 +73,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 锁定明确会话失效提示候选 `2ab2658…`，并拒绝早期已消费候选；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect 与真实 standalone 失效会话响应测试合同：
+当前 workflow/config 仍锁定已消费的 `2ab2658…`，因此不能用于 WP-11 部署。WP-11 工程 PR 合入并生成新候选后，必须通过独立绑定 PR 原子更新候选、三个 digest、artifact run/name 和唯一确认词；绑定仍只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、真实 standalone 失效会话响应测试，以及 WP-11 通知/可观测接线合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. `phase=deploy` 只接受绑定候选的确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`；该确认词目前尚未获 Owner 授权，不得 dispatch。历史确认词均已消费，不得复用。获得精确授权后，该阶段仍只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. 历史确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING` 已消费，不得复用。WP-11 绑定 PR 必须生成不同的候选精确确认词；获得当轮授权后，`phase=deploy` 仍只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 

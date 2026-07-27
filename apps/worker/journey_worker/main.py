@@ -10,12 +10,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from journey_api.db import SessionLocal
 from journey_api.models import (
+    AuditEntry,
     ExternalNotificationReceipt,
     LocalNotificationReceipt,
     NotificationAttempt,
@@ -76,6 +77,7 @@ class WorkerSettings:
     feishu_app_secret: str
     app_result_url: str
     provider_timeout_seconds: int
+    observability_snapshot_seconds: int
 
     @classmethod
     def from_env(cls) -> "WorkerSettings":
@@ -94,10 +96,13 @@ class WorkerSettings:
             feishu_app_id=os.getenv("FEISHU_NOTIFICATION_APP_ID", ""),
             feishu_app_secret=os.getenv("FEISHU_NOTIFICATION_APP_SECRET", ""),
             app_result_url=os.getenv(
-                "NOTIFICATION_RESULT_URL", "http://localhost:3000/me/result"
+                "NOTIFICATION_RESULT_URL", "http://localhost:3000/app/result"
             ),
             provider_timeout_seconds=positive_int(
                 "NOTIFICATION_PROVIDER_TIMEOUT_SECONDS", 10, minimum=1
+            ),
+            observability_snapshot_seconds=positive_int(
+                "OBSERVABILITY_SNAPSHOT_SECONDS", 60, minimum=15
             ),
         )
         if settings.app_env not in {"local", "test", "staging", "production"}:
@@ -120,7 +125,7 @@ class WorkerSettings:
             if (
                 result_url.scheme != "https"
                 or not result_url.hostname
-                or result_url.path != "/me/result"
+                or result_url.path != "/app/result"
                 or result_url.query
                 or result_url.fragment
                 or result_url.username
@@ -134,6 +139,65 @@ class WorkerSettings:
         if settings.crash_after_delivery and settings.app_env not in {"local", "test"}:
             raise ValueError("Worker crash injection is local/test only")
         return settings
+
+
+def runtime_metrics_snapshot() -> dict[str, int | bool]:
+    now = datetime.now(UTC)
+    with SessionLocal() as session:
+        outbox_backlog = session.scalar(
+            select(func.count(OutboxEvent.id)).where(
+                OutboxEvent.status.in_(
+                    [OutboxStatus.PENDING, OutboxStatus.PROCESSING, OutboxStatus.FAILED]
+                ),
+                OutboxEvent.processed_at.is_(None),
+            )
+        ) or 0
+        notification_retry_wait = session.scalar(
+            select(func.count(NotificationDelivery.id)).where(
+                NotificationDelivery.status == NotificationStatus.RETRY_WAIT
+            )
+        ) or 0
+        notification_dead = session.scalar(
+            select(func.count(NotificationDelivery.id)).where(
+                NotificationDelivery.status == NotificationStatus.DEAD
+            )
+        ) or 0
+        oldest_pending_at = session.scalar(
+            select(func.min(OutboxEvent.occurred_at)).where(
+                OutboxEvent.status.in_(
+                    [OutboxStatus.PENDING, OutboxStatus.PROCESSING, OutboxStatus.FAILED]
+                ),
+                OutboxEvent.processed_at.is_(None),
+            )
+        )
+        permission_denials_24h = session.scalar(
+            select(func.count(AuditEntry.id)).where(
+                AuditEntry.result == "DENIED",
+                AuditEntry.occurred_at >= now - timedelta(hours=24),
+            )
+        ) or 0
+    return {
+        "database_ready": True,
+        "worker_stale": False,
+        "outbox_backlog": outbox_backlog,
+        "notification_retry_wait": notification_retry_wait,
+        "notification_dead": notification_dead,
+        "oldest_pending_seconds": (
+            max(0, int((now - oldest_pending_at).total_seconds()))
+            if oldest_pending_at is not None
+            else 0
+        ),
+        "permission_denials_24h": permission_denials_24h,
+    }
+
+
+def emit_runtime_snapshot(settings: WorkerSettings) -> None:
+    log_event(
+        logging.INFO,
+        "runtime.snapshot",
+        release=settings.app_release,
+        **runtime_metrics_snapshot(),
+    )
 
 
 def record_heartbeat(settings: WorkerSettings, status: str) -> None:
@@ -236,6 +300,39 @@ def claim_next(
             OutboxEvent.locked_at <= lease_cutoff,
         ),
     )
+    if settings.adapter == "DISABLED":
+        eligible = and_(
+            eligible,
+            OutboxEvent.event_type != "notification.requested.v1",
+        )
+    elif settings.adapter == "FEISHU":
+        active_recipient_exists = (
+            select(NotificationEndpoint.id)
+            .join(
+                NotificationDelivery,
+                and_(
+                    NotificationDelivery.organization_id
+                    == NotificationEndpoint.organization_id,
+                    NotificationDelivery.recipient_user_id
+                    == NotificationEndpoint.user_id,
+                    NotificationDelivery.channel
+                    == NotificationEndpoint.channel,
+                ),
+            )
+            .where(
+                NotificationDelivery.event_id == OutboxEvent.id,
+                NotificationEndpoint.channel == NotificationChannel.FEISHU,
+                NotificationEndpoint.status == NotificationEndpointStatus.ACTIVE,
+            )
+            .exists()
+        )
+        eligible = and_(
+            eligible,
+            or_(
+                OutboxEvent.event_type != "notification.requested.v1",
+                active_recipient_exists,
+            ),
+        )
     with SessionLocal.begin() as session:
         query = (
             select(OutboxEvent)
@@ -553,9 +650,14 @@ def run() -> None:
         release=settings.app_release,
     )
     record_heartbeat(settings, "RUNNING")
+    next_snapshot_at = 0.0
     while True:
         processed = process_batch(settings=settings)
         record_heartbeat(settings, "RUNNING" if processed else "IDLE")
+        now = time.monotonic()
+        if now >= next_snapshot_at:
+            emit_runtime_snapshot(settings)
+            next_snapshot_at = now + settings.observability_snapshot_seconds
         if processed == 0:
             time.sleep(settings.poll_seconds)
 
