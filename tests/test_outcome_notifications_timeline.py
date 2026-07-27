@@ -11,7 +11,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import DBAPIError
 
 import test_reviewer_workbench as wp04
-from journey_worker.main import WorkerSettings
+from journey_worker.main import WorkerSettings, process_batch
 from journey_api.db import SessionLocal
 from journey_api.main import app
 from journey_api.models import (
@@ -138,6 +138,36 @@ def test_staging_disabled_adapter_is_explicit_and_production_remains_closed(
     monkeypatch.setenv("NOTIFICATION_ADAPTER", "LOCAL_TEST")
     with pytest.raises(ValueError, match="disabled outside local/test"):
         WorkerSettings.from_env()
+
+
+def test_staging_disabled_adapter_does_not_consume_notification_history():
+    flow = approve(f"disabled-history-{uuid.uuid4()}")
+    _, _, delivery, event = notification_state(flow["evaluation_id"])
+    settings = WorkerSettings(
+        app_env="staging",
+        app_release="wp11-disabled-test",
+        adapter="DISABLED",
+        local_behavior="success",
+        max_attempts=3,
+        retry_base_seconds=5,
+        lease_seconds=30,
+        poll_seconds=1,
+        crash_after_delivery=False,
+        recipient_key="",
+        feishu_app_id="",
+        feishu_app_secret="",
+        app_result_url="https://staging-vnext.muchenai.com/app/result",
+        provider_timeout_seconds=10,
+        observability_snapshot_seconds=60,
+    )
+    assert process_batch(event_id=event.id, settings=settings) == 0
+    with SessionLocal() as session:
+        stored_event = session.get(OutboxEvent, event.id)
+        stored_delivery = session.get(NotificationDelivery, delivery.id)
+        assert stored_event.status == OutboxStatus.PENDING
+        assert stored_event.attempt_count == 0
+        assert stored_delivery.status == NotificationStatus.PENDING
+        assert stored_delivery.attempt_count == 0
 
 
 def test_result_handoff_timeline_scope_immutability_and_get_purity():

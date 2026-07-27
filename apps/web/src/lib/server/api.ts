@@ -193,8 +193,8 @@ export type Result = {
     next_attempt_at: string | null;
     last_error_code: string | null;
     delivered_at: string | null;
-    delivery_scope: "LOCAL_TEST_ONLY";
-    external_delivery_confirmed: false;
+    delivery_scope: "LOCAL_TEST_ONLY" | "FEISHU";
+    external_delivery_confirmed: boolean;
   };
   ai_summary: {
     status: "NOT_ENABLED";

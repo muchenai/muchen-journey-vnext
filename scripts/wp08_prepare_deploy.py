@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import os
 import re
 import stat
@@ -29,6 +30,9 @@ SECRET_NAMES = (
     "WP09_IDENTITY_SUBJECT_SECRET",
     "WP09_FEISHU_APP_ID",
     "WP09_FEISHU_APP_SECRET",
+    "WP11_NOTIFICATION_RECIPIENT_KEY",
+    "WP11_FEISHU_APP_ID",
+    "WP11_FEISHU_APP_SECRET",
     "WP08_RDS_CA_PEM_B64",
 )
 
@@ -54,8 +58,10 @@ def required_environment() -> dict[str, str]:
         values["WP08_IMPORT_SIGNING_KEY"],
         values["WP09_IDENTITY_SUBJECT_SECRET"],
         values["WP09_FEISHU_APP_SECRET"],
+        values["WP11_NOTIFICATION_RECIPIENT_KEY"],
+        values["WP11_FEISHU_APP_SECRET"],
     }
-    if len(independent) != 7:
+    if len(independent) != 9:
         raise PrepareError("database and application secrets must all be independent")
     minimum_length_secrets = (
         "WP08_SESSION_SECRET",
@@ -70,6 +76,30 @@ def required_environment() -> dict[str, str]:
         raise PrepareError("WP09_FEISHU_APP_ID is invalid")
     if len(values["WP09_FEISHU_APP_SECRET"]) < 16:
         raise PrepareError("WP09_FEISHU_APP_SECRET must contain at least 16 characters")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,100}", values["WP11_FEISHU_APP_ID"]):
+        raise PrepareError("WP11_FEISHU_APP_ID is invalid")
+    if values["WP11_FEISHU_APP_ID"] == values["WP09_FEISHU_APP_ID"]:
+        raise PrepareError("WP11 Feishu notification app must be independent")
+    if len(values["WP11_FEISHU_APP_SECRET"]) < 16:
+        raise PrepareError("WP11_FEISHU_APP_SECRET must contain at least 16 characters")
+    try:
+        encoded_recipient_key = values["WP11_NOTIFICATION_RECIPIENT_KEY"]
+        recipient_key = base64.b64decode(
+            (
+                encoded_recipient_key
+                + "=" * (-len(encoded_recipient_key) % 4)
+            ).encode("ascii"),
+            altchars=b"-_",
+            validate=True,
+        )
+    except (ValueError, UnicodeEncodeError, binascii.Error) as error:
+        raise PrepareError(
+            "WP11_NOTIFICATION_RECIPIENT_KEY must be URL-safe Base64"
+        ) from error
+    if len(recipient_key) != 32:
+        raise PrepareError(
+            "WP11_NOTIFICATION_RECIPIENT_KEY must decode to exactly 32 bytes"
+        )
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", values["WP08_ACME_EMAIL"]):
         raise PrepareError("WP08_ACME_EMAIL is invalid")
     return values
@@ -126,7 +156,8 @@ def prepare(output: Path, host: str, port: int) -> None:
         "FEISHU_OAUTH_REDIRECT_URI": f"https://{STAGING_HOST}/auth/feishu/callback",
         "ATTACHMENTS_ENABLED": "false",
         "NOTIFICATION_CHANNEL": "FEISHU",
-        "NOTIFICATION_RECIPIENTS_ENABLED": "false",
+        "NOTIFICATION_RECIPIENTS_ENABLED": "true",
+        "NOTIFICATION_RECIPIENT_KEY": values["WP11_NOTIFICATION_RECIPIENT_KEY"],
     }
     write_env(secrets / "api.env", {**shared_api, "DATABASE_URL": runtime_url})
     write_env(secrets / "migration.env", {**shared_api, "DATABASE_URL": migration_url})
@@ -136,7 +167,17 @@ def prepare(output: Path, host: str, port: int) -> None:
             "APP_ENV": "staging",
             "APP_RELEASE": CANDIDATE,
             "DATABASE_URL": runtime_url,
-            "NOTIFICATION_ADAPTER": "DISABLED",
+            "NOTIFICATION_ADAPTER": "FEISHU",
+            "NOTIFICATION_RECIPIENT_KEY": values[
+                "WP11_NOTIFICATION_RECIPIENT_KEY"
+            ],
+            "FEISHU_NOTIFICATION_APP_ID": values["WP11_FEISHU_APP_ID"],
+            "FEISHU_NOTIFICATION_APP_SECRET": values[
+                "WP11_FEISHU_APP_SECRET"
+            ],
+            "NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result",
+            "NOTIFICATION_PROVIDER_TIMEOUT_SECONDS": "10",
+            "OBSERVABILITY_SNAPSHOT_SECONDS": "60",
             "NOTIFICATION_MAX_ATTEMPTS": "3",
             "NOTIFICATION_RETRY_BASE_SECONDS": "5",
             "OUTBOX_LEASE_SECONDS": "30",

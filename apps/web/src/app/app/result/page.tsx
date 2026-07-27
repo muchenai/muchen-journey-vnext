@@ -21,7 +21,13 @@ function timelineDetail(eventType: string, details: Timeline["items"][number]["d
     return details.decision === "PASS" ? "结论：通过" : "评价已定稿";
   }
   if (eventType.startsWith("NOTIFICATION_")) {
-    return "通知记录仅来自本地测试适配器，不代表外部送达";
+    if (details.external_delivery_confirmed === true) {
+      return "飞书服务已接受通知请求。";
+    }
+    if (details.channel === "LOCAL_TEST") {
+      return "本地测试记录不代表外部送达。";
+    }
+    return "通知尚未取得外部回执；核心结果不受影响。";
   }
   return null;
 }
@@ -31,6 +37,11 @@ export default async function ResultPage() {
     apiRequest<Result>("/api/v1/me/result", "LEARNER"),
     apiRequest<Timeline>("/api/v1/me/timeline?limit=100", "LEARNER"),
   ]);
+  const notificationEvidence = result.notification.external_delivery_confirmed
+    ? "飞书服务已确认接受通知请求。"
+    : result.notification.delivery_scope === "FEISHU"
+      ? "尚无飞书服务回执；结果仍以本页为准。"
+      : "本地测试记录不代表外部送达。";
   return (
     <article className="result-page">
       <header className="panel result-hero">
@@ -89,8 +100,8 @@ export default async function ResultPage() {
           <p>{result.notification.display_status}</p>
         </div>
         <p className="notification-disclaimer">
-          本地验证范围：{result.notification.delivery_scope}。外部飞书或邮件送达：<strong>未确认</strong>。
-          {result.notification.attempt_count > 0 ? ` 已执行 ${result.notification.attempt_count} 次本地尝试。` : ""}
+          {notificationEvidence}
+          {result.notification.attempt_count > 0 ? ` 已记录 ${result.notification.attempt_count} 次投递尝试。` : ""}
         </p>
       </section>
 
