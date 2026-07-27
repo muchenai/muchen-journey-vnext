@@ -61,7 +61,7 @@ variable "approved_monthly_estimate_cny" {
 
 variable "candidate_commit" {
   type    = string
-  default = "2ea51c0aba272769af8bd8f298242b35326d79ea"
+  default = "2ab2658fc0341d11bc1434524d86128e23da9170"
 
   validation {
     condition     = can(regex("^[0-9a-f]{40}$", var.candidate_commit))
