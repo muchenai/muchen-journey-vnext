@@ -1,4 +1,5 @@
 import re
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -21,7 +22,11 @@ from journey_api.models import (
     InviteStatus,
     JoinContext,
     JoinContextStatus,
+    ExternalNotificationReceipt,
+    NotificationChannel,
     NotificationDelivery,
+    NotificationEndpoint,
+    NotificationEndpointStatus,
     NotificationStatus,
     OutboxEvent,
     OutboxStatus,
@@ -39,16 +44,28 @@ from journey_api.schemas import (
     AuditListOut,
     AuditListResponse,
     CancelEnrollmentCommand,
+    ConfigureNotificationEndpointCommand,
     EnrollmentMutationOut,
     EnrollmentMutationResponse,
     EnrollmentOpsListOut,
     EnrollmentOpsListResponse,
     EnrollmentOpsOut,
+    NotificationEndpointListOut,
+    NotificationEndpointListResponse,
+    NotificationEndpointOut,
+    NotificationEndpointResponse,
+    NotificationOpsDeliveryListOut,
+    NotificationOpsDeliveryListResponse,
+    NotificationOpsDeliveryOut,
+    NotificationOpsDeliveryResponse,
+    RedriveNotificationCommand,
+    RevokeNotificationEndpointCommand,
     RuntimeComponentOut,
     RuntimeMetricsOut,
     RuntimeStatusOut,
     RuntimeStatusResponse,
 )
+from journey_api.notification_recipients import encrypt_open_id
 
 
 router = APIRouter(prefix="/api/v1/ops")
@@ -67,6 +84,9 @@ SAFE_AUDIT_KEYS = {
     "stable_key",
     "status",
     "version",
+    "channel",
+    "endpoint_status",
+    "redrive_count",
 }
 
 
@@ -385,6 +405,439 @@ def cancel_enrollment(
     return envelope(request, EnrollmentMutationOut(**result))
 
 
+def notification_endpoint_out(
+    endpoint: NotificationEndpoint, *, idempotency_replay: bool = False
+) -> NotificationEndpointOut:
+    return NotificationEndpointOut(
+        id=endpoint.id,
+        user_id=endpoint.user_id,
+        channel="FEISHU",
+        receive_id_type="open_id",
+        status=endpoint.status.value,
+        source="OPERATOR_CONFIG",
+        revision=endpoint.revision,
+        updated_at=endpoint.updated_at,
+        idempotency_replay=idempotency_replay,
+    )
+
+
+def require_recipient_configuration() -> str:
+    settings = get_settings()
+    if not settings.notification_recipients_enabled:
+        raise ApiError(409, "FEATURE_DISABLED", "通知接收人配置尚未启用。")
+    return settings.notification_recipient_key
+
+
+def scoped_notification_learner(
+    session: Session, actor: Actor, user_id: uuid.UUID
+) -> User:
+    learner = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .join(
+            Enrollment,
+            (Enrollment.learner_id == User.id)
+            & (Enrollment.organization_id == User.organization_id),
+        )
+        .where(
+            User.id == user_id,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.LEARNER,
+            Enrollment.status != EnrollmentStatus.CANCELLED,
+        )
+    )
+    if learner is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可配置通知的有效学员。")
+    return learner
+
+
+def add_notification_audit(
+    session: Session,
+    *,
+    request: Request,
+    actor: Actor,
+    action: str,
+    resource_type: str,
+    resource_id: uuid.UUID,
+    details: dict[str, object],
+) -> None:
+    session.add(
+        AuditEntry(
+            id=uuid.uuid4(),
+            organization_id=actor.organization_id,
+            actor_id=actor.id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            result="SUCCESS",
+            request_id=request.state.request_id,
+            details=details,
+        )
+    )
+
+
+@router.get(
+    "/notification-endpoints", response_model=NotificationEndpointListResponse
+)
+def list_notification_endpoints(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    endpoints = session.scalars(
+        select(NotificationEndpoint)
+        .where(NotificationEndpoint.organization_id == actor.organization_id)
+        .order_by(NotificationEndpoint.updated_at.desc(), NotificationEndpoint.id)
+        .limit(100)
+    ).all()
+    return envelope(
+        request,
+        NotificationEndpointListOut(
+            items=[notification_endpoint_out(endpoint) for endpoint in endpoints]
+        ),
+    )
+
+
+@router.put(
+    "/users/{user_id}/notification-endpoint",
+    response_model=NotificationEndpointResponse,
+)
+def configure_notification_endpoint(
+    user_id: uuid.UUID,
+    command: ConfigureNotificationEndpointCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    recipient_key = require_recipient_configuration()
+    scoped_notification_learner(session, actor, user_id)
+    encrypted_receive_id, fingerprint = encrypt_open_id(
+        command.receive_id,
+        key_value=recipient_key,
+        organization_id=actor.organization_id,
+        user_id=user_id,
+    )
+    payload = {
+        "expected_revision": command.expected_revision,
+        "reason": command.reason,
+        "recipient_fingerprint": fingerprint,
+        "user_id": str(user_id),
+    }
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="notification.endpoint.configure",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, NotificationEndpointOut(**replay))
+    endpoint = session.scalar(
+        select(NotificationEndpoint)
+        .where(
+            NotificationEndpoint.organization_id == actor.organization_id,
+            NotificationEndpoint.user_id == user_id,
+            NotificationEndpoint.channel == NotificationChannel.FEISHU,
+        )
+        .with_for_update()
+    )
+    actual_revision = endpoint.revision if endpoint is not None else 0
+    if actual_revision != command.expected_revision:
+        raise ApiError(
+            409,
+            "VERSION_CONFLICT",
+            "通知接收人配置已更新，请确认最新状态后重试。",
+            details={"current_revision": actual_revision},
+        )
+    now = datetime.now(UTC)
+    if endpoint is None:
+        endpoint = NotificationEndpoint(
+            id=uuid.uuid4(),
+            organization_id=actor.organization_id,
+            user_id=user_id,
+            channel=NotificationChannel.FEISHU,
+            receive_id_type="open_id",
+            encrypted_receive_id=encrypted_receive_id,
+            recipient_fingerprint=fingerprint,
+            key_version=1,
+            status=NotificationEndpointStatus.ACTIVE,
+            source="OPERATOR_CONFIG",
+            revision=1,
+            created_by=actor.id,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(endpoint)
+    else:
+        endpoint.encrypted_receive_id = encrypted_receive_id
+        endpoint.recipient_fingerprint = fingerprint
+        endpoint.status = NotificationEndpointStatus.ACTIVE
+        endpoint.revision += 1
+        endpoint.updated_at = now
+        endpoint.revoked_at = None
+    result = notification_endpoint_out(endpoint).model_dump(mode="json")
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="notification.endpoint.configure",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_notification_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="notification.endpoint.configured",
+        resource_type="notification_endpoint",
+        resource_id=endpoint.id,
+        details={
+            "channel": "FEISHU",
+            "endpoint_status": "ACTIVE",
+            "reason": command.reason,
+        },
+    )
+    session.commit()
+    session.refresh(endpoint)
+    return envelope(request, notification_endpoint_out(endpoint))
+
+
+@router.post(
+    "/notification-endpoints/{endpoint_id}/revoke",
+    response_model=NotificationEndpointResponse,
+)
+def revoke_notification_endpoint(
+    endpoint_id: uuid.UUID,
+    command: RevokeNotificationEndpointCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "endpoint_id": str(endpoint_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="notification.endpoint.revoke",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, NotificationEndpointOut(**replay))
+    endpoint = session.scalar(
+        select(NotificationEndpoint)
+        .where(
+            NotificationEndpoint.id == endpoint_id,
+            NotificationEndpoint.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if endpoint is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的通知接收人配置。")
+    ensure_revision(endpoint.revision, command.expected_revision)
+    if endpoint.status != NotificationEndpointStatus.ACTIVE:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "通知接收人配置已经撤销。")
+    endpoint.status = NotificationEndpointStatus.REVOKED
+    endpoint.revision += 1
+    endpoint.encrypted_receive_id = f"v1.{secrets.token_urlsafe(48)}"
+    endpoint.recipient_fingerprint = secrets.token_hex(32)
+    endpoint.revoked_at = datetime.now(UTC)
+    endpoint.updated_at = endpoint.revoked_at
+    result = notification_endpoint_out(endpoint).model_dump(mode="json")
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="notification.endpoint.revoke",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_notification_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="notification.endpoint.revoked",
+        resource_type="notification_endpoint",
+        resource_id=endpoint.id,
+        details={
+            "channel": "FEISHU",
+            "endpoint_status": "REVOKED",
+            "reason": command.reason,
+        },
+    )
+    session.commit()
+    session.refresh(endpoint)
+    return envelope(request, notification_endpoint_out(endpoint))
+
+
+def notification_delivery_out(
+    delivery: NotificationDelivery, *, receipt: bool
+) -> NotificationOpsDeliveryOut:
+    return NotificationOpsDeliveryOut(
+        id=delivery.id,
+        recipient_user_id=delivery.recipient_user_id,
+        channel=delivery.channel.value,
+        status=delivery.status.value,
+        attempt_count=delivery.attempt_count,
+        redrive_count=delivery.redrive_count,
+        revision=delivery.revision,
+        last_error_code=delivery.last_error_code,
+        next_attempt_at=delivery.next_attempt_at,
+        delivered_at=delivery.delivered_at,
+        external_receipt_recorded=receipt,
+    )
+
+
+@router.get(
+    "/notification-deliveries", response_model=NotificationOpsDeliveryListResponse
+)
+def list_notification_deliveries(
+    request: Request,
+    status: NotificationStatus | None = None,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    query = select(NotificationDelivery).where(
+        NotificationDelivery.organization_id == actor.organization_id
+    )
+    if status is not None:
+        query = query.where(NotificationDelivery.status == status)
+    deliveries = session.scalars(
+        query.order_by(NotificationDelivery.updated_at.desc()).limit(100)
+    ).all()
+    receipt_ids = set(
+        session.scalars(
+            select(ExternalNotificationReceipt.delivery_id).where(
+                ExternalNotificationReceipt.delivery_id.in_(
+                    [delivery.id for delivery in deliveries]
+                )
+            )
+        ).all()
+    ) if deliveries else set()
+    return envelope(
+        request,
+        NotificationOpsDeliveryListOut(
+            items=[
+                notification_delivery_out(
+                    delivery, receipt=delivery.id in receipt_ids
+                )
+                for delivery in deliveries
+            ]
+        ),
+    )
+
+
+@router.post(
+    "/notification-deliveries/{delivery_id}/redrive",
+    response_model=NotificationOpsDeliveryResponse,
+)
+def redrive_notification_delivery(
+    delivery_id: uuid.UUID,
+    command: RedriveNotificationCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "delivery_id": str(delivery_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="notification.delivery.redrive",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, NotificationOpsDeliveryOut(**replay))
+    delivery = session.scalar(
+        select(NotificationDelivery)
+        .where(
+            NotificationDelivery.id == delivery_id,
+            NotificationDelivery.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if delivery is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的通知投递。")
+    ensure_revision(delivery.revision, command.expected_revision)
+    if delivery.status != NotificationStatus.DEAD:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有 DEAD 通知可以人工重驱。")
+    if delivery.redrive_count >= 3:
+        raise ApiError(409, "REDRIVE_LIMIT_REACHED", "通知已达到人工重驱上限。")
+    if session.scalar(
+        select(ExternalNotificationReceipt.id).where(
+            ExternalNotificationReceipt.delivery_id == delivery.id
+        )
+    ) is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "已记录外部回执，不能再次投递。")
+    if delivery.channel == NotificationChannel.FEISHU:
+        active_endpoint = session.scalar(
+            select(NotificationEndpoint.id).where(
+                NotificationEndpoint.organization_id == actor.organization_id,
+                NotificationEndpoint.user_id == delivery.recipient_user_id,
+                NotificationEndpoint.channel == NotificationChannel.FEISHU,
+                NotificationEndpoint.status == NotificationEndpointStatus.ACTIVE,
+            )
+        )
+        if active_endpoint is None:
+            raise ApiError(409, "RECIPIENT_UNAVAILABLE", "接收人尚无有效飞书通知配置。")
+    event = session.scalar(
+        select(OutboxEvent)
+        .where(
+            OutboxEvent.id == delivery.event_id,
+            OutboxEvent.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if event is None or event.status != OutboxStatus.FAILED:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "通知 Outbox 状态不允许重驱。")
+    now = datetime.now(UTC)
+    delivery.status = NotificationStatus.PENDING
+    delivery.attempt_offset = event.attempt_count
+    delivery.redrive_count += 1
+    delivery.revision += 1
+    delivery.next_attempt_at = now
+    delivery.last_error_code = None
+    delivery.updated_at = now
+    event.status = OutboxStatus.PENDING
+    event.processed_at = None
+    event.next_attempt_at = now
+    event.last_error_code = None
+    event.locked_at = None
+    event.lock_token = None
+    result = notification_delivery_out(delivery, receipt=False).model_dump(mode="json")
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="notification.delivery.redrive",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_notification_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="notification.delivery.redriven",
+        resource_type="notification_delivery",
+        resource_id=delivery.id,
+        details={"redrive_count": delivery.redrive_count, "reason": command.reason},
+    )
+    session.commit()
+    return envelope(request, NotificationOpsDeliveryOut(**result))
+
+
 def safe_audit_details(details: dict[str, object]) -> tuple[dict[str, str | int | bool], list[str]]:
     safe: dict[str, str | int | bool] = {}
     redacted: list[str] = []
@@ -477,6 +930,24 @@ def runtime_status(
             NotificationDelivery.status == NotificationStatus.DEAD
         )
     ) or 0
+    retry_wait = session.scalar(
+        select(func.count(NotificationDelivery.id)).where(
+            NotificationDelivery.status == NotificationStatus.RETRY_WAIT
+        )
+    ) or 0
+    oldest_pending_at = session.scalar(
+        select(func.min(OutboxEvent.occurred_at)).where(
+            OutboxEvent.status.in_(
+                [OutboxStatus.PENDING, OutboxStatus.PROCESSING, OutboxStatus.FAILED]
+            ),
+            OutboxEvent.processed_at.is_(None),
+        )
+    )
+    oldest_pending_seconds = (
+        max(0, int((now - oldest_pending_at).total_seconds()))
+        if oldest_pending_at is not None
+        else 0
+    )
     denied = session.scalar(
         select(func.count(AuditEntry.id)).where(
             AuditEntry.organization_id == actor.organization_id,
@@ -497,10 +968,12 @@ def runtime_status(
             last_seen_at=heartbeat.last_seen_at if heartbeat else None,
             stale=stale,
         ),
-        observability_mode="LOCAL_STRUCTURED_STDOUT",
+        observability_mode="STRUCTURED_STDOUT",
         metrics=RuntimeMetricsOut(
             outbox_backlog=backlog,
+            notification_retry_wait=retry_wait,
             notification_dead=dead,
+            oldest_pending_seconds=oldest_pending_seconds,
             permission_denials_24h=denied,
         ),
     )

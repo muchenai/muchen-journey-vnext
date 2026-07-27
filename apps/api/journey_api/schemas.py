@@ -131,6 +131,35 @@ class CancelEnrollmentCommand(RevisionCommand):
         return value.strip()
 
 
+class ConfigureNotificationEndpointCommand(StrictModel):
+    expected_revision: int = Field(ge=0)
+    receive_id: str = Field(pattern=r"^ou_[A-Za-z0-9_-]{8,120}$")
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("receive_id", "reason")
+    @classmethod
+    def normalize_notification_endpoint_fields(cls, value: str) -> str:
+        return value.strip()
+
+
+class RevokeNotificationEndpointCommand(RevisionCommand):
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_notification_revoke_reason(cls, value: str) -> str:
+        return value.strip()
+
+
+class RedriveNotificationCommand(RevisionCommand):
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_notification_redrive_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class CreateTaskDefinitionCommand(StrictModel):
     stable_key: str = Field(min_length=3, max_length=80, pattern=r"^[A-Z][A-Z0-9_-]+$")
 
@@ -571,6 +600,60 @@ class EnrollmentMutationResponse(StrictModel):
     request_id: str
 
 
+class NotificationEndpointOut(StrictModel):
+    id: UUID
+    user_id: UUID
+    channel: Literal["FEISHU"]
+    receive_id_type: Literal["open_id"]
+    status: Literal["ACTIVE", "REVOKED"]
+    source: Literal["OPERATOR_CONFIG"]
+    revision: int
+    updated_at: datetime
+    idempotency_replay: bool = False
+
+
+class NotificationEndpointListOut(StrictModel):
+    items: list[NotificationEndpointOut]
+
+
+class NotificationEndpointResponse(StrictModel):
+    data: NotificationEndpointOut
+    request_id: str
+
+
+class NotificationEndpointListResponse(StrictModel):
+    data: NotificationEndpointListOut
+    request_id: str
+
+
+class NotificationOpsDeliveryOut(StrictModel):
+    id: UUID
+    recipient_user_id: UUID
+    channel: str
+    status: str
+    attempt_count: int
+    redrive_count: int
+    revision: int
+    last_error_code: str | None
+    next_attempt_at: datetime | None
+    delivered_at: datetime | None
+    external_receipt_recorded: bool
+
+
+class NotificationOpsDeliveryListOut(StrictModel):
+    items: list[NotificationOpsDeliveryOut]
+
+
+class NotificationOpsDeliveryResponse(StrictModel):
+    data: NotificationOpsDeliveryOut
+    request_id: str
+
+
+class NotificationOpsDeliveryListResponse(StrictModel):
+    data: NotificationOpsDeliveryListOut
+    request_id: str
+
+
 class AuditEntryOut(StrictModel):
     id: UUID
     actor_id: UUID | None
@@ -602,19 +685,21 @@ class RuntimeComponentOut(StrictModel):
 
 class RuntimeMetricsOut(StrictModel):
     outbox_backlog: int
+    notification_retry_wait: int
     notification_dead: int
+    oldest_pending_seconds: int
     permission_denials_24h: int
 
 
 class RuntimeStatusOut(StrictModel):
     environment: Literal["local", "test", "staging", "production"]
     release: str
-    config_schema_version: Literal[2]
+    config_schema_version: Literal[3]
     migration_revision: str
     api: RuntimeComponentOut
     database: RuntimeComponentOut
     worker: RuntimeComponentOut
-    observability_mode: Literal["LOCAL_STRUCTURED_STDOUT"]
+    observability_mode: Literal["STRUCTURED_STDOUT"]
     external_observability_confirmed: Literal[False] = False
     metrics: RuntimeMetricsOut
 
@@ -838,8 +923,8 @@ class NotificationDeliveryOut(StrictModel):
     next_attempt_at: datetime | None
     last_error_code: str | None
     delivered_at: datetime | None
-    delivery_scope: Literal["LOCAL_TEST_ONLY"] = "LOCAL_TEST_ONLY"
-    external_delivery_confirmed: Literal[False] = False
+    delivery_scope: Literal["LOCAL_TEST_ONLY", "FEISHU"]
+    external_delivery_confirmed: bool
 
 
 class AiSummaryOut(StrictModel):

@@ -35,7 +35,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0012_wp10_file_security"
+EXPECTED_MIGRATION_HEAD = "0013_wp11_notify_observability"
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",
@@ -401,7 +401,7 @@ def backup() -> Path:
             "plaintext_sha256": plain_checksum,
             "encrypted_sha256": sha256_file(encrypted),
             "backup_file": encrypted.name,
-            "config_schema_version": 2,
+            "config_schema_version": 3,
             "app_release": "wp06-local-no-head",
             "source_fingerprint_sha256": source_fingerprint(),
             "openapi_sha256": sha256_file(ROOT / "contracts" / "openapi.json"),

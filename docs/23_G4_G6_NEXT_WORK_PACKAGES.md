@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 Alpha 运行面已验证。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 暂时无法执行撤销后明确提示的真人复验，因此该项诚实标记 `WAITING_FOR_HUMAN_UAT`，不记 PASS，也不占工程 WIP。经用户确认，当前唯一工程 WIP 切换为 WP-10。WP-10 已完成真实 TOS/ClamAV 代码 walking skeleton，但 staging 扫描运行时、ECS 最小角色及物理 CORS/ACL/恢复证据尚未关闭；外部权限、真人、时间窗口和生产写入仍须取得精确授权。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 Alpha 运行面已验证。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`，不占工程 WIP。WP-10 的 TOS/ClamAV 工程路径已完成，但 staging 文件路径在扫描运行时、IAM/CORS/ACL/恢复证据关闭前保持禁用。当前唯一工程 WIP 为 WP-11；真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。
 
 ## 1. 结论
 
@@ -423,7 +423,7 @@ Agent 只能准备脚本、环境和证据模板，不能代替真人点击、�
 
 本文件已升级为 `APPROVED_FOR_BUILD`，代表 WP-07～WP-15 的编号、范围、Owner 组合、顺序与单一 WIP 协议已锁定。执行仍遵循：
 
-1. 当前只激活 WP-09；其真人访问矩阵已经通过，但明确会话失效提示尚待候选部署复验。只有该修复完成主任务复验并形成 `IDENTITY_AND_ACCESS_VERIFIED` 后才激活 WP-10；WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 必须在 WP-12 RC 冻结或任何 production 行为前关闭；
+1. 当前只激活 WP-11；WP-09 的真人提示复验和 WP-10 的物理文件路径证据作为显式债保留，不并行占用工程 WIP。WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN`、WP-09 的 `WAITING_FOR_HUMAN_UAT` 与 WP-10 的 `PHYSICAL_EVIDENCE_OPEN` 必须在 WP-12 RC 冻结或任何 production 行为前关闭；
 2. 第 2 节未关闭的物理执行输入必须在对应工作包开工前补齐；
 3. 外部资源、角色或权限变更每次只按已说明的供应商、环境、动作与范围执行，不从计划批准推定；
 4. WP-13、WP-14 的真人与时间证据不可由机器替代；

@@ -43,6 +43,9 @@ def test_nonlocal_identity_requires_distinct_vnext_secrets():
         tos_region="cn-beijing",
         tos_bucket="journey-private-test",
         tos_ecs_role_name="journey-runtime-test",
+        notification_channel="FEISHU",
+        notification_recipients_enabled=True,
+        notification_recipient_key="bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
     )
     assert configured.allow_fixture_identity is False
 
@@ -60,6 +63,7 @@ def test_nonlocal_attachment_dependencies_fail_closed():
         "feishu_app_secret": "staging-feishu-secret-123",
         "feishu_oauth_redirect_uri": "https://staging.example.test/auth/feishu/callback",
         "attachments_enabled": True,
+        "notification_channel": "FEISHU",
     }
     with pytest.raises(ValidationError, match="must use TOS"):
         Settings(**common)
@@ -86,6 +90,7 @@ def test_nonlocal_disabled_attachments_do_not_require_storage_or_scanner():
         feishu_app_secret="staging-feishu-secret-123",
         feishu_oauth_redirect_uri="https://staging.example.test/auth/feishu/callback",
         attachments_enabled=False,
+        notification_channel="FEISHU",
     )
     assert configured.attachment_storage_backend == "LOCAL"
     assert configured.attachment_scanner_backend == "TEST"

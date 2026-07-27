@@ -19,7 +19,8 @@
 - WP-08：火山引擎华北2（北京）冻结 staging 资源上的 Alpha 运行面已验证，TLS/readiness/API/Web/Worker/匿名权限与真实浏览器 smoke 通过；RDS `IsLatest` 供应商字段证据债保留到 RC/production 前关闭；
 - WP-09：独立飞书应用、首位真实 Operator、Reviewer 绑定及真实权限矩阵已完成；明确会话失效提示候选 `2ab2658…` 已在唯一冻结 staging deploy run `30242231558` 成功上线，readiness、匿名 `/ops`/`/review` 拒绝和飞书入口均通过机器复验。Reviewer 暂时无法继续真人复验，撤销会话提示保留为 `WAITING_FOR_HUMAN_UAT`，不伪记 PASS；
 - WP-10：真实 TOS 直传、对象元数据复核、短时授权下载、ClamAV 流式扫描和 fail-closed 隔离的工程路径已完成；配置合同升级为 V2。staging 在扫描运行时与最小 IAM 未关闭前明确禁用附件，结构化文本闭环不受阻；
-- 未实施 production 部署、真实旧系统数据导入、真实飞书/邮件/告警、异机/生产恢复、真人 UAT 或发布签署；物理 ACL 仍有证据债。当前发布判定必须是 `NO_GO`。
+- WP-11：独立飞书通知适配器、加密接收人、provider receipt、限流/超时/重试/DEAD/人工重驱、JSON 结构化日志和运行指标的工程路径已完成；配置合同升级为 V3。真实飞书收件、火山引擎 TLS/Cloud Monitor、外部告警与演练保持 `NOT_RUN`，staging 通知适配器继续禁用；
+- 未实施 production 部署、真实旧系统数据导入、真实飞书通知/外部告警、异机/生产恢复、完整真人 UAT 或发布签署；物理 ACL 仍有证据债。当前发布判定必须是 `NO_GO`。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
 
@@ -45,9 +46,9 @@ Reviewer 工作台以服务端 `allowed_commands` 为唯一动作来源。`GET /
 
 `APPROVE` 现在在同一数据库事务中写入最终 `Outcome(HANDOFF_READY)`、唯一 `Handoff(READY)`、最小化 Outbox 事件和 `NotificationDelivery`。`GET /api/v1/me/result` 返回服务端最终结论、结构化人工反馈、交接、通知状态与明确的本地范围；`GET /api/v1/me/timeline` 返回授权裁剪的 SubmissionVersion→Review/Evaluation→Outcome/Handoff→Notification 事实。两者都是无副作用读取。
 
-Compose worker 只实现 `LOCAL_TEST` 通知适配器，具备 pending/processing/sent-or-failed、attempt、指数退避、lease、死信和 dedupe receipt；`local/test` 之外会 fail closed。页面上的 `DELIVERED` 只表示本地测试适配器已处理，始终同时显示 `external_delivery_confirmed=false`，不得解读为飞书或邮件已真实送达。真实 Feishu、邮件和 AI 服务均为 `NOT_RUN`。
+Compose worker 在 `local/test` 使用 `LOCAL_TEST`，并实现仅允许 `staging/production` 的 `FEISHU` 适配器。飞书路径固定官方域名，使用独立通知凭据、加密 `open_id`、10 秒默认超时、稳定 provider UUID、最小无 PII 模板、指数退避、DEAD、最多三次人工重驱与私有 provider receipt；外部失败不会回滚 Outcome/Handoff。当前 staging 仍设置 `NOTIFICATION_ADAPTER=DISABLED`，因此工程能力不等于真实送达证据；只有存在外部回执时结果页才返回 `external_delivery_confirmed=true`。
 
-`/ops` 是受控 Operator 入口。它不提供通用状态编辑器：TaskVersion 只读且发布后不可变；Enrollment 只能执行服务端返回的 `allowed_commands`，写入必须带原因、幂等键和 expected revision，存在评审事实时拒绝更换主管或取消。身份区只列出同组织有效 Reviewer/Operator 的安全状态，原始外部 subject/token 不进入清单响应；一次性绑定链接只显示一次，撤销身份会同步撤销活动会话。`GET /api/v1/ops/audit` 仅返回同组织、最多 31 天/100 条的安全字段，敏感详情只列出被裁剪字段名；`GET /api/v1/ops/runtime-status` 暴露 release、config schema、migration、API/DB/worker heartbeat、队列/死信和可观测模式，并明确 `external_observability_confirmed=false`。
+`/ops` 是受控 Operator 入口。它不提供通用状态编辑器：TaskVersion 只读且发布后不可变；Enrollment 只能执行服务端返回的 `allowed_commands`，写入必须带原因、幂等键和 expected revision，存在评审事实时拒绝更换主管或取消。身份区只列出同组织有效 Reviewer/Operator 的安全状态；通知区只显示接收人状态与版本，不回显密文、指纹、`open_id` 或 provider message ID。一次性身份链接只显示一次，撤销身份会同步撤销活动会话。`GET /api/v1/ops/audit` 仅返回同组织、最多 31 天/100 行的安全字段；`GET /api/v1/ops/runtime-status` 暴露 release、config schema、migration、API/DB/worker heartbeat、backlog/retry/DEAD/最老待处理时长，并明确 `external_observability_confirmed=false`。
 
 离线导入是本地 CLI 合同，不是 HTTP 上传接口，也不连接旧系统。它只在 `local/test` 接受 HMAC 签名、SHA-256 校验、严格 manifest/NDJSON schema 的 `SYNTHETIC_VNEXT_FIXTURE` 包，先 dry-run，再以 package/source key 幂等应用；重放、跨包冲突和隔离原因写入不可变 ledger，报告不含记录标识符。示例命令：
 

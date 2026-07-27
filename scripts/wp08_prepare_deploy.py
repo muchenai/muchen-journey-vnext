@@ -113,7 +113,7 @@ def prepare(output: Path, host: str, port: int) -> None:
     shared_api = {
         "APP_ENV": "staging",
         "APP_RELEASE": CANDIDATE,
-        "CONFIG_SCHEMA_VERSION": "2",
+        "CONFIG_SCHEMA_VERSION": "3",
         "ALLOWED_HOSTS": f"{STAGING_HOST},api,localhost,127.0.0.1",
         "ALLOW_FIXTURE_IDENTITY": "false",
         "SESSION_SECRET": values["WP08_SESSION_SECRET"],
@@ -125,6 +125,8 @@ def prepare(output: Path, host: str, port: int) -> None:
         "FEISHU_APP_SECRET": values["WP09_FEISHU_APP_SECRET"],
         "FEISHU_OAUTH_REDIRECT_URI": f"https://{STAGING_HOST}/auth/feishu/callback",
         "ATTACHMENTS_ENABLED": "false",
+        "NOTIFICATION_CHANNEL": "FEISHU",
+        "NOTIFICATION_RECIPIENTS_ENABLED": "false",
     }
     write_env(secrets / "api.env", {**shared_api, "DATABASE_URL": runtime_url})
     write_env(secrets / "migration.env", {**shared_api, "DATABASE_URL": migration_url})
@@ -146,7 +148,7 @@ def prepare(output: Path, host: str, port: int) -> None:
         {
             "APP_ENV": "staging",
             "APP_RELEASE": CANDIDATE,
-            "CONFIG_SCHEMA_VERSION": "2",
+            "CONFIG_SCHEMA_VERSION": "3",
             "API_INTERNAL_URL": "http://api:8000",
             "ALLOW_FIXTURE_IDENTITY": "false",
         },

@@ -486,6 +486,68 @@ export async function cancelEnrollment(data: FormData) {
   redirect("/ops?updated=cancelled");
 }
 
+export async function configureNotificationEndpoint(data: FormData) {
+  const userId = requiredUuid(data, "user_id");
+  const revisionValue = Number(data.get("revision"));
+  if (!Number.isSafeInteger(revisionValue) || revisionValue < 0) {
+    throw new Error("通知接收人版本无效，请刷新页面后重试。");
+  }
+  const receiveId = data.get("receive_id");
+  if (
+    typeof receiveId !== "string"
+    || !/^ou_[A-Za-z0-9_-]{8,120}$/.test(receiveId.trim())
+  ) {
+    throw new Error("请输入一个有效的飞书 open_id。");
+  }
+  await apiRequest(`/api/v1/ops/users/${userId}/notification-endpoint`, "OPERATOR", {
+    method: "PUT",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: revisionValue,
+      receive_id: receiveId.trim(),
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=notification-endpoint");
+}
+
+export async function revokeNotificationEndpoint(data: FormData) {
+  const endpointId = requiredUuid(data, "endpoint_id");
+  await apiRequest(
+    `/api/v1/ops/notification-endpoints/${endpointId}/revoke`,
+    "OPERATOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        expected_revision: requiredRevision(data),
+        reason: requiredReason(data),
+      }),
+    },
+  );
+  revalidatePath("/ops");
+  redirect("/ops?updated=notification-endpoint-revoked");
+}
+
+export async function redriveNotificationDelivery(data: FormData) {
+  const deliveryId = requiredUuid(data, "delivery_id");
+  await apiRequest(
+    `/api/v1/ops/notification-deliveries/${deliveryId}/redrive`,
+    "OPERATOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        expected_revision: requiredRevision(data),
+        reason: requiredReason(data),
+      }),
+    },
+  );
+  revalidatePath("/ops");
+  redirect("/ops?updated=notification-redrive");
+}
+
 export type IdentityLinkActionState = {
   error?: string;
   requestId?: string;

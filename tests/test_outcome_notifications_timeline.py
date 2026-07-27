@@ -191,7 +191,11 @@ def test_result_handoff_timeline_scope_immutability_and_get_purity():
         for method in operations
         if "notification" in path and method.lower() not in {"get", "parameters"}
     ]
-    assert mutating_notification_paths == []
+    assert set(mutating_notification_paths) == {
+        ("/api/v1/ops/users/{user_id}/notification-endpoint", "put"),
+        ("/api/v1/ops/notification-endpoints/{endpoint_id}/revoke", "post"),
+        ("/api/v1/ops/notification-deliveries/{delivery_id}/redrive", "post"),
+    }
 
     result_first = wp04.assert_ok(first["learner"].get("/api/v1/me/result"))
     result_second = wp04.assert_ok(first["learner"].get("/api/v1/me/result"))
@@ -346,7 +350,7 @@ def test_real_worker_retry_failure_and_dead_letter_do_not_change_result():
             )
         )
     assert all(run.returncode == 0 for run in concurrent_runs)
-    assert sum("processed=1" in run.stderr for run in concurrent_runs) == 1
+    assert sum('"processed":1' in run.stderr for run in concurrent_runs) == 1
     assert all(str(concurrent_event.id) not in run.stderr for run in concurrent_runs)
     _, _, concurrent_delivery, concurrent_event = notification_state(
         concurrent_flow["evaluation_id"]
@@ -448,7 +452,7 @@ def test_real_worker_recovers_after_adapter_commit_without_duplicate_delivery():
 
     recovered = run_worker(event.id, behavior="success")
     assert recovered.returncode == 0, recovered.stderr
-    assert "deduplicated=True" in recovered.stderr
+    assert '"deduplicated":true' in recovered.stderr
     _, _, delivery, event = notification_state(flow["evaluation_id"])
     assert event.status == OutboxStatus.SENT
     assert event.attempt_count == 2

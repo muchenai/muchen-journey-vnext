@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from journey_api.config import get_settings
 from journey_api.models import (
     Assignment,
     Enrollment,
@@ -133,9 +134,10 @@ def create_pass_outcome_bundle(
 
     event_id = uuid.uuid4()
     template_version = "outcome-ready.v1"
+    notification_channel = NotificationChannel(get_settings().notification_channel)
     dedupe_key = (
         f"notification:{outcome.id}:{enrollment.learner_id}:"
-        f"{NotificationChannel.LOCAL_TEST.value}:{template_version}"
+        f"{notification_channel.value}:{template_version}"
     )
     notification_event = add_scoped_outbox_event(
         session,
@@ -161,7 +163,7 @@ def create_pass_outcome_bundle(
         event_id=notification_event.id,
         outcome_id=outcome.id,
         recipient_user_id=enrollment.learner_id,
-        channel=NotificationChannel.LOCAL_TEST,
+        channel=notification_channel,
         template_version=template_version,
         status=NotificationStatus.PENDING,
         attempt_count=0,

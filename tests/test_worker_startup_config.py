@@ -9,7 +9,7 @@ def staging_worker_environment() -> dict[str, str]:
         "APP_ENV": "staging",
         "APP_RELEASE": "a" * 40,
         "ALLOW_FIXTURE_IDENTITY": "false",
-        "CONFIG_SCHEMA_VERSION": "2",
+        "CONFIG_SCHEMA_VERSION": "3",
         "DATABASE_URL": (
             "postgresql+psycopg://journey_next_runtime:unused@"
             "db.example.invalid:5432/journey_next_staging"
