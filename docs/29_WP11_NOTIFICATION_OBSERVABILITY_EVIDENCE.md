@@ -1,8 +1,8 @@
 # WP-11 真实通知与外部可观测构建证据
 
-状态：`AS_BUILT / STAGING_WIRING_READY`
+状态：`AS_BUILT / CANDIDATE_BINDING_READY`
 
-结论：`ENGINEERING_VERIFIED / STAGING_WIRING_READY / EXTERNAL_OBSERVABILITY_NOT_RUN`
+结论：`ENGINEERING_VERIFIED / CANDIDATE_READY / EXTERNAL_OBSERVABILITY_NOT_RUN`
 
 ## 1. 本工作包关闭的问题
 
@@ -63,9 +63,16 @@ PASS
 - 未取得 provider message receipt、错误收件人、限流、凭据轮换的物理环境证据；
 - 未在火山引擎创建 TLS project/topic、LogCollector、Dashboard、Cloud Monitor 告警或外部路由；
 - 未执行外部告警演练，也未证明 DEAD 在真实外部系统中 4 小时内被发现；
-- 当前运行中的 staging 仍保持 `NOTIFICATION_ADAPTER=DISABLED`；本地接线尚未合入候选或部署，因此不能宣称 `INTEGRATIONS_AND_OBSERVABILITY_VERIFIED`。
+- 当前运行中的 staging 仍保持 `NOTIFICATION_ADAPTER=DISABLED`；WP-11 接线已合入候选但尚未部署，因此不能宣称 `INTEGRATIONS_AND_OBSERVABILITY_VERIFIED`。
 
-## 5. 下一次外部动作所需授权
+## 5. 已验证候选
+
+- PR #64 将 WP-11 工程接线合入主线 `172c9f62ffdcd4fce31fb4900fdca46b3405ab89`；
+- Mainline Candidate Gate `30302594972` 完成 `ci-main`、候选打包、三镜像 SPDX SBOM、GHCR 推送和 registry digest 二次验证；
+- canonical manifest 精确记录 migration `0013_wp11_notify_observability`、config V3、TSK-001 V1/V2 内容摘要和 `deployment=NOT_RUN`；
+- 候选绑定合同使用 API `sha256:9fd8ac58…10094`、Web `sha256:029cdc66…0b19`、Worker `sha256:6a2fe4c7…f4b79`。这些是镜像证据，不是部署授权。
+
+## 6. 下一次外部动作所需授权
 
 唯一执行顺序、最小权限、资源命名、停止条件和私有证据边界见 `docs/runbooks/WP11_STAGING_INTEGRATIONS.md`。
 

@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 工程实现与下一部署的 fail-closed 通知接线已完成；当前运行环境仍禁用通知，真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。WP-12 在剩余证据债关闭前不激活。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 工程实现已合入候选 `172c9f6…`，下一部署的 fail-closed 通知接线和不可变镜像合同已绑定；当前运行环境仍禁用通知，真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。WP-12 在剩余证据债关闭前不激活。
 
 ## 1. 结论
 

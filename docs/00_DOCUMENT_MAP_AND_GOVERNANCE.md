@@ -44,7 +44,7 @@
 | 26 | [WP-08 火山引擎 Staging 实施路径证据](26_WP08_VOLCENGINE_STAGING_PATH_EVIDENCE.md) | 已锁定 provider/region/budget 后，唯一 IaC/CI/secret/回滚路径是什么，云端是否已经写入？ | 冻结基础设施上的候选 `14c9ba0…` 已完成 migration、seed、完整服务健康、TLS 与浏览器 smoke；控制台、冻结 state 与真实数据面组合证据关闭物理 ACL，WP-08 为 `STAGING_ISOLATION_VERIFIED` |
 | 27 | [WP-09 真实身份与会话构建证据](27_WP09_REAL_IDENTITY_SESSION_EVIDENCE.md) | 飞书身份绑定、真实会话和撤销边界在代码与物理环境分别证明了什么？ | 修复候选已部署并通过机器复验；Reviewer 暂不可用，撤销会话明确提示保留 `WAITING_FOR_HUMAN_UAT` |
 | 28 | [WP-10 真实附件与文件安全构建证据](28_WP10_FILE_SECURITY_EVIDENCE.md) | 私有对象存储、短时授权、隔离扫描与停用边界实际证明了什么？ | 当前 Alpha/RC 固定无附件的 TSK-001 V1 并 fail closed，结论为 `SECURELY_DISABLED_FOR_ALPHA`；未来启用前重开五项物理门禁 |
-| 29 | [WP-11 真实通知与外部可观测构建证据](29_WP11_NOTIFICATION_OBSERVABILITY_EVIDENCE.md) | 加密接收人、真实飞书适配器、回执、重驱、结构化日志和外部观测合同分别证明了什么？ | staging fail-closed 接线与安全领取规则已验证；真实收件、TLS/Cloud Monitor、外部告警、演练和部署仍 `NOT_RUN`，当前运行环境通知保持禁用 |
+| 29 | [WP-11 真实通知与外部可观测构建证据](29_WP11_NOTIFICATION_OBSERVABILITY_EVIDENCE.md) | 加密接收人、真实飞书适配器、回执、重驱、结构化日志和外部观测合同分别证明了什么？ | 候选 `172c9f6…` 与不可变镜像合同已绑定；真实收件、TLS/Cloud Monitor、外部告警、演练和部署仍 `NOT_RUN`，当前运行环境通知保持禁用 |
 
 ## 3. 权威顺序
 
