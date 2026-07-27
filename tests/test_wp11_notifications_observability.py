@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 from pathlib import Path
@@ -106,9 +107,16 @@ def test_notification_recipient_encryption_is_scoped_and_tamper_evident():
             organization_id=organization_id,
             user_id=uuid.uuid4(),
         )
+    version, encoded = ciphertext.split(".", maxsplit=1)
+    blob = bytearray(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+    blob[-1] ^= 1
+    tampered = (
+        f"{version}."
+        f"{base64.urlsafe_b64encode(blob).decode('ascii').rstrip('=')}"
+    )
     with pytest.raises(ValueError, match="ciphertext is invalid"):
         decrypt_open_id(
-            ciphertext[:-1] + ("A" if ciphertext[-1] != "A" else "B"),
+            tampered,
             key_value=RECIPIENT_KEY,
             organization_id=organization_id,
             user_id=user_id,
