@@ -1,8 +1,8 @@
 # 12｜决策、风险与开放问题台账
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+版本：V0.2
+日期：2026-07-28
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
 
@@ -37,6 +37,7 @@
 | DEC-014 | 生产控制 | 生产密钥仅在受管 secret store；CI 受限身份发布；个人机器不得直接生产部署；双人批准后开放写入 | `APPROVED` | 物理配置与人员授权 `G4` | Liu Mowen（初始 Security + Ops Owner） |
 | DEC-015 | UI Foundations | 系统字体、4px 网格、390/768/1280、WCAG 2.2 AA、单一正式组件与蓝色主操作语义 | `APPROVED` | `BUILD_G0` | Liu Mowen（初始 Design + Frontend Owner） |
 | DEC-016 | P0 内容与评审 | 只发布 TSK-001“问题洞察与行动建议”；四维 Rubric 全部达标才 PASS；Reviewer SLA 2 个工作日 | `APPROVED` | 真人校准 `G4` | Liu Mowen（初始 Product + Content + Reviewer Owner） |
+| DEC-017 | Alpha/RC 附件边界 | 当前 Alpha/RC 只使用无附件的 `TSK-001 V1`，staging 固定 `ATTACHMENTS_ENABLED=false`；V2 附件能力不进入当前范围，未来启用前必须重开并完成 WP-10 五项物理门禁 | `APPROVED` | 当前范围 `G4`；未来附件启用前置门禁 | Liu Mowen（Product + Security + Tech Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -60,6 +61,10 @@
 
 P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但不能为了自动进入旧新手村而在 vNext 引入旧 API、旧 session 或共享状态。未来后续系统集成需独立 ADR/API 合同。
 
+### DEC-017｜为什么 Alpha/RC 不启用附件
+
+当前种子 Assignment 固定 `TSK-001 V1`，该版本的附件类型为空、大小上限为 0；结构化文本已能完成真实学习与评审闭环。为可选附件新增扫描运行时、IAM/CORS、对象生命周期和恢复证明，会消耗当前预算与工程 WIP，却没有真实用户阻塞证据。Alpha/RC 因此把附件作为明确的未激活能力：页面和 API 同时 fail closed，不能把“禁用”表述为 `FILE_SECURITY_VERIFIED`。若真实试点证明文件是完成任务的必要条件，必须先重开 WP-10，完成其五项物理门禁，再发布和分配新的 TaskVersion；不得修改在途 V1 Assignment。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
@@ -80,6 +85,7 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 | RSK-014 | 同栈导致无意识复制旧模式 | 中/高 | route registry、adapter、P0/V2 命名重现 | ADR review；forbidden pattern scan | Tech |
 | RSK-015 | 过度文档化、决定仍不落地 | 中/中 | 文档更多但 TBD 不关闭 | G0 只看阻塞项和签署；限时决策会 | Product/Tech |
 | RSK-016 | 新系统上线后 bug 继续上升 | 中/高 | RC 后 Sev-2 增长、同类 bug 3 次 | 停止规则；根因/门禁复盘；冻结功能 | QA/Tech |
+| RSK-017 | 未完成物理文件门禁即误启用附件 | 中/高 | staging 配置或新 TaskVersion 出现附件类型/额度 | DEC-017；`ATTACHMENTS_ENABLED=false`；启用前重开 WP-10 五项门禁与新版本评审 | Product/Security/Tech |
 
 ## 5. 原开放问题的关闭结论
 
@@ -95,6 +101,8 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 ## 6. G0 批准记录
 
 2026-07-20 已完成构建方向批准：DEC-001–016 全部为 `APPROVED`。本次批准授权建立独立仓库、WP-00 与最小 walking skeleton；不授权绕过 G4/G5 的真人、生产、恢复或发布证据，也不扩大为同时建设全部 P0 模块。
+
+2026-07-28 后续执行决策：Product Owner 明确批准 DEC-017，以当前 Alpha/RC 无附件范围关闭 WP-10；该批准不授权云资源、部署或未来附件启用，也不改变整体 `NO_GO`。
 
 ## 7. 签署区
 
