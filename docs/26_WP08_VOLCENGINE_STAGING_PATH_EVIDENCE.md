@@ -1,7 +1,7 @@
 # 26｜WP-08 火山引擎 Staging 实施路径证据
 
-日期：2026-07-25
-状态：`ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`
+日期：2026-07-27
+状态：`STAGING_ISOLATION_VERIFIED / PHYSICAL_ACL_EVIDENCE_CLOSED`
 当前候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`
 已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`（唯一 deploy 失败，禁止重试）；`dad44cc679184a1978b0f69e3632cb95de7f1b8e`（唯一 deploy 已落地但浏览器复验失败，禁止重试）；`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`（唯一 deploy 成功，授权已消费）
 历史候选：`670661865f708a835997596ed5b74904809564a5`（已退役）
@@ -46,6 +46,14 @@
 - 真实 Chromium 随后在 1440/768/390 三档视口复验公开根页：无 console error/warning、无水平 overflow、hydration 与键盘焦点正常；受保护 `/ops` 匿名访问仍为 401，readiness 返回精确 release 且 `no-store`；
 - 部署证明 Alpha staging 运行面及 ECS→RDS 实际 TLS 路径可用。但随后唯一只读 audit run [`30162196135`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30162196135) 在 AllowList 结构、精确安全组/IP、实例和 VPC 均匹配后，因 API 响应未返回可用的 `IsLatest` 字段而 fail closed；该 run 没有部署或云写入，不重试；
 - 本记录不把缺失字段篡改为 `true`，也不把它误判为已证实的网络故障。当前决策是停止继续修补 provider/audit 路径，将其作为正式发布前必须关闭的物理 ACL 证据债；阶段结论为 `ALPHA_STAGING_RUNTIME_VERIFIED / PHYSICAL_ACL_EVIDENCE_OPEN`，不是 `STAGING_ISOLATION_VERIFIED`，整体发布继续 `NO_GO`。
+
+## 2026-07-27 物理 ACL 人工复验与证据关闭
+
+- 用户在华北2（北京）的 RDS PostgreSQL 控制台打开现有应用 AllowList 详情并提供截图证据 `PEV-WP08-20260727-ACL-CONSOLE`；本仓库不保存截图，不记录其中的 IP、资源 ID 或 endpoint；
+- 控制台显示该 AllowList 不是默认白名单，当前全部地址恰好由一个已绑定安全组派生；绑定模式为关联 ECS IP，AllowList 地址与该安全组派生地址一致且非空；
+- 同一详情页只显示预期的 staging PostgreSQL 实例，并显示其位于预期 staging VPC。此前只读 audit 已用冻结 state 核对同一安全组、实例和 VPC，成功 deploy 又证明 ECS→RDS 的真实 TLS 数据面路径可用；
+- 控制台不展示 `IsLatest`，API 在后续响应中也不再返回可用字段。本次不把缺失字段伪造为 `true`，而是以“控制台当前派生事实 + 冻结 state 身份核对 + 成功 TLS 数据面连接”的组合证据替代不可取得的供应商内部标志；
+- 本轮只读查看，没有刷新、编辑、同步安全组、绑定/解绑实例、修改 IP 或部署。物理 ACL 证据债据此关闭，WP-08 退出结论升级为 `STAGING_ISOLATION_VERIFIED`；其他真人、文件、通知、灾备和发布门禁仍保持原状态，整体发布继续 `NO_GO`。
 
 ## 2026-07-22 路径设计时未发生（历史快照）
 

@@ -38,10 +38,10 @@
 | 20 | [WP-04 Reviewer 工作台与结论构建证据](20_WP04_REVIEWER_WORKBENCH_EVALUATION_EVIDENCE.md) | WP-04 的授权队列、固定材料、结构化结论、不可变历史与 Learner 状态闭环实际证明了什么？ | REQ-BR-005 本地证据可复现；真人 Reviewer/UAT、校准、物理环境和发布门禁仍独立 |
 | 21 | [WP-05 结果、交接、通知与历史构建证据](21_WP05_OUTCOME_HANDOFF_NOTIFICATION_TIMELINE_EVIDENCE.md) | WP-05 的不可变 Outcome/Handoff、可重试通知 worker、完整结果页与跨域时间线实际证明了什么？ | REQ-BR-007/009/010 本地证据可复现；真实通知/AI、真人 UAT、物理环境和发布门禁仍独立 |
 | 22 | [WP-06 受控运营、离线导入、恢复与发布门禁构建证据](22_WP06_CONTROLLED_OPERATIONS_IMPORT_RECOVERY_RELEASE_EVIDENCE.md) | WP-06 的有意图运营命令、签名导入、安全审计、运行状态、本地灾备及 fail-closed 发布判断实际证明了什么？ | REQ-BR-008、ISO-MUST-009/010/011 与 NFR-009/010/011 本地证据可复现；真实导入、真人 UAT、真实通知、物理环境、异机恢复和发布签署仍 `NOT_RUN`/`NO_GO` |
-| 23 | [G4–G6 下一批工作包定义](23_G4_G6_NEXT_WORK_PACKAGES.md) | WP-07～WP-15 如何按单一 WIP 推进候选、试点与正式切换？ | WP-07 已关闭；WP-08 Alpha 运行面已验证；WP-09 真人提示复验等待不占工程 WIP；WP-10 工程路径已完成但物理文件路径禁用；当前激活 WP-11 |
+| 23 | [G4–G6 下一批工作包定义](23_G4_G6_NEXT_WORK_PACKAGES.md) | WP-07～WP-15 如何按单一 WIP 推进候选、试点与正式切换？ | WP-07/WP-08 已关闭；WP-09 真人提示、WP-10 文件物理路径与 WP-11 外部集成证据按单一 WIP 逐项关闭；WP-12 尚未激活 |
 | 24 | [WP-07 候选基线与软件供应链构建证据](24_WP07_CANDIDATE_BASELINE_SUPPLY_CHAIN_EVIDENCE.md) | 本地候选、分层 CI、扫描、SBOM 与 release manifest 实际证明了什么？ | 候选、远端 CI、GHCR digest 与受保护 main 已复验；staging/production 仍不在该证据范围 |
 | 25 | [WP-08 Definition of Ready 构建证据](25_WP08_DEFINITION_OF_READY_EVIDENCE.md) | 物理 staging 写入前的 Git、浏览器、迁移、fixture、冷启动、Ops 与证据边界是否真实可重复？ | 本地 DoR 证据可复现；不等同于物理 staging 已创建、部署或通过隔离验收 |
-| 26 | [WP-08 火山引擎 Staging 实施路径证据](26_WP08_VOLCENGINE_STAGING_PATH_EVIDENCE.md) | 已锁定 provider/region/budget 后，唯一 IaC/CI/secret/回滚路径是什么，云端是否已经写入？ | 冻结基础设施上的候选 `14c9ba0…` 已成功完成 migration、seed、完整服务健康、TLS 与真实浏览器 smoke；物理 ACL 结构匹配，但 API 未返回 `IsLatest`，整体发布仍 `NO_GO` |
+| 26 | [WP-08 火山引擎 Staging 实施路径证据](26_WP08_VOLCENGINE_STAGING_PATH_EVIDENCE.md) | 已锁定 provider/region/budget 后，唯一 IaC/CI/secret/回滚路径是什么，云端是否已经写入？ | 冻结基础设施上的候选 `14c9ba0…` 已完成 migration、seed、完整服务健康、TLS 与浏览器 smoke；控制台、冻结 state 与真实数据面组合证据关闭物理 ACL，WP-08 为 `STAGING_ISOLATION_VERIFIED` |
 | 27 | [WP-09 真实身份与会话构建证据](27_WP09_REAL_IDENTITY_SESSION_EVIDENCE.md) | 飞书身份绑定、真实会话和撤销边界在代码与物理环境分别证明了什么？ | 修复候选已部署并通过机器复验；Reviewer 暂不可用，撤销会话明确提示保留 `WAITING_FOR_HUMAN_UAT` |
 | 28 | [WP-10 真实附件与文件安全构建证据](28_WP10_FILE_SECURITY_EVIDENCE.md) | 私有对象存储、短时授权、隔离扫描与停用边界实际证明了什么？ | 工程与本地机器证据通过；staging 扫描运行时、IAM/CORS/ACL 与恢复样本仍待物理关闭，附件保持禁用 |
 | 29 | [WP-11 真实通知与外部可观测构建证据](29_WP11_NOTIFICATION_OBSERVABILITY_EVIDENCE.md) | 加密接收人、真实飞书适配器、回执、重驱、结构化日志和外部观测合同分别证明了什么？ | 工程与本地机器证据通过；真实收件、TLS/Cloud Monitor、外部告警和演练仍 `NOT_RUN`，staging 通知保持禁用 |
