@@ -1,6 +1,6 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`REAL_ACCESS_MATRIX_PASS / SESSION_EXPIRED_UX_FIX_PENDING_CANDIDATE`
+状态：`REAL_ACCESS_MATRIX_PASS / SESSION_EXPIRED_UX_CANDIDATE_BOUND`
 日期：2026-07-27
 当前发布判断：`NO_GO`
 
@@ -8,7 +8,7 @@
 
 WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定和 cookie session 建立。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 已部署到冻结 staging，通过公网 readiness、身份入口和匿名拒绝机器复验，Environment Owner 随后从指定飞书登录入口完成真实登录并报告已进入 `/ops`。
 
-随后由当前 Operator 为 PII-free 的“试点主管”创建 30 分钟一次性 Reviewer 绑定，真实 Reviewer 完成授权对象访问、未授权 `/ops` 拒绝、重新登录轮换旧会话、身份撤销立即失效和日志脱敏矩阵。安全矩阵现为真人 `PASS`。撤销后的旧会话虽然不能继续读取 `/review`，但 Web 将 API `401` 落入通用错误页；该展示缺陷不改变 fail-closed 结果，却会让用户误以为业务操作失败。本分支已加入明确的会话失效/重新登录路径、匿名 `/review = 401` 和 production standalone 回归测试。修复尚未形成候选或部署，因此 WP-09 暂不关闭，WP-10 暂不激活。
+随后由当前 Operator 为 PII-free 的“试点主管”创建 30 分钟一次性 Reviewer 绑定，真实 Reviewer 完成授权对象访问、未授权 `/ops` 拒绝、重新登录轮换旧会话、身份撤销立即失效和日志脱敏矩阵。安全矩阵现为真人 `PASS`。撤销后的旧会话虽然不能继续读取 `/review`，但 Web 将 API `401` 落入通用错误页；该展示缺陷不改变 fail-closed 结果，却会让用户误以为业务操作失败。明确会话失效/重新登录路径、匿名 `/review = 401` 和 production standalone 回归测试已进入候选 `2ab2658…`。修复尚未部署，因此 WP-09 暂不关闭，WP-10 暂不激活。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -84,8 +84,9 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 ## 7. 当前缺陷、修复与关闭条件
 
 - 观察到的缺陷：撤销后的 Reviewer 会话由 API 正确返回 `401`，但 Server Component 抛错后进入通用“操作没有完成”页面；该页还声称显示 request ID，实际没有可显示的 API request ID。
-- 本地修复：Reviewer/Operator 页面读取遇到 `401` 时只跳转到 allowlist 内的 `/review` 或 `/ops` 重新登录入口；匿名 `/review` 与 `/ops` 均在 Web 边界返回不可缓存的 `401`；通用错误页不再承诺不存在的 request ID，只在 Next 提供安全 digest 时显示页面参考编号。
+- 候选修复：Reviewer/Operator 页面读取遇到 `401` 时只跳转到 allowlist 内的 `/review` 或 `/ops` 重新登录入口；匿名 `/review` 与 `/ops` 均在 Web 边界返回不可缓存的 `401`；通用错误页不再承诺不存在的 request ID，只在 Next 提供安全 digest 时显示页面参考编号。
 - 机器复验：Next 16.2.11 lint、typecheck、production build 通过；standalone runtime 实测 `anonymous_ops=401`、`anonymous_review=401`、`expired_reviewer=explicit-relogin`、逐请求 CSP nonce 和 OAuth root-relative redirect 全部通过。
-- 唯一剩余动作：修复经 PR 合入、形成精确候选并部署到冻结 staging；复验旧/撤销会话显示明确失效提示后，WP-09 才形成 `IDENTITY_AND_ACCESS_VERIFIED` 并激活 WP-10。
+- PR #56 已合入主线 `2ab2658fc0341d11bc1434524d86128e23da9170`；Mainline Candidate Gate `30237677350` 已完成完整 CI、三镜像、SBOM、GHCR push 与远端摘要验证。候选绑定合同只允许该 SHA、该 run 和三个不可变摘要，不构成部署授权。
+- 唯一剩余动作：取得指名候选 `2ab2658fc0341d11bc1434524d86128e23da9170`、届时绑定主线、火山引擎华北2（北京）冻结 staging、一次 `phase=deploy` 且失败不重试的精确授权；部署后复验旧/撤销会话显示明确失效提示，WP-09 才形成 `IDENTITY_AND_ACCESS_VERIFIED` 并激活 WP-10。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。当前不得为已经撤销的 Reviewer 再创建链接来制造重复证据。整体发布保持 `NO_GO`。

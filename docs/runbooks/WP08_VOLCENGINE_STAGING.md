@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP09_OAUTH_RETURN_FIX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `26d5601…`；OAuth 同源回跳修复候选 `2ea51c0…` 的 Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、真实 standalone 回跳响应测试、SBOM、GHCR push 与三摘要验证。机器合同绑定不构成新候选的部署授权。
+状态：`WP09_SESSION_EXPIRED_UX_CANDIDATE_BOUND / DEPLOY_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行已消费候选 `2ea51c0…`；明确会话失效提示候选 `2ab2658…` 的 Mainline Candidate Gate `30237677350` 已完成完整 CI、真实 standalone 失效会话响应测试、SBOM、GHCR push 与三摘要验证。机器合同绑定不构成新候选的部署授权。
 
 ## 1. 已锁定授权
 
@@ -11,7 +11,7 @@
 - 已消费候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，唯一 deploy run `30157449832` 已实际部署但浏览器 CSP/hydration 复验失败，禁止重试；
 - 已消费候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；唯一 deploy 已成功消费；
 - 当前运行候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；唯一 deploy run `30181022690` 成功，真实 Operator 已完成绑定、会话和 canonical `/ops` 访问；callback 自动回跳缺陷仍存在；
-- 当前待授权候选：`2ea51c0aba272769af8bd8f298242b35326d79ea`；canonical run `30183059038` attempt 2 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；该候选只修复 OAuth 同源回跳并补充真实 standalone 响应回归，尚未取得 deploy 授权；
+- 当前待授权候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；该候选只收口 WP-09 真人证据并修复撤销/失效会话的明确重新登录体验，尚未取得 deploy 授权；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -77,7 +77,7 @@ make wp08-staging-apply-check
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. `phase=deploy` 只接受绑定候选的确认词 `DEPLOY_2EA51C0_TO_VOLCENGINE_STAGING`；该确认词目前尚未获 Owner 授权，不得 dispatch。历史确认词均已消费，不得复用。获得精确授权后，该阶段仍只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
+3. `phase=deploy` 只接受绑定候选的确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`；该确认词目前尚未获 Owner 授权，不得 dispatch。历史确认词均已消费，不得复用。获得精确授权后，该阶段仍只从冻结 state 读取既有 ECS/RDS 定位值，不执行 DNS、plan、apply 或 CloudControl；随后添加 runner 单一 `/32`，执行迁移、运行时授权、合成 seed、应用部署和 TLS 验证，并在 `always()` 步骤撤销该精确规则。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
