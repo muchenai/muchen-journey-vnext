@@ -448,6 +448,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:apps/web/src/proxy.ts"',
         'git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts"',
         'git show "$candidate:scripts/wp08_web_runtime_check.py"',
+        'git show "$candidate:apps/worker/journey_worker/main.py"',
+        'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+        'git cat-file -e "$candidate:docs/runbooks/WP11_STAGING_INTEGRATIONS.md"',
+        '"runtime.snapshot"',
+        "active_recipient_exists",
+        'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
     )
     for marker in required:
         if marker not in workflow:
@@ -459,10 +465,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     if workflow.count("if: inputs.phase == 'audit'") != 1:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if (
-        workflow.count("git cat-file -e") != 1
-        or workflow.count('git show "$candidate:') != 5
+        workflow.count("git cat-file -e") != 2
+        or workflow.count('git show "$candidate:') != 8
     ):
-        raise StagingError("deploy must verify the Web contract inside the candidate source")
+        raise StagingError(
+            "deploy must verify the Web and WP-11 contracts inside the candidate source"
+        )
     if workflow.count("scripts/wp08_plan_guard.py") != 1:
         raise StagingError("every WP-08 apply path must have one destructive-plan guard")
     if workflow.count("scripts/wp08_dns_record.py") != 1:

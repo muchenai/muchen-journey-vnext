@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       confirmation:
-        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_2AB2658_TO_VOLCENGINE_STAGING
+        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_172C9F6_TO_VOLCENGINE_STAGING
         required: true
         type: string
 
@@ -33,9 +33,9 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == '2ab2658fc0341d11bc1434524d86128e23da9170' &&
+      inputs.candidate == '172c9f62ffdcd4fce31fb4900fdca46b3405ab89' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_2AB2658_TO_VOLCENGINE_STAGING'))
+      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_172C9F6_TO_VOLCENGINE_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -83,10 +83,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-2ab2658fc0341d11bc1434524d86128e23da9170
+          name: wp07-candidate-172c9f62ffdcd4fce31fb4900fdca46b3405ab89
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 30237677350
+          run-id: 30302594972
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
@@ -103,6 +103,13 @@ jobs:
               grep -Fq "oauth_redirect=root-relative"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
               grep -Fq "expired_reviewer=explicit-relogin"
+            git show "$candidate:apps/worker/journey_worker/main.py" | \
+              grep -Fq '"runtime.snapshot"'
+            git show "$candidate:apps/worker/journey_worker/main.py" | \
+              grep -Fq 'active_recipient_exists'
+            git show "$candidate:scripts/wp08_prepare_deploy.py" | \
+              grep -Fq 'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"'
+            git cat-file -e "$candidate:docs/runbooks/WP11_STAGING_INTEGRATIONS.md"
           fi
           make wp08-staging-apply-check
           echo "TF_VAR_approved_monthly_estimate_cny=$(jq -r .approved_monthly_estimate_cny config/wp08_staging.json)" >>"$GITHUB_ENV"
