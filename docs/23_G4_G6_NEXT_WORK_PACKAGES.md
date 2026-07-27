@@ -1,13 +1,13 @@
 # 23｜G4–G6 下一批工作包定义
 
 状态：`APPROVED_FOR_BUILD`
-版本：V0.8
-日期：2026-07-27
+版本：V0.9
+日期：2026-07-28
 建议 Owner：Product Owner + Tech Lead + QA/UAT Owner + Release/Ops Owner  
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。WP-10 的 TOS/ClamAV 工程路径已完成，但 staging 文件路径在扫描运行时、IAM/CORS/ACL/恢复证据关闭前保持禁用。WP-11 工程实现已合入，真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。WP-12 在剩余证据债关闭前不激活。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 工程实现已合入，真实飞书发送、火山引擎 TLS/Cloud Monitor、外部告警和 staging 部署仍须取得精确授权。WP-12 在剩余证据债关闭前不激活。
 
 ## 1. 结论
 
@@ -64,7 +64,7 @@ WP-07 → WP-08 → WP-09 → WP-10 → WP-11
 | WP-07 候选基线与供应链 | G4 前置 | 无 Git HEAD、无不可变候选、远端 CI/保护分支/SBOM 缺失 | `CANDIDATE_BASELINE_READY` |
 | WP-08 物理独立 Staging | G4 | 独立运行时、DB、网络、secret、域名、CI 发布身份和旧系统不可达 | `STAGING_ISOLATION_VERIFIED` |
 | WP-09 真实身份与权限 | G4 | Reviewer/Operator 飞书身份、真实 cookie/TLS、撤销/限流和物理权限矩阵 | `IDENTITY_AND_ACCESS_VERIFIED` |
-| WP-10 真实附件与文件安全 | G4 | S3-compatible storage、短时 URL、扫描、隔离、生命周期和物理 ACL | `FILE_SECURITY_VERIFIED` |
+| WP-10 真实附件与文件安全 | G4 | 当前 Alpha/RC 无附件并 fail closed；保留未来 S3-compatible storage、短时 URL、扫描、隔离、生命周期和物理 ACL 门禁 | 当前范围 `SECURELY_DISABLED_FOR_ALPHA`；未来启用才可取 `FILE_SECURITY_VERIFIED` |
 | WP-11 真实通知与可观测 | G4 | 飞书投递、provider receipt、限流/重试/DEAD、外部 APM/告警 | `INTEGRATIONS_AND_OBSERVABILITY_VERIFIED` |
 | WP-12 候选硬化与灾备 | G4 | 性能/SLO、安全、保留删除、异机备份恢复、RPO/RTO、N↔N+1 回滚 | `RC_TECHNICALLY_READY` |
 | WP-13 内容校准与真人 UAT | G4 | Reviewer 校准、5 秒理解、AT-UAT-001..008、键盘/辅助技术 | `UAT_SIGNED` 或 `NO_GO` |
@@ -195,7 +195,7 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 ### 目标
 
-用真实 S3-compatible storage 和恶意文件扫描替换本地附件合同适配器，关闭文件安全和物理隔离门禁。
+当前 Alpha/RC 使用无附件的 `TSK-001 V1`，使页面、API 与部署配置一致 fail closed，不为未经真实需求证明的可选能力增加运行资源。已经实现的 S3-compatible storage 与恶意文件扫描路径作为未来能力保留；一旦启用，必须重新打开本工作包并完成全部物理门禁。
 
 ### 追溯
 
@@ -214,10 +214,11 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 
 ### 退出门禁
 
-- 正常、超大、伪 MIME、恶意、跨 owner、跨组织、过期 URL 全矩阵通过；
-- 未 `READY` 的附件不能进入 SubmissionVersion；
-- Reviewer 只能下载固定授权版本；
-- 物理 bucket ACL、网络策略和恢复样本通过。
+- 当前 Alpha/RC Assignment 固定 `TSK-001 V1`，其附件类型为空、大小上限为 0；
+- staging 部署合同保持 `ATTACHMENTS_ENABLED=false`，页面不展示入口且附件 API fail closed；
+- 当前范围不创建文件 IAM/TOS CORS/扫描运行时，不执行部署；
+- 结论只能记 `SECURELY_DISABLED_FOR_ALPHA`，不能记 `FILE_SECURITY_VERIFIED`；
+- 未来启用附件前必须重开本工作包，并完成正常/过期/伪 MIME/EICAR/跨对象/扫描不可用/短时下载矩阵、最小 IAM、精确 CORS/私有 ACL/lifecycle、独立扫描运行时和对象恢复样本。
 
 ## 8. WP-11｜真实通知与外部可观测
 
@@ -423,7 +424,7 @@ Agent 只能准备脚本、环境和证据模板，不能代替真人点击、�
 
 本文件已升级为 `APPROVED_FOR_BUILD`，代表 WP-07～WP-15 的编号、范围、Owner 组合、顺序与单一 WIP 协议已锁定。执行仍遵循：
 
-1. WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 已于 2026-07-27 关闭。当前按单一 WIP 逐项关闭 WP-09 的 `WAITING_FOR_HUMAN_UAT`、WP-10 的 `PHYSICAL_EVIDENCE_OPEN` 与 WP-11 的真实通知/外部可观测证据；三者全部关闭前不激活 WP-12 RC 冻结，也不执行任何 production 行为；
+1. WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 已于 2026-07-27 关闭；WP-10 已于 2026-07-28 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭当前范围，未启用文件能力。当前仍须按单一 WIP 关闭 WP-09 的 `WAITING_FOR_HUMAN_UAT` 与 WP-11 的真实通知/外部可观测证据；二者关闭前不激活 WP-12 RC 冻结，也不执行任何 production 行为；
 2. 第 2 节未关闭的物理执行输入必须在对应工作包开工前补齐；
 3. 外部资源、角色或权限变更每次只按已说明的供应商、环境、动作与范围执行，不从计划批准推定；
 4. WP-13、WP-14 的真人与时间证据不可由机器替代；

@@ -18,9 +18,9 @@
 - WP-07：候选基线、CODEOWNERS、分层 CI、固定摘要的基础/扫描镜像、依赖/secret/旧引用扫描、三进程 SPDX SBOM，以及绑定完整 Git SHA、OpenAPI hash、migration head、config schema 和 TaskVersion 清单的 release manifest；远端 mainline 已向三个 canonical GHCR package 推送精确 SHA tag、验证 immutable digest 并上传工件。仓库按用户明确决策设为 Public，`main` 强制 PR、`WP-07 / quick`、线性历史、会话解决并禁止 force-push/删除，管理员同样受约束；
 - WP-08：火山引擎华北2（北京）冻结 staging 资源上的 Alpha 运行面、TLS/readiness/API/Web/Worker/匿名权限与真实浏览器 smoke 已通过；控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接已关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`；
 - WP-09：独立飞书应用、首位真实 Operator、Reviewer 绑定及真实权限矩阵已完成；明确会话失效提示候选 `2ab2658…` 已在唯一冻结 staging deploy run `30242231558` 成功上线，readiness、匿名 `/ops`/`/review` 拒绝和飞书入口均通过机器复验。Reviewer 暂时无法继续真人复验，撤销会话提示保留为 `WAITING_FOR_HUMAN_UAT`，不伪记 PASS；
-- WP-10：真实 TOS 直传、对象元数据复核、短时授权下载、ClamAV 流式扫描和 fail-closed 隔离的工程路径已完成；配置合同升级为 V2。staging 在扫描运行时与最小 IAM 未关闭前明确禁用附件，结构化文本闭环不受阻；
+- WP-10：真实 TOS 直传、对象元数据复核、短时授权下载、ClamAV 流式扫描和 fail-closed 隔离的工程路径已完成；当前 Alpha/RC 明确固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，结论为 `SECURELY_DISABLED_FOR_ALPHA`。V2 附件能力不进入当前范围，未来启用前必须重新完成五项物理门禁；
 - WP-11：独立飞书通知适配器、加密接收人、provider receipt、限流/超时/重试/DEAD/人工重驱、JSON 结构化日志和运行指标的工程路径已完成；配置合同升级为 V3。真实飞书收件、火山引擎 TLS/Cloud Monitor、外部告警与演练保持 `NOT_RUN`，staging 通知适配器继续禁用；
-- 未实施 production 部署、真实旧系统数据导入、真实飞书通知/外部告警、异机/生产恢复、完整真人 UAT 或发布签署；WP-09 真人提示、WP-10 文件物理路径和 WP-11 外部集成证据仍待关闭。当前发布判定必须是 `NO_GO`。
+- 未实施 production 部署、真实旧系统数据导入、真实飞书通知/外部告警、异机/生产恢复、完整真人 UAT 或发布签署；WP-09 真人提示和 WP-11 外部集成证据仍待关闭。WP-10 仅按当前 Alpha/RC 无附件范围关闭，不代表文件能力已物理启用或达到 `FILE_SECURITY_VERIFIED`。当前发布判定必须是 `NO_GO`。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
 
@@ -40,7 +40,7 @@ docker compose up --build
 
 当前仅在 `local/test` 允许 `X-Fixture-Role` 身份，用于 Operator 创建测试邀请以及保留 walking skeleton 回归。真实新人确认后使用 `journey_next_session` 独立会话；staging/production 配置会拒绝 fixture 身份和默认/复用的身份 secret。
 
-本地附件继续使用隔离目录和确定性测试扫描器；staging/production 只允许浏览器通过对象级短时 URL 直传私有 TOS，API 完成时复核 size/type/SHA-256 并通过 ClamAV 后才进入 `READY`。扫描器不可用时文件停留隔离态。当前 Alpha staging 因扫描运行时容量与最小 IAM 尚未关闭而设置 `ATTACHMENTS_ENABLED=false`，页面不展示附件入口，纯文本提交继续可用。
+本地附件继续使用隔离目录和确定性测试扫描器；未来非本地附件只允许浏览器通过对象级短时 URL 直传私有 TOS，API 完成时复核 size/type/SHA-256 并通过 ClamAV 后才进入 `READY`。扫描器不可用时文件停留隔离态。当前 Alpha/RC 只使用无附件的 `TSK-001 V1`，staging 固定 `ATTACHMENTS_ENABLED=false`，页面不展示附件入口，结构化文本提交继续可用；任何 V2/附件启用都必须先重开 WP-10 并关闭五项物理门禁。
 
 Reviewer 工作台以服务端 `allowed_commands` 为唯一动作来源。`GET /reviews*` 只查询且按明确 Reviewer、组织和对象裁剪；finalize 要求固定四维 Rubric、每维反馈、总体反馈与 `APPROVE`/`REQUEST_REVISION`，结论写入后由数据库拒绝覆盖。
 
