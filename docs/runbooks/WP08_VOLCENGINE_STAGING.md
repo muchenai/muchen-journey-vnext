@@ -10,7 +10,7 @@
 - 已消费候选：`d407b5f4a32fd68b1a8b08ac5a461aa04aa29fff`；唯一 deploy run `30138363837` 已失败且禁止重试；
 - 已消费候选：`dad44cc679184a1978b0f69e3632cb95de7f1b8e`；canonical run `30139385352` 的 `registry_push=VERIFIED`，唯一 deploy run `30157449832` 已实际部署但浏览器 CSP/hydration 复验失败，禁止重试；
 - 已消费候选：`14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；唯一 deploy 已成功消费；
-- 当前运行候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；唯一 deploy run `30181022690` 成功，真实 Operator 已完成绑定、会话和 canonical `/ops` 访问；callback 自动回跳缺陷仍存在；
+- 历史身份候选：`26d56010125024ca2dbc6e85f7dfeb59857f93dd`；唯一 deploy run `30181022690` 成功，真实 Operator 完成绑定与会话；随后已由 OAuth 同源回跳修复候选 `2ea51c0…` 成功部署并取代，不得再次 deploy；
 - 当前待授权候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，API/Web/Worker 均绑定 artifact 中的不可变 digest；该候选只收口 WP-09 真人证据并修复撤销/失效会话的明确重新登录体验，尚未取得 deploy 授权；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
@@ -73,7 +73,7 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 锁定 OAuth 同源回跳修复候选 `2ea51c0…`，并拒绝早期已消费候选；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops` 拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect 与真实 standalone 响应测试合同：
+当前 workflow/config 锁定明确会话失效提示候选 `2ab2658…`，并拒绝早期已消费候选；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect 与真实 standalone 失效会话响应测试合同：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
