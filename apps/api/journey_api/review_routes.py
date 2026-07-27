@@ -189,7 +189,7 @@ def review_materials(session: Session, context: ReviewContext) -> ReviewMaterial
     for _link, attachment in rows:
         available = (
             attachment.status == AttachmentStatus.READY
-            and attachment.scan_status == AttachmentScanStatus.LOCAL_CLEAN
+            and attachment.scan_status == AttachmentScanStatus.CLEAN
         )
         if not available:
             missing_items.append(f"附件 {attachment.original_filename} 当前不可用")

@@ -110,7 +110,7 @@ export default async function TaskPage({
               <h3 id="attachment-title">附件（可选）</h3>
               <p className="status-meta">
                 支持 TXT、PDF、PNG、JPEG；单个不超过 {Math.floor(assignment.max_attachment_size_bytes / 1024 / 1024)} MiB。
-                文件只在通过 hash、内容类型与本地隔离扫描后可提交。
+                文件由浏览器直传私有对象存储，只在服务端复核 hash、内容类型并通过安全扫描后可提交。
               </p>
               <AttachmentUploader assignmentId={assignment.id} />
               {assignment.available_attachments.length > 0 ? (

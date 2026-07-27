@@ -1977,6 +1977,18 @@
             "title": "Status",
             "type": "string"
           },
+          "upload_expires_at": {
+            "format": "date-time",
+            "title": "Upload Expires At",
+            "type": "string"
+          },
+          "upload_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Upload Headers",
+            "type": "object"
+          },
           "upload_method": {
             "const": "PUT",
             "title": "Upload Method",
@@ -1998,7 +2010,9 @@
           "status",
           "scan_status",
           "upload_method",
-          "upload_url"
+          "upload_url",
+          "upload_headers",
+          "upload_expires_at"
         ],
         "title": "PresignedAttachmentOut",
         "type": "object"
@@ -3156,7 +3170,7 @@
             "$ref": "#/components/schemas/RuntimeComponentOut"
           },
           "config_schema_version": {
-            "const": 1,
+            "const": 2,
             "title": "Config Schema Version",
             "type": "integer"
           },
