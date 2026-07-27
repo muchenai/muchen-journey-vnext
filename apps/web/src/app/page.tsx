@@ -5,14 +5,21 @@ const AUTH_ERRORS: Record<string, string> = {
   IDENTITY_REVOKED: "该飞书身份已撤销，请联系运营确认权限。",
   IDENTITY_PROVIDER_DISABLED: "飞书登录尚未完成环境配置。",
   IDENTITY_PROVIDER_UNAVAILABLE: "飞书登录暂时不可用，请稍后重新开始。",
+  SESSION_EXPIRED: "当前会话已失效。业务事实未受影响；如仍有权限，请重新使用飞书登录。",
 };
+
+const IDENTITY_RETURN_PATHS = new Set(["/review", "/ops"]);
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ auth_error?: string }>;
+  searchParams: Promise<{ auth_error?: string; return_to?: string }>;
 }) {
-  const authError = (await searchParams).auth_error;
+  const query = await searchParams;
+  const authError = query.auth_error;
+  const returnTo = query.return_to && IDENTITY_RETURN_PATHS.has(query.return_to)
+    ? query.return_to
+    : null;
   return (
     <section className="hero">
       <p className="eyebrow">探索营 · P0</p>
@@ -35,9 +42,14 @@ export default async function Home({
         </Link>
       </div>
       {authError ? (
-        <p className="inline-error" role="alert">
-          {AUTH_ERRORS[authError] ?? "身份登录没有完成，请重新开始或联系运营。"}
-        </p>
+        <div className="inline-error" role="alert">
+          <p>{AUTH_ERRORS[authError] ?? "身份登录没有完成，请重新开始或联系运营。"}</p>
+          {authError === "SESSION_EXPIRED" && returnTo ? (
+            <Link href={`/auth/feishu?return_to=${encodeURIComponent(returnTo)}`}>
+              重新使用飞书登录
+            </Link>
+          ) : null}
+        </div>
       ) : null}
       <aside className="notice" aria-label="环境说明">
         Alpha 试点仅限受邀参与者。新人使用邀请加入；主管和运营使用飞书登录。

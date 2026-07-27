@@ -1,12 +1,14 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`FIRST_OPERATOR_BOUND / OAUTH_RETURN_HUMAN_PASS / REAL_ACCESS_MATRIX_REQUIRED`
-日期：2026-07-26
+状态：`REAL_ACCESS_MATRIX_PASS / SESSION_EXPIRED_UX_FIX_PENDING_CANDIDATE`
+日期：2026-07-27
 当前发布判断：`NO_GO`
 
 ## 1. 结论
 
-WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定和 cookie session 建立。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 已部署到冻结 staging，通过公网 readiness、身份入口和匿名拒绝机器复验，Environment Owner 随后从指定飞书登录入口完成真实登录并报告已进入 `/ops`。自动回跳子项现为真人 `PASS`，但 Reviewer/Operator 完整权限与撤销矩阵仍未执行，WP-09 尚未关闭。
+WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定和 cookie session 建立。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 已部署到冻结 staging，通过公网 readiness、身份入口和匿名拒绝机器复验，Environment Owner 随后从指定飞书登录入口完成真实登录并报告已进入 `/ops`。
+
+随后由当前 Operator 为 PII-free 的“试点主管”创建 30 分钟一次性 Reviewer 绑定，真实 Reviewer 完成授权对象访问、未授权 `/ops` 拒绝、重新登录轮换旧会话、身份撤销立即失效和日志脱敏矩阵。安全矩阵现为真人 `PASS`。撤销后的旧会话虽然不能继续读取 `/review`，但 Web 将 API `401` 落入通用错误页；该展示缺陷不改变 fail-closed 结果，却会让用户误以为业务操作失败。本分支已加入明确的会话失效/重新登录路径、匿名 `/review = 401` 和 production standalone 回归测试。修复尚未形成候选或部署，因此 WP-09 暂不关闭，WP-10 暂不激活。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -58,15 +60,32 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - `FAIL`：callback 后的自动站内跳转使用 Next standalone 内部 request origin，浏览器收到 `https://0.0.0.0:3000/ops`；
 - 根因：Web Route Handler 使用 `new URL(safe_entry, request.url)` 生成同源返回地址，而 standalone runtime 的 `request.url` 不构成可信公网 Origin；
 - 修复合同：所有站内 OAuth 成功/失败跳转只允许 `/` 起始且拒绝 `//`、CR/LF 的 root-relative `Location`；只有飞书官方授权地址允许绝对 HTTPS URL；真实 standalone 响应测试必须同时验证 `/ops` 相对跳转和 session cookie 透传；
-- 当前真人会话已证明绑定成功，无需也不得重复生成首次绑定链接。修复候选重新部署后仍需复验“点击登录到自动进入 `/ops`”，并执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵。
+- 当前真人会话已证明绑定成功，无需也不得重复生成首次 Operator 绑定链接。该 OAuth 修复部署后的自动进入 `/ops` 及后续对象/组织权限、旧 cookie、撤销和日志脱敏矩阵均已按第 6 节完成。
 - 修复已通过 PR #52 合入主线候选 `2ea51c0aba272769af8bd8f298242b35326d79ea`；Mainline Candidate Gate `30183059038` attempt 2 已完成完整 CI、SBOM、GHCR push 与三摘要验证。attempt 1 仅因 GitHub runner 拉取固定 Syft 镜像时 Docker Hub 网络超时而停止，代码与真实回跳响应测试均已通过；没有触碰 staging。
 - 用户精确授权该候选基于绑定主线 `2992841f375d101afdd90ff44117245bc72e55d6`，在火山引擎华北2（北京）冻结基础设施执行一次 `phase=deploy`，失败不重试。唯一 run [`30187687813`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30187687813) 在 18 分 56 秒内成功；候选/摘要合同、冻结 state、临时 SSH `/32`、私有 bundle、精确镜像部署、外部 TLS 与 release surface 全部通过，`always()` SSH 清理通过，未执行 audit、DNS reconcile、Terraform apply 或第二次部署。
 - 独立公网复验返回 `health/ready.status=ready` 且 release 精确等于 `2ea51c0…`；根页为 `200`，匿名 `/ops` 为 `401`，身份入口以 `303` 跳转到飞书官方授权端点，回调仍固定为 staging canonical URL。该机器证据证明修复已部署且入口合同正确，但不能替代真人完成飞书授权后的浏览器落点。
 - 2026-07-26T05:48:48Z，Environment Owner 在本任务中报告“已进入”，并提供登录完成后的 staging Operator 页面截图。截图人工核对显示 canonical staging 域名、`OPERATOR · STAGING`、候选 `2ea51c0…` 与 migration `0011_wp09_feishu_identity`；私有截图只以 SHA-256 `c1b91fbcf3ea786537866647005ad4e5dc7b2bf3d43059ad384022ed25afa390` 引用，不复制进 Public Git，不记录账号、cookie、飞书 subject 或 token。该证据把“修复后自动进入 `/ops`”记为真人 `PASS`，不外推其他真人权限场景。
 
-以下仍为 `NOT_RUN`，不能由 fixture 或代码审查替代：
+## 6. Reviewer/Operator 真人权限矩阵
 
-1. 真实 Operator 与 Reviewer 执行对象/组织权限、旧 cookie、撤销和日志脱敏矩阵；
-2. 形成 `IDENTITY_AND_ACCESS_VERIFIED` 或明确失败证据。
+本轮只记录最小、PII-free 结论；不记录真实姓名、飞书 subject、cookie、一次性 token、完整业务正文或撤销理由正文：
 
-创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。完成前 WP-09 不关闭，WP-10 不激活，整体发布保持 `NO_GO`。
+| 场景 | 证据类型 | 结果 |
+|---|---|---|
+| 当前 Operator 进入 `/ops` | Environment Owner 真人浏览器报告；第 5 节既有私有截图摘要 | `PASS` |
+| “试点主管”进入授权 `/review` | Reviewer 真人浏览器报告 | `PASS` |
+| Reviewer 访问未授权 `/ops` | Reviewer 真人报告 HTTP 403/无权限 | `PASS` |
+| Reviewer 再次登录后旧会话失效 | Reviewer 真人在两个独立浏览器上下文报告：新会话可用，旧会话返回 `AUTH_REQUIRED` | `PASS` |
+| Operator 撤销 Reviewer 外部身份后旧会话失效 | Operator 受控命令审计为 `SUCCESS`；Reviewer 随后打开原 `/review` 不能继续访问。私有截图仅保留 SHA-256 `48773b36d883504e9462dd70e3098ff125ed238b0c0fd4dd2c7e5b878f3facb4` 引用，不复制进 Public Git | `PASS`（fail closed） |
+| 身份撤销不改写业务事实，且审计脱敏 | Operator 页面复验：Reviewer 为 `REVOKED`、Operator 仍为 `LINKED`、Enrollment/业务事实未变化；审计 `external_identity.revoked / SUCCESS` 的安全字段为空，仅列出被裁剪字段名 | `PASS` |
+
+机器测试已覆盖跨 organization、对象范围、state replay、CSRF、开放重定向、停用/移除角色和原始身份/token 不出响应。真人证据只补足浏览器、真实身份和撤销时序，不替代这些机器负测，也不外推到 WP-13 的完整真人 UAT。
+
+## 7. 当前缺陷、修复与关闭条件
+
+- 观察到的缺陷：撤销后的 Reviewer 会话由 API 正确返回 `401`，但 Server Component 抛错后进入通用“操作没有完成”页面；该页还声称显示 request ID，实际没有可显示的 API request ID。
+- 本地修复：Reviewer/Operator 页面读取遇到 `401` 时只跳转到 allowlist 内的 `/review` 或 `/ops` 重新登录入口；匿名 `/review` 与 `/ops` 均在 Web 边界返回不可缓存的 `401`；通用错误页不再承诺不存在的 request ID，只在 Next 提供安全 digest 时显示页面参考编号。
+- 机器复验：Next 16.2.11 lint、typecheck、production build 通过；standalone runtime 实测 `anonymous_ops=401`、`anonymous_review=401`、`expired_reviewer=explicit-relogin`、逐请求 CSP nonce 和 OAuth root-relative redirect 全部通过。
+- 唯一剩余动作：修复经 PR 合入、形成精确候选并部署到冻结 staging；复验旧/撤销会话显示明确失效提示后，WP-09 才形成 `IDENTITY_AND_ACCESS_VERIFIED` 并激活 WP-10。
+
+创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。当前不得为已经撤销的 Reviewer 再创建链接来制造重复证据。整体发布保持 `NO_GO`。

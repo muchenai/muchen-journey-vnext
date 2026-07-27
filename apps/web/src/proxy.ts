@@ -32,9 +32,11 @@ export function proxy(request: NextRequest) {
   // instructs the browser and leaves those generated scripts un-nonced.
   requestHeaders.set("Content-Security-Policy", policy);
 
-  const isOpsRoute =
-    request.nextUrl.pathname === "/ops" || request.nextUrl.pathname.startsWith("/ops/");
-  if (isOpsRoute && !request.cookies.get(SESSION_COOKIE)?.value) {
+  const isIdentityRoute = ["/ops", "/review"].some(
+    (prefix) => request.nextUrl.pathname === prefix
+      || request.nextUrl.pathname.startsWith(`${prefix}/`),
+  );
+  if (isIdentityRoute && !request.cookies.get(SESSION_COOKIE)?.value) {
     const response = NextResponse.json(
       { error: { code: "AUTH_REQUIRED", message: "Authentication required." } },
       { status: 401 },

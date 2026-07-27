@@ -43,8 +43,27 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header(
             "Set-Cookie",
-            "journey_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
+            "journey_next_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
         )
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        if self.path != "/api/v1/reviews":
+            self.send_error(404)
+            return
+        body = json.dumps(
+            {
+                "error": {
+                    "code": "UNAUTHENTICATED",
+                    "message": "vNext session is no longer valid.",
+                },
+                "request_id": "runtime-redacted-request",
+            }
+        ).encode()
+        self.send_response(401)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
@@ -157,6 +176,24 @@ def main() -> None:
         if "no-store" not in ops_headers.get("cache-control", ""):
             raise RuntimeError("anonymous /ops denial is cacheable")
 
+        review_status, _, review_headers = request(f"{base_url}/review")
+        if review_status != 401:
+            raise RuntimeError(f"anonymous /review returned HTTP {review_status}")
+        if "no-store" not in review_headers.get("cache-control", ""):
+            raise RuntimeError("anonymous /review denial is cacheable")
+
+        expired_status, _, expired_headers = request_without_redirect(
+            f"{base_url}/review",
+            {"Cookie": "journey_next_session=revoked-runtime-only"},
+        )
+        if expired_status not in {303, 307} or expired_headers.get("location") != (
+            "/?auth_error=SESSION_EXPIRED&return_to=%2Freview"
+        ):
+            raise RuntimeError(
+                "expired Reviewer session did not return to the explicit re-login path: "
+                f"status={expired_status} location={expired_headers.get('location')!r}"
+            )
+
         root_status, root_body, root_headers = request(f"{base_url}/")
         if root_status != 200:
             raise RuntimeError(f"root page returned HTTP {root_status}")
@@ -193,7 +230,7 @@ def main() -> None:
                 "OAuth callback did not return a root-relative /ops redirect: "
                 f"{callback_headers.get('location')!r}"
             )
-        if "journey_session=runtime-only" not in callback_headers.get("set-cookie", ""):
+        if "journey_next_session=runtime-only" not in callback_headers.get("set-cookie", ""):
             raise RuntimeError("OAuth callback did not preserve the upstream session cookie")
 
         invalid_status, _, invalid_headers = request_without_redirect(
@@ -221,8 +258,9 @@ def main() -> None:
         identity_api_thread.join(timeout=5)
 
     print(
-        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401"
-        " root=200 csp_nonce=per-request oauth_redirect=root-relative"
+        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401 anonymous_review=401"
+        " expired_reviewer=explicit-relogin root=200 csp_nonce=per-request"
+        " oauth_redirect=root-relative"
     )
 
 

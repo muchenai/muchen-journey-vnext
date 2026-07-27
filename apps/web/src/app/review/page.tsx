@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { apiRequest, ReviewItem } from "@/lib/server/api";
+import { identityPageRequest, ReviewItem } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,10 @@ export default async function ReviewQueuePage({
   searchParams: Promise<{ finalized?: string }>;
 }) {
   const query = await searchParams;
-  const queue = await apiRequest<{ items: ReviewItem[] }>("/api/v1/reviews", "REVIEWER");
+  const queue = await identityPageRequest<{ items: ReviewItem[] }>(
+    "/api/v1/reviews",
+    "REVIEWER",
+  );
   return (
     <section className="content-narrow review-queue-page">
       <p className="eyebrow">主管工作台</p>

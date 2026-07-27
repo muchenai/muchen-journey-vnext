@@ -1,6 +1,6 @@
 import { assignEnrollmentReviewer, cancelEnrollment } from "@/app/actions";
 import {
-  apiRequest,
+  identityPageRequest,
   OpsAuditEntry,
   OpsEnrollment,
   OpsIdentityAccess,
@@ -26,11 +26,11 @@ export default async function OpsPage({
 }) {
   const [query, tasks, enrollments, audit, runtime, identityAccess] = await Promise.all([
     searchParams,
-    apiRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
-    apiRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
-    apiRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
-    apiRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
-    apiRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
+    identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
+    identityPageRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
+    identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
+    identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
+    identityPageRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
   ]);
   const isStaging = runtime.environment === "staging";
 
