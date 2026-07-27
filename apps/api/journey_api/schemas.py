@@ -609,7 +609,7 @@ class RuntimeMetricsOut(StrictModel):
 class RuntimeStatusOut(StrictModel):
     environment: Literal["local", "test", "staging", "production"]
     release: str
-    config_schema_version: Literal[1]
+    config_schema_version: Literal[2]
     migration_revision: str
     api: RuntimeComponentOut
     database: RuntimeComponentOut
@@ -639,6 +639,8 @@ class AttachmentOut(StrictModel):
 class PresignedAttachmentOut(AttachmentOut):
     upload_method: Literal["PUT"]
     upload_url: str
+    upload_headers: dict[str, str]
+    upload_expires_at: datetime
     idempotency_replay: bool = False
 
 

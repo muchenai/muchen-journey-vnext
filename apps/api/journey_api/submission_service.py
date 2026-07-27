@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor
+from journey_api.config import get_settings
 from journey_api.errors import ApiError
 from journey_api.models import (
     Attachment,
@@ -141,6 +142,8 @@ def lock_ready_attachments(
 ) -> list[Attachment]:
     if not attachment_ids:
         return []
+    if not get_settings().attachments_enabled:
+        raise ApiError(422, "VALIDATION_FAILED", "当前环境不接受附件提交。")
     attachments = list(
         session.scalars(
             select(Attachment)

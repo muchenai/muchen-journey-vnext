@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -10,12 +12,13 @@ from journey_api.attachments import (
     MAX_ATTACHMENT_SIZE_BYTES,
     digest_bytes,
     download_disposition,
-    local_scan_clean,
+    get_attachment_scanner,
+    get_attachment_storage,
     safe_original_filename,
-    storage,
     validate_content,
 )
 from journey_api.auth import Actor, get_actor, require_role
+from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
@@ -67,6 +70,15 @@ api = APIRouter(prefix="/api/v1")
 
 def envelope(request: Request, data: object) -> dict[str, object]:
     return {"data": data, "request_id": request.state.request_id}
+
+
+def require_attachments_enabled() -> None:
+    if not get_settings().attachments_enabled:
+        raise ApiError(
+            503,
+            "DEPENDENCY_UNAVAILABLE",
+            "附件功能在当前环境尚未启用，请先提交结构化文本。",
+        )
 
 
 def ensure_revision(actual: int, expected: int) -> None:
@@ -155,6 +167,17 @@ def lock_owned_attachment(
     return attachment
 
 
+def attachment_upload_target(attachment: Attachment):
+    storage = get_attachment_storage()
+    return storage.presign_upload(
+        storage_key=attachment.storage_key,
+        local_upload_url=f"/api/v1/attachments/{attachment.id}/content",
+        content_type=attachment.content_type,
+        sha256=attachment.sha256,
+        filename=attachment.original_filename,
+    )
+
+
 @api.post(
     "/attachments/presign",
     response_model=PresignedAttachmentResponse,
@@ -167,6 +190,7 @@ def presign_attachment(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
+    require_attachments_enabled()
     require_role(actor, Role.LEARNER)
     payload = command.model_dump(mode="json")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
@@ -181,12 +205,17 @@ def presign_attachment(
         attachment = session.get(Attachment, uuid.UUID(str(replay["id"])))
         if attachment is None or attachment.owner_id != actor.id:
             raise ApiError(409, "VERSION_CONFLICT", "幂等附件引用已不可用。")
+        target = attachment_upload_target(attachment)
+        attachment.upload_expires_at = target.expires_at
+        session.commit()
         return envelope(
             request,
             PresignedAttachmentOut(
                 **attachment_out(attachment).model_dump(),
                 upload_method="PUT",
-                upload_url=f"/api/v1/attachments/{attachment.id}/content",
+                upload_url=target.url,
+                upload_headers=target.headers,
+                upload_expires_at=target.expires_at,
                 idempotency_replay=True,
             ),
         )
@@ -221,6 +250,8 @@ def presign_attachment(
         status=AttachmentStatus.PENDING_UPLOAD,
         scan_status=AttachmentScanStatus.PENDING,
     )
+    target = attachment_upload_target(attachment)
+    attachment.upload_expires_at = target.expires_at
     session.add(attachment)
     store_result(
         session,
@@ -250,7 +281,9 @@ def presign_attachment(
         PresignedAttachmentOut(
             **attachment_out(attachment).model_dump(),
             upload_method="PUT",
-            upload_url=f"/api/v1/attachments/{attachment.id}/content",
+            upload_url=target.url,
+            upload_headers=target.headers,
+            upload_expires_at=target.expires_at,
         ),
     )
 
@@ -279,8 +312,12 @@ async def upload_attachment_content(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
+    require_attachments_enabled()
     require_role(actor, Role.LEARNER)
     attachment = lock_owned_attachment(session, actor, attachment_id)
+    storage = get_attachment_storage()
+    if not storage.supports_api_upload:
+        raise ApiError(404, "NOT_FOUND", "对象存储不接受经 API 转发的上传。")
     declared_length = request.headers.get("content-length")
     if declared_length:
         try:
@@ -306,7 +343,7 @@ async def upload_attachment_content(
         return envelope(request, attachment_out(attachment))
     if attachment.status != AttachmentStatus.PENDING_UPLOAD:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前附件不能接收上传内容。")
-    storage.put(attachment.storage_key, content)
+    storage.put_from_api(attachment.storage_key, content)
     attachment.status = AttachmentStatus.UPLOADED
     attachment.uploaded_at = func.now()
     session.commit()
@@ -322,6 +359,7 @@ def complete_attachment(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
+    require_attachments_enabled()
     require_role(actor, Role.LEARNER)
     payload = {**command.model_dump(mode="json"), "attachment_id": str(attachment_id)}
     replay = find_replay(
@@ -355,19 +393,44 @@ def complete_attachment(
         )
         session.commit()
         return envelope(request, result)
-    if attachment.status != AttachmentStatus.UPLOADED:
+    if attachment.status not in {
+        AttachmentStatus.PENDING_UPLOAD,
+        AttachmentStatus.UPLOADED,
+    }:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "附件尚未上传或已被拒绝。")
+    if (
+        attachment.status == AttachmentStatus.PENDING_UPLOAD
+        and attachment.upload_expires_at is not None
+        and attachment.upload_expires_at < datetime.now(UTC)
+    ):
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "附件上传凭证已过期，请重新上传。")
+    storage = get_attachment_storage()
+    stored = storage.head(attachment.storage_key)
+    if (
+        stored.size_bytes != attachment.size_bytes
+        or (stored.content_type is not None and stored.content_type != attachment.content_type)
+        or stored.sha256 != attachment.sha256
+    ):
+        raise ApiError(422, "VALIDATION_FAILED", "存储中的附件元数据校验失败。")
+    attachment.status = AttachmentStatus.UPLOADED
+    attachment.uploaded_at = func.now()
+    attachment.storage_etag = stored.etag
+    attachment.storage_version_id = stored.version_id
     content = storage.get(attachment.storage_key)
     if len(content) != attachment.size_bytes or digest_bytes(content) != attachment.sha256:
         raise ApiError(422, "VALIDATION_FAILED", "存储中的附件校验失败。")
     validate_content(content, attachment.content_type)
-    clean = local_scan_clean(content)
+    try:
+        clean = get_attachment_scanner().scan(content)
+    except ApiError:
+        attachment.scan_status = AttachmentScanStatus.ERROR
+        session.commit()
+        raise
     attachment.status = AttachmentStatus.READY if clean else AttachmentStatus.REJECTED
     attachment.scan_status = (
-        AttachmentScanStatus.LOCAL_CLEAN
-        if clean
-        else AttachmentScanStatus.LOCAL_REJECTED
+        AttachmentScanStatus.CLEAN if clean else AttachmentScanStatus.INFECTED
     )
+    attachment.scan_completed_at = func.now()
     attachment.completed_at = func.now()
     if clean:
         store_result(
@@ -382,14 +445,14 @@ def complete_attachment(
         session,
         request=request,
         actor=actor,
-        action="attachment.local_scan_completed",
+        action="attachment.scan_completed",
         resource_type="attachment",
         resource_id=attachment.id,
-        details={"local_scan_result": attachment.scan_status.value},
+        details={"scan_result": attachment.scan_status.value},
     )
     session.commit()
     if not clean:
-        raise ApiError(422, "VALIDATION_FAILED", "附件未通过本地隔离扫描，不能提交。")
+        raise ApiError(422, "VALIDATION_FAILED", "附件未通过安全扫描，不能提交。")
     return envelope(request, attachment_out(attachment))
 
 
@@ -400,6 +463,7 @@ def delete_attachment(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
+    require_attachments_enabled()
     require_role(actor, Role.LEARNER)
     attachment = lock_owned_attachment(session, actor, attachment_id)
     linked = session.scalar(
@@ -410,6 +474,7 @@ def delete_attachment(
     if linked is not None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已绑定历史版本的附件不能删除。")
     attachment.status = AttachmentStatus.DELETED
+    storage = get_attachment_storage()
     storage.delete(attachment.storage_key)
     add_audit(
         session,
@@ -434,6 +499,7 @@ def download_attachment(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> Response:
+    require_attachments_enabled()
     attachment = session.scalar(
         select(Attachment).where(
             Attachment.id == attachment_id,
@@ -460,11 +526,26 @@ def download_attachment(
         ) is not None
     if not allowed:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
+    storage = get_attachment_storage()
+    signed_url = storage.presign_download(attachment.storage_key)
+    if signed_url is not None:
+        return RedirectResponse(
+            signed_url,
+            status_code=303,
+            headers={
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+            },
+        )
     content = storage.get(attachment.storage_key)
     return Response(
         content=content,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": download_disposition(attachment.original_filename)},
+        headers={
+            "Content-Disposition": download_disposition(attachment.original_filename),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

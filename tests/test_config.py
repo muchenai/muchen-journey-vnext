@@ -36,10 +36,61 @@ def test_nonlocal_identity_requires_distinct_vnext_secrets():
         feishu_app_id="cli_production",
         feishu_app_secret="production-feishu-secret-123",
         feishu_oauth_redirect_uri="https://journey.example.test/auth/feishu/callback",
+        attachments_enabled=True,
+        attachment_storage_backend="TOS",
+        attachment_scanner_backend="CLAMAV",
+        tos_endpoint="tos-cn-beijing.volces.com",
+        tos_region="cn-beijing",
+        tos_bucket="journey-private-test",
+        tos_ecs_role_name="journey-runtime-test",
     )
     assert configured.allow_fixture_identity is False
 
 
+def test_nonlocal_attachment_dependencies_fail_closed():
+    common = {
+        "app_env": "staging",
+        "allow_fixture_identity": False,
+        "session_secret": "staging-session-secret-example-123456789",
+        "invite_secret": "staging-invite-secret-example-1234567890",
+        "import_signing_key": "staging-import-signing-key-example-123456",
+        "identity_subject_secret": "staging-identity-subject-key-example-123456",
+        "feishu_oauth_enabled": True,
+        "feishu_app_id": "cli_staging",
+        "feishu_app_secret": "staging-feishu-secret-123",
+        "feishu_oauth_redirect_uri": "https://staging.example.test/auth/feishu/callback",
+        "attachments_enabled": True,
+    }
+    with pytest.raises(ValidationError, match="must use TOS"):
+        Settings(**common)
+    with pytest.raises(ValidationError, match="must use CLAMAV"):
+        Settings(**common, attachment_storage_backend="TOS")
+    with pytest.raises(ValidationError, match="ECS role are required"):
+        Settings(
+            **common,
+            attachment_storage_backend="TOS",
+            attachment_scanner_backend="CLAMAV",
+        )
+
+
+def test_nonlocal_disabled_attachments_do_not_require_storage_or_scanner():
+    configured = Settings(
+        app_env="staging",
+        allow_fixture_identity=False,
+        session_secret="staging-session-secret-example-123456789",
+        invite_secret="staging-invite-secret-example-1234567890",
+        import_signing_key="staging-import-signing-key-example-123456",
+        identity_subject_secret="staging-identity-subject-key-example-123456",
+        feishu_oauth_enabled=True,
+        feishu_app_id="cli_staging",
+        feishu_app_secret="staging-feishu-secret-123",
+        feishu_oauth_redirect_uri="https://staging.example.test/auth/feishu/callback",
+        attachments_enabled=False,
+    )
+    assert configured.attachment_storage_backend == "LOCAL"
+    assert configured.attachment_scanner_backend == "TEST"
+
+
 def test_config_schema_version_is_fail_closed():
     with pytest.raises(ValidationError, match="CONFIG_SCHEMA_VERSION"):
-        Settings(config_schema_version=2)
+        Settings(config_schema_version=1)

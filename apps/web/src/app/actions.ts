@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -245,56 +245,102 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/jpeg",
 ]);
 
-export async function uploadSubmissionAttachment(
-  _previousState: SubmissionActionState,
-  data: FormData,
-): Promise<SubmissionActionState> {
-  let assignmentId: string;
+export type AttachmentUploadIntent = {
+  id: string;
+  upload_url: string;
+  upload_headers: Record<string, string>;
+  upload_expires_at: string;
+};
+
+type AttachmentUploadInput = {
+  assignmentId: string;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+};
+
+export async function createSubmissionAttachmentUpload(
+  input: AttachmentUploadInput,
+): Promise<SubmissionActionState & { intent?: AttachmentUploadIntent }> {
   try {
-    assignmentId = requiredUuid(data, "assignment_id");
-    const file = data.get("attachment");
-    if (!(file instanceof File) || file.size < 1) {
+    if (!UUID_PATTERN.test(input.assignmentId)) {
+      return { error: "任务标识无效，请刷新页面后重试。" };
+    }
+    if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes < 1) {
       return { error: "请选择一个非空附件。" };
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (input.sizeBytes > 5 * 1024 * 1024) {
       return { error: "附件不能超过 5 MiB。" };
     }
-    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+    if (!ALLOWED_ATTACHMENT_TYPES.has(input.contentType)) {
       return { error: "附件只支持 TXT、PDF、PNG 或 JPEG。" };
     }
-    const content = Buffer.from(await file.arrayBuffer());
-    const sha256 = createHash("sha256").update(content).digest("hex");
-    const presigned = await apiRequest<{ id: string; upload_url: string }>(
+    if (!/^[0-9a-f]{64}$/.test(input.sha256)) {
+      return { error: "附件完整性摘要无效。" };
+    }
+    const intent = await apiRequest<AttachmentUploadIntent>(
       "/api/v1/attachments/presign",
       "LEARNER",
       {
         method: "POST",
         headers: commandHeaders(),
         body: JSON.stringify({
-          assignment_id: assignmentId,
+          assignment_id: input.assignmentId,
           purpose: "SUBMISSION_EVIDENCE",
-          original_filename: file.name,
-          content_type: file.type,
-          size_bytes: file.size,
-          sha256,
+          original_filename: input.originalFilename,
+          content_type: input.contentType,
+          size_bytes: input.sizeBytes,
+          sha256: input.sha256,
         }),
       },
     );
-    await apiRequest(presigned.upload_url, "LEARNER", {
+    return { intent };
+  } catch (error) {
+    return submissionError(error);
+  }
+}
+
+export async function uploadLocalSubmissionAttachment(
+  attachmentId: string,
+  file: File,
+): Promise<SubmissionActionState> {
+  if (!UUID_PATTERN.test(attachmentId) || file.size < 1 || file.size > 5 * 1024 * 1024) {
+    return { error: "本地上传参数无效。" };
+  }
+  try {
+    await apiRequest(`/api/v1/attachments/${attachmentId}/content`, "LEARNER", {
       method: "PUT",
-      headers: { "Content-Type": file.type, "Content-Length": String(file.size) },
-      body: content,
+      headers: { "Content-Type": file.type },
+      body: Buffer.from(await file.arrayBuffer()),
     });
-    await apiRequest(`/api/v1/attachments/${presigned.id}/complete`, "LEARNER", {
+    return {};
+  } catch (error) {
+    return submissionError(error);
+  }
+}
+
+export async function completeSubmissionAttachmentUpload(
+  assignmentId: string,
+  attachmentId: string,
+  contentType: string,
+  sizeBytes: number,
+  sha256: string,
+): Promise<SubmissionActionState> {
+  if (!UUID_PATTERN.test(assignmentId) || !UUID_PATTERN.test(attachmentId)) {
+    return { error: "附件完成参数无效。" };
+  }
+  try {
+    await apiRequest(`/api/v1/attachments/${attachmentId}/complete`, "LEARNER", {
       method: "POST",
       headers: commandHeaders(),
-      body: JSON.stringify({ content_type: file.type, size_bytes: file.size, sha256 }),
+      body: JSON.stringify({ content_type: contentType, size_bytes: sizeBytes, sha256 }),
     });
   } catch (error) {
     return submissionError(error);
   }
   revalidatePath(`/app/tasks/${assignmentId}`);
-  redirect(`/app/tasks/${assignmentId}?attachment=ready`);
+  return {};
 }
 
 export async function deleteSubmissionAttachment(data: FormData) {

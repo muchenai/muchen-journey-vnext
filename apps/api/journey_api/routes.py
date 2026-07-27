@@ -538,8 +538,12 @@ def assignment_detail(
         instructions=task.instructions,
         completion_criteria=task.completion_criteria,
         required_deliverables=task.required_deliverables,
-        allowed_attachment_types=task.allowed_attachment_types,
-        max_attachment_size_bytes=task.max_attachment_size_bytes,
+        allowed_attachment_types=(
+            task.allowed_attachment_types if get_settings().attachments_enabled else []
+        ),
+        max_attachment_size_bytes=(
+            task.max_attachment_size_bytes if get_settings().attachments_enabled else 0
+        ),
         reference_materials=task.reference_materials,
         estimated_duration_minutes=task.estimated_duration_minutes,
         feedback_sla_business_days=task.feedback_sla_business_days,

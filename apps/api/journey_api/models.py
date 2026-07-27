@@ -133,8 +133,9 @@ class AttachmentStatus(str, enum.Enum):
 
 class AttachmentScanStatus(str, enum.Enum):
     PENDING = "PENDING"
-    LOCAL_CLEAN = "LOCAL_CLEAN"
-    LOCAL_REJECTED = "LOCAL_REJECTED"
+    CLEAN = "CLEAN"
+    INFECTED = "INFECTED"
+    ERROR = "ERROR"
 
 
 class Organization(Base):
@@ -552,6 +553,14 @@ class Attachment(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     uploaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    upload_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    storage_etag: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    storage_version_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    scan_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     completed_at: Mapped[datetime | None] = mapped_column(

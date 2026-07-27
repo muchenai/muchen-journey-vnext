@@ -18,7 +18,6 @@ services:
       - secrets/api.env
     volumes:
       - ./secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro
-      - attachments:/srv/journey-next-staging/attachments
     expose:
       - "8000"
     healthcheck:
@@ -79,8 +78,6 @@ services:
         condition: service_healthy
 
 volumes:
-  attachments:
-    name: journey_next_staging_attachments_wp10_pending
   caddy_data:
     name: journey_next_staging_caddy_data
   caddy_config:

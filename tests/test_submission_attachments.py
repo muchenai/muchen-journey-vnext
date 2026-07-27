@@ -7,6 +7,8 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import DBAPIError
 
 from journey_api.db import SessionLocal
+from journey_api.config import get_settings
+from journey_api.errors import ApiError
 from journey_api.fixtures import REVIEWER_ID, TASK_VERSION_V2_ID
 from journey_api.main import app
 from journey_api.models import (
@@ -123,7 +125,10 @@ def upload_attachment(
     uploaded = assert_ok(
         learner.put(
             presigned["upload_url"],
-            headers={"Content-Type": content_type, "X-CSRF-Token": csrf_token},
+            headers={
+                **presigned["upload_headers"],
+                "X-CSRF-Token": csrf_token,
+            },
             content=content,
         )
     )
@@ -247,7 +252,7 @@ def test_attachment_scope_type_size_filename_scan_and_download_isolation():
         stored_rejected = session.get(Attachment, uuid.UUID(rejected["id"]))
         assert stored_rejected is not None
         assert stored_rejected.status == AttachmentStatus.REJECTED
-        assert stored_rejected.scan_status == AttachmentScanStatus.LOCAL_REJECTED
+        assert stored_rejected.scan_status == AttachmentScanStatus.INFECTED
 
     ready = upload_attachment(
         learner_a,
@@ -315,6 +320,118 @@ def test_attachment_scope_type_size_filename_scan_and_download_isolation():
     assert deleted["status"] == "DELETED"
     assert learner_a.get(f"/api/v1/attachments/{ready['id']}/download").status_code == 404
     assert started_a["status"] == "IN_PROGRESS"
+
+
+def test_scanner_unavailable_keeps_attachment_quarantined(monkeypatch):
+    class UnavailableScanner:
+        @staticmethod
+        def scan(_content: bytes) -> bool:
+            raise ApiError(
+                503,
+                "DEPENDENCY_UNAVAILABLE",
+                "scanner unavailable",
+                retryable=True,
+            )
+
+    learner, csrf_token, assignment_id, started = new_attachment_learner(
+        "scan-unavailable"
+    )
+    content = "真实扫描暂不可用。".encode()
+    digest = hashlib.sha256(content).hexdigest()
+    intent = assert_ok(
+        learner.post(
+            "/api/v1/attachments/presign",
+            headers={
+                "Idempotency-Key": f"scan-down-{uuid.uuid4()}",
+                "X-CSRF-Token": csrf_token,
+            },
+            json={
+                "assignment_id": assignment_id,
+                "purpose": "SUBMISSION_EVIDENCE",
+                "original_filename": "扫描失败.txt",
+                "content_type": "text/plain",
+                "size_bytes": len(content),
+                "sha256": digest,
+            },
+        )
+    )
+    assert_ok(
+        learner.put(
+            intent["upload_url"],
+            headers={**intent["upload_headers"], "X-CSRF-Token": csrf_token},
+            content=content,
+        )
+    )
+    monkeypatch.setattr(
+        "journey_api.submission_routes.get_attachment_scanner",
+        lambda: UnavailableScanner(),
+    )
+    completed = learner.post(
+        f"/api/v1/attachments/{intent['id']}/complete",
+        headers={
+            "Idempotency-Key": f"scan-complete-{uuid.uuid4()}",
+            "X-CSRF-Token": csrf_token,
+        },
+        json={
+            "size_bytes": len(content),
+            "content_type": "text/plain",
+            "sha256": digest,
+        },
+    )
+    assert completed.status_code == 503
+    assert completed.json()["error"]["retryable"] is True
+    with SessionLocal() as session:
+        attachment = session.get(Attachment, uuid.UUID(intent["id"]))
+        assert attachment is not None
+        assert attachment.status == AttachmentStatus.UPLOADED
+        assert attachment.scan_status == AttachmentScanStatus.ERROR
+    blocked = learner.post(
+        f"/api/v1/me/assignments/{assignment_id}/submissions",
+        headers={
+            "Idempotency-Key": f"scan-blocked-{uuid.uuid4()}",
+            "X-CSRF-Token": csrf_token,
+        },
+        json={
+            "expected_revision": started["revision"],
+            "body": submission_body("扫描失败仍隔离"),
+            "attachment_ids": [intent["id"]],
+        },
+    )
+    assert blocked.status_code == 422
+    assert blocked.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+def test_disabled_attachment_runtime_is_fail_closed(monkeypatch):
+    learner, csrf_token, assignment_id, _started = new_attachment_learner(
+        "attachments-disabled"
+    )
+    monkeypatch.setenv("ATTACHMENTS_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        assignment = assert_ok(
+            learner.get(f"/api/v1/me/assignments/{assignment_id}")
+        )
+        assert assignment["allowed_attachment_types"] == []
+        assert assignment["max_attachment_size_bytes"] == 0
+        blocked = learner.post(
+            "/api/v1/attachments/presign",
+            headers={
+                "Idempotency-Key": f"disabled-{uuid.uuid4()}",
+                "X-CSRF-Token": csrf_token,
+            },
+            json={
+                "assignment_id": assignment_id,
+                "purpose": "SUBMISSION_EVIDENCE",
+                "original_filename": "disabled.txt",
+                "content_type": "text/plain",
+                "size_bytes": 4,
+                "sha256": hashlib.sha256(b"text").hexdigest(),
+            },
+        )
+        assert blocked.status_code == 503
+        assert blocked.json()["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
+    finally:
+        get_settings.cache_clear()
 
 
 def test_draft_first_submit_revision_history_and_database_immutability():

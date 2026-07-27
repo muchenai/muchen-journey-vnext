@@ -16,11 +16,11 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0011_wp09_feishu_identity",
-        "revision_count": 11,
+        "head": "0012_wp10_file_security",
+        "revision_count": 12,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
-    monkeypatch.setattr(candidate, "config_schema", lambda: 1)
+    monkeypatch.setattr(candidate, "config_schema", lambda: 2)
     monkeypatch.setattr(candidate, "remote_manifest_digest", lambda reference: REMOTE_DIGEST)
 
     contract_path = tmp_path / "contracts" / "openapi.json"
@@ -70,7 +70,7 @@ def candidate_manifest(tmp_path, monkeypatch):
         "candidate": {"commit_sha": FULL_SHA},
         "openapi": {"sha256": candidate.sha256(contract_path)},
         "migration": expected_migration,
-        "config_schema_version": 1,
+        "config_schema_version": 2,
         "task_versions": task_versions,
         "task_versions_artifact": {
             "path": str(task_path.relative_to(tmp_path)),
@@ -87,16 +87,16 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0011_wp09_feishu_identity",
-        "revision_count": 11,
+        "head": "0012_wp10_file_security",
+        "revision_count": 12,
     }
-    assert config_schema() == 1
+    assert config_schema() == 2
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0011_wp09_feishu_identity"
-    assert config_schema() == 1
+    assert migration()["head"] == "0012_wp10_file_security"
+    assert config_schema() == 2
 
 
 def test_verify_accepts_bound_task_artifact_and_not_run_status(candidate_manifest):

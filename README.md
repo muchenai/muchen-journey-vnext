@@ -17,7 +17,8 @@
 - WP-06：版本化 Task/config 只读运营视图，带角色/组织/对象 scope、原因、幂等键与 expected revision 的 reviewer assignment / enrollment cancel 命令，安全裁剪审计，revision/health/worker/observability 状态，签名离线 fixture 导入，以及本地加密备份、隔离恢复、回滚/告警模拟和 fail-closed 发布门禁；
 - WP-07：候选基线、CODEOWNERS、分层 CI、固定摘要的基础/扫描镜像、依赖/secret/旧引用扫描、三进程 SPDX SBOM，以及绑定完整 Git SHA、OpenAPI hash、migration head、config schema 和 TaskVersion 清单的 release manifest；远端 mainline 已向三个 canonical GHCR package 推送精确 SHA tag、验证 immutable digest 并上传工件。仓库按用户明确决策设为 Public，`main` 强制 PR、`WP-07 / quick`、线性历史、会话解决并禁止 force-push/删除，管理员同样受约束；
 - WP-08：火山引擎华北2（北京）冻结 staging 资源上的 Alpha 运行面已验证，TLS/readiness/API/Web/Worker/匿名权限与真实浏览器 smoke 通过；RDS `IsLatest` 供应商字段证据债保留到 RC/production 前关闭；
-- WP-09：独立飞书应用、首位真实 Operator、Reviewer 绑定及真实权限矩阵已完成；Reviewer 授权访问、Operator 越权拒绝、旧会话轮换、身份撤销立即失效和安全审计脱敏均通过。明确会话失效提示修复候选 `2ab2658…` 已完成完整 CI、三镜像与远端摘要验证，待一次冻结 staging 部署复验后关闭 WP-09；
+- WP-09：独立飞书应用、首位真实 Operator、Reviewer 绑定及真实权限矩阵已完成；明确会话失效提示候选 `2ab2658…` 已在唯一冻结 staging deploy run `30242231558` 成功上线，readiness、匿名 `/ops`/`/review` 拒绝和飞书入口均通过机器复验。Reviewer 暂时无法继续真人复验，撤销会话提示保留为 `WAITING_FOR_HUMAN_UAT`，不伪记 PASS；
+- WP-10：真实 TOS 直传、对象元数据复核、短时授权下载、ClamAV 流式扫描和 fail-closed 隔离的工程路径已完成；配置合同升级为 V2。staging 在扫描运行时与最小 IAM 未关闭前明确禁用附件，结构化文本闭环不受阻；
 - 未实施 production 部署、真实旧系统数据导入、真实飞书/邮件/告警、异机/生产恢复、真人 UAT 或发布签署；物理 ACL 仍有证据债。当前发布判定必须是 `NO_GO`。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
@@ -38,7 +39,7 @@ docker compose up --build
 
 当前仅在 `local/test` 允许 `X-Fixture-Role` 身份，用于 Operator 创建测试邀请以及保留 walking skeleton 回归。真实新人确认后使用 `journey_next_session` 独立会话；staging/production 配置会拒绝 fixture 身份和默认/复用的身份 secret。
 
-WP-03 的本地附件实现使用 vNext 自有的隔离存储抽象和确定性恶意样本门禁，以便在 Compose 中验证 hash、大小、类型、文件名、对象 scope 与版本绑定。它不是生产对象存储或真实病毒扫描；真实 S3-compatible storage、病毒扫描服务和物理 ACL 仍是明确的 `NOT_RUN` 外部门禁。
+本地附件继续使用隔离目录和确定性测试扫描器；staging/production 只允许浏览器通过对象级短时 URL 直传私有 TOS，API 完成时复核 size/type/SHA-256 并通过 ClamAV 后才进入 `READY`。扫描器不可用时文件停留隔离态。当前 Alpha staging 因扫描运行时容量与最小 IAM 尚未关闭而设置 `ATTACHMENTS_ENABLED=false`，页面不展示附件入口，纯文本提交继续可用。
 
 Reviewer 工作台以服务端 `allowed_commands` 为唯一动作来源。`GET /reviews*` 只查询且按明确 Reviewer、组织和对象裁剪；finalize 要求固定四维 Rubric、每维反馈、总体反馈与 `APPROVE`/`REQUEST_REVISION`，结论写入后由数据库拒绝覆盖。
 
@@ -73,7 +74,7 @@ make release-gate      # 当前预期非零并输出 NO_GO
 make verify
 ```
 
-该命令精确重建测试数据库，执行空库迁移/种子、API 与领域测试、迁移升降级、Web lint/类型/生产构建、Greenfield 隔离扫描、真实 Compose HTTP 权限负向矩阵，并验证发布门禁保持 `NO_GO`。各工作包证据分别见 16–27 号 As-Built。依赖安全审计单独运行：
+该命令精确重建测试数据库，执行空库迁移/种子、API 与领域测试、迁移升降级、Web lint/类型/生产构建、Greenfield 隔离扫描、真实 Compose HTTP 权限负向矩阵，并验证发布门禁保持 `NO_GO`。各工作包证据分别见 16–28 号 As-Built。依赖安全审计单独运行：
 
 ```bash
 cd apps/web && npm audit --audit-level=low

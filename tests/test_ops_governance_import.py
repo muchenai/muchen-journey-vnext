@@ -307,8 +307,8 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
     )
     assert hidden.status_code == 404
     runtime = assert_ok(client.get("/api/v1/ops/runtime-status", headers=operator_headers))
-    assert runtime["migration_revision"] == "0011_wp09_feishu_identity"
-    assert runtime["config_schema_version"] == 1
+    assert runtime["migration_revision"] == "0012_wp10_file_security"
+    assert runtime["config_schema_version"] == 2
     assert runtime["external_observability_confirmed"] is False
     assert runtime["observability_mode"] == "LOCAL_STRUCTURED_STDOUT"
     assert set(runtime["metrics"]) == {
@@ -425,6 +425,12 @@ def test_offline_import_rejects_tampering_and_nonlocal_runtime(tmp_path, monkeyp
         feishu_app_id="cli_production",
         feishu_app_secret="production-feishu-secret-123",
         feishu_oauth_redirect_uri="https://journey.example.test/auth/feishu/callback",
+        attachment_storage_backend="TOS",
+        attachment_scanner_backend="CLAMAV",
+        tos_endpoint="tos-cn-beijing.volces.com",
+        tos_region="cn-beijing",
+        tos_bucket="journey-private-test",
+        tos_ecs_role_name="journey-runtime-test",
     )
     monkeypatch.setattr(offline_import, "get_settings", lambda: production)
     with pytest.raises(offline_import.PackageError, match="disabled outside local/test"):

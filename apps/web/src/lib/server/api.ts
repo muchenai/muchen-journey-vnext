@@ -274,7 +274,7 @@ export type OpsAuditEntry = {
 export type RuntimeStatus = {
   environment: "local" | "test" | "staging" | "production";
   release: string;
-  config_schema_version: 1;
+  config_schema_version: 2;
   migration_revision: string;
   api: { status: string; release: string | null };
   database: { status: string };

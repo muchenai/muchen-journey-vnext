@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     app_env: str = "local"
     app_release: str = "dev"
-    config_schema_version: int = 1
+    config_schema_version: int = 2
     database_url: str = "postgresql+psycopg://journey_next:journey_next_dev@localhost:5432/journey_next_dev"
     allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
     allow_fixture_identity: bool = False
@@ -44,6 +44,18 @@ class Settings(BaseSettings):
     feishu_app_secret: str = ""
     feishu_oauth_redirect_uri: str = "http://localhost:3000/auth/feishu/callback"
     attachment_storage_root: str = "/tmp/journey-next-attachments"
+    attachments_enabled: bool = False
+    attachment_storage_backend: str = "LOCAL"
+    attachment_upload_ttl_seconds: int = 300
+    attachment_download_ttl_seconds: int = 60
+    attachment_scanner_backend: str = "TEST"
+    tos_endpoint: str = ""
+    tos_region: str = ""
+    tos_bucket: str = ""
+    tos_ecs_role_name: str = ""
+    clamav_host: str = "clamav"
+    clamav_port: int = 3310
+    clamav_timeout_seconds: int = 15
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod
@@ -63,7 +75,7 @@ class Settings(BaseSettings):
     def fixture_identity_is_never_nonlocal(self) -> "Settings":
         if self.allow_fixture_identity and self.app_env not in {"local", "test"}:
             raise ValueError("ALLOW_FIXTURE_IDENTITY may only be enabled in local/test")
-        if self.app_env in {"staging", "production"}:
+        if self.attachments_enabled and self.app_env in {"staging", "production"}:
             insecure_defaults = {
                 "journey-next-local-session-secret-change-me",
                 "journey-next-local-invite-secret-change-me",
@@ -104,6 +116,30 @@ class Settings(BaseSettings):
             raise ValueError("OAUTH_STATE_TTL_MINUTES must be between 5 and 15")
         if self.app_env in {"staging", "production"} and not self.feishu_oauth_enabled:
             raise ValueError("FEISHU_OAUTH_ENABLED must be true outside local/test")
+        if self.attachment_storage_backend not in {"LOCAL", "TOS"}:
+            raise ValueError("ATTACHMENT_STORAGE_BACKEND must be LOCAL or TOS")
+        if self.attachment_scanner_backend not in {"TEST", "CLAMAV"}:
+            raise ValueError("ATTACHMENT_SCANNER_BACKEND must be TEST or CLAMAV")
+        if not 60 <= self.attachment_upload_ttl_seconds <= 900:
+            raise ValueError("ATTACHMENT_UPLOAD_TTL_SECONDS must be between 60 and 900")
+        if not 30 <= self.attachment_download_ttl_seconds <= 300:
+            raise ValueError("ATTACHMENT_DOWNLOAD_TTL_SECONDS must be between 30 and 300")
+        if not 1 <= self.clamav_timeout_seconds <= 30:
+            raise ValueError("CLAMAV_TIMEOUT_SECONDS must be between 1 and 30")
+        if self.attachments_enabled and self.app_env in {"staging", "production"}:
+            if self.attachment_storage_backend != "TOS":
+                raise ValueError("nonlocal attachment storage must use TOS")
+            if self.attachment_scanner_backend != "CLAMAV":
+                raise ValueError("nonlocal attachment scanning must use CLAMAV")
+            if not all(
+                (self.tos_endpoint, self.tos_region, self.tos_bucket, self.tos_ecs_role_name)
+            ):
+                raise ValueError("TOS endpoint, region, bucket, and ECS role are required")
+        elif self.attachments_enabled and (
+            self.attachment_storage_backend != "LOCAL"
+            or self.attachment_scanner_backend != "TEST"
+        ):
+            raise ValueError("local/test attachments must use isolated local test adapters")
         if self.feishu_oauth_enabled:
             if not self.feishu_app_id or len(self.feishu_app_secret) < 16:
                 raise ValueError("independent Feishu app credentials must be configured")
@@ -121,8 +157,8 @@ class Settings(BaseSettings):
                 raise ValueError("Feishu callback must use HTTPS outside local/test")
             if self.app_env in {"local", "test"} and redirect.scheme not in {"http", "https"}:
                 raise ValueError("Feishu callback must use HTTP or HTTPS")
-        if self.config_schema_version != 1:
-            raise ValueError("CONFIG_SCHEMA_VERSION must be the approved version 1")
+        if self.config_schema_version != 2:
+            raise ValueError("CONFIG_SCHEMA_VERSION must be the approved version 2")
         return self
 
 
