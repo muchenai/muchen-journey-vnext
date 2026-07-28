@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "required_checks": [
+    "candidate_binding",
+    "production_resource_isolation",
+    "managed_secrets",
+    "restricted_ci_identity",
+    "production_preflight",
+    "physical_acl_validation",
+    "real_human_uat",
+    "real_pilot_observation",
+    "real_external_notification",
+    "external_observability_and_alert_drill",
+    "off_host_backup_restore",
+    "rpo_rto_validation",
+    "rollback_or_maintenance_drill",
+    "production_backup",
+    "dual_release_approval",
+    "old_system_read_only",
+    "deployment_readiness_smoke",
+    "production_observation_window"
+  ],
+  "required_approval_count": 2
+}

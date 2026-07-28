@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "duration_days": 14,
+  "checkpoints": {
+    "D+1": 1,
+    "D+3": 3,
+    "D+7": 7,
+    "D+14": 14
+  },
+  "thresholds": {
+    "availability_minimum": 0.995,
+    "completion_rate_minimum": 0.8,
+    "current_action_understanding_minimum": 0.9,
+    "duplicate_facts_maximum": 0,
+    "reviews_within_two_business_days_minimum": 0.9,
+    "state_conflicts_maximum": 0,
+    "support_intervention_maximum": 0.2
+  }
+}
