@@ -25,6 +25,8 @@ DEC-019 进一步将跨地域/独立灾备故障域选型延期至真实 Alpha �
 - `config/wp12_data_lifecycle.json` 把 DEC-008 固定为机器合同：身份/提交/评价/结果/审计 1095 天、附件 365 天、通知 180 天、幂等 30 天，删除/纠错请求 30 天；
 - migration `0014_wp12_data_lifecycle` 新增 data-rights request 台账，记录主体、类型、30 日到期、合法保留、状态、解决码和 revision；数据库约束禁止开放请求伪造完成字段、已完成请求缺少解决证据或无理由 legal hold；
 - `journey_api.data_lifecycle` 只提供 `policy-check` 与 `PLAN_ONLY`。计划按明确 `as_of` 生成各数据类 cutoff、到期数量、逾期 rights request 和 legal hold 数量，不输出记录标识，不执行删除；
+- Operator API 支持同组织主体的删除/纠错请求登记与查询、30 日到期、幂等 replay、revision 冲突、legal hold 设置/解除和受限拒绝码；Learner/Reviewer/匿名与跨组织对象均拒绝。操作原因保留在审计事实中，但通用审计查询只显示 request type、状态、legal hold 和 resolution code，原因字段标记为 redacted；
+- API 不提供“完成删除”命令。存在 legal hold 时拒绝关闭；物理删除未证明前不能把请求伪记为 `COMPLETED`；
 - 当前没有非本地 APPLY 路径。真实删除必须在下一受审查切片中处理外键顺序、附件对象删除、主体最小化和不可变审计，再以精确环境授权执行。
 
 ## 3. 本地机器证据
@@ -94,7 +96,7 @@ PASS / no leaks found
 ## 5. 尚未关闭的 WP-12 门禁
 
 - staging 常规读取和核心命令 p95 ≤1 秒 benchmark、99.5% 试点可用性证据；
-- data-rights Operator 流程、受控删除执行器、法律保留/附件对象删除与真实删除证据；
+- 受控删除执行器、附件对象删除、不可逆动作双重确认与真实删除证据；
 - 每日加密备份、独立故障域副本、空白隔离恢复、RPO ≤24 小时和 RTO ≤4 小时实测；
 - staging/production 的 N→N+1→N 或维护模式演练，且不回滚已接受业务事实；
 - DB、Web、Worker、storage、identity、notification 故障卡的真实运行演练；
@@ -105,4 +107,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，下一单一 WIP 是 data-rights Operator 流程和受控数据生命周期执行器；随后准备 staging benchmark 的只读执行合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+在不部署、不新增云资源的前提下，下一单一 WIP 是准备 WP-13 真人 UAT 的冻结候选执行包；受控物理删除执行器作为 WP-12 未关闭高风险切片保留，获得精确对象和环境授权后再实现与演练。随后准备 staging benchmark 的只读执行合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
