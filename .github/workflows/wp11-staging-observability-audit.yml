@@ -1,0 +1,111 @@
+name: WP-11 Staging Observability Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact deployed 40-character candidate SHA
+        required: true
+        type: string
+      confirmation:
+        description: Type AUDIT_WP11_STAGING_OBSERVABILITY
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp11-staging-observability-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: WP-11 / read-only host observability
+    if: >-
+      inputs.candidate == '172c9f62ffdcd4fce31fb4900fdca46b3405ab89' &&
+      inputs.confirmation == 'AUDIT_WP11_STAGING_OBSERVABILITY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Verify read-only audit contract
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "${{ inputs.candidate }}" = "$(jq -r .candidate_commit config/wp08_staging.json)"
+          python3 -m py_compile scripts/wp11_host_observability_audit.py
+          make wp08-staging-apply-check
+      - name: Initialize encrypted private TOS state
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen staging infrastructure
+        id: frozen_infrastructure
+        working-directory: infra/staging
+        run: |
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          for value in "$public_ip" "$security_group_id"; do
+            test -n "$value"
+            echo "::add-mask::$value"
+          done
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP11_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open exact runner SSH ingress
+        run: |
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
+            --cidr "$WP11_RUNNER_CIDR"
+      - name: Execute bounded PII-free host audit
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp11-audit-key"
+          known_hosts="$RUNNER_TEMP/wp11-known-hosts"
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$key"
+          chmod 0600 "$key"
+          curl --fail --silent --show-error \
+            https://staging-vnext.muchenai.com/health/ready >/dev/null
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts")
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 - --candidate '${{ inputs.candidate }}' --lookback-seconds 600" \
+            <scripts/wp11_host_observability_audit.py
+          ssh-keygen -lf "$known_hosts"
+      - name: Close SSH ingress
+        if: always() && steps.frozen_infrastructure.outputs.security_group_id != ''
+        run: |
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
+            --cidr "$WP11_RUNNER_CIDR"
