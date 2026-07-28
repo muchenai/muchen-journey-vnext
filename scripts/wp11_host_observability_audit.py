@@ -30,6 +30,7 @@ FORBIDDEN_LOG_FIELDS = {
 }
 RELEASE_RE = re.compile(r"^[0-9a-f]{40}$")
 LOGCOLLECTOR_ROOT = Path("/usr/local/logcollector")
+LOGCOLLECTOR_SERVICE = "logcollectord.service"
 DEPLOYED_CANDIDATE = Path("/srv/journey-next-staging/DEPLOYED_CANDIDATE")
 
 
@@ -218,7 +219,7 @@ def _safe_logcollector_counts() -> dict[str, int]:
 
 def _logcollector_is_active() -> bool:
     completed = subprocess.run(
-        ("systemctl", "is-active", "logcollector"),
+        ("systemctl", "is-active", LOGCOLLECTOR_SERVICE),
         check=False,
         capture_output=True,
         text=True,
