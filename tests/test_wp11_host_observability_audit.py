@@ -77,3 +77,6 @@ def test_workflow_is_read_only_and_always_closes_temporary_ssh_ingress():
 
     with pytest.raises(contract.ContractError, match="terraform apply"):
         contract.validate_workflow(workflow + "\nterraform apply")
+
+    with pytest.raises(contract.ContractError, match="candidate artifact apply gate"):
+        contract.validate_workflow(workflow + "\nmake wp08-staging-apply-check")

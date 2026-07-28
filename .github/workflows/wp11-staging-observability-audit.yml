@@ -50,7 +50,7 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           test "${{ inputs.candidate }}" = "$(jq -r .candidate_commit config/wp08_staging.json)"
           python3 -m py_compile scripts/wp11_host_observability_audit.py
-          make wp08-staging-apply-check
+          make wp11-staging-audit-check
       - name: Initialize encrypted private TOS state
         working-directory: infra/staging
         run: |
