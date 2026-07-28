@@ -1,7 +1,7 @@
 # 12｜决策、风险与开放问题台账
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.2
+版本：V0.3
 日期：2026-07-28
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
@@ -38,6 +38,7 @@
 | DEC-015 | UI Foundations | 系统字体、4px 网格、390/768/1280、WCAG 2.2 AA、单一正式组件与蓝色主操作语义 | `APPROVED` | `BUILD_G0` | Liu Mowen（初始 Design + Frontend Owner） |
 | DEC-016 | P0 内容与评审 | 只发布 TSK-001“问题洞察与行动建议”；四维 Rubric 全部达标才 PASS；Reviewer SLA 2 个工作日 | `APPROVED` | 真人校准 `G4` | Liu Mowen（初始 Product + Content + Reviewer Owner） |
 | DEC-017 | Alpha/RC 附件边界 | 当前 Alpha/RC 只使用无附件的 `TSK-001 V1`，staging 固定 `ATTACHMENTS_ENABLED=false`；V2 附件能力不进入当前范围，未来启用前必须重开并完成 WP-10 五项物理门禁 | `APPROVED` | 当前范围 `G4`；未来附件启用前置门禁 | Liu Mowen（Product + Security + Tech Owner） |
+| DEC-018 | Alpha 可观测与通知延期边界 | Alpha 阶段延期 TLS 外部日志采集、真实通知和告警演练；保留无业务写入的有界主机审计作为临时观测手段，允许启动 WP-12；三项延期证据仍为 `NOT_RUN`，WP-11 不得记为完整验证，production 继续 `NO_GO` | `APPROVED` | Alpha WP-12 激活；production 前置门禁不变 | Liu Mowen（Product + Security + Tech + Ops Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -65,6 +66,12 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 
 当前种子 Assignment 固定 `TSK-001 V1`，该版本的附件类型为空、大小上限为 0；结构化文本已能完成真实学习与评审闭环。为可选附件新增扫描运行时、IAM/CORS、对象生命周期和恢复证明，会消耗当前预算与工程 WIP，却没有真实用户阻塞证据。Alpha/RC 因此把附件作为明确的未激活能力：页面和 API 同时 fail closed，不能把“禁用”表述为 `FILE_SECURITY_VERIFIED`。若真实试点证明文件是完成任务的必要条件，必须先重开 WP-10，完成其五项物理门禁，再发布和分配新的 TaskVersion；不得修改在途 V1 Assignment。
 
+### DEC-018｜为什么 Alpha 延期外部日志与真实通知
+
+当前候选已证明通知失败不会改写业务事实、无接收人时 Worker 不会错误消费通知，并能通过无业务写入的有界主机审计确认 API/Worker 运行与脱敏日志。继续修补 TLS provider 采集路径、配置真实接收人或发送测试消息，不会更快验证新人提交与主管评审的核心用户问题，反而会继续占用单一 WIP。
+
+因此 Alpha 只延期 TLS 外部日志采集、真实通知和告警演练，并允许 WP-12 进入候选硬化与灾备开发。延期不是豁免或通过：三项证据继续标记 `NOT_RUN`，WP-11 结论继续包含 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`；临时主机审计必须有界、只读、脱敏且不得配置接收人或发送消息。进入 production 前，必须由后续明确决策恢复并关闭这些门禁，或提出经 Security/Ops/Release 批准的等效生产观测方案；在此之前 production 始终 `NO_GO`。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
@@ -86,6 +93,7 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 | RSK-015 | 过度文档化、决定仍不落地 | 中/中 | 文档更多但 TBD 不关闭 | G0 只看阻塞项和签署；限时决策会 | Product/Tech |
 | RSK-016 | 新系统上线后 bug 继续上升 | 中/高 | RC 后 Sev-2 增长、同类 bug 3 次 | 停止规则；根因/门禁复盘；冻结功能 | QA/Tech |
 | RSK-017 | 未完成物理文件门禁即误启用附件 | 中/高 | staging 配置或新 TaskVersion 出现附件类型/额度 | DEC-017；`ATTACHMENTS_ENABLED=false`；启用前重开 WP-10 五项门禁与新版本评审 | Product/Security/Tech |
+| RSK-018 | Alpha 延期被误解为生产观测已通过 | 中/高 | 文档或发布门禁把 TLS/真实通知/告警标为 `VERIFIED`，或无外部观测即申请 production | DEC-018；三项保持 `NOT_RUN`；WP-11 保持 `NO_GO`；production release gate 拒绝 | Product/Security/Ops/Release |
 
 ## 5. 原开放问题的关闭结论
 
@@ -104,14 +112,16 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 
 2026-07-28 后续执行决策：Product Owner 明确批准 DEC-017，以当前 Alpha/RC 无附件范围关闭 WP-10；该批准不授权云资源、部署或未来附件启用，也不改变整体 `NO_GO`。
 
+2026-07-28 后续执行决策：Product Owner 明确批准 DEC-018，在 Alpha 阶段延期 TLS 外部日志采集、真实通知和告警演练，保留有界主机审计并允许启动 WP-12。该批准不把延期项记为通过，不授权真实发送、业务接收人或 production 行为，production 继续 `NO_GO`。
+
 ## 7. 签署区
 
 | 角色 | 姓名 | 已批准 DEC | 未批准 DEC | 结论 | 日期 |
 | --- | --- | --- | --- | --- | --- |
-| Product Owner | Liu Mowen | DEC-001..016 | 真人试点结果 | BUILD GO | 2026-07-20 |
-| Tech Lead | Liu Mowen | DEC-001..016 | 物理生产资源验证 | BUILD GO | 2026-07-20 |
+| Product Owner | Liu Mowen | DEC-001..018 | 真人试点结果 | BUILD GO | 2026-07-28 |
+| Tech Lead | Liu Mowen | DEC-001..018 | 物理生产资源验证 | BUILD GO | 2026-07-28 |
 | Data Owner | Liu Mowen | DEC-001..016 | 恢复演练证据 | BUILD GO | 2026-07-20 |
 | Design Owner | Liu Mowen | DEC-015/016 | 真人 5 秒测试 | BUILD GO | 2026-07-20 |
-| Security/Privacy | Liu Mowen | DEC-006/008/012/014 | 生产安全门禁 | BUILD GO | 2026-07-20 |
+| Security/Privacy | Liu Mowen | DEC-006/008/012/014/017/018 | 生产安全门禁 | BUILD GO | 2026-07-28 |
 | QA/UAT | Liu Mowen | DEC-007/010/016 | 真人 UAT | BUILD GO | 2026-07-20 |
-| Release/Ops | Liu Mowen | DEC-003/013/014 | 发布/观察证据 | BUILD GO | 2026-07-20 |
+| Release/Ops | Liu Mowen | DEC-003/013/014/018 | 发布/观察证据 | BUILD GO | 2026-07-28 |
