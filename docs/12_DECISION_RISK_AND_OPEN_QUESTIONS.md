@@ -1,7 +1,7 @@
 # 12｜决策、风险与开放问题台账
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.3
+版本：V0.4
 日期：2026-07-28
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
@@ -39,6 +39,7 @@
 | DEC-016 | P0 内容与评审 | 只发布 TSK-001“问题洞察与行动建议”；四维 Rubric 全部达标才 PASS；Reviewer SLA 2 个工作日 | `APPROVED` | 真人校准 `G4` | Liu Mowen（初始 Product + Content + Reviewer Owner） |
 | DEC-017 | Alpha/RC 附件边界 | 当前 Alpha/RC 只使用无附件的 `TSK-001 V1`，staging 固定 `ATTACHMENTS_ENABLED=false`；V2 附件能力不进入当前范围，未来启用前必须重开并完成 WP-10 五项物理门禁 | `APPROVED` | 当前范围 `G4`；未来附件启用前置门禁 | Liu Mowen（Product + Security + Tech Owner） |
 | DEC-018 | Alpha 可观测与通知延期边界 | Alpha 阶段延期 TLS 外部日志采集、真实通知和告警演练；保留无业务写入的有界主机审计作为临时观测手段，允许启动 WP-12；三项延期证据仍为 `NOT_RUN`，WP-11 不得记为完整验证，production 继续 `NO_GO` | `APPROVED` | Alpha WP-12 激活；production 前置门禁不变 | Liu Mowen（Product + Security + Tech + Ops Owner） |
+| DEC-019 | Alpha 灾备故障域延期边界 | Alpha 期间不选择跨地域或其他独立灾备故障域；待真实 Alpha 开放后连续稳定运行 30 个自然日再重开选型。基础备份、恢复可用性、数据完整性与 RPO/RTO 工程工作不取消；异机/独立故障域恢复继续 `NOT_RUN`，WP-12 不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO` | `APPROVED` | Alpha 可继续非故障域 WP-12 与真人 UAT；production 恢复门禁不变 | Liu Mowen（Product + Data + Tech + Ops Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -72,6 +73,14 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 
 因此 Alpha 只延期 TLS 外部日志采集、真实通知和告警演练，并允许 WP-12 进入候选硬化与灾备开发。延期不是豁免或通过：三项证据继续标记 `NOT_RUN`，WP-11 结论继续包含 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`；临时主机审计必须有界、只读、脱敏且不得配置接收人或发送消息。进入 production 前，必须由后续明确决策恢复并关闭这些门禁，或提出经 Security/Ops/Release 批准的等效生产观测方案；在此之前 production 始终 `NO_GO`。
 
+### DEC-019｜为什么延后灾备故障域选型但不取消基础恢复
+
+当前 Alpha 的首要问题是证明新人提交、主管评审和结果交接能稳定解决真实用户问题。此时提前选择跨地域、跨账号或其他独立故障域，会引入持续费用、KMS/复制权限、保留策略和恢复编排，但还没有一个月真实运行数据用于判断需要保护的实际数据量、恢复频率和运营能力。
+
+因此 Alpha 暂不选择灾备故障域。重新开启条件定义为：真实 Alpha 实际开放并由 Owner 登记起始日后，连续 30 个自然日没有 Sev-1/Sev-2、不可逆数据丢失或核心闭环长时间不可用；任一上述事件会中断并重新开始计时。30 日成熟检查点只能触发选型评审，不能自动把门禁改为通过。
+
+延期只覆盖跨地域/独立故障域副本和相应隔离恢复演练。数据库受管备份事实核对、备份可读性、schema/计数/约束/业务指纹校验、恢复脚本的本地或临时隔离测试，以及 RPO/RTO 预算分析仍属于 WP-12。异机恢复证据继续为 `NOT_RUN`，release gate 的 `off_host_backup_restore` 阻塞保持不变；在独立故障域选定并完成真实隔离恢复前，WP-12 不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO`。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
@@ -94,6 +103,7 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 | RSK-016 | 新系统上线后 bug 继续上升 | 中/高 | RC 后 Sev-2 增长、同类 bug 3 次 | 停止规则；根因/门禁复盘；冻结功能 | QA/Tech |
 | RSK-017 | 未完成物理文件门禁即误启用附件 | 中/高 | staging 配置或新 TaskVersion 出现附件类型/额度 | DEC-017；`ATTACHMENTS_ENABLED=false`；启用前重开 WP-10 五项门禁与新版本评审 | Product/Security/Tech |
 | RSK-018 | Alpha 延期被误解为生产观测已通过 | 中/高 | 文档或发布门禁把 TLS/真实通知/告警标为 `VERIFIED`，或无外部观测即申请 production | DEC-018；三项保持 `NOT_RUN`；WP-11 保持 `NO_GO`；production release gate 拒绝 | Product/Security/Ops/Release |
+| RSK-019 | 灾备故障域延期演变为无期限无恢复能力 | 中/高 | 没有登记 Alpha 起始日；30 日后不评审；把受管备份存在等同于隔离恢复通过 | DEC-019；30 日成熟触发器；严重事故重新计时；基础备份/恢复工程不停；`off_host_backup_restore` 保持阻塞 | Product/Data/Ops/Release |
 
 ## 5. 原开放问题的关闭结论
 
@@ -114,14 +124,16 @@ P0 可以输出“handoff ready + 明确责任人/说明/外部链接”，但�
 
 2026-07-28 后续执行决策：Product Owner 明确批准 DEC-018，在 Alpha 阶段延期 TLS 外部日志采集、真实通知和告警演练，保留有界主机审计并允许启动 WP-12。该批准不把延期项记为通过，不授权真实发送、业务接收人或 production 行为，production 继续 `NO_GO`。
 
+2026-07-28 后续执行决策：Product Owner 明确批准 DEC-019，Alpha 期间延期灾备故障域选型，待真实 Alpha 连续稳定运行 30 个自然日后重开。该批准不取消基础备份/恢复工程，不关闭 `off_host_backup_restore`，不授权 production，也不把 WP-12 记为 `RC_TECHNICALLY_READY`。
+
 ## 7. 签署区
 
 | 角色 | 姓名 | 已批准 DEC | 未批准 DEC | 结论 | 日期 |
 | --- | --- | --- | --- | --- | --- |
-| Product Owner | Liu Mowen | DEC-001..018 | 真人试点结果 | BUILD GO | 2026-07-28 |
-| Tech Lead | Liu Mowen | DEC-001..018 | 物理生产资源验证 | BUILD GO | 2026-07-28 |
-| Data Owner | Liu Mowen | DEC-001..016 | 恢复演练证据 | BUILD GO | 2026-07-20 |
+| Product Owner | Liu Mowen | DEC-001..019 | 真人试点结果 | BUILD GO | 2026-07-28 |
+| Tech Lead | Liu Mowen | DEC-001..019 | 物理生产资源验证 | BUILD GO | 2026-07-28 |
+| Data Owner | Liu Mowen | DEC-001..016/019 | 恢复演练证据 | BUILD GO | 2026-07-28 |
 | Design Owner | Liu Mowen | DEC-015/016 | 真人 5 秒测试 | BUILD GO | 2026-07-20 |
 | Security/Privacy | Liu Mowen | DEC-006/008/012/014/017/018 | 生产安全门禁 | BUILD GO | 2026-07-28 |
 | QA/UAT | Liu Mowen | DEC-007/010/016 | 真人 UAT | BUILD GO | 2026-07-20 |
-| Release/Ops | Liu Mowen | DEC-003/013/014/018 | 发布/观察证据 | BUILD GO | 2026-07-28 |
+| Release/Ops | Liu Mowen | DEC-003/013/014/018/019 | 发布/观察证据 | BUILD GO | 2026-07-28 |

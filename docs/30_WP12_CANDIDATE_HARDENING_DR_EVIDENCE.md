@@ -10,6 +10,8 @@ WP-12 追溯 `DEC-008/013/014`、`REQ-NFR-005/008/010`、`AT-DATA-008`、`AT-ISO
 
 DEC-018 仅允许 Alpha 延期 TLS 外部日志采集、真实通知和告警演练，并以有界、只读、脱敏的主机审计临时观测。延期项仍为 `NOT_RUN`，不计入 WP-12 通过证据，production 继续 `NO_GO`。本批次没有部署、没有新增云资源，也没有修改业务事实。
 
+DEC-019 进一步将跨地域/独立灾备故障域选型延期至真实 Alpha 连续稳定运行 30 个自然日后的成熟检查点。延期不取消基础备份与恢复工程，不关闭 release gate 的 `off_host_backup_restore`；异机恢复继续 `NOT_RUN`，WP-12 仍不得记 `RC_TECHNICALLY_READY`。
+
 ## 2. 第一批已实现硬化
 
 - 修复非本地配置 fail-open：staging/production 对公开本地默认 session、invite、import signing 和 identity subject secret 的拒绝不再依赖附件开关；这与 Alpha `ATTACHMENTS_ENABLED=false` 边界解耦；
@@ -57,7 +59,7 @@ PASS / no leaks found
 - Sev-1：未发现；
 - Sev-2：1 项非本地默认密钥 fail-open 已修复并回归；
 - Sev-3：容器运行时最小权限和 source map 显式门禁已修复；唯一 dev-only npm advisory 继续按精确 URL 和 2026-08-31 到期日 fail closed 管理，Owner 为 Tech Lead；
-- 尚未完成仓库级 threat model。灾备信任边界取决于异机副本是否跨地域，必须先由 Owner 锁定故障域，再形成最终模型。
+- 尚未完成仓库级 threat model。依据 DEC-019，模型必须把“Alpha 无独立灾备故障域”作为显式信任边界缺口和已接受的时限风险，而不是假设一个尚未批准的跨地域方案。
 
 ## 5. 尚未关闭的 WP-12 门禁
 
@@ -73,4 +75,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，先完成仓库级 threat model 与保留/删除任务的可测试实现；随后依据 Owner 锁定的灾备故障域，设计最小加密副本和空白恢复路径。任何真实备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+在不部署、不新增云资源的前提下，先完成仓库级 threat model、保留/删除任务和基础恢复校验的可测试实现；同时准备 staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
