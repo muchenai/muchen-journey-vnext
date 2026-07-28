@@ -59,6 +59,18 @@ make secret-scan
 PASS / no leaks found
 ```
 
+### 3.1 本地只读性能基线
+
+`scripts/wp12_local_readiness.py` 强制目标为 loopback HTTP，使用本地 fixture 身份，只读取 readiness、Learner Current Action、Reviewer queue 和 Operator runtime，不执行业务命令。每条路径预热 3 次、采样 25 次，任一非 200 或 p95 超过 1 秒即失败；报告权限为 owner-only，并固定 `staging_benchmark=NOT_RUN`、`pilot_availability_99_5_percent=NOT_RUN`。
+
+2026-07-28 本地报告 `artifacts/wp12/local-benchmark-20260728T165730Z-c04f75cd.json` 为 `PASS`：readiness p95 `0.002298s`、Current Action `0.004462s`、Reviewer queue `0.014472s`、Operator runtime `0.004550s`。这是本机 fixture 的工程余量，不包含公网、Caddy、ECS、RDS 网络、真实数据量或并发，不能关闭 staging benchmark 和 14 日可用性门禁。
+
+### 3.2 本地隔离恢复与当前迁移回滚
+
+`make wp12-local-recovery` 仅操作 Compose 开发库与空白 `db-test`：先升级/seed，再生成 owner-only 加密备份及签名 manifest，在全新随机数据库恢复，核对 migration、计数、约束、跨组织关键不变量和 TaskVersion 指纹，然后执行当前 `0013 → 0014 → 0013 → 0014` 隔离演练。若 `0014` 已存在 data-rights 事实，脚本拒绝 schema 回退并要求维护模式或前滚修复，禁止通过回滚抹除已接受事实。
+
+2026-07-28 报告 `artifacts/wp06/wp06-20260728T165823Z-7cd0532e/restore-rollback-report.json` 为 `PASS`：恢复与 re-upgrade 通过、`accepted_business_facts_rolled_back=false`、用时 `6.110s`、本地备份年龄 `0.696s`。`local_rto_within_budget=true` 与 `local_rpo_artifact_age_within_budget=true` 只说明本机演练低于 DEC-013 数值预算；`production_restore` 和 `off_host_restore` 均继续 `NOT_RUN`。
+
 最终 PR 仍必须通过远端 required `WP-07 / quick`；合并后主线全量门禁与候选摘要才是 canonical 证据。
 
 ## 4. 当前安全结论
@@ -68,13 +80,24 @@ PASS / no leaks found
 - Sev-3：容器运行时最小权限和 source map 显式门禁已修复；唯一 dev-only npm advisory 继续按精确 URL 和 2026-08-31 到期日 fail closed 管理，Owner 为 Tech Lead；
 - 仓库级 threat model 已完成，覆盖公网入口、邀请/飞书身份、跨组织/对象授权、不可变业务事实、Worker/Feishu 副作用、CI/GHCR 供应链、可观测和恢复边界；未发现有仓库证据支持的 critical 风险。高优先级残余风险继续由授权负测、身份治理、候选摘要和 release gate 控制。依据 DEC-019，“Alpha 无独立灾备故障域”明确记录为时限风险，而不是假设尚未批准的跨地域方案；见 `muchen-journey-vnext-threat-model.md`。
 
+### 4.1 Alpha 故障卡
+
+| 故障 | 第一动作 | Alpha 恢复证明 | 当前状态 |
+| --- | --- | --- | --- |
+| DB 不可用/高延迟 | 停止新写并进入维护；保留事务与连接证据 | readiness、migration、约束、关键计数与指纹 | 卡片已定义；真实演练 `NOT_RUN` |
+| Web 不可用但 API 正常 | 切维护页或回滚兼容 Web，不动数据库事实 | 三视口、release/readiness、Current Action/Review | 卡片已定义；真实演练 `NOT_RUN` |
+| Worker 停滞/backlog | 暂停领取、保护 lease/idempotency，修复后有界重驱 | heartbeat、backlog、attempt 历史且不重复 | 卡片已定义；外部告警演练 `NOT_RUN` |
+| Storage/附件故障 | 保持 `ATTACHMENTS_ENABLED=false`；不得临时开放不安全上传 | 无附件 TSK-001 V1 仍可完成闭环 | Alpha 安全禁用 |
+| Identity/Feishu 故障 | 停新绑定；已有会话按撤销/轮换合同处理，不降级为 fixture | OAuth state/browser binding、403/404、revoke audit | 真人矩阵部分通过；广泛故障演练 `NOT_RUN` |
+| Notification/Feishu 故障 | 业务事实继续提交；不配置接收人，保留 outbox/attempt | 无重复业务事实，恢复后有界投递 | DEC-018 延期，`NOT_RUN` |
+
 ## 5. 尚未关闭的 WP-12 门禁
 
 - staging 常规读取和核心命令 p95 ≤1 秒 benchmark、99.5% 试点可用性证据；
-- 3 年/1 年/180 天/30 天数据保留任务和 30 天删除/纠错流程；
+- data-rights Operator 流程、受控删除执行器、法律保留/附件对象删除与真实删除证据；
 - 每日加密备份、独立故障域副本、空白隔离恢复、RPO ≤24 小时和 RTO ≤4 小时实测；
-- N→N+1→N 或维护模式演练，且不回滚已接受业务事实；
-- DB、Web、Worker、storage、identity、notification 故障卡；
+- staging/production 的 N→N+1→N 或维护模式演练，且不回滚已接受业务事实；
+- DB、Web、Worker、storage、identity、notification 故障卡的真实运行演练；
 - 精确 RC、release notes、已知问题、值守、审批和候选冻结证明；
 - DEC-018 延期项及 production 所需真实观测门禁。
 
@@ -82,4 +105,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，下一单一 WIP 是 data-rights Operator 流程和受控数据生命周期执行器；随后完成基础恢复校验、staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+在不部署、不新增云资源的前提下，下一单一 WIP 是 data-rights Operator 流程和受控数据生命周期执行器；随后准备 staging benchmark 的只读执行合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
