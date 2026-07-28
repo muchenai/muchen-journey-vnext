@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "environment": "staging",
+  "roster_minimums": {
+    "learners": 5,
+    "operators": 1,
+    "qa_recorders": 1,
+    "reviewers": 2
+  },
+  "scenarios": [
+    "AT-UAT-001",
+    "AT-UAT-002",
+    "AT-UAT-003",
+    "AT-UAT-004",
+    "AT-UAT-005",
+    "AT-UAT-006",
+    "AT-UAT-007",
+    "AT-UAT-008"
+  ],
+  "calibration_cases": [
+    "CLEAR_PASS",
+    "CLEAR_REVISION",
+    "BOUNDARY"
+  ],
+  "accessibility_checks": [
+    "VIEWPORT_390",
+    "VIEWPORT_768",
+    "VIEWPORT_1280",
+    "KEYBOARD_ONLY",
+    "ZOOM_200_PERCENT",
+    "APPLICABLE_ASSISTIVE_TECH"
+  ],
+  "required_signatures": [
+    "OPERATOR",
+    "PRODUCT_OWNER",
+    "QA_RECORDER",
+    "REVIEWER_1",
+    "REVIEWER_2"
+  ],
+  "five_second_understanding_minimum": 0.9
+}

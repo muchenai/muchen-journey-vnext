@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署；指定真实 Reviewer 已完成撤销后原会话明确 `SESSION_EXPIRED`/重新登录提示复验，结论为 `IDENTITY_AND_ACCESS_VERIFIED`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 候选 `172c9f6…` 已由 run `30351059075` 部署，独立通知应用/secrets 和 TLS 最小资源已配置，主机审计通过且没有接收人、消息、尝试或回执；TLS 外部日志、真实通知与告警演练仍 `NOT_RUN`，结论保持 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`。依据 DEC-018，这三项仅在 Alpha 延期，production 继续 `NO_GO`。WP-12 已激活并完成第一批代码级安全硬化；依据 DEC-019，独立灾备故障域选型延期至真实 Alpha 连续稳定运行 30 日后的成熟检查点，基础备份/恢复、威胁模型、性能、保留删除与回滚仍按单一 WIP 继续，当前不得记 `RC_TECHNICALLY_READY`。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复，但物理删除、staging benchmark、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，真人 UAT、14 天时间与 production 执行均未开始。
 
 ## 1. 结论
 

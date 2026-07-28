@@ -1,0 +1,423 @@
+#!/usr/bin/env python3
+"""Fail-closed validation for WP-13 human UAT, WP-14 pilot, and WP-15 release.
+
+This tool validates private evidence. It cannot create human outcomes, advance
+wall-clock time, approve a release, or perform a production mutation.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_ROOT = ROOT / "config"
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+PASS = "PASS"
+NOT_RUN = "NOT_RUN"
+
+
+class EvidenceError(RuntimeError):
+    """Evidence is malformed, inconsistent, premature, or unsafe."""
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EvidenceError(f"cannot read evidence {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise EvidenceError(f"evidence must be an object: {path}")
+    return value
+
+
+def load_plans() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return (
+        load_json(CONFIG_ROOT / "wp13_uat_plan.json"),
+        load_json(CONFIG_ROOT / "wp14_pilot_plan.json"),
+        load_json(CONFIG_ROOT / "wp15_release_plan.json"),
+    )
+
+
+def exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != expected:
+        raise EvidenceError(f"{label} must contain exactly: {', '.join(sorted(expected))}")
+    return value
+
+
+def valid_reference(value: Any) -> bool:
+    return isinstance(value, str) and SHA256.fullmatch(value) is not None
+
+
+def parse_time(value: Any, label: str) -> datetime:
+    if not isinstance(value, str):
+        raise EvidenceError(f"{label} must be an ISO-8601 timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise EvidenceError(f"{label} must be an ISO-8601 timestamp") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise EvidenceError(f"{label} must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def validate_plans() -> dict[str, object]:
+    uat, pilot, release = load_plans()
+    if uat != {
+        "schema_version": 1,
+        "environment": "staging",
+        "roster_minimums": {
+            "learners": 5,
+            "operators": 1,
+            "qa_recorders": 1,
+            "reviewers": 2,
+        },
+        "scenarios": [f"AT-UAT-{index:03d}" for index in range(1, 9)],
+        "calibration_cases": ["CLEAR_PASS", "CLEAR_REVISION", "BOUNDARY"],
+        "accessibility_checks": [
+            "VIEWPORT_390",
+            "VIEWPORT_768",
+            "VIEWPORT_1280",
+            "KEYBOARD_ONLY",
+            "ZOOM_200_PERCENT",
+            "APPLICABLE_ASSISTIVE_TECH",
+        ],
+        "required_signatures": [
+            "OPERATOR",
+            "PRODUCT_OWNER",
+            "QA_RECORDER",
+            "REVIEWER_1",
+            "REVIEWER_2",
+        ],
+        "five_second_understanding_minimum": 0.9,
+    }:
+        raise EvidenceError("WP-13 plan differs from DEC-007/010/016")
+    if pilot != {
+        "schema_version": 1,
+        "duration_days": 14,
+        "checkpoints": {"D+1": 1, "D+3": 3, "D+7": 7, "D+14": 14},
+        "thresholds": {
+            "availability_minimum": 0.995,
+            "completion_rate_minimum": 0.8,
+            "current_action_understanding_minimum": 0.9,
+            "duplicate_facts_maximum": 0,
+            "reviews_within_two_business_days_minimum": 0.9,
+            "state_conflicts_maximum": 0,
+            "support_intervention_maximum": 0.2,
+        },
+    }:
+        raise EvidenceError("WP-14 plan differs from DEC-010/013")
+    checks = release.get("required_checks")
+    expected_release_checks = [
+        "candidate_binding",
+        "production_resource_isolation",
+        "managed_secrets",
+        "restricted_ci_identity",
+        "production_preflight",
+        "physical_acl_validation",
+        "real_human_uat",
+        "real_pilot_observation",
+        "real_external_notification",
+        "external_observability_and_alert_drill",
+        "off_host_backup_restore",
+        "rpo_rto_validation",
+        "rollback_or_maintenance_drill",
+        "production_backup",
+        "dual_release_approval",
+        "old_system_read_only",
+        "deployment_readiness_smoke",
+        "production_observation_window",
+    ]
+    if (
+        release.get("schema_version") != 1
+        or release.get("required_approval_count") != 2
+        or checks != expected_release_checks
+    ):
+        raise EvidenceError("WP-15 plan is incomplete")
+    return {
+        "status": PASS,
+        "wp13_scenarios": len(uat["scenarios"]),
+        "wp14_duration_days": pilot["duration_days"],
+        "wp15_required_checks": len(checks),
+        "human_actions_executed": False,
+        "production_mutation_executed": False,
+    }
+
+
+def ratio(metric: Any, label: str) -> float:
+    values = exact_keys(metric, {"numerator", "denominator"}, label)
+    numerator, denominator = values["numerator"], values["denominator"]
+    if (
+        not isinstance(numerator, int)
+        or not isinstance(denominator, int)
+        or denominator <= 0
+        or not 0 <= numerator <= denominator
+    ):
+        raise EvidenceError(f"{label} has an invalid numerator/denominator")
+    return numerator / denominator
+
+
+def candidate_sha(document: dict[str, Any], label: str) -> str:
+    value = document.get("candidate_sha")
+    if not isinstance(value, str) or FULL_SHA.fullmatch(value) is None:
+        raise EvidenceError(f"{label} must bind a full candidate SHA")
+    return value
+
+
+def evaluate_uat(document: dict[str, Any]) -> dict[str, object]:
+    plan, _, _ = load_plans()
+    blockers: list[str] = []
+    if document.get("schema_version") != 1 or document.get("environment") != "staging":
+        raise EvidenceError("WP-13 evidence schema/environment is invalid")
+    candidate_sha(document, "WP-13 evidence")
+    binding = exact_keys(
+        document.get("release_binding"),
+        {"config_schema_version", "deployment_run_id", "migration", "openapi_sha256"},
+        "WP-13 release binding",
+    )
+    if (
+        binding["config_schema_version"] != 3
+        or not isinstance(binding["deployment_run_id"], str)
+        or not binding["deployment_run_id"].strip()
+        or not isinstance(binding["migration"], str)
+        or not binding["migration"].strip()
+        or not valid_reference(binding["openapi_sha256"])
+    ):
+        blockers.append("candidate_binding")
+    roster = exact_keys(
+        document.get("roster_counts"), set(plan["roster_minimums"]), "WP-13 roster"
+    )
+    for role, minimum in plan["roster_minimums"].items():
+        if not isinstance(roster[role], int) or roster[role] < minimum:
+            blockers.append(f"roster.{role}")
+    if not valid_reference(document.get("roster_reference_sha256")):
+        blockers.append("roster_reference")
+    for field, expected_items in (
+        ("scenarios", plan["scenarios"]),
+        ("calibration", plan["calibration_cases"]),
+        ("accessibility", plan["accessibility_checks"]),
+    ):
+        values = exact_keys(document.get(field), set(expected_items), f"WP-13 {field}")
+        blockers.extend(f"{field}.{item}" for item in expected_items if values[item] != PASS)
+    understanding = ratio(document.get("five_second_understanding"), "WP-13 understanding")
+    if understanding < plan["five_second_understanding_minimum"]:
+        blockers.append("five_second_understanding")
+    defects = exact_keys(document.get("open_defects"), {"sev1", "sev2"}, "WP-13 defects")
+    if defects != {"sev1": 0, "sev2": 0}:
+        blockers.append("sev1_sev2")
+    signatures = exact_keys(
+        document.get("signatures"), set(plan["required_signatures"]), "WP-13 signatures"
+    )
+    blockers.extend(
+        f"signature.{role}"
+        for role, reference in signatures.items()
+        if not valid_reference(reference)
+    )
+    return {
+        "decision": "UAT_SIGNED" if not blockers else "NO_GO",
+        "candidate_sha": document["candidate_sha"],
+        "blockers": sorted(set(blockers)),
+        "understanding_rate": understanding,
+        "human_evidence_required": True,
+    }
+
+
+def evaluate_pilot(
+    document: dict[str, Any],
+    *,
+    uat: dict[str, Any],
+    now: datetime,
+) -> dict[str, object]:
+    _, plan, _ = load_plans()
+    uat_result = evaluate_uat(uat)
+    blockers: list[str] = []
+    if uat_result["decision"] != "UAT_SIGNED":
+        blockers.append("wp13_uat")
+    if document.get("schema_version") != 1:
+        raise EvidenceError("WP-14 evidence schema is invalid")
+    candidate = candidate_sha(document, "WP-14 evidence")
+    if candidate != uat_result["candidate_sha"]:
+        blockers.append("candidate_drift")
+    started = parse_time(document.get("started_at"), "WP-14 started_at")
+    ended = parse_time(document.get("ended_at"), "WP-14 ended_at")
+    if ended - started < timedelta(days=plan["duration_days"]) or now < ended:
+        blockers.append("real_14_day_window")
+    checkpoints = exact_keys(
+        document.get("checkpoints"), set(plan["checkpoints"]), "WP-14 checkpoints"
+    )
+    for name, offset in plan["checkpoints"].items():
+        checkpoint = exact_keys(
+            checkpoints[name], {"recorded_at", "reference_sha256", "status"}, name
+        )
+        recorded = parse_time(checkpoint["recorded_at"], f"{name} recorded_at")
+        if (
+            checkpoint["status"] != PASS
+            or not valid_reference(checkpoint["reference_sha256"])
+            or recorded < started + timedelta(days=offset)
+            or recorded > now
+        ):
+            blockers.append(f"checkpoint.{name}")
+    metrics = exact_keys(
+        document.get("metrics"),
+        {
+            "availability",
+            "completion_rate",
+            "current_action_understanding",
+            "duplicate_facts",
+            "reviews_within_two_business_days",
+            "state_conflicts",
+            "support_intervention",
+        },
+        "WP-14 metrics",
+    )
+    measured = {
+        "availability": ratio(metrics["availability"], "availability"),
+        "completion_rate": ratio(metrics["completion_rate"], "completion_rate"),
+        "current_action_understanding": ratio(
+            metrics["current_action_understanding"], "current_action_understanding"
+        ),
+        "reviews_within_two_business_days": ratio(
+            metrics["reviews_within_two_business_days"],
+            "reviews_within_two_business_days",
+        ),
+        "support_intervention": ratio(
+            metrics["support_intervention"], "support_intervention"
+        ),
+    }
+    thresholds = plan["thresholds"]
+    for name in (
+        "availability",
+        "completion_rate",
+        "current_action_understanding",
+        "reviews_within_two_business_days",
+    ):
+        if measured[name] < thresholds[f"{name}_minimum"]:
+            blockers.append(name)
+    if measured["support_intervention"] > thresholds["support_intervention_maximum"]:
+        blockers.append("support_intervention")
+    for name in ("duplicate_facts", "state_conflicts"):
+        if not isinstance(metrics[name], int) or metrics[name] != 0:
+            blockers.append(name)
+    defects = exact_keys(
+        document.get("defects"), {"sev1", "sev2", "trend"}, "WP-14 defects"
+    )
+    if (
+        defects["sev1"] != 0
+        or defects["sev2"] != 0
+        or defects["trend"] not in {"STABLE", "CONVERGING"}
+    ):
+        blockers.append("defects")
+    return {
+        "decision": "PILOT_ACCEPTED" if not blockers else "STOPPED",
+        "candidate_sha": candidate,
+        "blockers": sorted(set(blockers)),
+        "metrics": measured,
+        "real_time_required": True,
+    }
+
+
+def evaluate_release(
+    document: dict[str, Any],
+    *,
+    uat: dict[str, Any],
+    pilot: dict[str, Any],
+    now: datetime,
+) -> dict[str, object]:
+    _, _, plan = load_plans()
+    uat_result = evaluate_uat(uat)
+    pilot_result = evaluate_pilot(pilot, uat=uat, now=now)
+    blockers: list[str] = []
+    if document.get("schema_version") != 1 or document.get("environment") != "production":
+        raise EvidenceError("WP-15 evidence schema/environment is invalid")
+    candidate = candidate_sha(document, "WP-15 evidence")
+    if candidate != uat_result["candidate_sha"] or candidate != pilot_result["candidate_sha"]:
+        blockers.append("candidate_drift")
+    checks = exact_keys(
+        document.get("checks"), set(plan["required_checks"]), "WP-15 checks"
+    )
+    blockers.extend(name for name, status in checks.items() if status != PASS)
+    approvals = document.get("approvals")
+    if not isinstance(approvals, list) or len(approvals) < plan["required_approval_count"]:
+        blockers.append("dual_release_approval")
+    else:
+        roles: set[str] = set()
+        references: set[str] = set()
+        for approval in approvals:
+            values = exact_keys(
+                approval,
+                {"approved_at", "candidate_sha", "reference_sha256", "role"},
+                "WP-15 approval",
+            )
+            approved_at = parse_time(values["approved_at"], "approval approved_at")
+            if (
+                values["candidate_sha"] != candidate
+                or approved_at > now
+                or not valid_reference(values["reference_sha256"])
+                or not isinstance(values["role"], str)
+                or not values["role"].strip()
+            ):
+                blockers.append("dual_release_approval")
+            roles.add(str(values["role"]))
+            references.add(str(values["reference_sha256"]))
+        if len(roles) < 2 or len(references) < 2:
+            blockers.append("dual_release_approval")
+    if uat_result["decision"] != "UAT_SIGNED":
+        blockers.append("real_human_uat")
+    if pilot_result["decision"] != "PILOT_ACCEPTED":
+        blockers.append("real_pilot_observation")
+    return {
+        "decision": "RELEASE_GO" if not blockers else "NO_GO",
+        "candidate_sha": candidate,
+        "blockers": sorted(set(blockers)),
+        "production_mutation_executed": False,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("plans-check")
+    uat = commands.add_parser("uat-check")
+    uat.add_argument("evidence", type=Path)
+    pilot = commands.add_parser("pilot-check")
+    pilot.add_argument("evidence", type=Path)
+    pilot.add_argument("--uat", type=Path, required=True)
+    release = commands.add_parser("release-check")
+    release.add_argument("evidence", type=Path)
+    release.add_argument("--uat", type=Path, required=True)
+    release.add_argument("--pilot", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        now = datetime.now(timezone.utc)
+        if args.command == "plans-check":
+            result = validate_plans()
+        elif args.command == "uat-check":
+            result = evaluate_uat(load_json(args.evidence))
+        elif args.command == "pilot-check":
+            result = evaluate_pilot(
+                load_json(args.evidence), uat=load_json(args.uat), now=now
+            )
+        else:
+            result = evaluate_release(
+                load_json(args.evidence),
+                uat=load_json(args.uat),
+                pilot=load_json(args.pilot),
+                now=now,
+            )
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        decision = result.get("decision")
+        return 0 if decision in {None, "UAT_SIGNED", "PILOT_ACCEPTED", "RELEASE_GO"} else 3
+    except EvidenceError as error:
+        print(f"WP13_15_EVIDENCE_ERROR: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
