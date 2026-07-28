@@ -20,6 +20,13 @@ DEC-019 进一步将跨地域/独立灾备故障域选型延期至真实 Alpha �
 - 把上述 Compose 与 Next.js 合同加入 `ci-fast` 的只读 `wp12-hardening-check`；
 - 形成 `security_best_practices_report.md`，逐项记录严重度、证据、影响、修复和剩余风险。
 
+## 2.1 数据生命周期计划基线
+
+- `config/wp12_data_lifecycle.json` 把 DEC-008 固定为机器合同：身份/提交/评价/结果/审计 1095 天、附件 365 天、通知 180 天、幂等 30 天，删除/纠错请求 30 天；
+- migration `0014_wp12_data_lifecycle` 新增 data-rights request 台账，记录主体、类型、30 日到期、合法保留、状态、解决码和 revision；数据库约束禁止开放请求伪造完成字段、已完成请求缺少解决证据或无理由 legal hold；
+- `journey_api.data_lifecycle` 只提供 `policy-check` 与 `PLAN_ONLY`。计划按明确 `as_of` 生成各数据类 cutoff、到期数量、逾期 rights request 和 legal hold 数量，不输出记录标识，不执行删除；
+- 当前没有非本地 APPLY 路径。真实删除必须在下一受审查切片中处理外键顺序、附件对象删除、主体最小化和不可变审计，再以精确环境授权执行。
+
 ## 3. 本地机器证据
 
 2026-07-28 定向复验：
@@ -75,4 +82,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，下一单一 WIP 是保留/删除任务和基础恢复校验的可测试实现；同时准备 staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+在不部署、不新增云资源的前提下，下一单一 WIP 是 data-rights Operator 流程和受控数据生命周期执行器；随后完成基础恢复校验、staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。

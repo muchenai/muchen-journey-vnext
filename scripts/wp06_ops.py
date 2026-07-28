@@ -35,7 +35,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0013_wp11_notify_observability"
+EXPECTED_MIGRATION_HEAD = "0014_wp12_data_lifecycle"
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",
@@ -325,9 +325,9 @@ def migration_check() -> Path:
                     "schema_version": 1,
                     "completed_at": utc_now().isoformat(),
                     "scope": "ISOLATED_LOCAL_PERSISTENT_DRILL",
-                    "upgrade_0009_to_0010": "PASS",
-                    "downgrade_0010_to_0009": "PASS",
-                    "reupgrade_to_0010": "PASS",
+                    "upgrade_0009_to_head": "PASS",
+                    "downgrade_head_to_0009": "PASS",
+                    "reupgrade_to_head": "PASS",
                     "business_facts_preserved": True,
                     "facts": reupgraded,
             },

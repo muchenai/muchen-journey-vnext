@@ -16,8 +16,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0013_wp11_notify_observability",
-        "revision_count": 13,
+        "head": "0014_wp12_data_lifecycle",
+        "revision_count": 14,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -87,15 +87,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0013_wp11_notify_observability",
-        "revision_count": 13,
+        "head": "0014_wp12_data_lifecycle",
+        "revision_count": 14,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0013_wp11_notify_observability"
+    assert migration()["head"] == "0014_wp12_data_lifecycle"
     assert config_schema() == 3
 
 
