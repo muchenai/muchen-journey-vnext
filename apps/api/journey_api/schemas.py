@@ -160,6 +160,37 @@ class RedriveNotificationCommand(RevisionCommand):
         return value.strip()
 
 
+class CreateDataRightsRequestCommand(StrictModel):
+    subject_user_id: UUID
+    request_type: Literal["DELETE", "CORRECT"]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_data_rights_reason(cls, value: str) -> str:
+        return value.strip()
+
+
+class SetDataRightsLegalHoldCommand(RevisionCommand):
+    legal_hold: bool
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_legal_hold_reason(cls, value: str) -> str:
+        return value.strip()
+
+
+class RejectDataRightsRequestCommand(RevisionCommand):
+    resolution_code: Literal["DUPLICATE", "INVALID_SCOPE", "IDENTITY_UNVERIFIED"]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_data_rights_rejection_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class CreateTaskDefinitionCommand(StrictModel):
     stable_key: str = Field(min_length=3, max_length=80, pattern=r"^[A-Z][A-Z0-9_-]+$")
 
@@ -651,6 +682,37 @@ class NotificationOpsDeliveryResponse(StrictModel):
 
 class NotificationOpsDeliveryListResponse(StrictModel):
     data: NotificationOpsDeliveryListOut
+    request_id: str
+
+
+class DataRightsRequestOut(StrictModel):
+    id: UUID
+    subject_user_id: UUID
+    request_type: Literal["DELETE", "CORRECT"]
+    status: Literal["OPEN", "COMPLETED", "REJECTED"]
+    requested_at: datetime
+    due_at: datetime
+    legal_hold: bool
+    resolution_code: str | None
+    resolved_at: datetime | None
+    revision: int
+    allowed_commands: list[
+        Literal["set_legal_hold", "release_legal_hold", "reject_request"]
+    ]
+    idempotency_replay: bool = False
+
+
+class DataRightsRequestResponse(StrictModel):
+    data: DataRightsRequestOut
+    request_id: str
+
+
+class DataRightsRequestListOut(StrictModel):
+    items: list[DataRightsRequestOut]
+
+
+class DataRightsRequestListResponse(StrictModel):
+    data: DataRightsRequestListOut
     request_id: str
 
 

@@ -562,6 +562,37 @@
         "title": "ConfigureNotificationEndpointCommand",
         "type": "object"
       },
+      "CreateDataRightsRequestCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_type": {
+            "enum": [
+              "DELETE",
+              "CORRECT"
+            ],
+            "title": "Request Type",
+            "type": "string"
+          },
+          "subject_user_id": {
+            "format": "uuid",
+            "title": "Subject User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_user_id",
+          "request_type",
+          "reason"
+        ],
+        "title": "CreateDataRightsRequestCommand",
+        "type": "object"
+      },
       "CreateIdentityLinkCommand": {
         "additionalProperties": false,
         "properties": {
@@ -808,6 +839,173 @@
         ],
         "title": "CurrentActionResponse",
         "type": "object"
+      },
+      "DataRightsRequestListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DataRightsRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DataRightsRequestListOut",
+        "type": "object"
+      },
+      "DataRightsRequestListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DataRightsRequestListOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "DataRightsRequestListResponse",
+        "type": "object"
+      },
+      "DataRightsRequestOut": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_commands": {
+            "items": {
+              "enum": [
+                "set_legal_hold",
+                "release_legal_hold",
+                "reject_request"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Commands",
+            "type": "array"
+          },
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_replay": {
+            "default": false,
+            "title": "Idempotency Replay",
+            "type": "boolean"
+          },
+          "legal_hold": {
+            "title": "Legal Hold",
+            "type": "boolean"
+          },
+          "request_type": {
+            "enum": [
+              "DELETE",
+              "CORRECT"
+            ],
+            "title": "Request Type",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "resolution_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Code"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "COMPLETED",
+              "REJECTED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subject_user_id": {
+            "format": "uuid",
+            "title": "Subject User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject_user_id",
+          "request_type",
+          "status",
+          "requested_at",
+          "due_at",
+          "legal_hold",
+          "resolution_code",
+          "resolved_at",
+          "revision",
+          "allowed_commands"
+        ],
+        "title": "DataRightsRequestOut",
+        "type": "object"
+      },
+      "DataRightsRequestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DataRightsRequestOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "DataRightsRequestResponse",
+        "type": "object"
+      },
+      "DataRightsRequestStatus": {
+        "enum": [
+          "OPEN",
+          "COMPLETED",
+          "REJECTED"
+        ],
+        "title": "DataRightsRequestStatus",
+        "type": "string"
       },
       "EnrollmentMutationOut": {
         "additionalProperties": false,
@@ -2518,6 +2716,38 @@
         "title": "RedriveNotificationCommand",
         "type": "object"
       },
+      "RejectDataRightsRequestCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "resolution_code": {
+            "enum": [
+              "DUPLICATE",
+              "INVALID_SCOPE",
+              "IDENTITY_UNVERIFIED"
+            ],
+            "title": "Resolution Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "resolution_code",
+          "reason"
+        ],
+        "title": "RejectDataRightsRequestCommand",
+        "type": "object"
+      },
       "ResultEvaluationOut": {
         "additionalProperties": false,
         "properties": {
@@ -3743,6 +3973,33 @@
           "request_id"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "SetDataRightsLegalHoldCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "legal_hold": {
+            "title": "Legal Hold",
+            "type": "boolean"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "legal_hold",
+          "reason"
+        ],
+        "title": "SetDataRightsLegalHoldCommand",
         "type": "object"
       },
       "SubmissionCommand": {
@@ -5676,6 +5933,281 @@
           }
         },
         "summary": "List Audit"
+      }
+    },
+    "/api/v1/ops/data-rights-requests": {
+      "get": {
+        "operationId": "list_data_rights_requests_api_v1_ops_data_rights_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DataRightsRequestStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRequestListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Data Rights Requests"
+      },
+      "post": {
+        "operationId": "create_data_rights_request_api_v1_ops_data_rights_requests_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDataRightsRequestCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Data Rights Request"
+      }
+    },
+    "/api/v1/ops/data-rights-requests/{request_id}/legal-hold": {
+      "put": {
+        "operationId": "set_data_rights_legal_hold_api_v1_ops_data_rights_requests__request_id__legal_hold_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDataRightsLegalHoldCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Data Rights Legal Hold"
+      }
+    },
+    "/api/v1/ops/data-rights-requests/{request_id}/reject": {
+      "post": {
+        "operationId": "reject_data_rights_request_api_v1_ops_data_rights_requests__request_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectDataRightsRequestCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Data Rights Request"
       }
     },
     "/api/v1/ops/enrollments": {

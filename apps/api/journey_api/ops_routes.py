@@ -16,6 +16,9 @@ from journey_api.models import (
     Assignment,
     AssignmentStatus,
     AuditEntry,
+    DataRightsRequest,
+    DataRightsRequestStatus,
+    DataRightsRequestType,
     Enrollment,
     EnrollmentStatus,
     Invite,
@@ -45,6 +48,11 @@ from journey_api.schemas import (
     AuditListResponse,
     CancelEnrollmentCommand,
     ConfigureNotificationEndpointCommand,
+    CreateDataRightsRequestCommand,
+    DataRightsRequestListOut,
+    DataRightsRequestListResponse,
+    DataRightsRequestOut,
+    DataRightsRequestResponse,
     EnrollmentMutationOut,
     EnrollmentMutationResponse,
     EnrollmentOpsListOut,
@@ -59,11 +67,13 @@ from journey_api.schemas import (
     NotificationOpsDeliveryOut,
     NotificationOpsDeliveryResponse,
     RedriveNotificationCommand,
+    RejectDataRightsRequestCommand,
     RevokeNotificationEndpointCommand,
     RuntimeComponentOut,
     RuntimeMetricsOut,
     RuntimeStatusOut,
     RuntimeStatusResponse,
+    SetDataRightsLegalHoldCommand,
 )
 from journey_api.notification_recipients import encrypt_open_id
 
@@ -87,6 +97,9 @@ SAFE_AUDIT_KEYS = {
     "channel",
     "endpoint_status",
     "redrive_count",
+    "request_type",
+    "legal_hold",
+    "resolution_code",
 }
 
 
@@ -195,6 +208,322 @@ def add_ops_facts(
             status=OutboxStatus.PENDING,
         )
     )
+
+
+def data_rights_request_out(
+    request: DataRightsRequest, *, idempotency_replay: bool = False
+) -> DataRightsRequestOut:
+    allowed_commands: list[str] = []
+    if request.status == DataRightsRequestStatus.OPEN:
+        allowed_commands.append(
+            "release_legal_hold" if request.legal_hold else "set_legal_hold"
+        )
+        if not request.legal_hold:
+            allowed_commands.append("reject_request")
+    return DataRightsRequestOut(
+        id=request.id,
+        subject_user_id=request.subject_user_id,
+        request_type=request.request_type.value,
+        status=request.status.value,
+        requested_at=request.requested_at,
+        due_at=request.due_at,
+        legal_hold=request.legal_hold,
+        resolution_code=request.resolution_code,
+        resolved_at=request.completed_at,
+        revision=request.revision,
+        allowed_commands=allowed_commands,  # type: ignore[arg-type]
+        idempotency_replay=idempotency_replay,
+    )
+
+
+def add_data_rights_audit(
+    session: Session,
+    *,
+    request: Request,
+    actor: Actor,
+    action: str,
+    resource_id: uuid.UUID,
+    details: dict[str, object],
+) -> None:
+    session.add(
+        AuditEntry(
+            id=uuid.uuid4(),
+            organization_id=actor.organization_id,
+            actor_id=actor.id,
+            action=action,
+            resource_type="data_rights_request",
+            resource_id=resource_id,
+            result="SUCCESS",
+            request_id=request.state.request_id,
+            details=details,
+        )
+    )
+
+
+@router.post("/data-rights-requests", response_model=DataRightsRequestResponse)
+def create_data_rights_request(
+    command: CreateDataRightsRequestCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = command.model_dump(mode="json")
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.create",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        existing = session.scalar(
+            select(DataRightsRequest).where(
+                DataRightsRequest.id == uuid.UUID(str(replay["id"])),
+                DataRightsRequest.organization_id == actor.organization_id,
+            )
+        )
+        if existing is None:
+            raise ApiError(
+                409, "VERSION_CONFLICT", "幂等结果引用的数据权利请求已不可用。"
+            )
+        return envelope(
+            request, data_rights_request_out(existing, idempotency_replay=True)
+        )
+    subject = session.scalar(
+        select(User).where(
+            User.id == command.subject_user_id,
+            User.organization_id == actor.organization_id,
+        )
+    )
+    if subject is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的数据主体。")
+    now = datetime.now(UTC)
+    rights_request = DataRightsRequest(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        subject_user_id=subject.id,
+        request_type=DataRightsRequestType(command.request_type),
+        status=DataRightsRequestStatus.OPEN,
+        requested_by=actor.id,
+        requested_at=now,
+        due_at=now + timedelta(days=30),
+        legal_hold=False,
+        revision=1,
+    )
+    session.add(rights_request)
+    result = {"id": str(rights_request.id)}
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.create",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_data_rights_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="data_rights_request.created",
+        resource_id=rights_request.id,
+        details={
+            "request_type": command.request_type,
+            "status": "OPEN",
+            "reason": command.reason,
+        },
+    )
+    session.commit()
+    session.refresh(rights_request)
+    return envelope(request, data_rights_request_out(rights_request))
+
+
+@router.get("/data-rights-requests", response_model=DataRightsRequestListResponse)
+def list_data_rights_requests(
+    request: Request,
+    status: DataRightsRequestStatus | None = None,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    query = select(DataRightsRequest).where(
+        DataRightsRequest.organization_id == actor.organization_id
+    )
+    if status is not None:
+        query = query.where(DataRightsRequest.status == status)
+    requests = session.scalars(
+        query.order_by(DataRightsRequest.due_at, DataRightsRequest.id).limit(100)
+    ).all()
+    return envelope(
+        request,
+        DataRightsRequestListOut(
+            items=[data_rights_request_out(item) for item in requests]
+        ),
+    )
+
+
+def scoped_data_rights_request(
+    session: Session, actor: Actor, request_id: uuid.UUID
+) -> DataRightsRequest:
+    rights_request = session.scalar(
+        select(DataRightsRequest)
+        .where(
+            DataRightsRequest.id == request_id,
+            DataRightsRequest.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if rights_request is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的数据权利请求。")
+    return rights_request
+
+
+@router.put(
+    "/data-rights-requests/{request_id}/legal-hold",
+    response_model=DataRightsRequestResponse,
+)
+def set_data_rights_legal_hold(
+    request_id: uuid.UUID,
+    command: SetDataRightsLegalHoldCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "request_id": str(request_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.legal_hold",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        existing = session.scalar(
+            select(DataRightsRequest).where(
+                DataRightsRequest.id == request_id,
+                DataRightsRequest.organization_id == actor.organization_id,
+            )
+        )
+        if existing is None:
+            raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的数据权利请求已不可用。")
+        return envelope(
+            request, data_rights_request_out(existing, idempotency_replay=True)
+        )
+    rights_request = scoped_data_rights_request(session, actor, request_id)
+    ensure_revision(rights_request.revision, command.expected_revision)
+    if rights_request.status != DataRightsRequestStatus.OPEN:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "已关闭的请求不能更改 legal hold。")
+    if rights_request.legal_hold == command.legal_hold:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "legal hold 已处于目标状态。")
+    rights_request.legal_hold = command.legal_hold
+    rights_request.legal_hold_reason = command.reason if command.legal_hold else None
+    rights_request.revision += 1
+    result = {"id": str(rights_request.id), "revision": rights_request.revision}
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.legal_hold",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_data_rights_audit(
+        session,
+        request=request,
+        actor=actor,
+        action=(
+            "data_rights_request.legal_hold_set"
+            if command.legal_hold
+            else "data_rights_request.legal_hold_released"
+        ),
+        resource_id=rights_request.id,
+        details={
+            "legal_hold": command.legal_hold,
+            "status": "OPEN",
+            "reason": command.reason,
+        },
+    )
+    session.commit()
+    session.refresh(rights_request)
+    return envelope(request, data_rights_request_out(rights_request))
+
+
+@router.post(
+    "/data-rights-requests/{request_id}/reject",
+    response_model=DataRightsRequestResponse,
+)
+def reject_data_rights_request(
+    request_id: uuid.UUID,
+    command: RejectDataRightsRequestCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "request_id": str(request_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.reject",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        existing = session.scalar(
+            select(DataRightsRequest).where(
+                DataRightsRequest.id == request_id,
+                DataRightsRequest.organization_id == actor.organization_id,
+            )
+        )
+        if existing is None:
+            raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的数据权利请求已不可用。")
+        return envelope(
+            request, data_rights_request_out(existing, idempotency_replay=True)
+        )
+    rights_request = scoped_data_rights_request(session, actor, request_id)
+    ensure_revision(rights_request.revision, command.expected_revision)
+    if rights_request.status != DataRightsRequestStatus.OPEN:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "数据权利请求已经关闭。")
+    if rights_request.legal_hold:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "legal hold 未解除，不能拒绝请求。")
+    now = datetime.now(UTC)
+    rights_request.status = DataRightsRequestStatus.REJECTED
+    rights_request.resolution_code = command.resolution_code
+    rights_request.completed_at = now
+    rights_request.completed_by = actor.id
+    rights_request.revision += 1
+    result = {"id": str(rights_request.id), "revision": rights_request.revision}
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="data_rights_request.reject",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_data_rights_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="data_rights_request.rejected",
+        resource_id=rights_request.id,
+        details={
+            "request_type": rights_request.request_type.value,
+            "status": "REJECTED",
+            "resolution_code": command.resolution_code,
+            "reason": command.reason,
+        },
+    )
+    session.commit()
+    session.refresh(rights_request)
+    return envelope(request, data_rights_request_out(rights_request))
 
 
 @router.get("/enrollments", response_model=EnrollmentOpsListResponse)
