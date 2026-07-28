@@ -1,8 +1,10 @@
 # WP-11 真实通知与外部可观测构建证据
 
-状态：`STAGING_DEPLOYED / HOST_OBSERVABILITY_VERIFIED / EXTERNAL_LOG_INGESTION_BLOCKED`
+状态：`STAGING_DEPLOYED / HOST_OBSERVABILITY_VERIFIED / ALPHA_DEFERRED_BY_DEC_018`
 
 结论：`ENGINEERING_VERIFIED / STAGING_RUNTIME_VERIFIED / INTEGRATIONS_AND_OBSERVABILITY_NO_GO`
+
+Alpha 执行边界（DEC-018）：TLS 外部日志采集、真实通知和告警演练延期；有界、只读、脱敏的主机审计作为临时观测手段。延期项继续为 `NOT_RUN`，不改变 WP-11 的 `NO_GO` 结论；production 继续 `NO_GO`。该决策仅解除 WP-12 的启动阻塞，不授权业务接收人、真实发送、额外云资源或部署。
 
 ## 1. 本工作包关闭的问题
 
@@ -87,6 +89,6 @@ PASS
 工程接线、候选锁定、独立应用/secret、staging 部署和主机侧审计已经完成。下一次外部动作只能是以下两条之一，不再把它们与应用部署混在同一轮：
 
 1. 由 Owner/厂商支持在不改应用、不部署的前提下关闭 TLS 容器采集/传输问题；通过后再为一个明确受控接收人执行真实送达与告警演练；或
-2. 由 Product/Engineering/Security 共同批准一条新的 Alpha 延期决策，承认外部日志、真实通知和告警演练尚未关闭，保留主机有界审计作为临时手段，并保持 production `NO_GO`。
+2. 已由 Product/Engineering/Security/Ops 通过 DEC-018 选择 Alpha 延期：外部日志、真实通知和告警演练尚未关闭，保留主机有界审计作为临时手段，production 保持 `NO_GO`。进入 production 前仍必须关闭原门禁或批准等效生产观测方案。
 
 未获得上述选择前，不继续修改 TLS 配置、应用、云资源或部署，也不产生外部消息或业务接收人事实。
