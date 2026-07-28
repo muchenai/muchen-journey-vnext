@@ -96,6 +96,20 @@ def test_nonlocal_disabled_attachments_do_not_require_storage_or_scanner():
     assert configured.attachment_scanner_backend == "TEST"
 
 
+def test_nonlocal_disabled_attachments_still_reject_local_identity_secrets():
+    with pytest.raises(ValidationError, match="independently configured"):
+        Settings(
+            app_env="staging",
+            allow_fixture_identity=False,
+            feishu_oauth_enabled=True,
+            feishu_app_id="cli_staging",
+            feishu_app_secret="staging-feishu-secret-123",
+            feishu_oauth_redirect_uri="https://staging.example.test/auth/feishu/callback",
+            attachments_enabled=False,
+            notification_channel="FEISHU",
+        )
+
+
 def test_config_schema_version_is_fail_closed():
     with pytest.raises(ValidationError, match="CONFIG_SCHEMA_VERSION"):
         Settings(config_schema_version=1)

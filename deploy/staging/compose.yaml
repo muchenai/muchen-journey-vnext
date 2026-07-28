@@ -10,9 +10,16 @@ x-common: &common
   extra_hosts:
     - "journey.muchenai.com:127.0.0.1"
 
+x-app-security: &app-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  pids_limit: 256
+
 services:
   api:
-    <<: *common
+    <<: [*common, *app-security]
     image: ${API_IMAGE:?API_IMAGE must be an immutable GHCR digest reference}
     env_file:
       - secrets/api.env
@@ -28,7 +35,7 @@ services:
       start_period: 10s
 
   worker:
-    <<: *common
+    <<: [*common, *app-security]
     image: ${WORKER_IMAGE:?WORKER_IMAGE must be an immutable GHCR digest reference}
     env_file:
       - secrets/worker.env
@@ -45,7 +52,7 @@ services:
       start_period: 15s
 
   web:
-    <<: *common
+    <<: [*common, *app-security]
     image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable GHCR digest reference}
     env_file:
       - secrets/web.env
