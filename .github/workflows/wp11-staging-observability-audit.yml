@@ -79,6 +79,7 @@ jobs:
           import sys
           ipaddress.IPv4Address(sys.argv[1])
           PY
+          echo "::add-mask::$runner_ip"
           echo "WP11_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
           echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
           echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
