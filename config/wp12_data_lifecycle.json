@@ -1,0 +1,15 @@
+{
+  "data_rights_due_days": 30,
+  "policy_version": "2026-07-28",
+  "retention_days": {
+    "attachments": 365,
+    "audit": 1095,
+    "evaluations": 1095,
+    "idempotency": 30,
+    "identity": 1095,
+    "notifications": 180,
+    "outcomes": 1095,
+    "submissions": 1095
+  },
+  "schema_version": 1
+}

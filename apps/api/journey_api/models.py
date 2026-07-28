@@ -143,6 +143,17 @@ class AttachmentScanStatus(str, enum.Enum):
     ERROR = "ERROR"
 
 
+class DataRightsRequestType(str, enum.Enum):
+    DELETE = "DELETE"
+    CORRECT = "CORRECT"
+
+
+class DataRightsRequestStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    COMPLETED = "COMPLETED"
+    REJECTED = "REJECTED"
+
+
 class Organization(Base):
     __tablename__ = "organizations"
 
@@ -1171,3 +1182,67 @@ class IdempotencyRecord(Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     response_body: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataRightsRequest(Base):
+    __tablename__ = "data_rights_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "request_type IN ('DELETE', 'CORRECT')",
+            name="ck_data_rights_request_type",
+        ),
+        CheckConstraint(
+            "status IN ('OPEN', 'COMPLETED', 'REJECTED')",
+            name="ck_data_rights_request_status",
+        ),
+        CheckConstraint(
+            "due_at > requested_at",
+            name="ck_data_rights_request_due_after_request",
+        ),
+        CheckConstraint(
+            "(legal_hold = false AND legal_hold_reason IS NULL) "
+            "OR (legal_hold = true AND legal_hold_reason IS NOT NULL)",
+            name="ck_data_rights_request_legal_hold",
+        ),
+        CheckConstraint(
+            "(status = 'OPEN' AND completed_at IS NULL AND completed_by IS NULL "
+            "AND resolution_code IS NULL) "
+            "OR (status IN ('COMPLETED', 'REJECTED') AND completed_at IS NOT NULL "
+            "AND completed_by IS NOT NULL AND resolution_code IS NOT NULL)",
+            name="ck_data_rights_request_resolution",
+        ),
+        CheckConstraint("revision >= 1", name="ck_data_rights_request_revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    subject_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), index=True
+    )
+    request_type: Mapped[DataRightsRequestType] = mapped_column(
+        Enum(DataRightsRequestType, native_enum=False)
+    )
+    status: Mapped[DataRightsRequestStatus] = mapped_column(
+        Enum(DataRightsRequestStatus, native_enum=False), index=True
+    )
+    requested_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    legal_hold: Mapped[bool] = mapped_column(Boolean, default=False)
+    legal_hold_reason: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
+    resolution_code: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    revision: Mapped[int] = mapped_column(default=1)
