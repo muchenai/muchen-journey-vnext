@@ -31,6 +31,13 @@ FORBIDDEN_LOG_FIELDS = {
 RELEASE_RE = re.compile(r"^[0-9a-f]{40}$")
 LOGCOLLECTOR_ROOT = Path("/usr/local/logcollector")
 LOGCOLLECTOR_SERVICE = "logcollectord.service"
+LOGCOLLECTOR_CONFIG = LOGCOLLECTOR_ROOT / "etc" / "logcollector.yml"
+LOGCOLLECTOR_AGENT_INFO = LOGCOLLECTOR_ROOT / "agent_info.json"
+LOGCOLLECTOR_RULE_MARKERS = (
+    "journey-next-staging-json-stdout",
+    "journey-next-staging-runtime",
+    "journey-next-staging-(api|worker)-1",
+)
 DEPLOYED_CANDIDATE = Path("/srv/journey-next-staging/DEPLOYED_CANDIDATE")
 
 
@@ -44,6 +51,16 @@ class StructuredLogSummary:
     expected_event_count: int
     release_match_count: int
     forbidden_fields: frozenset[str]
+
+
+@dataclass(frozen=True)
+class LogCollectorDiagnostic:
+    version: str
+    agent_info_valid: bool
+    endpoint_region_valid: bool
+    credentials_present: bool
+    staging_rule_marker_observed: bool
+    ops_failure_files: int
 
 
 def _run(*command: str) -> str:
@@ -217,6 +234,93 @@ def _safe_logcollector_counts() -> dict[str, int]:
     return counts
 
 
+def _bounded_text(path: Path, *, maximum_bytes: int = 4_000_000) -> str:
+    try:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size > maximum_bytes
+        ):
+            return ""
+        return path.read_text(errors="ignore")
+    except OSError:
+        return ""
+
+
+def _logcollector_version() -> str:
+    raw = _run(str(LOGCOLLECTOR_ROOT / "logcollector"), "--version")
+    match = re.search(r"\b(\d+\.\d+\.\d+)\b", raw)
+    if match is None:
+        raise AuditError("LogCollector version is unavailable")
+    return match.group(1)
+
+
+def _yaml_scalar(source: str, key: str) -> str:
+    match = re.search(
+        rf"^\s*{re.escape(key)}\s*:\s*([^\r\n]+?)\s*$", source, re.MULTILINE
+    )
+    if match is None:
+        return ""
+    return match.group(1).strip().strip("'\"").strip()
+
+
+def _logcollector_diagnostic() -> LogCollectorDiagnostic:
+    config = _bounded_text(LOGCOLLECTOR_CONFIG, maximum_bytes=1_000_000)
+    endpoint_region_valid = (
+        _yaml_scalar(config, "region") == "cn-beijing"
+        and _yaml_scalar(config, "endpoint")
+        == "https://tls-cn-beijing.ivolces.com"
+    )
+    credentials_present = bool(
+        _yaml_scalar(config, "secret_id") and _yaml_scalar(config, "secret_key")
+    )
+
+    agent_info_valid = False
+    agent_info_text = _bounded_text(LOGCOLLECTOR_AGENT_INFO, maximum_bytes=100_000)
+    if agent_info_text:
+        try:
+            agent_info = json.loads(agent_info_text)
+        except json.JSONDecodeError:
+            agent_info = None
+        agent_info_valid = bool(
+            isinstance(agent_info, dict)
+            and isinstance(agent_info.get("ip"), str)
+            and agent_info["ip"].strip()
+            and isinstance(agent_info.get("version"), str)
+            and re.fullmatch(r"\d+\.\d+\.\d+", agent_info["version"])
+        )
+
+    marker_observed = False
+    ops_failure_files = 0
+    inspected_files = 0
+    for path in LOGCOLLECTOR_ROOT.glob("**/*"):
+        if inspected_files >= 512:
+            break
+        try:
+            relative = path.relative_to(LOGCOLLECTOR_ROOT)
+        except ValueError:
+            continue
+        if not relative.parts or relative.parts[0] == "logs":
+            continue
+        if path.name.endswith(".fail") and path.is_file() and not path.is_symlink():
+            ops_failure_files += 1
+        content = _bounded_text(path)
+        if not content:
+            continue
+        inspected_files += 1
+        if any(marker in content for marker in LOGCOLLECTOR_RULE_MARKERS):
+            marker_observed = True
+
+    return LogCollectorDiagnostic(
+        version=_logcollector_version(),
+        agent_info_valid=agent_info_valid,
+        endpoint_region_valid=endpoint_region_valid,
+        credentials_present=credentials_present,
+        staging_rule_marker_observed=marker_observed,
+        ops_failure_files=ops_failure_files,
+    )
+
+
 def _logcollector_is_active() -> bool:
     completed = subprocess.run(
         ("systemctl", "is-active", LOGCOLLECTOR_SERVICE),
@@ -263,6 +367,7 @@ def audit(candidate: str, lookback_seconds: int) -> None:
     logcollector_active = _logcollector_is_active()
     socket_accessible = Path("/var/run/docker.sock").exists()
     errors = _safe_logcollector_counts()
+    diagnostic = _logcollector_diagnostic()
 
     print("WP11_HOST_CANDIDATE_MATCH=PASS")
     print("WP11_DOCKER_LOG_DRIVER=PASS services=api,worker")
@@ -286,6 +391,16 @@ def audit(candidate: str, lookback_seconds: int) -> None:
     print(
         "WP11_LOGCOLLECTOR_SAFE_ERROR_COUNTS="
         + ",".join(f"{key}:{value}" for key, value in sorted(errors.items()))
+    )
+    print(
+        "WP11_LOGCOLLECTOR_BOUNDED_DIAGNOSTIC="
+        f"version={diagnostic.version},"
+        f"agent_info_valid={str(diagnostic.agent_info_valid).lower()},"
+        f"endpoint_region_valid={str(diagnostic.endpoint_region_valid).lower()},"
+        f"credentials_present={str(diagnostic.credentials_present).lower()},"
+        "staging_rule_marker_observed="
+        f"{str(diagnostic.staging_rule_marker_observed).lower()},"
+        f"ops_failure_files={diagnostic.ops_failure_files}"
     )
     if not logcollector_active or not socket_accessible:
         raise AuditError("LogCollector host prerequisites are not satisfied")

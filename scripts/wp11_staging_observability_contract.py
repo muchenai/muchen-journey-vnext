@@ -15,6 +15,10 @@ REQUIRED_MARKERS = {
     "candidate machine contract": "config/wp08_staging.json",
     "frozen infrastructure": "Read frozen staging infrastructure",
     "temporary SSH open": "wp08_security_group open",
+    "runner address masking": 'echo "::add-mask::$runner_ip"',
+    "runner environment export": (
+        'echo "WP11_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"'
+    ),
     "bounded host audit": "wp11_host_observability_audit.py",
     "unconditional cleanup": "if: always()",
     "temporary SSH close": "wp08_security_group close",
@@ -44,6 +48,12 @@ def validate_workflow(source: str) -> None:
         raise ContractError("temporary SSH open must occur exactly once")
     if source.count("wp08_security_group close") != 1:
         raise ContractError("temporary SSH close must occur exactly once")
+    mask_position = source.find('echo "::add-mask::$runner_ip"')
+    environment_position = source.find(
+        'echo "WP11_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"'
+    )
+    if environment_position < 0 or mask_position > environment_position:
+        raise ContractError("runner address must be masked before environment export")
 
 
 def main() -> int:
