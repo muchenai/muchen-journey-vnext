@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     def fixture_identity_is_never_nonlocal(self) -> "Settings":
         if self.allow_fixture_identity and self.app_env not in {"local", "test"}:
             raise ValueError("ALLOW_FIXTURE_IDENTITY may only be enabled in local/test")
-        if self.attachments_enabled and self.app_env in {"staging", "production"}:
+        if self.app_env in {"staging", "production"}:
             insecure_defaults = {
                 "journey-next-local-session-secret-change-me",
                 "journey-next-local-invite-secret-change-me",
