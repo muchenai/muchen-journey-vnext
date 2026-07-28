@@ -19,6 +19,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -217,6 +218,7 @@ def database_facts(service: str, database: str) -> dict[str, Any]:
         "evaluations",
         "outcomes",
         "import_batches",
+        "data_rights_requests",
     ):
         counts[table] = int(psql(service, database, f'SELECT count(*) FROM "{table}"'))
     task_fingerprint = psql(
@@ -446,6 +448,8 @@ def latest_manifest() -> Path:
 
 def drill(manifest_path: Path) -> Path:
     ensure_local_services()
+    drill_started_at = utc_now()
+    drill_started_monotonic = time.monotonic()
     manifest, _ = load_manifest(manifest_path)
     encrypted = manifest_path.parent / str(manifest["backup_file"])
     if not encrypted.is_file() or sha256_file(encrypted) != manifest["encrypted_sha256"]:
@@ -496,6 +500,11 @@ def drill(manifest_path: Path) -> Path:
             restored = database_facts("db-test", database)
             if restored != manifest["database_facts"]:
                 raise OpsError("restored database facts do not match the signed backup manifest")
+            if restored["counts"]["data_rights_requests"] != 0:
+                raise OpsError(
+                    "N+1 data-rights facts exist; schema rollback is unsafe, "
+                    "use maintenance mode or a forward fix"
+                )
             database_url = (
                 f"postgresql+psycopg://{TEST_DATABASE_USER}:{TEST_DATABASE_PASSWORD}"
                 f"@db-test:5432/{database}"
@@ -509,11 +518,13 @@ def drill(manifest_path: Path) -> Path:
                 "api",
                 "alembic",
                 "downgrade",
-                "0009_notification_scope",
+                "0013_wp11_notify_observability",
             )
             rollback_revision = psql("db-test", database, "SELECT version_num FROM alembic_version")
-            if rollback_revision != "0009_notification_scope":
-                raise OpsError("migration rollback did not reach 0009_notification_scope")
+            if rollback_revision != "0013_wp11_notify_observability":
+                raise OpsError(
+                    "migration rollback did not reach 0013_wp11_notify_observability"
+                )
             compose(
                 "run",
                 "--rm",
@@ -528,14 +539,34 @@ def drill(manifest_path: Path) -> Path:
             upgraded = database_facts("db-test", database)
             if upgraded != restored:
                 raise OpsError("rollback/re-upgrade changed restored business facts")
+            completed_at = utc_now()
+            elapsed_seconds = round(time.monotonic() - drill_started_monotonic, 3)
+            backup_created_at = datetime.fromisoformat(
+                str(manifest["created_at"]).replace("Z", "+00:00")
+            )
+            backup_age_seconds = round(
+                (drill_started_at - backup_created_at).total_seconds(), 3
+            )
             report = {
                 "schema_version": 1,
                 "run_id": manifest["run_id"],
-                "completed_at": utc_now().isoformat(),
+                "started_at": drill_started_at.isoformat(),
+                "completed_at": completed_at.isoformat(),
                 "scope": "ISOLATED_LOCAL_COMPOSE_DB_TEST",
                 "restore": "PASS",
                 "rollback_to": rollback_revision,
                 "reupgrade": "PASS",
+                "rollback_mode": "N_TO_N_PLUS_1_TO_N_WITH_ZERO_N_PLUS_1_FACTS",
+                "accepted_business_facts_rolled_back": False,
+                "elapsed_seconds": elapsed_seconds,
+                "backup_age_seconds": backup_age_seconds,
+                "rto_budget_seconds": 4 * 60 * 60,
+                "rpo_budget_seconds": 24 * 60 * 60,
+                "local_rto_within_budget": elapsed_seconds <= 4 * 60 * 60,
+                "local_rpo_artifact_age_within_budget": (
+                    0 <= backup_age_seconds <= 24 * 60 * 60
+                ),
+                "rpo_claim_scope": "LOCAL_BACKUP_ARTIFACT_AGE_ONLY",
                 "database_facts": upgraded,
                 "production_restore": "NOT_RUN",
                 "off_host_restore": "NOT_RUN",
