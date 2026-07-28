@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署并通过机器复验；Reviewer 的明确会话失效提示仍为 `WAITING_FOR_HUMAN_UAT`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 候选 `172c9f6…` 已由 run `30351059075` 部署，独立通知应用/secrets 和 TLS 最小资源已配置，主机审计通过且没有接收人、消息、尝试或回执；TLS 外部日志仍为 0，真实通知与告警演练仍未运行，结论为 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`。WP-12 在剩余证据债关闭或获得新的 Alpha 延期决策前不激活。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署；指定真实 Reviewer 已完成撤销后原会话明确 `SESSION_EXPIRED`/重新登录提示复验，结论为 `IDENTITY_AND_ACCESS_VERIFIED`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 候选 `172c9f6…` 已由 run `30351059075` 部署，独立通知应用/secrets 和 TLS 最小资源已配置，主机审计通过且没有接收人、消息、尝试或回执；TLS 外部日志仍为 0，真实通知与告警演练仍未运行，结论为 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`。WP-12 在 WP-11 剩余证据债关闭或获得新的 Alpha 延期决策前不激活。
 
 ## 1. 结论
 
@@ -424,7 +424,7 @@ Agent 只能准备脚本、环境和证据模板，不能代替真人点击、�
 
 本文件已升级为 `APPROVED_FOR_BUILD`，代表 WP-07～WP-15 的编号、范围、Owner 组合、顺序与单一 WIP 协议已锁定。执行仍遵循：
 
-1. WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 已于 2026-07-27 关闭；WP-10 已于 2026-07-28 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭当前范围，未启用文件能力。当前仍须按单一 WIP 关闭 WP-09 的 `WAITING_FOR_HUMAN_UAT` 与 WP-11 的真实通知/外部可观测证据；二者关闭前不激活 WP-12 RC 冻结，也不执行任何 production 行为；
+1. WP-08 的 `PHYSICAL_ACL_EVIDENCE_OPEN` 已于 2026-07-27 关闭；WP-09 的 `WAITING_FOR_HUMAN_UAT` 已于 2026-07-28 以指定真实 Reviewer 原撤销会话的明确 `SESSION_EXPIRED`/重新登录提示关闭；WP-10 已按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭当前范围，未启用文件能力。当前仍须按单一 WIP 关闭 WP-11 的真实通知/外部可观测证据，或批准明确的 Alpha 延期决策；此前不激活 WP-12 RC 冻结，也不执行任何 production 行为；
 2. 第 2 节未关闭的物理执行输入必须在对应工作包开工前补齐；
 3. 外部资源、角色或权限变更每次只按已说明的供应商、环境、动作与范围执行，不从计划批准推定；
 4. WP-13、WP-14 的真人与时间证据不可由机器替代；
