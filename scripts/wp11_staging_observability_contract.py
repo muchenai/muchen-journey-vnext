@@ -11,6 +11,8 @@ WORKFLOW = ROOT / ".github/workflows/wp11-staging-observability-audit.yml"
 
 REQUIRED_MARKERS = {
     "workflow confirmation": "AUDIT_WP11_STAGING_OBSERVABILITY",
+    "exact deployed candidate": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+    "candidate machine contract": "config/wp08_staging.json",
     "frozen infrastructure": "Read frozen staging infrastructure",
     "temporary SSH open": "wp08_security_group open",
     "bounded host audit": "wp11_host_observability_audit.py",
@@ -18,6 +20,7 @@ REQUIRED_MARKERS = {
     "temporary SSH close": "wp08_security_group close",
 }
 FORBIDDEN_MARKERS = {
+    "candidate artifact apply gate": "wp08-staging-apply-check",
     "terraform plan": "terraform plan",
     "terraform apply": "terraform apply",
     "deployment phase": "phase=deploy",
