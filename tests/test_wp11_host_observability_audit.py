@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +10,19 @@ from scripts import wp11_staging_observability_contract as contract
 
 
 CANDIDATE = "1" * 40
+
+
+def test_logcollector_uses_the_official_host_service_name(monkeypatch):
+    commands: list[tuple[str, ...]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stdout="active\n")
+
+    monkeypatch.setattr(audit.subprocess, "run", fake_run)
+
+    assert audit._logcollector_is_active() is True
+    assert commands == [("systemctl", "is-active", "logcollectord.service")]
 
 
 def test_structured_log_summary_requires_expected_release_and_rejects_sensitive_keys():
