@@ -1,14 +1,14 @@
 # 27｜WP-09 真实身份与会话构建证据
 
-状态：`REAL_ACCESS_MATRIX_PASS / MACHINE_DEPLOY_PASS / HUMAN_SESSION_UX_WAITING`
-日期：2026-07-27
+状态：`IDENTITY_AND_ACCESS_VERIFIED / HUMAN_SESSION_UX_PASS`
+日期：2026-07-28
 当前发布判断：`NO_GO`
 
 ## 1. 结论
 
 WP-09 的最小代码闭环已经实现：Learner 继续使用一次性邀请；Reviewer 与 Operator 使用 vNext 独立飞书 OAuth、内部 `user_id` 和独立 cookie session。首位真实 Operator 已完成飞书认证、一次性绑定和 cookie session 建立。首次 callback 曾错误跳转到容器内部 `https://0.0.0.0:3000/ops`；修复候选 `2ea51c0aba272769af8bd8f298242b35326d79ea` 已部署到冻结 staging，通过公网 readiness、身份入口和匿名拒绝机器复验，Environment Owner 随后从指定飞书登录入口完成真实登录并报告已进入 `/ops`。
 
-随后由当前 Operator 为 PII-free 的“试点主管”创建 30 分钟一次性 Reviewer 绑定，真实 Reviewer 完成授权对象访问、未授权 `/ops` 拒绝、重新登录轮换旧会话、身份撤销立即失效和日志脱敏矩阵。撤销后的旧会话虽然不能继续读取 `/review`，但 Web 曾把 API `401` 落入通用错误页。明确会话失效/重新登录修复进入候选 `2ab2658…`，并由唯一冻结 staging deploy run `30242231558` 成功上线；公网 readiness、release、匿名 `/ops`/`/review` 拒绝与飞书入口机器复验通过。Reviewer 当前无法继续真人操作，因此“撤销后显示明确重新登录提示”保留为 `WAITING_FOR_HUMAN_UAT`，不伪记 PASS。用户已允许把工程 WIP 移交 WP-10，整体发布仍 `NO_GO`。
+随后由当前 Operator 为 PII-free 的“试点主管”创建 30 分钟一次性 Reviewer 绑定，真实 Reviewer 完成授权对象访问、未授权 `/ops` 拒绝、重新登录轮换旧会话、身份撤销立即失效和日志脱敏矩阵。撤销后的旧会话虽然不能继续读取 `/review`，但 Web 曾把 API `401` 落入通用错误页。明确会话失效/重新登录修复进入候选 `2ab2658…`，并由唯一冻结 staging deploy run `30242231558` 成功上线；公网 readiness、release、匿名 `/ops`/`/review` 拒绝与飞书入口机器复验通过。2026-07-28，指定真实 Reviewer 在新绑定会话中确认可进入 `/review`；Operator 随后只撤销该 Reviewer 身份，Reviewer 在原会话刷新后看到明确 `SESSION_EXPIRED` 和重新登录指引，关闭最后一项真人证据。WP-09 结论升级为 `IDENTITY_AND_ACCESS_VERIFIED`，整体发布仍 `NO_GO`。
 
 WP-08 的 Alpha 运行面已经验证，物理 ACL 仍有一项供应商字段证据债。该债不再阻塞 WP-09 代码和小规模 Alpha 学习，但必须在 WP-12 RC 冻结或任何 production 行为前关闭。
 
@@ -88,6 +88,8 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - 机器复验：Next 16.2.11 lint、typecheck、production build 通过；standalone runtime 实测 `anonymous_ops=401`、`anonymous_review=401`、`expired_reviewer=explicit-relogin`、逐请求 CSP nonce 和 OAuth root-relative redirect 全部通过。
 - PR #56 已合入主线 `2ab2658fc0341d11bc1434524d86128e23da9170`；Mainline Candidate Gate `30237677350` 已完成完整 CI、三镜像、SBOM、GHCR push 与远端摘要验证。候选绑定合同只允许该 SHA、该 run 和三个不可变摘要，不构成部署授权。
 - 候选 `2ab2658fc0341d11bc1434524d86128e23da9170` 已基于主线 `354a68ad783fd67a623e2efbb2f4f164130ac3a9` 在唯一 run [`30242231558`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30242231558) 成功部署，冻结基础设施、精确摘要、外部 TLS/release surface 与 SSH 清理均通过；未执行 Terraform apply、DNS 或第二次部署。
-- 唯一剩余真人项是 Reviewer 在原撤销会话上下文确认明确失效/重新登录提示。当前 Reviewer 不可用，该项为 `WAITING_FOR_HUMAN_UAT`；不能用匿名无 cookie 的 `AUTH_REQUIRED` 响应替代。用户已批准该等待不占工程 WIP并激活 WP-10，但 WP-09 在真人项完成前不记 `IDENTITY_AND_ACCESS_VERIFIED`。
+- 2026-07-28，指定真实 Reviewer 使用仅显示一次的 30 分钟替换链接完成飞书绑定并报告可进入授权 `/review`；Operator 页面随后只对该 PII-free Reviewer 执行一次身份撤销，页面复验为 Reviewer=`REVOKED`、Operator=`LINKED`，审计 `external_identity.revoked / SUCCESS` 仅显示空安全字段并裁剪 provider/reason 标记；
+- Reviewer 在同一原浏览器会话刷新 `/review`，落到 `auth_error=SESSION_EXPIRED&return_to=%2Freview`，页面明确显示“当前会话已失效。业务事实未受影响；如仍有权限，请重新使用飞书登录。”，没有返回匿名 JSON `AUTH_REQUIRED`，也没有进入通用错误页；
+- 真人截图仅以 SHA-256 `b4f0cb1687a7b86324c58731d4db28d7437823e64322844872d0ec353b77a193` 引用，不复制进 Public Git，不记录姓名、飞书 subject、cookie、链接 token 或业务正文。该证据关闭 `WAITING_FOR_HUMAN_UAT`，WP-09 记为 `IDENTITY_AND_ACCESS_VERIFIED / HUMAN_SESSION_UX_PASS`；不外推 WP-13 全量真人 UAT 或发布 GO。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。当前不得为已经撤销的 Reviewer 再创建链接来制造重复证据。整体发布保持 `NO_GO`。
