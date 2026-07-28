@@ -1,7 +1,7 @@
 # 00｜文档地图与治理规则
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.5
+版本：V0.6
 日期：2026-07-28
 适用阶段：立项至 G0 开工门禁  
 权威性：本目录是 vNext 开发前唯一文档事实源；旧版 DOCX、旧仓库 README、会议纪要和聊天记录均不是 vNext 实施权威。
@@ -46,6 +46,7 @@
 | 28 | [WP-10 真实附件与文件安全构建证据](28_WP10_FILE_SECURITY_EVIDENCE.md) | 私有对象存储、短时授权、隔离扫描与停用边界实际证明了什么？ | 当前 Alpha/RC 固定无附件的 TSK-001 V1 并 fail closed，结论为 `SECURELY_DISABLED_FOR_ALPHA`；未来启用前重开五项物理门禁 |
 | 29 | [WP-11 真实通知与外部可观测构建证据](29_WP11_NOTIFICATION_OBSERVABILITY_EVIDENCE.md) | 加密接收人、真实飞书适配器、回执、重驱、结构化日志和外部观测合同分别证明了什么？ | 候选 `172c9f6…` 已部署，独立通知应用/secrets 与主机观测通过；DEC-018 将 TLS topic、真实通知和告警演练仅在 Alpha 延期，三项仍 `NOT_RUN`，production 与完整 WP-11 结论仍 `NO_GO` |
 | 30 | [WP-12 候选硬化与灾备构建证据](30_WP12_CANDIDATE_HARDENING_DR_EVIDENCE.md) | RC 的安全、性能、保留删除、异机恢复和回滚门禁实际关闭到什么程度？ | 第一批代码级安全硬化已验证；DEC-019 仅延期独立灾备故障域选型，基础恢复、威胁模型、性能、保留删除和回滚仍未关闭，WP-12 为 `IN_PROGRESS`，production 为 `NO_GO` |
+| TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 
 ## 3. 权威顺序
 

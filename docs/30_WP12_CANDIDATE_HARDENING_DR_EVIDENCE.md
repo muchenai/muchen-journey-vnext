@@ -59,7 +59,7 @@ PASS / no leaks found
 - Sev-1：未发现；
 - Sev-2：1 项非本地默认密钥 fail-open 已修复并回归；
 - Sev-3：容器运行时最小权限和 source map 显式门禁已修复；唯一 dev-only npm advisory 继续按精确 URL 和 2026-08-31 到期日 fail closed 管理，Owner 为 Tech Lead；
-- 尚未完成仓库级 threat model。依据 DEC-019，模型必须把“Alpha 无独立灾备故障域”作为显式信任边界缺口和已接受的时限风险，而不是假设一个尚未批准的跨地域方案。
+- 仓库级 threat model 已完成，覆盖公网入口、邀请/飞书身份、跨组织/对象授权、不可变业务事实、Worker/Feishu 副作用、CI/GHCR 供应链、可观测和恢复边界；未发现有仓库证据支持的 critical 风险。高优先级残余风险继续由授权负测、身份治理、候选摘要和 release gate 控制。依据 DEC-019，“Alpha 无独立灾备故障域”明确记录为时限风险，而不是假设尚未批准的跨地域方案；见 `muchen-journey-vnext-threat-model.md`。
 
 ## 5. 尚未关闭的 WP-12 门禁
 
@@ -75,4 +75,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，先完成仓库级 threat model、保留/删除任务和基础恢复校验的可测试实现；同时准备 staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+在不部署、不新增云资源的前提下，下一单一 WIP 是保留/删除任务和基础恢复校验的可测试实现；同时准备 staging benchmark 与回滚合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
