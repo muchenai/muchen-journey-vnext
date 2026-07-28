@@ -1,13 +1,13 @@
 # 23｜G4–G6 下一批工作包定义
 
 状态：`APPROVED_FOR_BUILD`
-版本：V0.11
+版本：V0.12
 日期：2026-07-28
 建议 Owner：Product Owner + Tech Lead + QA/UAT Owner + Release/Ops Owner  
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署；指定真实 Reviewer 已完成撤销后原会话明确 `SESSION_EXPIRED`/重新登录提示复验，结论为 `IDENTITY_AND_ACCESS_VERIFIED`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 候选 `172c9f6…` 已由 run `30351059075` 部署，独立通知应用/secrets 和 TLS 最小资源已配置，主机审计通过且没有接收人、消息、尝试或回执；TLS 外部日志、真实通知与告警演练仍 `NOT_RUN`，结论保持 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`。依据 DEC-018，这三项仅在 Alpha 延期，production 继续 `NO_GO`。WP-12 已激活并完成第一批代码级安全硬化；威胁模型、性能、保留删除、异机恢复与回滚仍按单一 WIP 继续，当前不得记 `RC_TECHNICALLY_READY`。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准，且用户已授权 WP-08～WP-13 按“独立任务、单一 WIP、主任务复验”自主推进。WP-08 已用控制台当前事实、冻结 state 身份核对和成功 ECS→RDS TLS 数据面连接关闭物理 ACL 证据债，结论为 `STAGING_ISOLATION_VERIFIED`。WP-09 候选 `2ab2658…` 已由唯一 run `30242231558` 成功部署；指定真实 Reviewer 已完成撤销后原会话明确 `SESSION_EXPIRED`/重新登录提示复验，结论为 `IDENTITY_AND_ACCESS_VERIFIED`。依据 DEC-017，WP-10 当前 Alpha/RC 固定无附件的 `TSK-001 V1`，staging 保持 `ATTACHMENTS_ENABLED=false`，以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；TOS/ClamAV 工程路径保留，未来启用前必须重开五项物理门禁。WP-11 候选 `172c9f6…` 已由 run `30351059075` 部署，独立通知应用/secrets 和 TLS 最小资源已配置，主机审计通过且没有接收人、消息、尝试或回执；TLS 外部日志、真实通知与告警演练仍 `NOT_RUN`，结论保持 `INTEGRATIONS_AND_OBSERVABILITY_NO_GO`。依据 DEC-018，这三项仅在 Alpha 延期，production 继续 `NO_GO`。WP-12 已激活并完成第一批代码级安全硬化；依据 DEC-019，独立灾备故障域选型延期至真实 Alpha 连续稳定运行 30 日后的成熟检查点，基础备份/恢复、威胁模型、性能、保留删除与回滚仍按单一 WIP 继续，当前不得记 `RC_TECHNICALLY_READY`。
 
 ## 1. 结论
 
@@ -284,6 +284,14 @@ WP-07 实现与证据见 24 号文档：quick/mainline Make 与 GitHub Actions �
 - 性能、权限、幂等、故障注入和恢复预算通过；
 - 无 Sev-1/Sev-2；Sev-3 有 Owner、期限和 Product/QA 接受；
 - 候选冻结后无漂移。
+
+### Alpha 延期边界（DEC-019）
+
+- 当前不选择跨地域、跨账号或其他独立灾备故障域，不创建对应资源；
+- 真实 Alpha 开放后由 Owner 登记起始日，连续 30 个自然日无 Sev-1/Sev-2、不可逆数据丢失或核心闭环长时间不可用后，触发一次灾备故障域选型评审；严重事故中断并重新计时；
+- 数据库受管备份事实核对、基础恢复脚本、schema/计数/约束/业务指纹校验、RPO/RTO 分析不在延期范围；
+- `off_host_backup_restore` 继续阻塞 release；异机恢复仍 `NOT_RUN`，WP-12 不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO`；
+- Alpha 可以继续剩余非故障域 WP-12 工作和真人 UAT 准备，但不得据此开放 production。
 
 ## 10. WP-13｜内容校准与真人 UAT
 
