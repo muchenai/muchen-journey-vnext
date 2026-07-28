@@ -1,6 +1,6 @@
 # WP-11 Staging 真实通知与外部可观测最小实施手册
 
-状态：`PREPARED / EXTERNAL_WRITES_NOT_AUTHORIZED / NO_DEPLOY`
+状态：`STAGING_DEPLOYED / HOST_AUDIT_PASS / EXTERNAL_LOG_INGESTION_BLOCKED`
 
 本手册只服务当前 Alpha staging，目标是证明“真实结果通知可送达，失败能被发现”。它不创建第二条部署路径，不扩大冻结 IaC，不读通讯录，不订阅消息事件，不把业务正文或人员标识写入日志。
 
@@ -9,7 +9,7 @@
 - Region 只能是火山引擎华北2（北京）`cn-beijing`；所有新的 TLS/Cloud Monitor 对象必须属于已有 IAM 项目 `journey-next-staging`。
 - 不改 Terraform state/provider，不为 `journey-next-staging-ci` 增加 TLS、Cloud Monitor、IAM 或全局权限。Alpha 的一次性建置由 Owner 在控制台完成并留存私有证据。
 - 通知应用必须与 WP-09 登录应用独立；不得复用身份 App ID/Secret。飞书 `open_id` 是应用级标识，不得把 WP-09 应用下的 `open_id` 复制给通知应用。
-- 当前 staging 在新候选部署前仍为 `NOTIFICATION_ADAPTER=DISABLED`。未取得精确授权时，不创建应用/云资源、不写 Environment secrets、不配置接收人、不发消息、不部署。
+- 候选 `172c9f62…` 已部署并完成通知接线；当前没有业务接收人、通知尝试或外部回执。未取得新的精确授权时，不配置接收人、不发消息、不修改应用/云资源、不再次部署。
 - 通知是异步副作用；无论投递成功或失败，都不得回滚 Outcome、Evaluation、Handoff 或既有历史。
 
 ## 2. 飞书通知应用的最小配置
@@ -80,3 +80,11 @@ Cloud Monitor 只使用现有 ECS 的基础监控，告警对象精确选择单�
 出现以下任一情况立即停止：候选/镜像不匹配、通知 App 复用身份 App、请求通讯录或消息读权限、TLS 对象未转入 staging IAM 项目、LogCollector 超过 1 分钟无 heartbeat、索引出现禁止字段、通知链接不是 `/app/result`、未配接收人的历史事件被消费、或月度预测超过现有 ¥800 上限。
 
 公开证据只记录 PR/run/candidate、资源类别、布尔门禁、时间窗口和结论。App ID/Secret、`open_id`、provider message ID、云资源 ID/IP/endpoint、原始日志和截图只能进入私有证据库，不进 Git/Actions artifact/聊天。
+
+## 6. 当前执行记录与停止点（2026-07-28）
+
+- 飞书独立通知应用、三项 staging secrets、TLS project/topic/host group/collection/index 已完成最小配置；未配置业务接收人，未发送消息；
+- 部署 run `30351059075` 成功，migration head 为 `0013_wp11_notify_observability`；
+- 有界审计 run `30358231823`、`30359621278` 证明主机本地 API/Worker JSON 日志、LogCollector 服务、heartbeat、Docker socket 与 `json-file` 均正常；
+- TLS topic 仍为 0 条；精确 API 容器正则的临时验证未改变结果，原配置已恢复；
+- 停止继续调整应用、部署、数据库、IAM 或 TLS collection。后续仅接受“厂商/人工关闭 LogCollector 容器采集路径”或“批准 Alpha 延期并保持 production NO_GO”之一。

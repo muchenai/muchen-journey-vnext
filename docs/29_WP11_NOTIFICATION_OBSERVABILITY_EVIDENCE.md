@@ -1,8 +1,8 @@
 # WP-11 真实通知与外部可观测构建证据
 
-状态：`AS_BUILT / CANDIDATE_BINDING_READY`
+状态：`STAGING_DEPLOYED / HOST_OBSERVABILITY_VERIFIED / EXTERNAL_LOG_INGESTION_BLOCKED`
 
-结论：`ENGINEERING_VERIFIED / CANDIDATE_READY / EXTERNAL_OBSERVABILITY_NOT_RUN`
+结论：`ENGINEERING_VERIFIED / STAGING_RUNTIME_VERIFIED / INTEGRATIONS_AND_OBSERVABILITY_NO_GO`
 
 ## 1. 本工作包关闭的问题
 
@@ -56,32 +56,37 @@ PASS
 
 完整 `ci-fast`、迁移升降级、生产 Web build、依赖/secret 扫描和 OpenAPI 同步在候选提交前重新执行并记录最终结果。
 
-## 4. 未运行且不得伪记通过
+## 4. Staging 物理证据（2026-07-28）
 
-- 未创建或授权独立飞书通知应用，未向 GitHub staging Environment 写入通知 App ID/Secret 或接收人加密密钥；
-- 未登记本次真实发送的明确接收人清单，未发送飞书消息；
-- 未取得 provider message receipt、错误收件人、限流、凭据轮换的物理环境证据；
-- 未在火山引擎创建 TLS project/topic、LogCollector、Dashboard、Cloud Monitor 告警或外部路由；
+- 已创建与 WP-09 身份应用分离的飞书通知应用，仅启用机器人和发消息权限；独立 App ID/Secret 与 32-byte recipient key 已写入 GitHub `staging` Environment。公开证据只记录存在性与独立性，不记录值；
+- 候选 `172c9f62ffdcd4fce31fb4900fdca46b3405ab89` 已由唯一授权部署 run `30351059075` 成功部署到冻结 staging 基础设施；migration 已从 `0011_wp09_feishu_identity` 升级至 `0013_wp11_notify_observability`，部署 readiness 通过；
+- 部署后没有配置业务接收人、没有发送飞书消息。两次有界主机审计均确认活动接收人、外部回执和通知尝试为 0，业务事实未因观测复验而改变；
+- 火山引擎 TLS project/topic、staging ECS host group、JSON stdout collection 与索引已存在并归属 staging 项目；LogCollector heartbeat 正常、服务运行、Docker socket 可访问，Docker 使用 `json-file`；
+- 主机审计 run `30358231823` 与脱敏修复后的 run `30359621278` 均通过：最近 10 分钟可见 API/Worker 本地 JSON 事件，安全错误计数不含配置、容器运行时、Docker 连接或权限拒绝；后者在导出 runner CIDR 前完成掩码；
+- TLS topic 在同一窗口仍返回 0 条日志。将 collection 临时收窄为精确 API 容器后结果仍为 0，随后已恢复原 API/Worker 合同；因此可排除“候选未部署、容器无日志、LogCollector 未运行、host group 未绑定、复合容器正则或索引缺失”作为当前主因，但不能宣称外部日志采集通过；
+- 当前证据将剩余问题限定在 LogCollector 容器采集/传输/provider 路径。继续修改应用、部署、数据库、IAM 或业务事实不会增加诊断价值，因此停止该方向的自动修补。
+
+## 5. 仍未运行且不得伪记通过
+
+- 未登记真实业务接收人，未执行真实飞书发送，因此没有 provider message receipt，也没有错误收件人、限流或凭据轮换物理证据；
+- TLS 外部日志采集未通过；Dashboard、Cloud Monitor 策略、外部路由和告警送达没有在本轮重新核验；
 - 未执行外部告警演练，也未证明 DEAD 在真实外部系统中 4 小时内被发现；
-- 当前运行中的 staging 仍保持 `NOTIFICATION_ADAPTER=DISABLED`；WP-11 接线已合入候选但尚未部署，因此不能宣称 `INTEGRATIONS_AND_OBSERVABILITY_VERIFIED`。
+- WP-11 仍不得记为 `INTEGRATIONS_AND_OBSERVABILITY_VERIFIED`。进入 WP-12 前必须由 Owner 选择：修复外部日志采集并完成真实通知/告警证据，或以新的 Alpha 范围决策明确延期并继续保持 production `NO_GO`。
 
-## 5. 已验证候选
+## 6. 已验证候选
 
 - PR #64 将 WP-11 工程接线合入主线 `172c9f62ffdcd4fce31fb4900fdca46b3405ab89`；
 - Mainline Candidate Gate `30302594972` 完成 `ci-main`、候选打包、三镜像 SPDX SBOM、GHCR 推送和 registry digest 二次验证；
-- canonical manifest 精确记录 migration `0013_wp11_notify_observability`、config V3、TSK-001 V1/V2 内容摘要和 `deployment=NOT_RUN`；
-- 候选绑定合同使用 API `sha256:9fd8ac58…10094`、Web `sha256:029cdc66…0b19`、Worker `sha256:6a2fe4c7…f4b79`。这些是镜像证据，不是部署授权。
+- canonical manifest 精确记录 migration `0013_wp11_notify_observability`、config V3、TSK-001 V1/V2 内容摘要；
+- 候选绑定合同使用 API `sha256:9fd8ac58…10094`、Web `sha256:029cdc66…0b19`、Worker `sha256:6a2fe4c7…f4b79`；run `30351059075` 已把该候选部署到 staging。
 
-## 6. 下一次外部动作所需授权
+## 7. 下一次外部动作所需授权
 
 唯一执行顺序、最小权限、资源命名、停止条件和私有证据边界见 `docs/runbooks/WP11_STAGING_INTEGRATIONS.md`。
 
-只有在本接线 PR 合入、候选 SHA/镜像摘要生成并锁定后，才可另行请求以下精确授权：
+工程接线、候选锁定、独立应用/secret、staging 部署和主机侧审计已经完成。下一次外部动作只能是以下两条之一，不再把它们与应用部署混在同一轮：
 
-1. 在当前飞书租户创建独立通知应用，只启用 bot 发消息与所需最小权限；
-2. 将独立通知 App ID/Secret、随机接收人密钥和明确试点接收人 `open_id` 写入 GitHub staging Environment；
-3. 在火山引擎华北2（北京）的 staging 项目内创建 TLS/Cloud Monitor 最小资源和告警路由；
-4. 对明确接收人执行一轮有界的成功、错误接收人、限流/凭据和 DEAD 告警演练；
-5. 仅在上述配置复验通过后执行一次冻结基础设施的 staging deploy；部署后先配置一个明确受控接收人，未配置接收人的历史通知保持 PENDING；失败不自动重试。
+1. 由 Owner/厂商支持在不改应用、不部署的前提下关闭 TLS 容器采集/传输问题；通过后再为一个明确受控接收人执行真实送达与告警演练；或
+2. 由 Product/Engineering/Security 共同批准一条新的 Alpha 延期决策，承认外部日志、真实通知和告警演练尚未关闭，保留主机有界审计作为临时手段，并保持 production `NO_GO`。
 
-未获得上述逐项授权前，工程推进可继续，但不得产生外部消息、云资源或环境 secret 写入。
+未获得上述选择前，不继续修改 TLS 配置、应用、云资源或部署，也不产生外部消息或业务接收人事实。
