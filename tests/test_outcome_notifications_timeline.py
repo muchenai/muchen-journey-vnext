@@ -5,6 +5,7 @@ import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import func, select, update
@@ -26,6 +27,40 @@ from journey_api.models import (
     OutboxEvent,
     OutboxStatus,
 )
+from journey_api.outcome_service import create_pass_outcome_bundle
+
+
+def test_pass_outcome_bundle_uses_two_foreign_key_flush_boundaries():
+    class RecordingSession:
+        def __init__(self):
+            self.added = []
+            self.flush_count = 0
+
+        def add(self, item):
+            self.added.append(item)
+
+        def flush(self):
+            self.flush_count += 1
+
+    session = RecordingSession()
+    organization_id = uuid.uuid4()
+    learner_id = uuid.uuid4()
+    outcome, handoff, delivery = create_pass_outcome_bundle(
+        session,
+        enrollment=SimpleNamespace(
+            id=uuid.uuid4(),
+            organization_id=organization_id,
+            learner_id=learner_id,
+        ),
+        assignment=SimpleNamespace(id=uuid.uuid4()),
+        evaluation=SimpleNamespace(id=uuid.uuid4()),
+        reviewer_id=uuid.uuid4(),
+        request_id="req_flush_contract",
+    )
+    assert session.flush_count == 2
+    assert outcome in session.added
+    assert handoff in session.added
+    assert delivery in session.added
 
 
 def approve(label: str) -> dict[str, object]:
