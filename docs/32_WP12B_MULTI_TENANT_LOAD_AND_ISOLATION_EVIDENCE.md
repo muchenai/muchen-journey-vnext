@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过，但未部署包含本工具的新候选，也未在 staging 执行批准规模，因此不得把本文件记为 `WP12B_CLOSED`。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；主线 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 经 Mainline Candidate Gate `30416410890` 生成并验证三镜像摘要，但尚未部署，也未在 staging 执行批准规模，因此不得把本文件记为 `WP12B_CLOSED`。
 
 ## 2. 固定负载合同
 
