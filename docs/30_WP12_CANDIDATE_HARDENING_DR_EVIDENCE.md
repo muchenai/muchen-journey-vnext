@@ -67,6 +67,12 @@ PASS / no leaks found
 
 2026-07-28 本地报告 `artifacts/wp12/local-benchmark-20260728T165730Z-c04f75cd.json` 为 `PASS`：readiness p95 `0.002298s`、Current Action `0.004462s`、Reviewer queue `0.014472s`、Operator runtime `0.004550s`。这是本机 fixture 的工程余量，不包含公网、Caddy、ECS、RDS 网络、真实数据量或并发，不能关闭 staging benchmark 和 14 日可用性门禁。
 
+### 3.1.1 WP-12B 多租户负载与隔离
+
+2026-07-29 因未来实际范围包含十几个 `organization_id`，把 staging benchmark 明确拆成 WP-12B。批准合同为 20 个合成组织、500 名 Learner、峰值并发 50、10 分钟稳态与 1 分钟突发；常规读取和核心命令 p95 ≤1 秒，5xx、409、跨组织泄漏、重复事实和意外响应均为 0。工具不启用 fixture identity、不创建通知接收人、不发送消息、不新增云资源，失败后仍撤销全部两小时合成会话并禁用合成用户。
+
+本地 2 组织 HTTP smoke 已完成 69 次请求，负载、数据库审计与身份退役均 PASS；这是 harness 证明，`staging_benchmark` 继续 `NOT_RUN`。精确合同与关闭步骤见 32 号文档。
+
 ### 3.2 本地隔离恢复与当前迁移回滚
 
 `make wp12-local-recovery` 仅操作 Compose 开发库与空白 `db-test`：先升级/seed，再生成 owner-only 加密备份及签名 manifest，在全新随机数据库恢复，核对 migration、计数、约束、跨组织关键不变量和 TaskVersion 指纹，然后执行当前 `0013 → 0014 → 0013 → 0014` 隔离演练。若 `0014` 已存在 data-rights 事实，脚本拒绝 schema 回退并要求维护模式或前滚修复，禁止通过回滚抹除已接受事实。
@@ -95,7 +101,7 @@ PASS / no leaks found
 
 ## 5. 尚未关闭的 WP-12 门禁
 
-- staging 常规读取和核心命令 p95 ≤1 秒 benchmark、99.5% 试点可用性证据；
+- WP-12B staging 多租户常规读取和核心命令 p95 ≤1 秒、零跨组织泄漏/重复事实 benchmark；99.5% 试点可用性仍由 WP-14 证明；
 - 受控删除执行器、附件对象删除、不可逆动作双重确认与真实删除证据；
 - 每日加密备份、独立故障域副本、空白隔离恢复、RPO ≤24 小时和 RTO ≤4 小时实测；
 - staging/production 的 N→N+1→N 或维护模式演练，且不回滚已接受业务事实；
@@ -107,4 +113,4 @@ PASS / no leaks found
 
 ## 6. 下一步单一 WIP
 
-在不部署、不新增云资源的前提下，下一单一 WIP 是准备 WP-13 真人 UAT 的冻结候选执行包；受控物理删除执行器作为 WP-12 未关闭高风险切片保留，获得精确对象和环境授权后再实现与演练。随后准备 staging benchmark 的只读执行合同。独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。
+下一单一 WIP 是关闭 WP-12B：合入工具、生成并绑定新候选、精确授权部署，再对同一候选执行一次 staging 合成负载。WP-12B 关闭前不启动 WP-13 真人 UAT。受控物理删除执行器继续作为 WP-12 未关闭高风险切片，独立故障域选型等到 DEC-019 的 30 日成熟检查点再重开。任何真实数据删除、备份目的地、KMS/存储资源、staging 写入或恢复演练均需另行获得精确授权。

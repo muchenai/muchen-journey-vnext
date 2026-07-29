@@ -1,0 +1,173 @@
+name: WP-12B Staging Multi-Tenant Load
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact already-deployed 40-character candidate SHA
+        required: true
+        type: string
+      confirmation:
+        description: Type RUN_WP12B_<full candidate SHA>
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp12b-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  load:
+    name: WP-12B / synthetic multi-tenant load
+    if: inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Verify bounded load contract and candidate
+        run: |
+          set -euo pipefail
+          candidate="${{ inputs.candidate }}"
+          [[ "$candidate" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = refs/heads/main
+          git cat-file -e "$candidate^{commit}"
+          git merge-base --is-ancestor "$candidate" HEAD
+          python3 scripts/wp12b_load.py contract-check
+      - name: Read frozen staging host
+        id: frozen
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          test -n "$public_ip"
+          test -n "$security_group_id"
+          echo "::add-mask::$public_ip"
+          echo "::add-mask::$security_group_id"
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP12B_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open exact runner SSH ingress
+        run: |
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$WP12B_RUNNER_CIDR"
+      - name: Prepare SSH identity
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$RUNNER_TEMP/wp12b-key"
+      - name: Verify deployed candidate and prepare synthetic identities
+        id: prepare
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          candidate="${{ inputs.candidate }}"
+          run_id="wp12b-$GITHUB_RUN_ID"
+          echo "run_id=$run_id" >>"$GITHUB_OUTPUT"
+          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
+          remote="root@$PUBLIC_IP"
+          test "$(ssh "${ssh_opts[@]}" "$remote" 'cat /srv/journey-next-staging/DEPLOYED_CANDIDATE')" = "$candidate"
+          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic prepare --candidate '$candidate' --confirmation 'PREPARE_WP12B_$candidate' --run-id '$run_id' --organizations 20 --learners-per-organization 25 --reviewers-per-organization 2 --output /tmp/wp12b-bundle.json && docker compose cp api:/tmp/wp12b-bundle.json /tmp/wp12b-bundle-$run_id.json && chmod 0600 /tmp/wp12b-bundle-$run_id.json"
+          scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-bundle-$run_id.json" "$RUNNER_TEMP/wp12b-bundle.json"
+          chmod 0600 "$RUNNER_TEMP/wp12b-bundle.json"
+      - name: Execute bounded public HTTPS load
+        id: load
+        run: |
+          set -euo pipefail
+          report=$(python3 scripts/wp12b_load.py run \
+            --origin https://staging-vnext.muchenai.com \
+            --bundle "$RUNNER_TEMP/wp12b-bundle.json")
+          echo "report=$report" >>"$GITHUB_OUTPUT"
+      - name: Audit immutable facts and tenant scope
+        id: audit
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          candidate="${{ inputs.candidate }}"
+          run_id="${{ steps.prepare.outputs.run_id }}"
+          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
+          remote="root@$PUBLIC_IP"
+          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic audit --candidate '$candidate' --run-id '$run_id' --output /tmp/wp12b-audit.json && docker compose cp api:/tmp/wp12b-audit.json /tmp/wp12b-audit-$run_id.json && chmod 0600 /tmp/wp12b-audit-$run_id.json"
+          scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-audit-$run_id.json" "$RUNNER_TEMP/wp12b-audit.json"
+          chmod 0600 "$RUNNER_TEMP/wp12b-audit.json"
+      - name: Retire all synthetic identities
+        id: retire
+        if: always() && steps.prepare.outputs.run_id != ''
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          candidate="${{ inputs.candidate }}"
+          run_id="${{ steps.prepare.outputs.run_id }}"
+          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
+          remote="root@$PUBLIC_IP"
+          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic retire --candidate '$candidate' --run-id '$run_id' --output /tmp/wp12b-retired.json && docker compose cp api:/tmp/wp12b-retired.json /tmp/wp12b-retired-$run_id.json && chmod 0600 /tmp/wp12b-retired-$run_id.json && docker compose exec -T api python -c \"from pathlib import Path; [path.unlink(missing_ok=True) for path in map(Path, ('/tmp/wp12b-bundle.json','/tmp/wp12b-audit.json','/tmp/wp12b-retired.json'))]\""
+          scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-retired-$run_id.json" "$RUNNER_TEMP/wp12b-retired.json"
+          chmod 0600 "$RUNNER_TEMP/wp12b-retired.json"
+          ssh "${ssh_opts[@]}" "$remote" "shred -u /tmp/wp12b-bundle-$run_id.json /tmp/wp12b-audit-$run_id.json /tmp/wp12b-retired-$run_id.json 2>/dev/null || true"
+      - name: Close WP-12B evidence gate
+        if: steps.load.outcome == 'success' && steps.audit.outcome == 'success' && steps.retire.outcome == 'success'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/wp12b-evidence"
+          cp "${{ steps.load.outputs.report }}" "$RUNNER_TEMP/wp12b-evidence/load.json"
+          cp "$RUNNER_TEMP/wp12b-audit.json" "$RUNNER_TEMP/wp12b-evidence/audit.json"
+          cp "$RUNNER_TEMP/wp12b-retired.json" "$RUNNER_TEMP/wp12b-evidence/retired.json"
+          python3 scripts/wp12b_load.py verify \
+            --load "$RUNNER_TEMP/wp12b-evidence/load.json" \
+            --audit "$RUNNER_TEMP/wp12b-evidence/audit.json" \
+            --retired "$RUNNER_TEMP/wp12b-evidence/retired.json" \
+            --output "$RUNNER_TEMP/wp12b-evidence/closure.json"
+      - name: Upload PII-free evidence
+        if: steps.load.outcome == 'success' && steps.audit.outcome == 'success' && steps.retire.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp12b-evidence-${{ inputs.candidate }}
+          path: ${{ runner.temp }}/wp12b-evidence
+          if-no-files-found: error
+          retention-days: 30
+      - name: Close SSH ingress
+        if: always() && steps.frozen.outputs.security_group_id != ''
+        run: |
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$WP12B_RUNNER_CIDR"
