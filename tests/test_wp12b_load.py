@@ -42,6 +42,7 @@ docker compose exec -T api python -m journey_api.wp12b_synthetic prepare < /dev/
 - name: Execute bounded internal API load
 docker inspect api
 docker cp runner "$api_container:/tmp/runner"
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 host
 docker exec --user 10001:10001 "$api_container" python "$container_root/scripts/wp12b_load.py" run --origin http://127.0.0.1:8000 --ecs-internal --public-origin https://staging-vnext.muchenai.com --output /tmp/runner/output/load.json
 - name: Audit immutable facts and tenant scope
 if: always() && steps.prepare.outputs.run_id != ''
@@ -130,6 +131,14 @@ def test_wp12b_workflow_audits_after_load_failure():
     )
     with pytest.raises(LoadError, match="audit must run"):
         validate_workflow_source(invalid)
+
+
+def test_wp12b_workflow_requires_long_connection_keepalive():
+    valid = valid_workflow_source()
+    with pytest.raises(LoadError, match="must use bounded keepalives"):
+        validate_workflow_source(valid.replace("-o ServerAliveInterval=15", ""))
+    with pytest.raises(LoadError, match="must use bounded keepalives"):
+        validate_workflow_source(valid.replace("-o ServerAliveCountMax=4", ""))
 
 
 def test_wp12b_failure_evidence_is_owner_only_and_contains_no_session_material(tmp_path):

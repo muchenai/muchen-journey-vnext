@@ -129,7 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           run_id="${{ steps.prepare.outputs.run_id }}"
-          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
+          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes)
           remote="root@$PUBLIC_IP"
           runner_root="/tmp/wp12b-runner-$run_id"
           cleanup_remote_runner() {
