@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复，但物理删除、staging benchmark、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，真人 UAT、14 天时间与 production 执行均未开始。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复；WP-12B 因未来十几个组织补充 20 组织/500 Learner staging 容量与隔离门禁，本地 harness 已通过、staging 正式规模仍 `NOT_RUN`。物理删除、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，WP-12B 关闭前不启动真人 UAT。
 
 ## 1. 结论
 
@@ -24,7 +24,7 @@ WP-07 → WP-08 → WP-09 → WP-10 → WP-11
       → WP-12 → WP-13 → WP-14 → WP-15
 ```
 
-其中 WP-07～WP-12 以工程和机器证据为主；WP-13、WP-14 必须由真实角色完成；WP-15 涉及生产写入和正式切换，必须获得精确候选、环境和窗口的当轮明确授权。
+其中 WP-07～WP-12 以工程和机器证据为主；WP-12B 多租户 staging 门禁关闭前不启动 WP-13。WP-13、WP-14 必须由真实角色完成；WP-15 涉及生产写入和正式切换，必须获得精确候选、环境和窗口的当轮明确授权。
 
 ## 2. 进入下一批前必须锁定的执行输入
 

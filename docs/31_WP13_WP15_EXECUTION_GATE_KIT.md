@@ -93,7 +93,7 @@ python3 scripts/wp13_15_evidence.py release-check \
 
 ## 6. 当前必须人工提供的输入
 
-当前没有需要立即打断工程准备的人工点击，但 WP-13 真正启动前必须补齐：
+当前没有需要立即打断工程准备的人工点击，但 WP-13 真正启动前必须先取得 WP-12B=`CLOSED`，并补齐：
 
 1. 5 名 Learner、2 名独立 Reviewer、1 名 Operator、1 名 QA Recorder 的私有名册；
 2. 冻结候选的完整 SHA、三镜像摘要和一次明确授权的 staging 部署；

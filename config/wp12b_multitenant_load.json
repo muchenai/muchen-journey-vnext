@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "scope": "STAGING_SYNTHETIC_MULTI_TENANT",
+  "organization_count": 20,
+  "learners_per_organization": 25,
+  "reviewers_per_organization": 2,
+  "operators_per_organization": 1,
+  "peak_concurrency": 50,
+  "steady_state_seconds": 600,
+  "steady_requests_per_second": 10,
+  "burst_seconds": 60,
+  "burst_requests_per_second": 25,
+  "p95_budget_seconds": 1.0,
+  "request_timeout_seconds": 5.0,
+  "max_http_5xx": 0,
+  "max_unexpected_responses": 0,
+  "max_cross_org_leaks": 0,
+  "max_duplicate_facts": 0,
+  "max_state_conflicts": 0
+}
