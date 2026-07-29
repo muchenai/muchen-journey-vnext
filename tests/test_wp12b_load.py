@@ -10,12 +10,15 @@ from journey_api.wp12b_synthetic import SyntheticError, audit, prepare, retire
 from scripts.wp12b_load import (
     LoadError,
     Observation,
+    execute,
     load_bundle,
     load_contract,
     summarize,
     validate_origin,
+    validate_public_origin,
     validate_workflow_source,
     verify_evidence,
+    write_owner_only,
 )
 
 
@@ -36,8 +39,10 @@ python3 scripts/wp12b_load.py contract-check
 test -f .deployment.env && test ! -L .deployment.env
 . ./.deployment.env
 docker compose exec -T api python -m journey_api.wp12b_synthetic prepare < /dev/null
-- name: Execute bounded public HTTPS load
-python3 scripts/wp12b_load.py run
+- name: Execute bounded internal API load
+docker inspect api
+ssh -o ExitOnForwardFailure=yes -N -L 127.0.0.1:38000:10.0.0.2:8000 host
+python3 scripts/wp12b_load.py run --origin http://127.0.0.1:38000 --public-origin https://staging-vnext.muchenai.com --output "$load_report"
 - name: Audit immutable facts and tenant scope
 test -f .deployment.env && test ! -L .deployment.env
 . ./.deployment.env
@@ -54,7 +59,11 @@ docker cp "$api_container:$container_retired" output
 docker exec "$api_container" python -c cleanup
 - name: Close WP-12B evidence gate
 python3 scripts/wp12b_load.py verify
+- name: Assemble PII-free evidence
+if: always() && steps.prepare.outputs.run_id != '' && steps.retire.outcome == 'success'
+cp "$RUNNER_TEMP/wp12b-load.json" wp12b-evidence/load.json
 - name: Upload PII-free evidence
+if: always() && steps.assemble.outcome == 'success'
   path: wp12b-evidence
 - name: Close SSH ingress
 if: always() && steps.frozen.outputs.security_group_id != ''
@@ -70,15 +79,12 @@ def test_wp12b_contract_is_bounded_and_zero_tolerance():
     assert contract["p95_budget_seconds"] == 1.0
     assert contract["max_cross_org_leaks"] == 0
     assert contract["max_duplicate_facts"] == 0
-    assert validate_origin("https://staging-vnext.muchenai.com") == (
-        "https://staging-vnext.muchenai.com",
-        "staging",
-    )
-    assert validate_origin("http://127.0.0.1:38000") == (
-        "http://127.0.0.1:38000",
-        "local",
+    assert validate_origin("http://127.0.0.1:38000") == "http://127.0.0.1:38000"
+    assert validate_public_origin("https://staging-vnext.muchenai.com") == (
+        "https://staging-vnext.muchenai.com"
     )
     for unsafe in (
+        "https://staging-vnext.muchenai.com",
         "https://muchenai.com",
         "https://journey.muchenai.com",
         "https://staging-vnext.muchenai.com/path",
@@ -86,6 +92,13 @@ def test_wp12b_contract_is_bounded_and_zero_tolerance():
     ):
         with pytest.raises(LoadError):
             validate_origin(unsafe)
+    for unsafe_public in (
+        "http://127.0.0.1:38000",
+        "https://staging-vnext.muchenai.com/path",
+        "https://journey.muchenai.com",
+    ):
+        with pytest.raises(LoadError):
+            validate_public_origin(unsafe_public)
 
 
 def test_wp12b_workflow_contract_rejects_mutation_and_bundle_upload():
@@ -95,6 +108,116 @@ def test_wp12b_workflow_contract_rejects_mutation_and_bundle_upload():
         validate_workflow_source(valid + "\nterraform apply")
     with pytest.raises(LoadError, match="private session bundle"):
         validate_workflow_source(valid + "\nwp12b-bundle")
+
+
+def test_wp12b_failure_evidence_is_owner_only_and_contains_no_session_material(tmp_path):
+    report = {
+        "schema_version": 1,
+        "failure_code": "REVIEW_QUEUE_COUNT_MISMATCH",
+        "diagnostics": {
+            "expected_review_queue_count": 500,
+            "actual_review_queue_count": 0,
+        },
+        "status": "FAIL",
+        "session_material_recorded": False,
+    }
+    output = tmp_path / "load.json"
+    write_owner_only(output, report)
+    persisted = output.read_text(encoding="utf-8")
+    assert stat.S_IMODE(output.stat().st_mode) == 0o600
+    assert "session_token" not in persisted
+    assert json.loads(persisted) == report
+
+
+def test_wp12b_runner_persists_pii_free_report_before_known_flow_failure(
+    tmp_path, monkeypatch
+):
+    now = datetime.now(timezone.utc)
+    candidate = "local-test-candidate"
+    actor_token = "s" * 40
+    csrf_token = "c" * 40
+    organizations = []
+    for index in range(2):
+        ref = f"org-{index:03d}"
+        organizations.append(
+            {
+                "ref": ref,
+                "learners": [
+                    {
+                        "organization_ref": ref,
+                        "role": "LEARNER",
+                        "session_token": actor_token + str(index),
+                        "csrf_token": csrf_token + str(index),
+                        "assignment_id": f"assignment-{index}",
+                    }
+                ],
+                "reviewers": [
+                    {
+                        "organization_ref": ref,
+                        "role": "REVIEWER",
+                        "session_token": "r" * 40 + str(index),
+                        "csrf_token": "x" * 40 + str(index),
+                        "assignment_id": None,
+                    }
+                ],
+                "operator": {
+                    "organization_ref": ref,
+                    "role": "OPERATOR",
+                    "session_token": "o" * 40 + str(index),
+                    "csrf_token": "y" * 40 + str(index),
+                    "assignment_id": None,
+                },
+            }
+        )
+    bundle = tmp_path / "bundle.json"
+    write_private(
+        bundle,
+        {
+            "schema_version": 1,
+            "classification": "SYNTHETIC_NO_REAL_PII",
+            "scope": "LOCAL_SMOKE",
+            "candidate_sha": candidate,
+            "run_id": "wp12b-report-test",
+            "created_at": now.isoformat(),
+            "expires_at": (now + timedelta(hours=1)).isoformat(),
+            "organizations": organizations,
+        },
+    )
+
+    class FakeRunner:
+        def __init__(self, _origin, _timeout_seconds):
+            self._observations = []
+
+        @property
+        def observations(self):
+            return tuple(self._observations)
+
+        def request(self, operation, _path, *, expected_status=200, **_kwargs):
+            self._observations.append(
+                Observation(operation, expected_status, expected_status, 0.01)
+            )
+            if operation == "readiness.api":
+                return 200, {"release": candidate}
+            return expected_status, {}
+
+    monkeypatch.setattr("scripts.wp12b_load.Runner", FakeRunner)
+    output = tmp_path / "failure.json"
+    with pytest.raises(LoadError, match="REVIEW_QUEUE_COUNT_MISMATCH"):
+        execute(
+            "http://127.0.0.1:38000",
+            bundle,
+            smoke=True,
+            output=output,
+        )
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["failure_code"] == "REVIEW_QUEUE_COUNT_MISMATCH"
+    assert report["diagnostics"] == {
+        "expected_review_queue_count": 2,
+        "actual_review_queue_count": 0,
+    }
+    assert report["status"] == "FAIL"
+    assert report["session_material_recorded"] is False
+    assert stat.S_IMODE(output.stat().st_mode) == 0o600
 
 
 def test_wp12b_workflow_loads_compose_env_and_retirement_bypasses_compose():

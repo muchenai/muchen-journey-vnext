@@ -1,6 +1,6 @@
 # WP-12B｜多租户容量与隔离门禁证据
 
-状态：`LOCAL_HARNESS_PASS / STAGING_NOT_RUN / WP12B_NOT_CLOSED`
+状态：`LOCAL_HARNESS_PASS / STAGING_ATTEMPT_FAILED / WP12B_NOT_CLOSED`
 
 日期：2026-07-29
 Owner：Tech Lead + QA/UAT Owner + Release/Ops
@@ -30,7 +30,7 @@ WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用�
 | 组件 | 职责 | 失败边界 |
 | --- | --- | --- |
 | `journey_api.wp12b_synthetic prepare` | 仅在 local/test/staging 创建明确标记的合成组织、角色、任务和两小时会话；staging 要求运行中 release 与完整 candidate SHA 相等及精确确认词 | production 拒绝；run id 不可重放；不创建 ExternalIdentity 或通知接收人 |
-| `scripts/wp12b_load.py run` | 从 owner-only 私有 bundle 经真实 HTTP/HTTPS 执行开始、提交、评审、读取和跨组织 404 探测 | 只接受 loopback HTTP 或 canonical staging HTTPS；不打印/记录 token |
+| `scripts/wp12b_load.py run` | 从 owner-only 私有 bundle 经 loopback HTTP 执行开始、提交、评审、读取和跨组织 404 探测；canonical staging HTTPS 只用于独立 Web readiness 核对 | API origin 只接受 loopback HTTP；staging 还必须提供精确 canonical public origin；不打印/记录 token |
 | `journey_api.wp12b_synthetic audit` | 核对组织/用户/Assignment/Submission/Review/Evaluation/Outcome 数量、固定 scope 和一事实不变量 | 任一漏单、重复或跨组织 FK 不一致即失败 |
 | `journey_api.wp12b_synthetic retire` | 无论负载/审计成功与否，撤销全部合成会话并禁用合成用户 | 不删除已经产生的业务事实，保留可审计历史 |
 | `scripts/wp12b_load.py verify` | 只在 load/audit/retire 同一候选、同一 run 且全部 PASS 时输出 `WP12B_CLOSED` | 不部署、不修改 staging/production |
@@ -59,7 +59,17 @@ GitHub workflow 只从加密 Terraform state 读取现有 ECS/安全组，临时
 
 本节只关闭首次失败的根因分析和代码修复，不关闭 staging 负载门禁。新的 WP-12B staging 运行必须由 Owner 对精确候选另行授权，失败运行 `30422068110` 不得重跑。
 
-## 6. 关闭条件
+## 6. 第二次 staging 执行与传输边界修复
+
+PR #82 合入后，Owner 授权同一候选基于主线 `50dbf155d57449599b61ddd6bf56bb8d9b562498` 执行一次新的 WP-12B。GitHub Actions run `30433586481` 完成 20 个合成组织、500 名 Learner 的 prepare，但 load 在 Reviewer 队列核对处得到 `expected=500 / actual=0`，audit 因 load 失败未执行。`retire` 随后 PASS，确认 active sessions=`0`、active users=`0`；SSH `/32` 入站也成功关闭。该次运行未部署、未新增资源、未发送消息，且未重试。
+
+只读核对显示 canonical staging Web readiness 返回 200 且 release 与候选一致，而公开 `/api/v1/reviews` 返回 404。Caddy 合同仅代理 Web 容器，未公开 API；因此该结果证明 load runner 错把 Web origin 当作 API origin，不证明 20 组织或 500 Learner 容量失败，也不证明 Reviewer 队列业务逻辑失败。
+
+本次代码修复保持公网合同不变：工作流通过已有有界 SSH 连接解析唯一 API 容器及其内部 IPv4，只在 GitHub runner 的 `127.0.0.1:38000` 建立临时 SSH 转发，所有业务压测请求走该 loopback origin；canonical HTTPS 继续独立验证用户可见 Web readiness 和精确 release。隧道进程由 `EXIT` trap 清理，不新增安全组端口、不公开 `/api`。runner 对业务阶段失败写出 owner-only、PII-free 的固定聚合报告；workflow 在 retire PASS 后无论 load/audit 是否成功均组装并上传已有的 load/audit/retired/closure 文档，永不上传 session bundle。
+
+本修复和证据回写不构成新的 staging 执行授权。run `30433586481` 保持失败，WP-12B 仍为 `WP12B_NOT_CLOSED`。
+
+## 7. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 
