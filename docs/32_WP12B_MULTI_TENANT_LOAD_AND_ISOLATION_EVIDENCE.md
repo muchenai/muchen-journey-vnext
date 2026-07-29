@@ -51,7 +51,15 @@ GitHub workflow 只从加密 Terraform state 读取现有 ECS/安全组，临时
 - 数据库审计 PASS；临时 session 全撤销、用户全禁用；
 - 报告：`artifacts/wp12b/multitenant-load-20260729T012211Z-a64ff401.json`（本地私有证据，不关闭 staging 门禁）。
 
-## 5. 关闭条件
+## 5. 首次 staging 执行与修复
+
+2026-07-29，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 基于主线 `c0743c3ca44be76a6c9dee5ebea97ffe64e7c3e2` 执行唯一一次 WP-12B；GitHub Actions run `30422068110` 在准备合成身份前失败。根因是远端 `docker compose exec` 未先加载发布目录的 `.deployment.env`，Compose 在解析 `API_IMAGE` 时 fail closed。该次运行未创建合成组织、用户、会话或业务事实，公开负载和数据库审计均未开始；独立 `always()` SSH 关闭步骤成功，未部署、未新增资源、未发送消息，也未重试。
+
+本修复让 prepare/audit 在任何 Compose 调用前显式加载已有 `.deployment.env`；retire 不再解析 Compose 文件，而是用既有 Compose project/service 标签解析唯一运行中的 API 容器，再通过直接 `docker exec` 撤销身份并删除容器内会话材料。runner 侧用 `EXIT` trap 清除 ECS 上的临时私有文件，即使证据复制失败也执行。合同测试明确拒绝 prepare/audit 环境加载顺序倒置，以及 retire 再次依赖 `docker compose`。
+
+本节只关闭首次失败的根因分析和代码修复，不关闭 staging 负载门禁。新的 WP-12B staging 运行必须由 Owner 对精确候选另行授权，失败运行 `30422068110` 不得重跑。
+
+## 6. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 

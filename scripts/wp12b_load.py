@@ -191,10 +191,14 @@ def validate_workflow_source(source: str) -> None:
         "python3 scripts/wp12b_load.py run",
         "python3 scripts/wp12b_load.py verify",
         "if: always() && steps.prepare.outputs.run_id != ''",
-        "python -m journey_api.wp12b_synthetic retire",
+        "--filter label=com.docker.compose.project=journey-next-staging",
+        "--filter label=com.docker.compose.service=api",
+        'test "${#api_containers[@]}" -eq 1',
+        'docker cp "$api_container:$container_retired"',
         "if: always() && steps.frozen.outputs.security_group_id != ''",
         "scripts.wp08_security_group close",
-        "shred -u /tmp/wp12b-bundle-",
+        "cleanup_remote_files",
+        "trap cleanup_remote_files EXIT",
     )
     missing = [item for item in required if item not in source]
     if missing:
@@ -211,6 +215,31 @@ def validate_workflow_source(source: str) -> None:
     found = [item for item in forbidden if item in source]
     if found:
         raise LoadError(f"WP-12B workflow contains forbidden operations: {found}")
+    prepare_step = source.split("- name: Verify deployed candidate and prepare synthetic identities", 1)
+    audit_step = source.split("- name: Audit immutable facts and tenant scope", 1)
+    retire_step = source.split("- name: Retire all synthetic identities", 1)
+    if not all((len(prepare_step) == 2, len(audit_step) == 2, len(retire_step) == 2)):
+        raise LoadError("WP-12B workflow operational steps are missing")
+    prepare_body = prepare_step[1].split("- name: Execute bounded public HTTPS load", 1)[0]
+    audit_body = audit_step[1].split("- name: Retire all synthetic identities", 1)[0]
+    retire_body = retire_step[1].split("- name: Close WP-12B evidence gate", 1)[0]
+    for name, body in (("prepare", prepare_body), ("audit", audit_body)):
+        deployment_env = body.find(". ./.deployment.env")
+        compose = body.find("docker compose")
+        if (
+            "test -f .deployment.env && test ! -L .deployment.env" not in body
+            or deployment_env < 0
+            or compose < 0
+            or deployment_env >= compose
+            or "< /dev/null" not in body
+        ):
+            raise LoadError(
+                f"WP-12B {name} must load the deployed image environment before Compose"
+            )
+    if "docker compose" in retire_body:
+        raise LoadError("WP-12B retirement must not depend on Compose interpolation")
+    if retire_body.count("docker exec \"$api_container\"") < 2:
+        raise LoadError("WP-12B retirement and container secret cleanup must use direct docker exec")
     upload_step = source.split("- name: Upload PII-free evidence", 1)
     if len(upload_step) != 2 or "wp12b-bundle" in upload_step[1]:
         raise LoadError("WP-12B workflow may expose the private session bundle")

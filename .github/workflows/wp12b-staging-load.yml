@@ -105,7 +105,25 @@ jobs:
           ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
           remote="root@$PUBLIC_IP"
           test "$(ssh "${ssh_opts[@]}" "$remote" 'cat /srv/journey-next-staging/DEPLOYED_CANDIDATE')" = "$candidate"
-          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic prepare --candidate '$candidate' --confirmation 'PREPARE_WP12B_$candidate' --run-id '$run_id' --organizations 20 --learners-per-organization 25 --reviewers-per-organization 2 --output /tmp/wp12b-bundle.json && docker compose cp api:/tmp/wp12b-bundle.json /tmp/wp12b-bundle-$run_id.json && chmod 0600 /tmp/wp12b-bundle-$run_id.json"
+          ssh "${ssh_opts[@]}" "$remote" "CANDIDATE='$candidate' RUN_ID='$run_id' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /srv/journey-next-staging/current
+          test -f .deployment.env && test ! -L .deployment.env
+          set -a
+          . ./.deployment.env
+          set +a
+          container_bundle="/tmp/wp12b-bundle-$RUN_ID.json"
+          docker compose exec -T api python -m journey_api.wp12b_synthetic prepare \
+            --candidate "$CANDIDATE" \
+            --confirmation "PREPARE_WP12B_$CANDIDATE" \
+            --run-id "$RUN_ID" \
+            --organizations 20 \
+            --learners-per-organization 25 \
+            --reviewers-per-organization 2 \
+            --output "$container_bundle" < /dev/null
+          docker compose cp "api:$container_bundle" "/tmp/wp12b-bundle-$RUN_ID.json"
+          chmod 0600 "/tmp/wp12b-bundle-$RUN_ID.json"
+          REMOTE
           scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-bundle-$run_id.json" "$RUNNER_TEMP/wp12b-bundle.json"
           chmod 0600 "$RUNNER_TEMP/wp12b-bundle.json"
       - name: Execute bounded public HTTPS load
@@ -126,7 +144,21 @@ jobs:
           run_id="${{ steps.prepare.outputs.run_id }}"
           ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
           remote="root@$PUBLIC_IP"
-          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic audit --candidate '$candidate' --run-id '$run_id' --output /tmp/wp12b-audit.json && docker compose cp api:/tmp/wp12b-audit.json /tmp/wp12b-audit-$run_id.json && chmod 0600 /tmp/wp12b-audit-$run_id.json"
+          ssh "${ssh_opts[@]}" "$remote" "CANDIDATE='$candidate' RUN_ID='$run_id' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /srv/journey-next-staging/current
+          test -f .deployment.env && test ! -L .deployment.env
+          set -a
+          . ./.deployment.env
+          set +a
+          container_audit="/tmp/wp12b-audit-$RUN_ID.json"
+          docker compose exec -T api python -m journey_api.wp12b_synthetic audit \
+            --candidate "$CANDIDATE" \
+            --run-id "$RUN_ID" \
+            --output "$container_audit" < /dev/null
+          docker compose cp "api:$container_audit" "/tmp/wp12b-audit-$RUN_ID.json"
+          chmod 0600 "/tmp/wp12b-audit-$RUN_ID.json"
+          REMOTE
           scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-audit-$run_id.json" "$RUNNER_TEMP/wp12b-audit.json"
           chmod 0600 "$RUNNER_TEMP/wp12b-audit.json"
       - name: Retire all synthetic identities
@@ -140,10 +172,38 @@ jobs:
           run_id="${{ steps.prepare.outputs.run_id }}"
           ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
           remote="root@$PUBLIC_IP"
-          ssh "${ssh_opts[@]}" "$remote" "cd /srv/journey-next-staging/current && docker compose exec -T api python -m journey_api.wp12b_synthetic retire --candidate '$candidate' --run-id '$run_id' --output /tmp/wp12b-retired.json && docker compose cp api:/tmp/wp12b-retired.json /tmp/wp12b-retired-$run_id.json && chmod 0600 /tmp/wp12b-retired-$run_id.json && docker compose exec -T api python -c \"from pathlib import Path; [path.unlink(missing_ok=True) for path in map(Path, ('/tmp/wp12b-bundle.json','/tmp/wp12b-audit.json','/tmp/wp12b-retired.json'))]\""
+          cleanup_remote_files() {
+            ssh "${ssh_opts[@]}" "$remote" \
+              "shred -u '/tmp/wp12b-bundle-$run_id.json' '/tmp/wp12b-audit-$run_id.json' '/tmp/wp12b-retired-$run_id.json' 2>/dev/null || true" || true
+          }
+          trap cleanup_remote_files EXIT
+          ssh "${ssh_opts[@]}" "$remote" "CANDIDATE='$candidate' RUN_ID='$run_id' bash -s" <<'REMOTE'
+          set -euo pipefail
+          mapfile -t api_containers < <(
+            docker ps \
+              --filter label=com.docker.compose.project=journey-next-staging \
+              --filter label=com.docker.compose.service=api \
+              --format '{{.ID}}'
+          )
+          test "${#api_containers[@]}" -eq 1
+          api_container="${api_containers[0]}"
+          container_bundle="/tmp/wp12b-bundle-$RUN_ID.json"
+          container_audit="/tmp/wp12b-audit-$RUN_ID.json"
+          container_retired="/tmp/wp12b-retired-$RUN_ID.json"
+          docker exec "$api_container" python -m journey_api.wp12b_synthetic retire \
+            --candidate "$CANDIDATE" \
+            --run-id "$RUN_ID" \
+            --output "$container_retired"
+          docker cp "$api_container:$container_retired" "/tmp/wp12b-retired-$RUN_ID.json"
+          chmod 0600 "/tmp/wp12b-retired-$RUN_ID.json"
+          docker exec "$api_container" python -c \
+            'from pathlib import Path; import sys; [Path(item).unlink(missing_ok=True) for item in sys.argv[1:]]' \
+            "$container_bundle" "$container_audit" "$container_retired"
+          REMOTE
           scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-retired-$run_id.json" "$RUNNER_TEMP/wp12b-retired.json"
           chmod 0600 "$RUNNER_TEMP/wp12b-retired.json"
-          ssh "${ssh_opts[@]}" "$remote" "shred -u /tmp/wp12b-bundle-$run_id.json /tmp/wp12b-audit-$run_id.json /tmp/wp12b-retired-$run_id.json 2>/dev/null || true"
+          cleanup_remote_files
+          trap - EXIT
       - name: Close WP-12B evidence gate
         if: steps.load.outcome == 'success' && steps.audit.outcome == 'success' && steps.retire.outcome == 'success'
         run: |

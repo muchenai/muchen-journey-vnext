@@ -24,6 +24,44 @@ def write_private(path, payload):
     path.chmod(0o600)
 
 
+def valid_workflow_source():
+    return """
+workflow_dispatch:
+environment: staging
+inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)
+git merge-base --is-ancestor
+cat /srv/journey-next-staging/DEPLOYED_CANDIDATE
+python3 scripts/wp12b_load.py contract-check
+- name: Verify deployed candidate and prepare synthetic identities
+test -f .deployment.env && test ! -L .deployment.env
+. ./.deployment.env
+docker compose exec -T api python -m journey_api.wp12b_synthetic prepare < /dev/null
+- name: Execute bounded public HTTPS load
+python3 scripts/wp12b_load.py run
+- name: Audit immutable facts and tenant scope
+test -f .deployment.env && test ! -L .deployment.env
+. ./.deployment.env
+docker compose exec -T api python -m journey_api.wp12b_synthetic audit < /dev/null
+- name: Retire all synthetic identities
+if: always() && steps.prepare.outputs.run_id != ''
+cleanup_remote_files
+trap cleanup_remote_files EXIT
+--filter label=com.docker.compose.project=journey-next-staging
+--filter label=com.docker.compose.service=api
+test "${#api_containers[@]}" -eq 1
+docker exec "$api_container" python -m journey_api.wp12b_synthetic retire
+docker cp "$api_container:$container_retired" output
+docker exec "$api_container" python -c cleanup
+- name: Close WP-12B evidence gate
+python3 scripts/wp12b_load.py verify
+- name: Upload PII-free evidence
+  path: wp12b-evidence
+- name: Close SSH ingress
+if: always() && steps.frozen.outputs.security_group_id != ''
+python3 -m scripts.wp08_security_group close
+"""
+
+
 def test_wp12b_contract_is_bounded_and_zero_tolerance():
     contract = load_contract()
     assert contract["organization_count"] == 20
@@ -51,28 +89,35 @@ def test_wp12b_contract_is_bounded_and_zero_tolerance():
 
 
 def test_wp12b_workflow_contract_rejects_mutation_and_bundle_upload():
-    required = (
-        "workflow_dispatch:",
-        "environment: staging",
-        "inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)",
-        "git merge-base --is-ancestor",
-        "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
-        "python3 scripts/wp12b_load.py contract-check",
-        "python3 scripts/wp12b_load.py run",
-        "python3 scripts/wp12b_load.py verify",
-        "if: always() && steps.prepare.outputs.run_id != ''",
-        "python -m journey_api.wp12b_synthetic retire",
-        "if: always() && steps.frozen.outputs.security_group_id != ''",
-        "scripts.wp08_security_group close",
-        "shred -u /tmp/wp12b-bundle-",
-        "- name: Upload PII-free evidence\n  path: wp12b-evidence",
-    )
-    valid = "\n".join(required)
+    valid = valid_workflow_source()
     validate_workflow_source(valid)
     with pytest.raises(LoadError, match="forbidden operations"):
         validate_workflow_source(valid + "\nterraform apply")
     with pytest.raises(LoadError, match="private session bundle"):
         validate_workflow_source(valid + "\nwp12b-bundle")
+
+
+def test_wp12b_workflow_loads_compose_env_and_retirement_bypasses_compose():
+    valid = valid_workflow_source()
+    with pytest.raises(LoadError, match="prepare must load"):
+        validate_workflow_source(valid.replace(". ./.deployment.env", ":", 1))
+
+    audit_marker = "- name: Audit immutable facts and tenant scope"
+    prefix, audit_and_after = valid.split(audit_marker, 1)
+    with pytest.raises(LoadError, match="audit must load"):
+        validate_workflow_source(
+            prefix + audit_marker + audit_and_after.replace(". ./.deployment.env", ":", 1)
+        )
+
+    retire_marker = "- name: Retire all synthetic identities"
+    prefix, retire_and_after = valid.split(retire_marker, 1)
+    invalid_retire = retire_and_after.replace(
+        'docker exec "$api_container" python -m journey_api.wp12b_synthetic retire',
+        'docker compose exec -T api python -m journey_api.wp12b_synthetic retire',
+        1,
+    )
+    with pytest.raises(LoadError, match="retirement must not depend"):
+        validate_workflow_source(prefix + retire_marker + invalid_retire)
 
 
 def test_wp12b_summary_fails_latency_status_and_cross_org_leak():
