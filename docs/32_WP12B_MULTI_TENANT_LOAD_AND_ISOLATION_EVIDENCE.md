@@ -1,6 +1,6 @@
 # WP-12B｜多租户容量与隔离门禁证据
 
-状态：`LOCAL_HARNESS_PASS / STAGING_ATTEMPT_FAILED / WP12B_NOT_CLOSED`
+状态：`LOCAL_HARNESS_PASS / REVIEW_PERFORMANCE_CANDIDATE_READY / WP12B_NOT_CLOSED`
 
 日期：2026-07-29
 Owner：Tech Lead + QA/UAT Owner + Release/Ops
@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 经 Mainline Candidate Gate `30416410890` 生成并验证三镜像摘要，已部署至 staging 并完成三次有界 WP-12B 尝试，但尚无一次 load/audit/retire 同 run 全部 PASS，因此不得把本文件记为 `WP12B_CLOSED`。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 已部署并完成五次有界 WP-12B 尝试，最近一次得到 Reviewer 写路径真实性能 FAIL。最小优化已由 PR #86 合入，新候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 经 Mainline Candidate Gate `30489417625` 验证并推送三镜像，但尚未部署或执行负载；因此不得把本文件记为 `WP12B_CLOSED`。
 
 ## 2. 固定负载合同
 
@@ -99,7 +99,7 @@ PR #85 合入后，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6`
 
 代码诊断显示两条失败路径共享事务往返放大：原实现依次锁定 Review、锁定 Assignment、再读取完整组织范围上下文；finalize 还为复合外键依赖执行三次中间 flush。本次最小应用修复将可变 Review/Assignment 与完整 scoped context 合并为一次 `FOR UPDATE OF reviews, assignments` 查询，并在保留即时复合外键检查的前提下把 Outcome/Handoff/Outbox 的 flush 边界从三次降为两次。测试固定单条 scoped lock 查询和两次依赖 flush；不修改数据模型、业务事实、并发规模或性能预算。
 
-本修复不构成新的候选、部署或 staging 执行授权。run `30487668744` 保持真实性能 FAIL，WP-12B 仍为 `WP12B_NOT_CLOSED`。
+PR #86 已将本修复合入主线；自动 Mainline Candidate Gate `30489417625` 对精确候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 完成 `ci-main`、SBOM、三镜像 GHCR push、registry digest 验证和候选 artifact 上传。该事实只证明候选可部署，不构成部署或 staging 负载授权。run `30487668744` 保持真实性能 FAIL，WP-12B 仍为 `WP12B_NOT_CLOSED`。
 
 ## 10. 关闭条件
 
