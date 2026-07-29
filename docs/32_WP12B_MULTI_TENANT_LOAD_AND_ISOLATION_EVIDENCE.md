@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；主线 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 经 Mainline Candidate Gate `30416410890` 生成并验证三镜像摘要，但尚未部署，也未在 staging 执行批准规模，因此不得把本文件记为 `WP12B_CLOSED`。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 经 Mainline Candidate Gate `30416410890` 生成并验证三镜像摘要，已部署至 staging 并完成三次有界 WP-12B 尝试，但尚无一次 load/audit/retire 同 run 全部 PASS，因此不得把本文件记为 `WP12B_CLOSED`。
 
 ## 2. 固定负载合同
 
@@ -30,7 +30,7 @@ WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用�
 | 组件 | 职责 | 失败边界 |
 | --- | --- | --- |
 | `journey_api.wp12b_synthetic prepare` | 仅在 local/test/staging 创建明确标记的合成组织、角色、任务和两小时会话；staging 要求运行中 release 与完整 candidate SHA 相等及精确确认词 | production 拒绝；run id 不可重放；不创建 ExternalIdentity 或通知接收人 |
-| `scripts/wp12b_load.py run` | 从 owner-only 私有 bundle 经 loopback HTTP 执行开始、提交、评审、读取和跨组织 404 探测；canonical staging HTTPS 只用于独立 Web readiness 核对 | API origin 只接受 loopback HTTP；staging 还必须提供精确 canonical public origin；不打印/记录 token |
+| `scripts/wp12b_load.py run` | 从 owner-only 私有 bundle 经 local HTTP 执行开始、提交、评审、读取和跨组织 404 探测；canonical staging HTTPS 只做一次可达性与精确 release 核对 | local smoke 只接受 loopback；staging runner 以非特权进程在现有北京 ECS API 容器内访问固定 `127.0.0.1:8000`；公开 readiness 不进入性能指标；不打印/记录 token |
 | `journey_api.wp12b_synthetic audit` | 核对组织/用户/Assignment/Submission/Review/Evaluation/Outcome 数量、固定 scope 和一事实不变量 | 任一漏单、重复或跨组织 FK 不一致即失败 |
 | `journey_api.wp12b_synthetic retire` | 无论负载/审计成功与否，撤销全部合成会话并禁用合成用户 | 不删除已经产生的业务事实，保留可审计历史 |
 | `scripts/wp12b_load.py verify` | 只在 load/audit/retire 同一候选、同一 run 且全部 PASS 时输出 `WP12B_CLOSED` | 不部署、不修改 staging/production |
@@ -69,7 +69,17 @@ PR #82 合入后，Owner 授权同一候选基于主线 `50dbf155d57449599b61ddd
 
 本修复和证据回写不构成新的 staging 执行授权。run `30433586481` 保持失败，WP-12B 仍为 `WP12B_NOT_CLOSED`。
 
-## 7. 关闭条件
+## 7. 第三次 staging 执行与测量位置修复
+
+PR #83 合入后，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 基于主线 `7b3815cec6e806a3c1e0f359ac9a43d0820162e0` 执行一次 WP-12B。GitHub Actions run `30482295111` 完成 20 组织、500 Learner、500/500 Reviewer 队列和 10,562 次真实请求；HTTP 5xx、409、cross-org leak、unexpected response 均为 0，公开 readiness 及精确 release 核对 PASS。load 因 7 个端点 p95 超过统一 1 秒预算而 FAIL，数据库 audit 按旧顺序被跳过；retire PASS，active sessions/users 均为 0，PII-free 失败证据上传和 SSH 关闭 PASS。未部署、未新增资源、未发消息，也未重试。
+
+该次 GitHub runner 位于美国西部、staging 位于北京。API/readiness 基线 p50 已约 0.58–0.69 秒，因此 p95 同时包含跨境网络抖动和应用处理时间，不能单独归因为 API/RDS 容量不足，也不能通过放宽预算将其改记为 PASS。
+
+本次代码修复保持 1 秒应用预算不变，并改变测量位置而非结果：主线 runner/config 临时复制到北京 ECS 现有 API 容器的 `/tmp`，以非特权应用用户启动独立 load 进程；不修改应用目录/镜像，不重启服务、不拉取镜像、不创建云资源，进程结束即删除临时文件。私有 session bundle 始终留在 API 容器，不再复制到 ECS 主机文件或 GitHub runner。canonical public readiness 只核对 HTTP 200 与候选 release，明确排除在应用 p95 指标之外。数据库 audit 改为 prepare 成功后 `always()` 执行，即使性能门禁失败也保留事实唯一性/组织隔离证据；随后 retire 与 SSH close 继续无条件收尾。
+
+本修复不构成新的 staging 执行授权。run `30482295111` 保持失败，WP-12B 仍为 `WP12B_NOT_CLOSED`。
+
+## 8. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 
