@@ -94,14 +94,13 @@ def create_pass_outcome_bundle(
         instructions="查看主管的结构化反馈，并与交接责任人确认后续安排。",
         created_at=now,
     )
-    # Flush in dependency order while retaining one surrounding transaction.  The
-    # fixed-scope composite foreign keys deliberately do not rely on nullable or
-    # single-column shortcuts, so making the order explicit also keeps failures
-    # local to this atomic bundle.
+    # The fixed-scope composite FKs intentionally have no ORM relationships, so
+    # keep explicit dependency boundaries while combining independent children:
+    # Evaluation/Outcome first, then Handoff and Outbox in one flush. This retains
+    # immediate constraint checks and removes one database round trip.
     session.add(outcome)
     session.flush()
     session.add(handoff)
-    session.flush()
 
     add_scoped_outbox_event(
         session,

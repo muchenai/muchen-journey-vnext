@@ -143,31 +143,23 @@ def get_scoped_context(
     return ReviewContext(*row)
 
 
+def locked_scoped_context_query(actor: Actor, review_id: uuid.UUID):
+    # Review and Assignment are the only rows mutated by both transitions.
+    # Lock them in the same scoped join used to load the immutable context so
+    # one database round trip replaces the former lock-review, lock-assignment,
+    # then load-context sequence.
+    return scoped_context_query(actor, review_id).with_for_update(
+        of=(Review, Assignment)
+    )
+
+
 def lock_scoped_context(
     session: Session, actor: Actor, review_id: uuid.UUID
 ) -> ReviewContext:
-    review = session.scalar(
-        select(Review)
-        .where(
-            Review.id == review_id,
-            Review.organization_id == actor.organization_id,
-            Review.reviewer_id == actor.id,
-        )
-        .with_for_update()
-    )
-    if review is None:
+    row = session.execute(locked_scoped_context_query(actor, review_id)).first()
+    if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的评审。")
-    assignment = session.scalar(
-        select(Assignment)
-        .where(
-            Assignment.id == review.assignment_id,
-            Assignment.organization_id == actor.organization_id,
-        )
-        .with_for_update()
-    )
-    if assignment is None:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "评审缺少固定任务引用。")
-    return get_scoped_context(session, actor, review_id)
+    return ReviewContext(*row)
 
 
 def review_materials(session: Session, context: ReviewContext) -> ReviewMaterialOut:

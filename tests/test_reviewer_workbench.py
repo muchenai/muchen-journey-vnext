@@ -3,8 +3,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import DBAPIError
 
+from journey_api.auth import Actor
 from journey_api.db import SessionLocal
 from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_VERSION_V2_ID
 from journey_api.main import app
@@ -34,6 +36,7 @@ from journey_api.models import (
     User,
     UserStatus,
 )
+from journey_api.review_routes import locked_scoped_context_query
 
 
 REVIEWER_HEADERS = {"X-Fixture-Role": "REVIEWER"}
@@ -44,6 +47,19 @@ RUBRIC_KEYS = (
     "action_feasibility",
     "validation_design",
 )
+
+
+def test_reviewer_transition_locks_context_in_one_scoped_postgres_query():
+    statement = locked_scoped_context_query(
+        Actor(REVIEWER_ID, ORGANIZATION_ID, Role.REVIEWER, "Fixture Reviewer"),
+        uuid.uuid4(),
+    )
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert sql.count("SELECT ") == 1
+    assert "FOR UPDATE OF reviews, assignments" in sql
+    assert "reviews.organization_id =" in sql
+    assert "reviews.reviewer_id =" in sql
+    assert "assignments.organization_id =" in sql
 
 
 def client_for(label: str) -> TestClient:

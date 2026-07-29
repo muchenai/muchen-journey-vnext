@@ -89,7 +89,19 @@ load 运行约五分钟后，GitHub runner 到 ECS 的控制连接报 `client_lo
 
 本修复不构成新的 staging 执行授权。run `30486354070` 保持失败，任何后续执行必须基于合入后的精确主线重新获得一次性授权。
 
-## 9. 关闭条件
+## 9. 第五次 staging 执行与 Reviewer 写路径诊断
+
+PR #85 合入后，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 基于主线 `379edf82ef941b5a0bc1a50df058c380a02a349d` 执行一次 WP-12B。GitHub Actions run `30487668744` 完整运行 13 分 17 秒，证明 keepalive 修复有效并首次得到北京容器内完整性能报告：20 组织、500 Learner、50 峰值并发、600 秒 × 10 rps 稳态、60 秒 × 25 rps 突发，共 10,561 请求；canonical public readiness/release PASS 且未计入性能指标。HTTP 5xx、409、cross-org leak、unexpected response 均为 0，500/500 Reviewer 队列完整。
+
+容量门禁仍 FAIL，且失败已收敛为两条真实 Reviewer 写路径：`reviewer.review_start` p50=`0.930194s`、p95=`1.364579s`；`reviewer.review_finalize` p50=`1.007398s`、p95=`1.502132s`。其余全部端点 p95 低于 1 秒，其中 submission create=`0.900642s`、assignment start=`0.822677s`，稳态读取与 readiness p95 均低于 `0.025s`。因此不得放宽统一 1 秒预算，也不得把该结果解释为网络或读取容量问题。
+
+同 run 数据库 audit PASS：500 Assignment/Submission/Review/Evaluation/Outcome 全部闭环，cross-org mismatch、duplicate fact、incomplete flow 均为 0。retire PASS：560 个合成会话全部撤销、560 个合成用户全部禁用，active session/user 均为 0；PII-free 证据上传和 SSH 关闭 PASS。未部署、未新增资源、未发消息，也未重试。
+
+代码诊断显示两条失败路径共享事务往返放大：原实现依次锁定 Review、锁定 Assignment、再读取完整组织范围上下文；finalize 还为复合外键依赖执行三次中间 flush。本次最小应用修复将可变 Review/Assignment 与完整 scoped context 合并为一次 `FOR UPDATE OF reviews, assignments` 查询，并在保留即时复合外键检查的前提下把 Outcome/Handoff/Outbox 的 flush 边界从三次降为两次。测试固定单条 scoped lock 查询和两次依赖 flush；不修改数据模型、业务事实、并发规模或性能预算。
+
+本修复不构成新的候选、部署或 staging 执行授权。run `30487668744` 保持真实性能 FAIL，WP-12B 仍为 `WP12B_NOT_CLOSED`。
+
+## 10. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 
