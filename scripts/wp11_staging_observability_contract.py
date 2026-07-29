@@ -11,7 +11,7 @@ WORKFLOW = ROOT / ".github/workflows/wp11-staging-observability-audit.yml"
 
 REQUIRED_MARKERS = {
     "workflow confirmation": "AUDIT_WP11_STAGING_OBSERVABILITY",
-    "exact deployed candidate": "9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6",
+    "exact deployed candidate": "674e51d8ed67f9c29c3d04693376c9ba6f1114e5",
     "candidate machine contract": "config/wp08_staging.json",
     "frozen infrastructure": "Read frozen staging infrastructure",
     "temporary SSH open": "wp08_security_group open",

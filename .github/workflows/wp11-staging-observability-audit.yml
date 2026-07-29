@@ -23,7 +23,7 @@ jobs:
   audit:
     name: WP-11 / read-only host observability
     if: >-
-      inputs.candidate == '9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6' &&
+      inputs.candidate == '674e51d8ed67f9c29c3d04693376c9ba6f1114e5' &&
       inputs.confirmation == 'AUDIT_WP11_STAGING_OBSERVABILITY'
     runs-on: ubuntu-latest
     timeout-minutes: 15
