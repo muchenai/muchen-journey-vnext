@@ -258,6 +258,8 @@ def validate_workflow_source(source: str) -> None:
         raise LoadError("WP-12B API traffic must not use the public Web origin")
     if "docker cp" not in load_body or "docker exec --user 10001:10001" not in load_body:
         raise LoadError("WP-12B API traffic must run inside the existing ECS API container")
+    if "ServerAliveInterval=15" not in load_body or "ServerAliveCountMax=4" not in load_body:
+        raise LoadError("WP-12B long-running load SSH session must use bounded keepalives")
     if "-L 127.0.0.1:" in load_body or "wp12b-bundle.json" in load_body:
         raise LoadError("WP-12B may not copy private sessions to the GitHub runner")
     if "if: always() && steps.prepare.outputs.run_id != ''" not in audit_body:

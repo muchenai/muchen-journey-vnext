@@ -79,7 +79,17 @@ PR #83 合入后，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6`
 
 本修复不构成新的 staging 执行授权。run `30482295111` 保持失败，WP-12B 仍为 `WP12B_NOT_CLOSED`。
 
-## 8. 关闭条件
+## 8. 第四次 staging 执行与长连接修复
+
+PR #84 合入后，Owner 授权候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 基于主线 `d7bc8372f0a047a24a568b09d1055758f5d5ce5b` 执行一次 WP-12B。GitHub Actions run `30486354070` 在北京 ECS API 容器内完成 20 组织、500 Learner 的真实业务事实；数据库 audit PASS：500 Assignment/Submission/Review/Evaluation/Outcome 全部闭环，cross-org mismatch、duplicate fact、incomplete flow 均为 0。retire PASS：560 个会话全部撤销、560 个合成用户全部禁用，active session/user 均为 0；PII-free 证据上传和 SSH 关闭 PASS。未部署、未新增资源、未发消息，也未重试。
+
+load 运行约五分钟后，GitHub runner 到 ECS 的控制连接报 `client_loop: send disconnect: Broken pipe` 并以 255 退出；没有生成 `load.json`，因此该 run 不是性能 PASS/FAIL 证据，WP-12B 仍为 `WP12B_NOT_CLOSED`。事实闭环和 audit 证明应用进程已工作，但不能替代完整 600 秒稳态、60 秒突发和 p95 预算证据。
+
+根因是长时间无标准输出的 SSH 会话未配置 client keepalive，而不是 API/RDS 容量结论。本次最小修复仅为 performance SSH 会话增加固定 `ServerAliveInterval=15`、`ServerAliveCountMax=4` 和 TCP keepalive；不改变负载规模、性能预算、应用、数据库、基础设施或失败不重试边界。合同测试要求 keepalive 不得被移除。
+
+本修复不构成新的 staging 执行授权。run `30486354070` 保持失败，任何后续执行必须基于合入后的精确主线重新获得一次性授权。
+
+## 9. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 
