@@ -3,8 +3,8 @@
 
 The runner consumes an owner-only synthetic session bundle prepared inside the
 API container. It never provisions identities, changes cloud resources, sends
-notifications, or prints session material. Staging API traffic is accepted only
-through a loopback tunnel; the canonical public HTTPS host is checked separately.
+notifications, or prints session material. Staging API traffic runs only inside
+the existing ECS API container; canonical public HTTPS is checked once.
 """
 
 from __future__ import annotations
@@ -192,12 +192,12 @@ def validate_workflow_source(source: str) -> None:
         "git merge-base --is-ancestor",
         "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
         "python3 scripts/wp12b_load.py contract-check",
-        "python3 scripts/wp12b_load.py run",
+        'python "$container_root/scripts/wp12b_load.py" run',
         "python3 scripts/wp12b_load.py verify",
-        "-L 127.0.0.1:38000:",
-        "--origin http://127.0.0.1:38000",
+        "--origin http://127.0.0.1:8000",
+        "--ecs-internal",
         f"--public-origin {STAGING_ORIGIN}",
-        "ExitOnForwardFailure=yes",
+        "docker exec --user 10001:10001 \"$api_container\"",
         "if: always() && steps.prepare.outputs.run_id != ''",
         "--filter label=com.docker.compose.project=journey-next-staging",
         "--filter label=com.docker.compose.service=api",
@@ -256,8 +256,12 @@ def validate_workflow_source(source: str) -> None:
     load_body = load_step[1].split("- name: Audit immutable facts and tenant scope", 1)[0]
     if f"--origin {STAGING_ORIGIN}" in load_body:
         raise LoadError("WP-12B API traffic must not use the public Web origin")
-    if "docker inspect" not in load_body or "127.0.0.1:38000" not in load_body:
-        raise LoadError("WP-12B API traffic must use the bounded SSH container tunnel")
+    if "docker cp" not in load_body or "docker exec --user 10001:10001" not in load_body:
+        raise LoadError("WP-12B API traffic must run inside the existing ECS API container")
+    if "-L 127.0.0.1:" in load_body or "wp12b-bundle.json" in load_body:
+        raise LoadError("WP-12B may not copy private sessions to the GitHub runner")
+    if "if: always() && steps.prepare.outputs.run_id != ''" not in audit_body:
+        raise LoadError("WP-12B database audit must run after prepare even when load fails")
     assemble_step = source.split("- name: Assemble PII-free evidence", 1)
     if len(assemble_step) != 2 or "wp12b-bundle" in assemble_step[1]:
         raise LoadError("WP-12B failure evidence assembly may expose the private session bundle")
@@ -663,6 +667,7 @@ def execute(
     bundle_path: Path,
     *,
     smoke: bool,
+    ecs_internal: bool = False,
     public_origin: str | None = None,
     output: Path | None = None,
 ) -> Path:
@@ -672,12 +677,21 @@ def execute(
     candidate = bundle["candidate_sha"]
     is_staging = bundle["scope"] == "STAGING_SYNTHETIC_MULTI_TENANT"
     if is_staging:
-        if smoke or not isinstance(candidate, str) or not SHA_RE.fullmatch(candidate):
+        if (
+            smoke
+            or not ecs_internal
+            or not isinstance(candidate, str)
+            or not SHA_RE.fullmatch(candidate)
+        ):
             raise LoadError("staging execution requires the full approved profile and candidate SHA")
         if public_origin is None:
             raise LoadError("staging execution requires the canonical public readiness origin")
         public_origin = validate_public_origin(public_origin)
-    elif bundle["scope"] != "LOCAL_SMOKE" or public_origin is not None:
+    elif (
+        bundle["scope"] != "LOCAL_SMOKE"
+        or ecs_internal
+        or public_origin is not None
+    ):
         raise LoadError("loopback execution requires a LOCAL_SMOKE bundle")
 
     concurrency = min(8, config["peak_concurrency"]) if smoke else config["peak_concurrency"]
@@ -784,10 +798,6 @@ def execute(
         probes: list[Callable[[], None]] = [
             lambda: runner.request("readiness.api", "/health/ready"),
         ]
-        if public_runner is not None:
-            probes.append(
-                lambda: public_runner.request("readiness.public", "/health/ready")
-            )
         for organization in organizations:
             learner = organization.learners[0]
             reviewer = organization.reviewers[0]
@@ -825,9 +835,7 @@ def execute(
     except LoadError as error:
         failure_code = error.code
 
-    observations = runner.observations + (
-        public_runner.observations if public_runner is not None else ()
-    )
+    observations = runner.observations
     if observations:
         status, metrics = summarize(observations, config)
     else:
@@ -861,8 +869,9 @@ def execute(
         "production_mutation_executed": False,
         "notifications_sent_by_runner": False,
         "session_material_recorded": False,
-        "api_transport": "SSH_LOOPBACK_TUNNEL" if is_staging else "LOCAL_LOOPBACK",
+        "api_transport": "ECS_API_CONTAINER_LOOPBACK" if is_staging else "LOCAL_LOOPBACK",
         "public_readiness_verified": public_readiness_verified,
+        "public_readiness_in_performance_metrics": False,
     }
     if output is not None:
         write_owner_only(output, report)
@@ -920,6 +929,7 @@ def parse_args() -> argparse.Namespace:
     subparsers.add_parser("contract-check")
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--origin", required=True)
+    run_parser.add_argument("--ecs-internal", action="store_true")
     run_parser.add_argument("--public-origin")
     run_parser.add_argument("--bundle", type=Path, required=True)
     run_parser.add_argument("--output", type=Path)
@@ -951,6 +961,7 @@ def main() -> int:
                     args.origin,
                     args.bundle,
                     smoke=args.smoke,
+                    ecs_internal=args.ecs_internal,
                     public_origin=args.public_origin,
                     output=args.output,
                 )

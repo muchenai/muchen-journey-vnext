@@ -121,22 +121,32 @@ jobs:
             --learners-per-organization 25 \
             --reviewers-per-organization 2 \
             --output "$container_bundle" < /dev/null
-          docker compose cp "api:$container_bundle" "/tmp/wp12b-bundle-$RUN_ID.json"
-          chmod 0600 "/tmp/wp12b-bundle-$RUN_ID.json"
           REMOTE
-          scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-bundle-$run_id.json" "$RUNNER_TEMP/wp12b-bundle.json"
-          chmod 0600 "$RUNNER_TEMP/wp12b-bundle.json"
       - name: Execute bounded internal API load
         id: load
         env:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
+          run_id="${{ steps.prepare.outputs.run_id }}"
           ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
           remote="root@$PUBLIC_IP"
-          api_ip=$(
-            ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE'
+          runner_root="/tmp/wp12b-runner-$run_id"
+          cleanup_remote_runner() {
+            ssh "${ssh_opts[@]}" "$remote" \
+              "shred -u '/tmp/wp12b-load-$run_id.json' 2>/dev/null || true; find '$runner_root' -xdev -type f -exec shred -u {} + 2>/dev/null || true; find '$runner_root' -xdev -depth -type d -empty -delete 2>/dev/null || true" || true
+          }
+          trap cleanup_remote_runner EXIT
+          ssh "${ssh_opts[@]}" "$remote" \
+            "install -d -m 0700 '$runner_root/scripts' '$runner_root/config' '$runner_root/output'"
+          scp "${ssh_opts[@]}" scripts/wp12b_load.py "$remote:$runner_root/scripts/wp12b_load.py"
+          scp "${ssh_opts[@]}" config/wp12b_multitenant_load.json "$remote:$runner_root/config/wp12b_multitenant_load.json"
+          set +e
+          ssh "${ssh_opts[@]}" "$remote" "RUN_ID='$run_id' bash -s" <<'REMOTE'
           set -euo pipefail
+          runner_root="/tmp/wp12b-runner-$RUN_ID"
+          test -f "$runner_root/scripts/wp12b_load.py" && test ! -L "$runner_root/scripts/wp12b_load.py"
+          test -f "$runner_root/config/wp12b_multitenant_load.json" && test ! -L "$runner_root/config/wp12b_multitenant_load.json"
           mapfile -t api_containers < <(
             docker ps \
               --filter label=com.docker.compose.project=journey-next-staging \
@@ -144,50 +154,47 @@ jobs:
               --format '{{.ID}}'
           )
           test "${#api_containers[@]}" -eq 1
-          docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' "${api_containers[0]}"
-          REMOTE
-          )
-          api_ip=$(printf '%s\n' "$api_ip" | sed '/^[[:space:]]*$/d')
-          python3 - "$api_ip" <<'PY'
-          import ipaddress
-          import sys
-          ipaddress.IPv4Address(sys.argv[1])
-          PY
-          echo "::add-mask::$api_ip"
-          ssh "${ssh_opts[@]}" \
-            -o ExitOnForwardFailure=yes \
-            -o ServerAliveInterval=15 \
-            -o ServerAliveCountMax=4 \
-            -N -L 127.0.0.1:38000:"$api_ip":8000 "$remote" &
-          tunnel_pid=$!
-          cleanup_tunnel() {
-            kill "$tunnel_pid" 2>/dev/null || true
-            wait "$tunnel_pid" 2>/dev/null || true
-          }
-          trap cleanup_tunnel EXIT
-          for _attempt in $(seq 1 30); do
-            if curl -fsS --max-time 2 http://127.0.0.1:38000/health/ready >/dev/null; then
-              break
-            fi
-            kill -0 "$tunnel_pid"
-            sleep 1
-          done
-          curl -fsS --max-time 2 http://127.0.0.1:38000/health/ready >/dev/null
-          load_report="$RUNNER_TEMP/wp12b-load.json"
+          api_container="${api_containers[0]}"
+          container_root="/tmp/wp12b-runner-$RUN_ID"
+          container_bundle="/tmp/wp12b-bundle-$RUN_ID.json"
+          docker exec --user 10001:10001 "$api_container" \
+            mkdir -p "$container_root/scripts" "$container_root/config" "$container_root/output"
+          docker cp "$runner_root/scripts/wp12b_load.py" "$api_container:$container_root/scripts/wp12b_load.py"
+          docker cp "$runner_root/config/wp12b_multitenant_load.json" "$api_container:$container_root/config/wp12b_multitenant_load.json"
           set +e
-          python3 scripts/wp12b_load.py run \
-            --origin http://127.0.0.1:38000 \
+          docker exec --user 10001:10001 "$api_container" \
+            python "$container_root/scripts/wp12b_load.py" run \
+            --origin http://127.0.0.1:8000 \
+            --ecs-internal \
             --public-origin https://staging-vnext.muchenai.com \
-            --bundle "$RUNNER_TEMP/wp12b-bundle.json" \
-            --output "$load_report"
+            --bundle "$container_bundle" \
+            --output "$container_root/output/load.json"
           load_exit=$?
           set -e
-          if test -f "$load_report"; then
-            echo "report=$load_report" >>"$GITHUB_OUTPUT"
+          if docker exec "$api_container" test -f "$container_root/output/load.json"; then
+            docker cp "$api_container:$container_root/output/load.json" "/tmp/wp12b-load-$RUN_ID.json"
+            chmod 0600 "/tmp/wp12b-load-$RUN_ID.json"
           fi
+          docker exec --user 10001:10001 "$api_container" python -c \
+            'from pathlib import Path; import sys; files=[Path(item) for item in sys.argv[1:]]; [item.unlink(missing_ok=True) for item in files]; [item.rmdir() for item in (files[0].parent, files[1].parent, files[2].parent, files[0].parent.parent) if item.exists()]' \
+            "$container_root/scripts/wp12b_load.py" \
+            "$container_root/config/wp12b_multitenant_load.json" \
+            "$container_root/output/load.json"
+          exit "$load_exit"
+          REMOTE
+          load_exit=$?
+          set -e
+          if ssh "${ssh_opts[@]}" "$remote" "test -f '/tmp/wp12b-load-$run_id.json'"; then
+            scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-load-$run_id.json" "$RUNNER_TEMP/wp12b-load.json"
+            chmod 0600 "$RUNNER_TEMP/wp12b-load.json"
+            echo "report=$RUNNER_TEMP/wp12b-load.json" >>"$GITHUB_OUTPUT"
+          fi
+          cleanup_remote_runner
+          trap - EXIT
           exit "$load_exit"
       - name: Audit immutable facts and tenant scope
         id: audit
+        if: always() && steps.prepare.outputs.run_id != ''
         env:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
@@ -196,6 +203,7 @@ jobs:
           run_id="${{ steps.prepare.outputs.run_id }}"
           ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
           remote="root@$PUBLIC_IP"
+          set +e
           ssh "${ssh_opts[@]}" "$remote" "CANDIDATE='$candidate' RUN_ID='$run_id' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /srv/journey-next-staging/current
@@ -204,15 +212,24 @@ jobs:
           . ./.deployment.env
           set +a
           container_audit="/tmp/wp12b-audit-$RUN_ID.json"
+          set +e
           docker compose exec -T api python -m journey_api.wp12b_synthetic audit \
             --candidate "$CANDIDATE" \
             --run-id "$RUN_ID" \
             --output "$container_audit" < /dev/null
+          audit_exit=$?
+          set -e
           docker compose cp "api:$container_audit" "/tmp/wp12b-audit-$RUN_ID.json"
           chmod 0600 "/tmp/wp12b-audit-$RUN_ID.json"
+          exit "$audit_exit"
           REMOTE
-          scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-audit-$run_id.json" "$RUNNER_TEMP/wp12b-audit.json"
-          chmod 0600 "$RUNNER_TEMP/wp12b-audit.json"
+          audit_exit=$?
+          set -e
+          if ssh "${ssh_opts[@]}" "$remote" "test -f '/tmp/wp12b-audit-$run_id.json'"; then
+            scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-audit-$run_id.json" "$RUNNER_TEMP/wp12b-audit.json"
+            chmod 0600 "$RUNNER_TEMP/wp12b-audit.json"
+          fi
+          exit "$audit_exit"
       - name: Retire all synthetic identities
         id: retire
         if: always() && steps.prepare.outputs.run_id != ''
@@ -226,7 +243,7 @@ jobs:
           remote="root@$PUBLIC_IP"
           cleanup_remote_files() {
             ssh "${ssh_opts[@]}" "$remote" \
-              "shred -u '/tmp/wp12b-bundle-$run_id.json' '/tmp/wp12b-audit-$run_id.json' '/tmp/wp12b-retired-$run_id.json' 2>/dev/null || true" || true
+              "shred -u '/tmp/wp12b-load-$run_id.json' '/tmp/wp12b-audit-$run_id.json' '/tmp/wp12b-retired-$run_id.json' 2>/dev/null || true; find '/tmp/wp12b-runner-$run_id' -xdev -type f -exec shred -u {} + 2>/dev/null || true; find '/tmp/wp12b-runner-$run_id' -xdev -depth -type d -empty -delete 2>/dev/null || true" || true
           }
           trap cleanup_remote_files EXIT
           ssh "${ssh_opts[@]}" "$remote" "CANDIDATE='$candidate' RUN_ID='$run_id' bash -s" <<'REMOTE'
@@ -239,6 +256,10 @@ jobs:
           )
           test "${#api_containers[@]}" -eq 1
           api_container="${api_containers[0]}"
+          container_runner="/tmp/wp12b-runner-$RUN_ID"
+          docker exec --user 10001:10001 "$api_container" python -c \
+            'from pathlib import Path; import shutil, sys; root=Path(sys.argv[1]); allowed=Path("/tmp") / ("wp12b-runner-" + sys.argv[2]); assert root == allowed and root.parent == Path("/tmp"); shutil.rmtree(root, ignore_errors=True)' \
+            "$container_runner" "$RUN_ID"
           container_bundle="/tmp/wp12b-bundle-$RUN_ID.json"
           container_audit="/tmp/wp12b-audit-$RUN_ID.json"
           container_retired="/tmp/wp12b-retired-$RUN_ID.json"

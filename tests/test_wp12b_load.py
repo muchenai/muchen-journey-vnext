@@ -41,9 +41,10 @@ test -f .deployment.env && test ! -L .deployment.env
 docker compose exec -T api python -m journey_api.wp12b_synthetic prepare < /dev/null
 - name: Execute bounded internal API load
 docker inspect api
-ssh -o ExitOnForwardFailure=yes -N -L 127.0.0.1:38000:10.0.0.2:8000 host
-python3 scripts/wp12b_load.py run --origin http://127.0.0.1:38000 --public-origin https://staging-vnext.muchenai.com --output "$load_report"
+docker cp runner "$api_container:/tmp/runner"
+docker exec --user 10001:10001 "$api_container" python "$container_root/scripts/wp12b_load.py" run --origin http://127.0.0.1:8000 --ecs-internal --public-origin https://staging-vnext.muchenai.com --output /tmp/runner/output/load.json
 - name: Audit immutable facts and tenant scope
+if: always() && steps.prepare.outputs.run_id != ''
 test -f .deployment.env && test ! -L .deployment.env
 . ./.deployment.env
 docker compose exec -T api python -m journey_api.wp12b_synthetic audit < /dev/null
@@ -92,6 +93,8 @@ def test_wp12b_contract_is_bounded_and_zero_tolerance():
     ):
         with pytest.raises(LoadError):
             validate_origin(unsafe)
+    with pytest.raises(LoadError):
+        validate_origin("http://api:8000")
     for unsafe_public in (
         "http://127.0.0.1:38000",
         "https://staging-vnext.muchenai.com/path",
@@ -108,6 +111,25 @@ def test_wp12b_workflow_contract_rejects_mutation_and_bundle_upload():
         validate_workflow_source(valid + "\nterraform apply")
     with pytest.raises(LoadError, match="private session bundle"):
         validate_workflow_source(valid + "\nwp12b-bundle")
+    with pytest.raises(LoadError, match="may not copy private sessions"):
+        validate_workflow_source(
+            valid.replace(
+                "docker inspect api",
+                'docker inspect api\nscp host:/tmp/wp12b-bundle.json "$RUNNER_TEMP/wp12b-bundle.json"',
+            )
+        )
+
+
+def test_wp12b_workflow_audits_after_load_failure():
+    valid = valid_workflow_source()
+    invalid = valid.replace(
+        "if: always() && steps.prepare.outputs.run_id != ''\n"
+        "test -f .deployment.env && test ! -L .deployment.env",
+        "test -f .deployment.env && test ! -L .deployment.env",
+        1,
+    )
+    with pytest.raises(LoadError, match="audit must run"):
+        validate_workflow_source(invalid)
 
 
 def test_wp12b_failure_evidence_is_owner_only_and_contains_no_session_material(tmp_path):
