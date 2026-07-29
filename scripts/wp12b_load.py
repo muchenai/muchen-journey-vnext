@@ -3,8 +3,8 @@
 
 The runner consumes an owner-only synthetic session bundle prepared inside the
 API container. It never provisions identities, changes cloud resources, sends
-notifications, or prints session material. Staging execution is accepted only
-for the canonical HTTPS host and an exact deployed 40-character candidate.
+notifications, or prints session material. Staging API traffic is accepted only
+through a loopback tunnel; the canonical public HTTPS host is checked separately.
 """
 
 from __future__ import annotations
@@ -43,6 +43,10 @@ RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{5,39}$")
 
 class LoadError(RuntimeError):
     """The load contract, execution, or evidence failed closed."""
+
+    def __init__(self, message: str, *, code: str = "CONTRACT_VIOLATION") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -190,6 +194,10 @@ def validate_workflow_source(source: str) -> None:
         "python3 scripts/wp12b_load.py contract-check",
         "python3 scripts/wp12b_load.py run",
         "python3 scripts/wp12b_load.py verify",
+        "-L 127.0.0.1:38000:",
+        "--origin http://127.0.0.1:38000",
+        f"--public-origin {STAGING_ORIGIN}",
+        "ExitOnForwardFailure=yes",
         "if: always() && steps.prepare.outputs.run_id != ''",
         "--filter label=com.docker.compose.project=journey-next-staging",
         "--filter label=com.docker.compose.service=api",
@@ -199,6 +207,8 @@ def validate_workflow_source(source: str) -> None:
         "scripts.wp08_security_group close",
         "cleanup_remote_files",
         "trap cleanup_remote_files EXIT",
+        "if: always() && steps.prepare.outputs.run_id != '' && steps.retire.outcome == 'success'",
+        "if: always() && steps.assemble.outcome == 'success'",
     )
     missing = [item for item in required if item not in source]
     if missing:
@@ -220,7 +230,7 @@ def validate_workflow_source(source: str) -> None:
     retire_step = source.split("- name: Retire all synthetic identities", 1)
     if not all((len(prepare_step) == 2, len(audit_step) == 2, len(retire_step) == 2)):
         raise LoadError("WP-12B workflow operational steps are missing")
-    prepare_body = prepare_step[1].split("- name: Execute bounded public HTTPS load", 1)[0]
+    prepare_body = prepare_step[1].split("- name: Execute bounded internal API load", 1)[0]
     audit_body = audit_step[1].split("- name: Retire all synthetic identities", 1)[0]
     retire_body = retire_step[1].split("- name: Close WP-12B evidence gate", 1)[0]
     for name, body in (("prepare", prepare_body), ("audit", audit_body)):
@@ -240,6 +250,17 @@ def validate_workflow_source(source: str) -> None:
         raise LoadError("WP-12B retirement must not depend on Compose interpolation")
     if retire_body.count("docker exec \"$api_container\"") < 2:
         raise LoadError("WP-12B retirement and container secret cleanup must use direct docker exec")
+    load_step = source.split("- name: Execute bounded internal API load", 1)
+    if len(load_step) != 2:
+        raise LoadError("WP-12B internal API load step is missing")
+    load_body = load_step[1].split("- name: Audit immutable facts and tenant scope", 1)[0]
+    if f"--origin {STAGING_ORIGIN}" in load_body:
+        raise LoadError("WP-12B API traffic must not use the public Web origin")
+    if "docker inspect" not in load_body or "127.0.0.1:38000" not in load_body:
+        raise LoadError("WP-12B API traffic must use the bounded SSH container tunnel")
+    assemble_step = source.split("- name: Assemble PII-free evidence", 1)
+    if len(assemble_step) != 2 or "wp12b-bundle" in assemble_step[1]:
+        raise LoadError("WP-12B failure evidence assembly may expose the private session bundle")
     upload_step = source.split("- name: Upload PII-free evidence", 1)
     if len(upload_step) != 2 or "wp12b-bundle" in upload_step[1]:
         raise LoadError("WP-12B workflow may expose the private session bundle")
@@ -253,15 +274,22 @@ def validate_workflow(path: Path = WORKFLOW_PATH) -> None:
     validate_workflow_source(source)
 
 
-def validate_origin(value: str) -> tuple[str, str]:
+def validate_origin(value: str) -> str:
     parsed = urllib.parse.urlsplit(value)
     if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
         raise LoadError("load target must be a plain origin without credentials or path")
-    if value.rstrip("/") == STAGING_ORIGIN:
-        return STAGING_ORIGIN, "staging"
     if parsed.scheme == "http" and parsed.hostname in LOCAL_HOSTS and parsed.port:
-        return value.rstrip("/"), "local"
-    raise LoadError("load target must be canonical staging HTTPS or loopback HTTP")
+        return value.rstrip("/")
+    raise LoadError("API load target must be loopback HTTP")
+
+
+def validate_public_origin(value: str) -> str:
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+        raise LoadError("public target must be a plain origin without credentials or path")
+    if value.rstrip("/") == STAGING_ORIGIN:
+        return STAGING_ORIGIN
+    raise LoadError("public target must be canonical staging HTTPS")
 
 
 def actor_from_json(value: object, *, expected_role: str, organization_ref: str) -> SessionActor:
@@ -607,29 +635,50 @@ def owner_only_write(root: Path, prefix: str, payload: dict[str, Any]) -> Path:
         f"{prefix}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-"
         f"{secrets.token_hex(4)}.json"
     )
+    write_owner_only(path, payload)
+    return path
+
+
+def write_owner_only(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
-    return path
 
 
-def execute(origin: str, bundle_path: Path, *, smoke: bool) -> Path:
+def empty_metrics() -> dict[str, Any]:
+    return {
+        "requests": 0,
+        "http_5xx": 0,
+        "state_conflicts": 0,
+        "cross_org_leaks": 0,
+        "unexpected_responses": 0,
+        "endpoints": {},
+    }
+
+
+def execute(
+    origin: str,
+    bundle_path: Path,
+    *,
+    smoke: bool,
+    public_origin: str | None = None,
+    output: Path | None = None,
+) -> Path:
     config = load_contract()
-    origin, environment = validate_origin(origin)
+    origin = validate_origin(origin)
     bundle, organizations = load_bundle(bundle_path, config, smoke=smoke)
     candidate = bundle["candidate_sha"]
-    if environment == "staging":
-        if smoke or bundle["scope"] != "STAGING_SYNTHETIC_MULTI_TENANT" or not isinstance(candidate, str) or not SHA_RE.fullmatch(candidate):
+    is_staging = bundle["scope"] == "STAGING_SYNTHETIC_MULTI_TENANT"
+    if is_staging:
+        if smoke or not isinstance(candidate, str) or not SHA_RE.fullmatch(candidate):
             raise LoadError("staging execution requires the full approved profile and candidate SHA")
-    elif bundle["scope"] != "LOCAL_SMOKE":
+        if public_origin is None:
+            raise LoadError("staging execution requires the canonical public readiness origin")
+        public_origin = validate_public_origin(public_origin)
+    elif bundle["scope"] != "LOCAL_SMOKE" or public_origin is not None:
         raise LoadError("loopback execution requires a LOCAL_SMOKE bundle")
-    runner = Runner(origin, float(config["request_timeout_seconds"]))
-    readiness_status, readiness = runner.request("readiness", "/health/ready")
-    if readiness_status != 200 or not isinstance(readiness.get("release"), str):
-        raise LoadError("target readiness did not return a release")
-    if readiness["release"] != candidate:
-        raise LoadError("target release differs from the prepared synthetic bundle")
 
     concurrency = min(8, config["peak_concurrency"]) if smoke else config["peak_concurrency"]
     learners = [
@@ -637,81 +686,154 @@ def execute(origin: str, bundle_path: Path, *, smoke: bool) -> Path:
         for organization_index, organization in enumerate(organizations)
         for actor in organization.learners
     ]
-    run_parallel(
-        (
-            lambda actor=actor, organization_index=organization_index: learner_flow(
-                runner,
-                actor,
-                organizations[(organization_index + 1) % len(organizations)]
-                .learners[0]
-                .assignment_id
-                or "",
-                bundle["run_id"],
-            )
-            for organization_index, _organization, actor in learners
-        ),
-        concurrency,
-    )
-
-    review_queues: dict[str, tuple[SessionActor, list[dict[str, Any]]]] = {}
-    for organization in organizations:
-        for reviewer in organization.reviewers:
-            review_queues[f"{organization.ref}:{len(review_queues)}"] = (reviewer, reviewer_queue(runner, reviewer))
-    expected_reviews = len(learners)
-    actual_reviews = sum(len(items) for _, items in review_queues.values())
-    if actual_reviews != expected_reviews:
-        raise LoadError(f"review queue count mismatch: expected {expected_reviews}, got {actual_reviews}")
-
-    queues_by_org: dict[str, list[tuple[SessionActor, dict[str, Any]]]] = {}
-    first_review_by_org: dict[str, str] = {}
-    for reviewer, items in review_queues.values():
-        queues_by_org.setdefault(reviewer.organization_ref, []).extend((reviewer, item) for item in items)
-        if items and isinstance(items[0].get("id"), str):
-            first_review_by_org.setdefault(reviewer.organization_ref, items[0]["id"])
-    for index, organization in enumerate(organizations):
-        foreign_ref = organizations[(index + 1) % len(organizations)].ref
-        foreign_review = first_review_by_org.get(foreign_ref)
-        if foreign_review:
-            runner.request(
-                "isolation.reviewer_foreign_review",
-                f"/api/v1/reviews/{foreign_review}",
-                actor=organization.reviewers[0],
-                expected_status=404,
-            )
-    run_parallel(
-        (
-            lambda reviewer=reviewer, review=review: reviewer_flow(
-                runner, reviewer, review, bundle["run_id"]
-            )
-            for entries in queues_by_org.values()
-            for reviewer, review in entries
-        ),
-        concurrency,
-    )
-
-    probes: list[Callable[[], None]] = [
-        lambda: runner.request("readiness", "/health/ready"),
-    ]
-    for organization in organizations:
-        learner = organization.learners[0]
-        reviewer = organization.reviewers[0]
-        operator = organization.operator
-        probes.extend(
-            (
-                lambda actor=learner: runner.request("learner.current_action.post", "/api/v1/me/current-action", actor=actor),
-                lambda actor=learner: runner.request("learner.result", "/api/v1/me/result", actor=actor),
-                lambda actor=reviewer: runner.request("reviewer.queue.post", "/api/v1/reviews", actor=actor),
-                lambda actor=operator: runner.request("operator.runtime", "/api/v1/ops/runtime-status", actor=actor),
-            )
-        )
     steady_seconds = 2 if smoke else config["steady_state_seconds"]
     steady_rate = min(10, config["steady_requests_per_second"]) if smoke else config["steady_requests_per_second"]
     burst_seconds = 1 if smoke else config["burst_seconds"]
     burst_rate = min(20, config["burst_requests_per_second"]) if smoke else config["burst_requests_per_second"]
-    scheduled_reads(runner, tuple(probes), duration_seconds=steady_seconds, requests_per_second=steady_rate, concurrency=concurrency)
-    scheduled_reads(runner, tuple(probes), duration_seconds=burst_seconds, requests_per_second=burst_rate, concurrency=concurrency)
+    runner = Runner(origin, float(config["request_timeout_seconds"]))
+    public_runner = (
+        Runner(public_origin, float(config["request_timeout_seconds"]))
+        if public_origin is not None
+        else None
+    )
+    failure_code: str | None = None
+    diagnostics: dict[str, int] = {}
+    public_readiness_verified = False
+    try:
+        if public_runner is not None:
+            public_status, public_readiness = public_runner.request(
+                "readiness.public", "/health/ready"
+            )
+            if public_status != 200 or public_readiness.get("release") != candidate:
+                raise LoadError(
+                    "public readiness differs from the prepared candidate",
+                    code="PUBLIC_READINESS_MISMATCH",
+                )
+            public_readiness_verified = True
+        readiness_status, readiness = runner.request("readiness.api", "/health/ready")
+        if readiness_status != 200 or readiness.get("release") != candidate:
+            raise LoadError(
+                "internal API readiness differs from the prepared candidate",
+                code="API_READINESS_MISMATCH",
+            )
 
-    status, metrics = summarize(runner.observations, config)
+        run_parallel(
+            (
+                lambda actor=actor, organization_index=organization_index: learner_flow(
+                    runner,
+                    actor,
+                    organizations[(organization_index + 1) % len(organizations)]
+                    .learners[0]
+                    .assignment_id
+                    or "",
+                    bundle["run_id"],
+                )
+                for organization_index, _organization, actor in learners
+            ),
+            concurrency,
+        )
+
+        review_queues: dict[str, tuple[SessionActor, list[dict[str, Any]]]] = {}
+        for organization in organizations:
+            for reviewer in organization.reviewers:
+                review_queues[f"{organization.ref}:{len(review_queues)}"] = (
+                    reviewer,
+                    reviewer_queue(runner, reviewer),
+                )
+        expected_reviews = len(learners)
+        actual_reviews = sum(len(items) for _, items in review_queues.values())
+        diagnostics.update(
+            expected_review_queue_count=expected_reviews,
+            actual_review_queue_count=actual_reviews,
+        )
+        if actual_reviews != expected_reviews:
+            raise LoadError(
+                "review queue count differs from the prepared learner count",
+                code="REVIEW_QUEUE_COUNT_MISMATCH",
+            )
+
+        queues_by_org: dict[str, list[tuple[SessionActor, dict[str, Any]]]] = {}
+        first_review_by_org: dict[str, str] = {}
+        for reviewer, items in review_queues.values():
+            queues_by_org.setdefault(reviewer.organization_ref, []).extend(
+                (reviewer, item) for item in items
+            )
+            if items and isinstance(items[0].get("id"), str):
+                first_review_by_org.setdefault(reviewer.organization_ref, items[0]["id"])
+        for index, organization in enumerate(organizations):
+            foreign_ref = organizations[(index + 1) % len(organizations)].ref
+            foreign_review = first_review_by_org.get(foreign_ref)
+            if foreign_review:
+                runner.request(
+                    "isolation.reviewer_foreign_review",
+                    f"/api/v1/reviews/{foreign_review}",
+                    actor=organization.reviewers[0],
+                    expected_status=404,
+                )
+        run_parallel(
+            (
+                lambda reviewer=reviewer, review=review: reviewer_flow(
+                    runner, reviewer, review, bundle["run_id"]
+                )
+                for entries in queues_by_org.values()
+                for reviewer, review in entries
+            ),
+            concurrency,
+        )
+
+        probes: list[Callable[[], None]] = [
+            lambda: runner.request("readiness.api", "/health/ready"),
+        ]
+        if public_runner is not None:
+            probes.append(
+                lambda: public_runner.request("readiness.public", "/health/ready")
+            )
+        for organization in organizations:
+            learner = organization.learners[0]
+            reviewer = organization.reviewers[0]
+            operator = organization.operator
+            probes.extend(
+                (
+                    lambda actor=learner: runner.request(
+                        "learner.current_action.post", "/api/v1/me/current-action", actor=actor
+                    ),
+                    lambda actor=learner: runner.request(
+                        "learner.result", "/api/v1/me/result", actor=actor
+                    ),
+                    lambda actor=reviewer: runner.request(
+                        "reviewer.queue.post", "/api/v1/reviews", actor=actor
+                    ),
+                    lambda actor=operator: runner.request(
+                        "operator.runtime", "/api/v1/ops/runtime-status", actor=actor
+                    ),
+                )
+            )
+        scheduled_reads(
+            runner,
+            tuple(probes),
+            duration_seconds=steady_seconds,
+            requests_per_second=steady_rate,
+            concurrency=concurrency,
+        )
+        scheduled_reads(
+            runner,
+            tuple(probes),
+            duration_seconds=burst_seconds,
+            requests_per_second=burst_rate,
+            concurrency=concurrency,
+        )
+    except LoadError as error:
+        failure_code = error.code
+
+    observations = runner.observations + (
+        public_runner.observations if public_runner is not None else ()
+    )
+    if observations:
+        status, metrics = summarize(observations, config)
+    else:
+        status, metrics = "FAIL", empty_metrics()
+    if failure_code is not None:
+        status = "FAIL"
     report = {
         "schema_version": 1,
         "scope": "LOCAL_SMOKE" if smoke else "STAGING_SYNTHETIC_MULTI_TENANT",
@@ -731,16 +853,27 @@ def execute(origin: str, bundle_path: Path, *, smoke: bool) -> Path:
             "burst_requests_per_second": burst_rate,
         },
         "metrics": metrics,
+        "diagnostics": diagnostics,
+        "failure_code": failure_code,
         "status": status,
         "staging_benchmark": "PASS" if not smoke and status == "PASS" else "NOT_RUN",
         "pilot_availability_99_5_percent": "NOT_RUN",
         "production_mutation_executed": False,
         "notifications_sent_by_runner": False,
         "session_material_recorded": False,
+        "api_transport": "SSH_LOOPBACK_TUNNEL" if is_staging else "LOCAL_LOOPBACK",
+        "public_readiness_verified": public_readiness_verified,
     }
-    path = owner_only_write(ARTIFACT_ROOT, "multitenant-load", report)
+    if output is not None:
+        write_owner_only(output, report)
+        path = output
+    else:
+        path = owner_only_write(ARTIFACT_ROOT, "multitenant-load", report)
     if status != "PASS":
-        raise LoadError(f"multi-tenant load failed; evidence: {path}")
+        raise LoadError(
+            f"{failure_code or 'LOAD_BUDGET_FAILED'}; PII-free evidence: {path}",
+            code=failure_code or "LOAD_BUDGET_FAILED",
+        )
     return path
 
 
@@ -787,7 +920,9 @@ def parse_args() -> argparse.Namespace:
     subparsers.add_parser("contract-check")
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--origin", required=True)
+    run_parser.add_argument("--public-origin")
     run_parser.add_argument("--bundle", type=Path, required=True)
+    run_parser.add_argument("--output", type=Path)
     run_parser.add_argument("--smoke", action="store_true")
     verify_parser = subparsers.add_parser("verify")
     verify_parser.add_argument("--load", type=Path, required=True)
@@ -811,7 +946,15 @@ def main() -> int:
                 "staging_mutation_executed=false"
             )
         elif args.command == "run":
-            print(execute(args.origin, args.bundle, smoke=args.smoke))
+            print(
+                execute(
+                    args.origin,
+                    args.bundle,
+                    smoke=args.smoke,
+                    public_origin=args.public_origin,
+                    output=args.output,
+                )
+            )
         elif args.command == "verify":
             evidence = verify_evidence(args.load, args.audit, args.retired)
             if args.output:

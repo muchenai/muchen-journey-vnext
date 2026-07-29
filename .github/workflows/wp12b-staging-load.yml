@@ -126,14 +126,66 @@ jobs:
           REMOTE
           scp "${ssh_opts[@]}" "$remote:/tmp/wp12b-bundle-$run_id.json" "$RUNNER_TEMP/wp12b-bundle.json"
           chmod 0600 "$RUNNER_TEMP/wp12b-bundle.json"
-      - name: Execute bounded public HTTPS load
+      - name: Execute bounded internal API load
         id: load
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          report=$(python3 scripts/wp12b_load.py run \
-            --origin https://staging-vnext.muchenai.com \
-            --bundle "$RUNNER_TEMP/wp12b-bundle.json")
-          echo "report=$report" >>"$GITHUB_OUTPUT"
+          ssh_opts=(-i "$RUNNER_TEMP/wp12b-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp12b-known-hosts")
+          remote="root@$PUBLIC_IP"
+          api_ip=$(
+            ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE'
+          set -euo pipefail
+          mapfile -t api_containers < <(
+            docker ps \
+              --filter label=com.docker.compose.project=journey-next-staging \
+              --filter label=com.docker.compose.service=api \
+              --format '{{.ID}}'
+          )
+          test "${#api_containers[@]}" -eq 1
+          docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' "${api_containers[0]}"
+          REMOTE
+          )
+          api_ip=$(printf '%s\n' "$api_ip" | sed '/^[[:space:]]*$/d')
+          python3 - "$api_ip" <<'PY'
+          import ipaddress
+          import sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "::add-mask::$api_ip"
+          ssh "${ssh_opts[@]}" \
+            -o ExitOnForwardFailure=yes \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            -N -L 127.0.0.1:38000:"$api_ip":8000 "$remote" &
+          tunnel_pid=$!
+          cleanup_tunnel() {
+            kill "$tunnel_pid" 2>/dev/null || true
+            wait "$tunnel_pid" 2>/dev/null || true
+          }
+          trap cleanup_tunnel EXIT
+          for _attempt in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:38000/health/ready >/dev/null; then
+              break
+            fi
+            kill -0 "$tunnel_pid"
+            sleep 1
+          done
+          curl -fsS --max-time 2 http://127.0.0.1:38000/health/ready >/dev/null
+          load_report="$RUNNER_TEMP/wp12b-load.json"
+          set +e
+          python3 scripts/wp12b_load.py run \
+            --origin http://127.0.0.1:38000 \
+            --public-origin https://staging-vnext.muchenai.com \
+            --bundle "$RUNNER_TEMP/wp12b-bundle.json" \
+            --output "$load_report"
+          load_exit=$?
+          set -e
+          if test -f "$load_report"; then
+            echo "report=$load_report" >>"$GITHUB_OUTPUT"
+          fi
+          exit "$load_exit"
       - name: Audit immutable facts and tenant scope
         id: audit
         env:
@@ -208,17 +260,27 @@ jobs:
         if: steps.load.outcome == 'success' && steps.audit.outcome == 'success' && steps.retire.outcome == 'success'
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/wp12b-evidence"
-          cp "${{ steps.load.outputs.report }}" "$RUNNER_TEMP/wp12b-evidence/load.json"
-          cp "$RUNNER_TEMP/wp12b-audit.json" "$RUNNER_TEMP/wp12b-evidence/audit.json"
-          cp "$RUNNER_TEMP/wp12b-retired.json" "$RUNNER_TEMP/wp12b-evidence/retired.json"
           python3 scripts/wp12b_load.py verify \
-            --load "$RUNNER_TEMP/wp12b-evidence/load.json" \
-            --audit "$RUNNER_TEMP/wp12b-evidence/audit.json" \
-            --retired "$RUNNER_TEMP/wp12b-evidence/retired.json" \
-            --output "$RUNNER_TEMP/wp12b-evidence/closure.json"
+            --load "$RUNNER_TEMP/wp12b-load.json" \
+            --audit "$RUNNER_TEMP/wp12b-audit.json" \
+            --retired "$RUNNER_TEMP/wp12b-retired.json" \
+            --output "$RUNNER_TEMP/wp12b-closure.json"
+      - name: Assemble PII-free evidence
+        id: assemble
+        if: always() && steps.prepare.outputs.run_id != '' && steps.retire.outcome == 'success'
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/wp12b-evidence"
+          mkdir -p "$evidence_dir"
+          for artifact in load audit retired closure; do
+            source_path="$RUNNER_TEMP/wp12b-$artifact.json"
+            if test -f "$source_path"; then
+              cp "$source_path" "$evidence_dir/$artifact.json"
+            fi
+          done
+          test -f "$evidence_dir/retired.json"
       - name: Upload PII-free evidence
-        if: steps.load.outcome == 'success' && steps.audit.outcome == 'success' && steps.retire.outcome == 'success'
+        if: always() && steps.assemble.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp12b-evidence-${{ inputs.candidate }}
