@@ -7,7 +7,7 @@
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复；WP-12B 的 20 组织/500 Learner staging 正式规模已执行，正确性/隔离/退役 PASS，但三条并发写路径 p95 超过 1 秒，状态为 `STAGING_LOAD_FAIL / NO_RETRY`。隔离诊断已定位默认 15 连接池排队并完成有界修复；候选 `02863d0…` 已通过 Mainline Candidate Gate 并绑定部署合同，但 staging 尚未验证。物理删除、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，WP-12B 关闭前不启动真人 UAT。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复；旧 WP-12B 正式规模的正确性/隔离/退役 PASS，但三条写路径 p95 超过 1 秒。连接池修复候选 `02863d0…` 已通过 Mainline Candidate Gate，并由唯一 run `30519669770` 成功部署到冻结 staging；其 WP-12B 尚未运行。物理删除、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，WP-12B 关闭前不启动真人 UAT。
 
 ## 1. 结论
 

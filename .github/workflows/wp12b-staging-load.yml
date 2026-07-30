@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       confirmation:
-        description: Type RUN_WP12B_<full candidate SHA>
+        description: Type RUN_WP12B_02863d0b670ee9b00b9def3e75bc6699827f555a
         required: true
         type: string
 
@@ -22,7 +22,9 @@ concurrency:
 jobs:
   load:
     name: WP-12B / synthetic multi-tenant load
-    if: inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)
+    if: >-
+      inputs.candidate == '02863d0b670ee9b00b9def3e75bc6699827f555a' &&
+      inputs.confirmation == 'RUN_WP12B_02863d0b670ee9b00b9def3e75bc6699827f555a'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
