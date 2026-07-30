@@ -14,12 +14,12 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-CANDIDATE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
+CANDIDATE = "222096db506e95db887a8705b22ca4a439d0545d"
 STAGING_HOST = "staging-vnext.muchenai.com"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
-    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:710d8de9fe3297819b965d6a25f85792b8689e0c62e00f32b0c00ad52d281401",
-    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22",
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:6c98bdf2b4bead95618a4d9ef7116af79fa75b242af05079653056fc81dcbb13",
+    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:a940420f58eb6ef085926c442996f40b66b6870136272c565bfb9b1c2656d1c2",
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:2d505fa9a3e4d37a38cded5ea2789274192eafde039ec05bdc5f9a44957525b7",
 }
 SECRET_NAMES = (
     "WP08_MIGRATION_DB_PASSWORD",
