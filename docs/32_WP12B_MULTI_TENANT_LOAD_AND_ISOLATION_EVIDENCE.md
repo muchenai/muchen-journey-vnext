@@ -127,7 +127,9 @@ PR #86 已将本修复合入主线；自动 Mainline Candidate Gate `30489417625
 
 修复将 staging API 固定为 `pool_size=20/max_overflow=5`，Worker 固定为 `2/1`，合计最坏 28 个应用连接；配置逐进程硬限制不超过 30。当前 RDS `rds.postgres.1c2g` 官方规格最大 200 连接，因此保留至少 172 个连接余量，且不扩容、不新增进程或资源。submission/reviewer 回归 25 项，以及配置、部署环境与诊断脚本 13 项测试均 PASS。
 
-当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_FIX_NOT_STAGING_VERIFIED`。下一单一 WIP 是完成全量 CI、合入修复并生成新候选；WP-12B、WP-12 和 WP-13 前置仍未关闭，不授权任何 staging 写入。
+PR #90 已将修复合入主线；Mainline Candidate Gate `30511897160` 对精确候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 完成 `ci-main`、SBOM、三镜像 GHCR push、registry digest verify 和候选 artifact 上传。部署合同已绑定该候选、精确 artifact run 与 registry digest，但绑定 PR 不授权 dispatch。
+
+当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_CANDIDATE_READY_NOT_STAGING_VERIFIED`。下一单一 WIP 是在获得精确授权后只部署该候选；WP-12B、WP-12 和 WP-13 前置仍未关闭，候选部署成功也不能替代后续另行授权的 WP-12B。
 
 ## 13. 关闭条件
 
