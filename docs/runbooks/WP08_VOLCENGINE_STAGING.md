@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP12B_REVIEW_PERFORMANCE_CANDIDATE_DEPLOYED / LOAD_NOT_AUTHORIZED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行候选为 `674e51d…`；该候选不得再次部署，WP-12B 负载仍须另行精确授权。
+状态：`WP12B_STAGING_LOAD_FAIL / NO_RETRY`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行候选为 `674e51d…`；唯一 WP-12B run `30508873351` 已消费且性能 FAIL，该候选不得再次部署或重跑。
 
 ## 1. 已锁定授权
 
@@ -14,7 +14,7 @@
 - 历史已消费候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，唯一 deploy run `30242231558` 已成功，后续已由 WP-11 候选替代；
 - 历史已消费候选：`172c9f62ffdcd4fce31fb4900fdca46b3405ab89`；Mainline Candidate Gate `30302594972` 与唯一 deploy run `30351059075` 均成功，该候选不得再次部署；
 - 历史已消费候选：`9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6`；Mainline Candidate Gate `30416410890` 和部署均成功，WP-12B run `30487668744` 给出真实性能 FAIL，该候选不得再次部署或重跑；
-- 当前运行中已消费候选：`674e51d8ed67f9c29c3d04693376c9ba6f1114e5`；Mainline Candidate Gate `30489417625` 完成 `ci-main`、SBOM、三镜像 GHCR push 与 registry digest 验证，唯一 deploy run `30506961105` 在冻结基础设施上成功，外部 readiness/release、匿名 `/ops`/`/review` 拒绝、三档视口/console/overflow/可见焦点 browser smoke 和 SSH 关闭均通过；该候选不得再次部署，WP-12B 尚未授权；
+- 当前运行中已消费候选：`674e51d8ed67f9c29c3d04693376c9ba6f1114e5`；Mainline Candidate Gate `30489417625`、唯一 deploy run `30506961105` 均成功；唯一 WP-12B run `30508873351` 完成 20 组织/500 Learner/10,561 请求，正确性、数据库 audit、560 会话/用户退役、证据上传和 SSH 关闭均 PASS，但 submission/review start/review finalize p95 超过 1 秒，性能门禁 FAIL；该候选不得再次部署或重跑；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
