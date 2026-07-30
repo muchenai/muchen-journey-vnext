@@ -1,7 +1,7 @@
 # 12｜决策、风险与开放问题台账
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.5
+版本：V0.6
 日期：2026-07-30
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
@@ -41,6 +41,7 @@
 | DEC-018 | Alpha 可观测与通知延期边界 | Alpha 阶段延期 TLS 外部日志采集、真实通知和告警演练；保留无业务写入的有界主机审计作为临时观测手段，允许启动 WP-12；三项延期证据仍为 `NOT_RUN`，WP-11 不得记为完整验证，production 继续 `NO_GO` | `APPROVED` | Alpha WP-12 激活；production 前置门禁不变 | Liu Mowen（Product + Security + Tech + Ops Owner） |
 | DEC-019 | Alpha 灾备故障域延期边界 | Alpha 期间不选择跨地域或其他独立灾备故障域；待真实 Alpha 开放后连续稳定运行 30 个自然日再重开选型。基础备份、恢复可用性、数据完整性与 RPO/RTO 工程工作不取消；异机/独立故障域恢复继续 `NOT_RUN`，WP-12 不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO` | `APPROVED` | Alpha 可继续非故障域 WP-12 与真人 UAT；production 恢复门禁不变 | Liu Mowen（Product + Data + Tech + Ops Owner） |
 | DEC-020 | Alpha 性能条件放行 | 候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 的 WP-12B run `30525165474` 保持原 1 秒合同 `FAIL`；仅为启动 WP-13 真人 UAT，接受核心同步命令 p95 ≤1.2 秒的候选级条件边界。该 run 的隔离、正确性、数据库审计、身份退役和 SSH 关闭必须全部保持 PASS；候选漂移立即失效。DEC-013 的 production p95≤1 秒不变，WP-12B 不记 `CLOSED`，production 继续 `NO_GO` | `APPROVED` | 允许该候选启动 WP-13；不授权 WP-14、production、重跑负载或再次部署 | Liu Mowen（Product + Tech + QA/UAT Owner） |
+| DEC-021 | WP-13 Web 修复候选重绑定 | 主线 `222096db506e95db887a8705b22ca4a439d0545d` 相对已测候选仅改变 Web 运行代码；API、Worker、迁移、OpenAPI、Python/Web 锁文件及 Compose 内容保持一致。允许沿用 WP-12B run `30525165474` 的原始 FAIL 与 DEC-020 的 Alpha ≤1.2 秒条件证据来准备新候选 UAT 绑定，不重跑 WP-12B。Mainline run `30550010916` 生成并验证三镜像；在该候选完成一次独立授权的 staging 部署、readiness/版本核对和部署 run 绑定前，真人 UAT 不得恢复，production 继续 `NO_GO` | `APPROVED` | 仅批准影响核对、候选生成和 pending UAT 重绑定；不授权部署、UAT 恢复、WP-14 或 production | Liu Mowen（Product + Tech + QA/UAT Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -88,6 +89,12 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 把该 run 追认成 `PASS` 会破坏证据真实性，继续为约 0.1 秒差距重复部署和合成负载又不能更快验证真实用户问题。因此本决策保留 WP-12B=`FAIL/NOT_CLOSED`，只为同一已部署候选建立 p95≤1.2 秒的 `CONDITIONAL_PASS_FOR_ALPHA`，允许启动 WP-13。该边界不是 DEC-013 的替代品：WP-14 不自动启动，RC/production 仍须满足原 1 秒 SLO 或由新的生产级决策明确替代；任何候选、部署或规模变化都必须重新评估。
 
+### DEC-021｜为什么 Web 修复不重跑后端负载
+
+`UAT-WP13-001` 的根因是 `/ops` 缺少邀请入口。候选差异核对证明 `apps/api`、`apps/worker`、`migrations` 的 Git tree，以及 OpenAPI、Python/Web 锁文件与 Compose blob 均和候选 `02863d0…` 完全一致；运行态新增只包含邀请入口的 Web UI/Server Action，并复用既有 scoped invite API。重新执行 20 组织/500 Learner 的后端负载不会增加与该缺陷相关的证据，反而会消耗试点时间。
+
+因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。`config/wp13_uat_rebind.json` 在部署前固定 `deployment_run_id=null`、`human_uat_resume_allowed=false`；只有精确候选成功部署并完成版本/readiness 核对后，才可通过新的受审 PR 激活 `config/wp13_uat_plan.json`。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
@@ -112,6 +119,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-018 | Alpha 延期被误解为生产观测已通过 | 中/高 | 文档或发布门禁把 TLS/真实通知/告警标为 `VERIFIED`，或无外部观测即申请 production | DEC-018；三项保持 `NOT_RUN`；WP-11 保持 `NO_GO`；production release gate 拒绝 | Product/Security/Ops/Release |
 | RSK-019 | 灾备故障域延期演变为无期限无恢复能力 | 中/高 | 没有登记 Alpha 起始日；30 日后不评审；把受管备份存在等同于隔离恢复通过 | DEC-019；30 日成熟触发器；严重事故重新计时；基础备份/恢复工程不停；`off_host_backup_restore` 保持阻塞 | Product/Data/Ops/Release |
 | RSK-020 | Alpha 条件放行被误写成性能门禁通过 | 中/高 | 文档出现 `WP12B_CLOSED`、候选漂移后继续 UAT，或以 1.2 秒申请 production | DEC-020；保留原 run FAIL；WP-13 计划精确绑定候选；production 继续执行 DEC-013 的 1 秒 SLO | Product/Tech/QA/Release |
+| RSK-021 | pending 候选重绑定被误当成已部署 | 中/高 | 新候选未部署即恢复 UAT，或新 UAT 证据仍引用旧 deployment run | DEC-021；独立 pending rebind 合同；deployment run 为空时 resume=false；部署后单独 PR 激活 | Product/Tech/QA/Release |
 
 ## 5. 原开放问题的关闭结论
 
@@ -136,14 +144,16 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 2026-07-30 后续执行决策：Product Owner 明确批准 DEC-020，保留候选 `02863d0…` 的 WP-12B run `30525165474` 为原合同 FAIL，仅按 p95≤1.2 秒条件边界启动同一候选的 WP-13 真人 UAT。该批准不重跑 WP-12B、不再次部署、不启动 WP-14、不修改 DEC-013 production SLO，也不构成 production GO。
 
+2026-07-30 后续执行决策：Product Owner 明确批准 DEC-021，对主线 `222096db…` 执行 Web-only 影响核对、生成候选并准备 UAT 重绑定，不重跑 WP-12B。该批准不授权 staging 部署或恢复 UAT；部署 run 未绑定前 `human_uat_resume_allowed=false`，production 继续 `NO_GO`。
+
 ## 7. 签署区
 
 | 角色 | 姓名 | 已批准 DEC | 未批准 DEC | 结论 | 日期 |
 | --- | --- | --- | --- | --- | --- |
-| Product Owner | Liu Mowen | DEC-001..020 | 真人试点结果 | BUILD GO | 2026-07-30 |
-| Tech Lead | Liu Mowen | DEC-001..020 | 物理生产资源验证 | BUILD GO | 2026-07-30 |
+| Product Owner | Liu Mowen | DEC-001..021 | 真人试点结果 | BUILD GO | 2026-07-30 |
+| Tech Lead | Liu Mowen | DEC-001..021 | 物理生产资源验证 | BUILD GO | 2026-07-30 |
 | Data Owner | Liu Mowen | DEC-001..016/019 | 恢复演练证据 | BUILD GO | 2026-07-28 |
 | Design Owner | Liu Mowen | DEC-015/016 | 真人 5 秒测试 | BUILD GO | 2026-07-20 |
 | Security/Privacy | Liu Mowen | DEC-006/008/012/014/017/018 | 生产安全门禁 | BUILD GO | 2026-07-28 |
-| QA/UAT | Liu Mowen | DEC-007/010/016/020 | 真人 UAT | BUILD GO | 2026-07-30 |
+| QA/UAT | Liu Mowen | DEC-007/010/016/020/021 | 真人 UAT | BUILD GO | 2026-07-30 |
 | Release/Ops | Liu Mowen | DEC-003/013/014/018/019 | 发布/观察证据 | BUILD GO | 2026-07-28 |
