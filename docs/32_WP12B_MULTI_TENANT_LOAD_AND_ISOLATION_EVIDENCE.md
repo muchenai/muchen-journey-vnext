@@ -1,6 +1,6 @@
 # WP-12B｜多租户容量与隔离门禁证据
 
-状态：`LOCAL_HARNESS_PASS / REVIEW_PERFORMANCE_CANDIDATE_DEPLOYED / WP12B_NOT_CLOSED`
+状态：`LOCAL_HARNESS_PASS / STAGING_LOAD_FAIL / WP12B_NOT_CLOSED`
 
 日期：2026-07-30
 Owner：Tech Lead + QA/UAT Owner + Release/Ops
@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 已部署并完成五次有界 WP-12B 尝试，最近一次得到 Reviewer 写路径真实性能 FAIL。最小优化已由 PR #86 合入，新候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 经 Mainline Candidate Gate `30489417625` 验证并推送三镜像，且已由唯一部署 run `30506961105` 在冻结 staging 成功部署；该候选尚未执行 WP-12B 负载，因此不得把本文件记为 `WP12B_CLOSED`。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 已部署并完成五次有界 WP-12B 尝试，最近一次得到 Reviewer 写路径真实性能 FAIL。最小优化已由 PR #86 合入，新候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 经 Mainline Candidate Gate `30489417625` 验证、唯一部署 run `30506961105` 成功部署，并由一次性 WP-12B run `30508873351` 完成正式规模测量；隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，因此 WP-12B 仍为 `NOT_CLOSED`，该 run 不得重试。
 
 ## 2. 固定负载合同
 
@@ -109,7 +109,17 @@ PR #86 已将本修复合入主线；自动 Mainline Candidate Gate `30489417625
 
 该 run 只关闭候选部署条件，不构成 WP-12B workflow 授权。候选不得再次部署；下一次外部写入只能是 Owner 对同一候选和届时精确主线另行授权的一次 WP-12B，仍须满足不部署、不新增资源、不发送消息、失败不重试、始终退役合成身份并关闭 SSH。
 
-## 11. 关闭条件
+## 11. 第六次 staging 执行与共享写入瓶颈证据
+
+2026-07-30，Owner 授权候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 基于主线 `aa759b4107c694c0cab0dfc6e0efa61fddc86819` 在现有 staging 执行一次 WP-12B；GitHub Actions run `30508873351` 按授权只运行一次，未部署、未新增资源、未发送消息。20 个合成组织、500 名 Learner、40 名 Reviewer、20 名 Operator、50 峰值并发、600 秒 × 10 rps 稳态与 60 秒 × 25 rps 突发均完整执行，共 10,561 个真实请求；公开 readiness/release 和内部 API release 均核对为该候选。
+
+正确性门禁全部通过：HTTP 5xx、409、跨组织泄漏和意外响应均为 0，Reviewer 队列为 500/500；数据库 audit 的 cross-org mismatch、duplicate fact、incomplete flow 均为 0。失败后强制收尾也全部通过：560 个合成会话全部撤销、560 个合成用户全部禁用，active session/user 均为 0，PII-free artifact 已上传，临时材料已清理，单一 `/32` SSH 已关闭。
+
+性能门禁仍 FAIL。`reviewer.review_start` p95 从旧候选的 1.365 秒降至 1.309 秒，`reviewer.review_finalize` 从 1.502 秒降至 1.423 秒，说明最小查询/flush 优化方向有效但幅度不足；同时 `learner.submission_create` p95 从 0.901 秒升至 1.119 秒。其余端点均低于 1 秒：assignment start=`0.907s`、current action pre=`0.888s`、跨组织 Assignment 404=`0.838s`，稳态读取均低于 `0.023s`。因此最新证据不再支持“只有 Reviewer 查询往返”这一单点根因；更可能存在 50 并发写入下共享数据库事务、连接池、锁等待或 RDS 资源竞争，具体归因仍需有界测量，不能凭一次结果认定。
+
+该 run 是终局失败证据，不得重试，也不得放宽统一 1 秒预算。下一步不是继续微调同一函数或直接生成候选，而是先在不写 staging 的测试环境加入事务分段、连接池等待、数据库语句与锁等待的聚合计时，复现 50 并发写入并用证据选择一个最小修复；任何新的 staging 负载必须重新生成、部署精确候选并获得新的单次授权。
+
+## 12. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 
