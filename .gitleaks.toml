@@ -14,3 +14,11 @@ condition = "AND"
 regexTarget = "line"
 regexes = ['''idempotency_key="wp06-negative-scope"''']
 paths = ['''scripts/wp06_ops\.py$''']
+
+[[allowlists]]
+description = "WP-13 candidate binding stores a public OpenAPI SHA-256 digest, not a credential."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''"openapi_sha256"\s*:\s*"[0-9a-f]{64}"''']
+paths = ['''(^|/)(config/wp13_uat_plan\.json|scripts/wp13_15_evidence\.py|tests/test_wp13_15_evidence\.py|evidence/private/wp13-uat\.json)$''']
