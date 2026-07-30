@@ -258,6 +258,15 @@ export type OpsIdentityAccess = {
   >;
 };
 
+export type OpsInvite = {
+  id: string;
+  purpose: string;
+  role: "LEARNER";
+  status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "REVOKED";
+  expires_at: string;
+  revision: number;
+};
+
 export type OpsAuditEntry = {
   id: string;
   actor_id: string | null;

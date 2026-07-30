@@ -52,7 +52,7 @@ web-install:
 	cd apps/web && npm ci
 
 web-static:
-	cd apps/web && npm run lint && npm run typecheck
+	cd apps/web && npm run lint && npm run typecheck && npm test
 
 web-source-map-check:
 	@test -d apps/web/.next/static

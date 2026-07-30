@@ -29,7 +29,7 @@ body {
 }
 
 a { color: inherit; }
-button, textarea, input { font: inherit; }
+button, textarea, input, select { font: inherit; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .skip-link {
@@ -102,6 +102,7 @@ h2 { font-size: 24px; line-height: 1.25; }
 label, legend { font-weight: 700; }
 textarea { width: 100%; min-height: 240px; margin-top: 8px; padding: 14px; color: var(--text-primary); background: #fff; border: 1px solid var(--border-strong); border-radius: 8px; resize: vertical; }
 input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: 100%; min-height: 48px; margin: 8px 0 20px; padding: 10px 12px; color: var(--text-primary); background: #fff; border: 1px solid var(--border-strong); border-radius: 8px; }
+select { width: 100%; min-height: 48px; margin: 8px 0 20px; padding: 10px 12px; color: var(--text-primary); background: #fff; border: 1px solid var(--border-strong); border-radius: 8px; }
 .attachment-choice { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; font-weight: 500; }
 .attachment-choice input { width: 20px; height: 20px; margin-top: 3px; }
 .attachment-workspace, .submission-history { margin: 32px 0; padding-top: 24px; border-top: 1px solid var(--border-default); }
@@ -181,6 +182,7 @@ fieldset { margin: 24px 0; padding: 20px; border: 1px solid var(--border-default
 .result-timeline p { margin-bottom: 0; color: var(--text-secondary); font-size: 14px; }
 .ops-page { display: grid; min-width: 0; gap: 24px; max-width: 1040px; }
 .ops-page > h1 { max-width: none; }
+.ops-primary-action { width: fit-content; }
 .ops-section { min-width: 0; box-shadow: 0 10px 32px rgba(23, 32, 51, 0.055); }
 .ops-section h2 { margin-bottom: 12px; }
 .ops-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 24px 0 0; }
@@ -195,6 +197,11 @@ fieldset { margin: 24px 0; padding: 20px; border: 1px solid var(--border-default
 .ops-command-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 12px; align-items: end; padding-top: 12px; border-top: 1px solid var(--border-default); }
 .ops-command-form label { min-width: 0; }
 .ops-command-form input { margin-bottom: 0 !important; }
+.ops-command-form select { margin-bottom: 0; }
+.invite-create-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 24px 0; }
+.invite-create-form .invite-purpose-field, .invite-create-form > .inline-error { grid-column: 1 / -1; }
+.invite-create-form > .button { width: fit-content; }
+.invite-list { margin-bottom: 0; }
 .identity-create-form { grid-template-columns: minmax(0, 1fr) auto; }
 .identity-create-form > p { margin: 0; color: var(--text-secondary); }
 .identity-create-form > .inline-error { grid-column: 1 / -1; margin: 0; }
