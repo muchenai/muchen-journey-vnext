@@ -450,6 +450,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:scripts/wp08_web_runtime_check.py"',
         'git show "$candidate:apps/worker/journey_worker/main.py"',
         'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+        '"DB_POOL_SIZE": "20"',
+        '"DB_MAX_OVERFLOW": "5"',
+        '"DB_POOL_SIZE": "2"',
+        '"DB_MAX_OVERFLOW": "1"',
         'git cat-file -e "$candidate:docs/runbooks/WP11_STAGING_INTEGRATIONS.md"',
         'git cat-file -e "$candidate:scripts/wp12b_load.py"',
         'git cat-file -e "$candidate:apps/api/journey_api/wp12b_synthetic.py"',
@@ -469,10 +473,11 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
-        or workflow.count('git show "$candidate:') != 8
+        or workflow.count('git show "$candidate:') != 12
     ):
         raise StagingError(
-            "deploy must verify the Web, WP-11, and WP-12B contracts inside the candidate source"
+            "deploy must verify the Web, bounded database pool, WP-11, and WP-12B contracts "
+            "inside the candidate source"
         )
     if workflow.count("scripts/wp08_plan_guard.py") != 1:
         raise StagingError("every WP-08 apply path must have one destructive-plan guard")

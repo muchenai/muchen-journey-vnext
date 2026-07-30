@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       confirmation:
-        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_674E51D_TO_VOLCENGINE_STAGING
+        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_02863D0_TO_VOLCENGINE_STAGING
         required: true
         type: string
 
@@ -33,9 +33,9 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == '674e51d8ed67f9c29c3d04693376c9ba6f1114e5' &&
+      inputs.candidate == '02863d0b670ee9b00b9def3e75bc6699827f555a' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_674E51D_TO_VOLCENGINE_STAGING'))
+      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_02863D0_TO_VOLCENGINE_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -83,10 +83,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-674e51d8ed67f9c29c3d04693376c9ba6f1114e5
+          name: wp07-candidate-02863d0b670ee9b00b9def3e75bc6699827f555a
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 30489417625
+          run-id: 30511897160
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
@@ -109,6 +109,14 @@ jobs:
               grep -Fq 'active_recipient_exists'
             git show "$candidate:scripts/wp08_prepare_deploy.py" | \
               grep -Fq 'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"'
+            git show "$candidate:scripts/wp08_prepare_deploy.py" | \
+              grep -Fq '"DB_POOL_SIZE": "20"'
+            git show "$candidate:scripts/wp08_prepare_deploy.py" | \
+              grep -Fq '"DB_MAX_OVERFLOW": "5"'
+            git show "$candidate:scripts/wp08_prepare_deploy.py" | \
+              grep -Fq '"DB_POOL_SIZE": "2"'
+            git show "$candidate:scripts/wp08_prepare_deploy.py" | \
+              grep -Fq '"DB_MAX_OVERFLOW": "1"'
             git cat-file -e "$candidate:docs/runbooks/WP11_STAGING_INTEGRATIONS.md"
             git cat-file -e "$candidate:scripts/wp12b_load.py"
             git cat-file -e "$candidate:apps/api/journey_api/wp12b_synthetic.py"

@@ -10,16 +10,16 @@ fail() {
 }
 
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "674e51d8ed67f9c29c3d04693376c9ba6f1114e5" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "02863d0b670ee9b00b9def3e75bc6699827f555a" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${API_IMAGE#*@}" == "sha256:d60d76ab47182167c956e87b51f426d44f744fd34659a797315d60bb65584bed" ]] || fail "API digest differs from candidate manifest"
-[[ "${WEB_IMAGE#*@}" == "sha256:2937da12588108bc3d0eebce202ebf7fb1b19c71a631ce39f259cd09ce333963" ]] || fail "Web digest differs from candidate manifest"
-[[ "${WORKER_IMAGE#*@}" == "sha256:02e03dbada3c12246a1c1b11d224e4e1f8c91dcc5701d244fb4ac02cb9574559" ]] || fail "Worker digest differs from candidate manifest"
+[[ "${API_IMAGE#*@}" == "sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0" ]] || fail "API digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:710d8de9fe3297819b965d6a25f85792b8689e0c62e00f32b0c00ad52d281401" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WORKER_IMAGE#*@}" == "sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22" ]] || fail "Worker digest differs from candidate manifest"
 
 command -v docker >/dev/null || fail "docker is missing"
 docker compose version >/dev/null || fail "docker compose plugin is missing"
@@ -38,7 +38,11 @@ openssl x509 -in "$ca_path" -noout -checkend 2592000 >/dev/null || fail "RDS CA 
 grep -qx 'APP_ENV=staging' "$SECRETS/api.env" || fail "API must run as staging"
 grep -qx 'ALLOW_FIXTURE_IDENTITY=false' "$SECRETS/api.env" || fail "fixture identity must be disabled"
 grep -qx 'NOTIFICATION_RECIPIENTS_ENABLED=true' "$SECRETS/api.env" || fail "staging notification recipients must be enabled"
+grep -qx 'DB_POOL_SIZE=20' "$SECRETS/api.env" || fail "API database pool size is not the bounded WP-12B value"
+grep -qx 'DB_MAX_OVERFLOW=5' "$SECRETS/api.env" || fail "API database overflow is not the bounded WP-12B value"
 grep -qx 'APP_ENV=staging' "$SECRETS/worker.env" || fail "Worker must run as staging"
+grep -qx 'DB_POOL_SIZE=2' "$SECRETS/worker.env" || fail "Worker database pool size is not bounded"
+grep -qx 'DB_MAX_OVERFLOW=1' "$SECRETS/worker.env" || fail "Worker database overflow is not bounded"
 grep -qx 'NOTIFICATION_ADAPTER=FEISHU' "$SECRETS/worker.env" || fail "WP-11 worker must use the dedicated Feishu adapter"
 grep -qx 'NOTIFICATION_RESULT_URL=https://staging-vnext.muchenai.com/app/result' "$SECRETS/worker.env" || fail "WP-11 notification result URL is not canonical"
 grep -qx 'OBSERVABILITY_SNAPSHOT_SECONDS=60' "$SECRETS/worker.env" || fail "WP-11 observability snapshot cadence is not canonical"
