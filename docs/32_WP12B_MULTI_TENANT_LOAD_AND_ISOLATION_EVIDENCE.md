@@ -117,9 +117,19 @@ PR #86 已将本修复合入主线；自动 Mainline Candidate Gate `30489417625
 
 性能门禁仍 FAIL。`reviewer.review_start` p95 从旧候选的 1.365 秒降至 1.309 秒，`reviewer.review_finalize` 从 1.502 秒降至 1.423 秒，说明最小查询/flush 优化方向有效但幅度不足；同时 `learner.submission_create` p95 从 0.901 秒升至 1.119 秒。其余端点均低于 1 秒：assignment start=`0.907s`、current action pre=`0.888s`、跨组织 Assignment 404=`0.838s`，稳态读取均低于 `0.023s`。因此最新证据不再支持“只有 Reviewer 查询往返”这一单点根因；更可能存在 50 并发写入下共享数据库事务、连接池、锁等待或 RDS 资源竞争，具体归因仍需有界测量，不能凭一次结果认定。
 
-该 run 是终局失败证据，不得重试，也不得放宽统一 1 秒预算。下一步不是继续微调同一函数或直接生成候选，而是先在不写 staging 的测试环境加入事务分段、连接池等待、数据库语句与锁等待的聚合计时，复现 50 并发写入并用证据选择一个最小修复；任何新的 staging 负载必须重新生成、部署精确候选并获得新的单次授权。
+该 run 是终局失败证据，不得重试，也不得放宽统一 1 秒预算。任何新的 staging 负载必须重新生成、部署精确候选并获得新的单次授权。
 
-## 12. 关闭条件
+## 12. 隔离诊断与有界连接池修复
+
+2026-07-30 在本地 `db-test` 只读诊断中，以 50 并发、每连接持有 250ms、预热后 3 波共 150 个样本复现连接池排队。现状 SQLAlchemy 默认等价配置 `pool_size=5/max_overflow=10` 的 checkout wait p95=`0.750s`、总耗时 p95=`1.007s`；有界配置 `20/5` 分别为 `0.261s`、`0.527s`，checkout wait p95 降低 `65.1%`。`scripts/wp12b_pool_diagnostic.py` 只接受 loopback/`db-test` 且数据库名必须以 `_test` 结尾，不记录 DSN、不写业务事实；`make wp12b-pool-diagnostic` 可复现该证据。
+
+另以两组合成本地 run 组成 50 个并发真实 Learner/Reviewer 闭环：默认池的 assignment start/submission/review start/review finalize p95 分别为 `0.258/0.239/0.464/0.765s`；API `20/5` 加 submission flush 修复后为 `0.210/0.264/0.284/0.362s`。Reviewer 两条写路径分别改善约 `39%/53%`，且 320 个请求保持 5xx/意外响应为 0，两个 run 的 cross-org mismatch、duplicate fact、incomplete flow、active session/user 均为 0。submission 在本地低 RTT 环境没有改善，因此额外删除提交事务中两个不必要的显式 `flush`，让已在进程内分配 UUID 的相关 INSERT 由同一 commit 排序；该改动减少两个远端数据库往返，但仍须由新 staging 候选验证，不能据本地结果宣称性能门禁已关闭。
+
+修复将 staging API 固定为 `pool_size=20/max_overflow=5`，Worker 固定为 `2/1`，合计最坏 28 个应用连接；配置逐进程硬限制不超过 30。当前 RDS `rds.postgres.1c2g` 官方规格最大 200 连接，因此保留至少 172 个连接余量，且不扩容、不新增进程或资源。submission/reviewer 回归 25 项，以及配置、部署环境与诊断脚本 13 项测试均 PASS。
+
+当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_FIX_NOT_STAGING_VERIFIED`。下一单一 WIP 是完成全量 CI、合入修复并生成新候选；WP-12B、WP-12 和 WP-13 前置仍未关闭，不授权任何 staging 写入。
+
+## 13. 关闭条件
 
 WP-12B 只有同时满足以下条件才关闭：
 

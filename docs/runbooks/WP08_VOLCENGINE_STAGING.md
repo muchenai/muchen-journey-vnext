@@ -2,6 +2,8 @@
 
 状态：`WP12B_STAGING_LOAD_FAIL / NO_RETRY`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行候选为 `674e51d…`；唯一 WP-12B run `30508873351` 已消费且性能 FAIL，该候选不得再次部署或重跑。
 
+2026-07-30 本地隔离诊断已复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除；该结论仅为 `FIX_NOT_STAGING_VERIFIED`，不改变本手册状态，也不授权 deploy 或 WP-12B。
+
 ## 1. 已锁定授权
 
 - Provider：火山引擎；Region：华北2（北京），ID=`cn-beijing`；

@@ -40,6 +40,9 @@ services:
       APP_RELEASE: wp06-local-no-head
       CONFIG_SCHEMA_VERSION: 3
       DATABASE_URL: postgresql+psycopg://journey_next:journey_next_dev@db:5432/journey_next_dev
+      DB_POOL_SIZE: ${MJ_API_DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${MJ_API_DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${MJ_DB_POOL_TIMEOUT_SECONDS:-5}
       ALLOWED_HOSTS: localhost,127.0.0.1,api
       ALLOW_FIXTURE_IDENTITY: "true"
       SESSION_SECRET: journey-next-local-session-secret-change-me
@@ -67,6 +70,9 @@ services:
       APP_RELEASE: wp06-local-no-head
       CONFIG_SCHEMA_VERSION: 3
       DATABASE_URL: postgresql+psycopg://journey_next:journey_next_dev@db:5432/journey_next_dev
+      DB_POOL_SIZE: ${MJ_WORKER_DB_POOL_SIZE:-2}
+      DB_MAX_OVERFLOW: ${MJ_WORKER_DB_MAX_OVERFLOW:-1}
+      DB_POOL_TIMEOUT_SECONDS: ${MJ_DB_POOL_TIMEOUT_SECONDS:-5}
       NOTIFICATION_ADAPTER: LOCAL_TEST
       LOCAL_NOTIFICATION_BEHAVIOR: success
       NOTIFICATION_MAX_ATTEMPTS: 3

@@ -692,7 +692,6 @@ def submit_assignment(
             current_version_no=0,
         )
         session.add(submission)
-        session.flush()
     version_no = submission.current_version_no + 1
     version = SubmissionVersion(
         id=uuid.uuid4(),
@@ -702,7 +701,9 @@ def submit_assignment(
         created_by=actor.id,
     )
     session.add(version)
-    session.flush()
+    # IDs are allocated in-process and the assignment row is already locked.
+    # Let the unit of work order all dependent INSERTs at commit so a remote
+    # database does not pay two avoidable flush round trips per submission.
     for position, attachment in enumerate(attachments, start=1):
         session.add(
             SubmissionVersionAttachment(
