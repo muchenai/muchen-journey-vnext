@@ -55,6 +55,12 @@ def test_prepare_writes_private_independent_environment_files(
         in worker_env
     )
     assert "NOTIFICATION_RECIPIENTS_ENABLED=true" in api_env
+    assert "DB_POOL_SIZE=20" in api_env
+    assert "DB_MAX_OVERFLOW=5" in api_env
+    assert "DB_POOL_TIMEOUT_SECONDS=5" in api_env
+    assert "DB_POOL_SIZE=2" in worker_env
+    assert "DB_MAX_OVERFLOW=1" in worker_env
+    assert "DB_POOL_TIMEOUT_SECONDS=5" in worker_env
     api_recipient_key = next(
         line
         for line in api_env.splitlines()

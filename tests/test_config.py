@@ -1,7 +1,24 @@
 import pytest
 from pydantic import ValidationError
 
-from journey_api.config import Settings
+from journey_api.config import DatabaseSettings, Settings
+
+
+def test_database_pool_configuration_is_explicit_and_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("DB_POOL_SIZE", "20")
+    monkeypatch.setenv("DB_MAX_OVERFLOW", "5")
+    monkeypatch.setenv("DB_POOL_TIMEOUT_SECONDS", "5")
+    configured = DatabaseSettings()
+    assert configured.db_pool_size == 20
+    assert configured.db_max_overflow == 5
+    assert configured.db_pool_timeout_seconds == 5
+
+    with pytest.raises(ValidationError, match="at most 30 connections"):
+        DatabaseSettings(db_pool_size=25, db_max_overflow=6)
+    with pytest.raises(ValidationError, match="DB_POOL_TIMEOUT_SECONDS"):
+        DatabaseSettings(db_pool_timeout_seconds=31)
 
 
 def test_fixture_identity_configuration_fails_closed_outside_local_test():

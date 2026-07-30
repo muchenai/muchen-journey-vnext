@@ -158,6 +158,9 @@ def prepare(output: Path, host: str, port: int) -> None:
         "NOTIFICATION_CHANNEL": "FEISHU",
         "NOTIFICATION_RECIPIENTS_ENABLED": "true",
         "NOTIFICATION_RECIPIENT_KEY": values["WP11_NOTIFICATION_RECIPIENT_KEY"],
+        "DB_POOL_SIZE": "20",
+        "DB_MAX_OVERFLOW": "5",
+        "DB_POOL_TIMEOUT_SECONDS": "5",
     }
     write_env(secrets / "api.env", {**shared_api, "DATABASE_URL": runtime_url})
     write_env(secrets / "migration.env", {**shared_api, "DATABASE_URL": migration_url})
@@ -178,6 +181,9 @@ def prepare(output: Path, host: str, port: int) -> None:
             "NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result",
             "NOTIFICATION_PROVIDER_TIMEOUT_SECONDS": "10",
             "OBSERVABILITY_SNAPSHOT_SECONDS": "60",
+            "DB_POOL_SIZE": "2",
+            "DB_MAX_OVERFLOW": "1",
+            "DB_POOL_TIMEOUT_SECONDS": "5",
             "NOTIFICATION_MAX_ATTEMPTS": "3",
             "NOTIFICATION_RETRY_BASE_SECONDS": "5",
             "OUTBOX_LEASE_SECONDS": "30",

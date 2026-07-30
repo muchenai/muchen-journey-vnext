@@ -19,6 +19,21 @@ class DatabaseSettings(BaseSettings):
         "postgresql+psycopg://journey_next:journey_next_dev@"
         "localhost:5432/journey_next_dev"
     )
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout_seconds: int = 5
+
+    @model_validator(mode="after")
+    def database_pool_is_bounded(self) -> "DatabaseSettings":
+        if not 1 <= self.db_pool_size <= 25:
+            raise ValueError("DB_POOL_SIZE must be between 1 and 25")
+        if not 0 <= self.db_max_overflow <= 25:
+            raise ValueError("DB_MAX_OVERFLOW must be between 0 and 25")
+        if self.db_pool_size + self.db_max_overflow > 30:
+            raise ValueError("database pool may open at most 30 connections per process")
+        if not 1 <= self.db_pool_timeout_seconds <= 30:
+            raise ValueError("DB_POOL_TIMEOUT_SECONDS must be between 1 and 30")
+        return self
 
 
 class Settings(BaseSettings):
