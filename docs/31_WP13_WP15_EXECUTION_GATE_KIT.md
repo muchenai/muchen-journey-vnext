@@ -102,9 +102,17 @@ WP-12B run `30525165474` 的原 1 秒合同保持 `FAIL/NOT_CLOSED`。DEC-020 �
 
 WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还受 WP-11 外部通知/观测、WP-12 异机恢复/物理删除/staging 性能、production 独立资源和双人批准阻塞。
 
+### 6.1 UAT-WP13-001｜运营邀请入口
+
+2026-07-30 首次真人执行在 `AT-UAT-003` 停止：Operator 在 60 秒内无法从 `/ops` 找到新人邀请入口。该结果按 `SEV2` 记录为 `UAT-WP13-001`，原失败事实和私有证据保持不变，不能被后续修复覆盖。
+
+修复范围仅限 Web 运营页：复用既有 organization-scoped `POST/GET /ops/invites` 与 revoke 合同，让 Operator 通过已绑定 Reviewer 和已发布 TaskVersion 的可读名称创建 24 小时一次性链接，并查看/撤销最近邀请；不要求人工输入 UUID，不新增 API、数据表、云资源或 IAM 权限。邀请 token 仍只在创建成功后的当前页面状态显示，并放在 `/join#token=…` fragment 中；刷新后不再回显。
+
+该修复在合入、生成新候选、部署并重新绑定 UAT 计划前只属于 `FIX_PREPARED_NOT_DEPLOYED`。由于 DEC-020 精确绑定旧候选，任何新候选都必须先完成影响核对和明确的 UAT 重绑定决定；不得直接把旧候选的条件放行外推给新候选。
+
 ## 7. 当前判定
 
-- WP-13：`AUTHORIZED / CANDIDATE_BOUND / HUMAN_UAT_NOT_RUN`
+- WP-13：`HUMAN_UAT_STOPPED / AT-UAT-003_FAIL / UAT-WP13-001_SEV2 / FIX_PREPARED_NOT_DEPLOYED / NO_GO`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
 - WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
 - production mutation：`false`

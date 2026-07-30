@@ -10,12 +10,14 @@ import {
   OpsAuditEntry,
   OpsEnrollment,
   OpsIdentityAccess,
+  OpsInvite,
   OpsNotificationDelivery,
   OpsNotificationEndpoint,
   OpsTaskDefinition,
   RuntimeStatus,
 } from "@/lib/server/api";
 import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
+import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,7 @@ export default async function OpsPage({
     audit,
     runtime,
     identityAccess,
+    invites,
     notificationEndpoints,
     notificationDeliveries,
   ] = await Promise.all([
@@ -48,6 +51,7 @@ export default async function OpsPage({
     identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
     identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
     identityPageRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
+    identityPageRequest<{ items: OpsInvite[] }>("/api/v1/ops/invites", "OPERATOR"),
     identityPageRequest<{ items: OpsNotificationEndpoint[] }>(
       "/api/v1/ops/notification-endpoints",
       "OPERATOR",
@@ -72,6 +76,21 @@ export default async function OpsPage({
           : "当前为本地/测试环境；真人 UAT、真实通知与发布签署不在此环境中成立，发布判定必须 NO_GO。"}
       </p>
       {query.updated ? <p className="success-text" role="status">受控命令已写入并记录审计。</p> : null}
+
+      <a className="button primary ops-primary-action" href="#learner-invites">邀请新人</a>
+
+      <section className="panel ops-section" id="learner-invites" aria-labelledby="invite-heading">
+        <p className="section-label">LEARNER INVITE / FIRST REAL LOOP</p>
+        <h2 id="invite-heading">邀请新人进入当前行动</h2>
+        <p>
+          为一名新人选择已绑定主管和已发布任务，生成一条独立的一次性邀请链接。页面不会要求或展示内部 UUID。
+        </p>
+        <InviteManagementPanel
+          invites={invites.items}
+          identityAccess={identityAccess.items}
+          tasks={tasks.items}
+        />
+      </section>
 
       <section className="panel ops-section" aria-labelledby="runtime-heading">
         <div className="section-heading-row">

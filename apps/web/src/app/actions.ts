@@ -486,6 +486,64 @@ export async function cancelEnrollment(data: FormData) {
   redirect("/ops?updated=cancelled");
 }
 
+export type InviteActionState = {
+  error?: string;
+  requestId?: string;
+  joinPath?: string;
+  expiresAt?: string;
+};
+
+export async function createLearnerInvite(
+  _previousState: InviteActionState,
+  data: FormData,
+): Promise<InviteActionState> {
+  try {
+    const reviewerId = requiredUuid(data, "reviewer_id");
+    const taskVersionId = requiredUuid(data, "task_version_id");
+    const purpose = data.get("purpose");
+    if (typeof purpose !== "string" || purpose.trim().length < 3 || purpose.length > 200) {
+      return { error: "邀请用途需为 3–200 个字符。" };
+    }
+    const result = await apiRequest<{ invite_token: string; expires_at: string }>(
+      "/api/v1/ops/invites",
+      "OPERATOR",
+      {
+        method: "POST",
+        headers: commandHeaders(),
+        body: JSON.stringify({
+          purpose: purpose.trim(),
+          expires_in_hours: 24,
+          role: "LEARNER",
+          reviewer_id: reviewerId,
+          task_version_id: taskVersionId,
+          target_user_id: null,
+        }),
+      },
+    );
+    revalidatePath("/ops");
+    return {
+      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}`,
+      expiresAt: result.expires_at,
+    };
+  } catch (error) {
+    return submissionError(error);
+  }
+}
+
+export async function revokeLearnerInvite(data: FormData) {
+  const inviteId = requiredUuid(data, "invite_id");
+  await apiRequest(`/api/v1/ops/invites/${inviteId}/revoke`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=invite-revoked#learner-invites");
+}
+
 export async function configureNotificationEndpoint(data: FormData) {
   const userId = requiredUuid(data, "user_id");
   const revisionValue = Number(data.get("revision"));
