@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6` 已部署并完成五次有界 WP-12B 尝试，最近一次得到 Reviewer 写路径真实性能 FAIL。最小优化已由 PR #86 合入，新候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 经 Mainline Candidate Gate `30489417625` 验证、唯一部署 run `30506961105` 成功部署，并由一次性 WP-12B run `30508873351` 完成正式规模测量；隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，因此 WP-12B 仍为 `NOT_CLOSED`，该 run 不得重试。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 的一次性 WP-12B run `30508873351` 完成正式规模测量，隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，该 run 不得重试。连接池修复候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 已由唯一 deploy run `30519669770` 成功部署；其 WP-12B 尚未运行，因此仍为 `NOT_CLOSED`。
 
 ## 2. 固定负载合同
 
@@ -129,7 +129,9 @@ PR #86 已将本修复合入主线；自动 Mainline Candidate Gate `30489417625
 
 PR #90 已将修复合入主线；Mainline Candidate Gate `30511897160` 对精确候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 完成 `ci-main`、SBOM、三镜像 GHCR push、registry digest verify 和候选 artifact 上传。部署合同已绑定该候选、精确 artifact run 与 registry digest，但绑定 PR 不授权 dispatch。
 
-当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_CANDIDATE_READY_NOT_STAGING_VERIFIED`。下一单一 WIP 是在获得精确授权后只部署该候选；WP-12B、WP-12 和 WP-13 前置仍未关闭，候选部署成功也不能替代后续另行授权的 WP-12B。
+2026-07-30，Owner 授权候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 基于主线 `689250ac46ee1bbfb01f102d34705c139999755e` 在火山引擎华北2（北京）的冻结 staging 执行一次 `phase=deploy`，失败不重试、不发送飞书消息、不配置业务接收人。唯一 run `30519669770` 成功：精确候选/artifact/digest、预算合同、加密 state 仅读取、API `20+5`/Worker `2+1` 环境、migration、API/Web/Worker/Edge 健康、外部 TLS/release surface 与匿名 401 均 PASS；`audit/provision/apply` 均跳过，单一 SSH `/32` 已关闭。镜像下载耗时约 36 分钟但仍在 45 分钟门限内完成。该候选不得再次部署。
+
+当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_CANDIDATE_DEPLOYED / WP12B_NOT_RUN`。下一单一 WIP 是在获得独立精确授权后只执行一次该候选的 WP-12B；部署成功不能替代性能、数据库 audit、身份 retire 和 SSH close 证据。
 
 ## 13. 关闭条件
 

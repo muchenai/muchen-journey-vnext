@@ -36,6 +36,8 @@ WORKFLOW_PATH = ROOT / ".github" / "workflows" / "wp12b-staging-load.yml"
 ARTIFACT_ROOT = ROOT / "artifacts" / "wp12b"
 PRIVATE_ROOT = ROOT / "evidence" / "private"
 STAGING_ORIGIN = "https://staging-vnext.muchenai.com"
+APPROVED_STAGING_CANDIDATE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
+APPROVED_STAGING_CONFIRMATION = f"RUN_WP12B_{APPROVED_STAGING_CANDIDATE}"
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{5,39}$")
@@ -188,7 +190,8 @@ def validate_workflow_source(source: str) -> None:
     required = (
         "workflow_dispatch:",
         "environment: staging",
-        "inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)",
+        f"inputs.candidate == '{APPROVED_STAGING_CANDIDATE}'",
+        f"inputs.confirmation == '{APPROVED_STAGING_CONFIRMATION}'",
         "git merge-base --is-ancestor",
         "cat /srv/journey-next-staging/DEPLOYED_CANDIDATE",
         "python3 scripts/wp12b_load.py contract-check",

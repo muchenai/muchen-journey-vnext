@@ -1,8 +1,8 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP12B_STAGING_LOAD_FAIL / NO_RETRY`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行候选为 `674e51d…`；唯一 WP-12B run `30508873351` 已消费且性能 FAIL，该候选不得再次部署或重跑。
+状态：`BOUNDED_POOL_CANDIDATE_DEPLOYED / WP12B_NOT_RUN`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。staging 当前运行候选为 `02863d0…`；其 WP-12B 尚未授权或运行。
 
-2026-07-30 本地隔离诊断已复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除；该结论仅为 `FIX_NOT_STAGING_VERIFIED`，不改变本手册状态，也不授权 deploy 或 WP-12B。
+2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除；候选现已部署，但 WP-12B 性能、隔离、事实审计和强制退役仍须单独执行，不能由部署结果替代。
 
 ## 1. 已锁定授权
 
@@ -16,8 +16,8 @@
 - 历史已消费候选：`2ab2658fc0341d11bc1434524d86128e23da9170`；canonical run `30237677350` 的 `registry_push=VERIFIED`，唯一 deploy run `30242231558` 已成功，后续已由 WP-11 候选替代；
 - 历史已消费候选：`172c9f62ffdcd4fce31fb4900fdca46b3405ab89`；Mainline Candidate Gate `30302594972` 与唯一 deploy run `30351059075` 均成功，该候选不得再次部署；
 - 历史已消费候选：`9e1cdb280e47ecb5b2571a4f4bedb05a7c9f22f6`；Mainline Candidate Gate `30416410890` 和部署均成功，WP-12B run `30487668744` 给出真实性能 FAIL，该候选不得再次部署或重跑；
-- 当前运行中已消费候选：`674e51d8ed67f9c29c3d04693376c9ba6f1114e5`；Mainline Candidate Gate `30489417625`、唯一 deploy run `30506961105` 均成功；唯一 WP-12B run `30508873351` 完成 20 组织/500 Learner/10,561 请求，正确性、数据库 audit、560 会话/用户退役、证据上传和 SSH 关闭均 PASS，但 submission/review start/review finalize p95 超过 1 秒，性能门禁 FAIL；该候选不得再次部署或重跑；
-- 待部署性能修复候选：`02863d0b670ee9b00b9def3e75bc6699827f555a`；PR #90 已合入，Mainline Candidate Gate `30511897160` 的 `ci-main`、SBOM、三镜像 GHCR push、registry digest verify 和 artifact 上传均 PASS；尚未部署或执行 WP-12B，不能视为性能门禁通过；
+- 历史已消费候选：`674e51d8ed67f9c29c3d04693376c9ba6f1114e5`；Mainline Candidate Gate `30489417625`、唯一 deploy run `30506961105` 均成功；唯一 WP-12B run `30508873351` 完成 20 组织/500 Learner/10,561 请求，正确性、数据库 audit、560 会话/用户退役、证据上传和 SSH 关闭均 PASS，但 submission/review start/review finalize p95 超过 1 秒，性能门禁 FAIL；该候选不得再次部署或重跑；
+- 当前运行中性能修复候选：`02863d0b670ee9b00b9def3e75bc6699827f555a`；PR #90、Mainline Candidate Gate `30511897160` 和唯一 deploy run `30519669770` 均成功；精确 digest、冻结 state、migration、API/Web/Worker/Edge、外部 TLS/release surface 和 SSH 关闭均 PASS，`audit/provision/apply` 均未执行；该候选不得再次部署，WP-12B 尚未运行，不能视为性能门禁通过；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。

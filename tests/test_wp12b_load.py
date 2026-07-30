@@ -31,7 +31,8 @@ def valid_workflow_source():
     return """
 workflow_dispatch:
 environment: staging
-inputs.confirmation == format('RUN_WP12B_{0}', inputs.candidate)
+inputs.candidate == '02863d0b670ee9b00b9def3e75bc6699827f555a'
+inputs.confirmation == 'RUN_WP12B_02863d0b670ee9b00b9def3e75bc6699827f555a'
 git merge-base --is-ancestor
 cat /srv/journey-next-staging/DEPLOYED_CANDIDATE
 python3 scripts/wp12b_load.py contract-check
@@ -117,6 +118,13 @@ def test_wp12b_workflow_contract_rejects_mutation_and_bundle_upload():
             valid.replace(
                 "docker inspect api",
                 'docker inspect api\nscp host:/tmp/wp12b-bundle.json "$RUNNER_TEMP/wp12b-bundle.json"',
+            )
+        )
+    with pytest.raises(LoadError, match="missing required contracts"):
+        validate_workflow_source(
+            valid.replace(
+                "inputs.candidate == '02863d0b670ee9b00b9def3e75bc6699827f555a'",
+                "inputs.candidate == '674e51d8ed67f9c29c3d04693376c9ba6f1114e5'",
             )
         )
 
