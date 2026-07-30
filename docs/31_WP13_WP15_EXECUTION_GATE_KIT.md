@@ -1,8 +1,8 @@
 # WP-13～WP-15 真人、时间与生产门禁执行包
 
-状态：`PREPARED_NOT_STARTED`
+状态：`AUTHORIZED_NOT_STARTED`
 
-结论：`MACHINE_CONTRACT_READY / HUMAN_AND_TIME_EVIDENCE_NOT_RUN / PRODUCTION_NO_GO`
+结论：`MACHINE_CONTRACT_READY / ALPHA_ENTRY_CONDITIONALLY_APPROVED / HUMAN_AND_TIME_EVIDENCE_NOT_RUN / PRODUCTION_NO_GO`
 
 ## 1. 第一性原则
 
@@ -20,7 +20,7 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
-| `config/wp13_uat_plan.json` | 5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 合同已验证；真人结果 `NOT_RUN` |
+| `config/wp13_uat_plan.json` | 精确绑定候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 合同已验证；真人结果 `NOT_RUN` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
@@ -93,10 +93,10 @@ python3 scripts/wp13_15_evidence.py release-check \
 
 ## 6. 当前必须人工提供的输入
 
-当前没有需要立即打断工程准备的人工点击，但 WP-13 真正启动前必须先取得 WP-12B=`CLOSED`，并补齐：
+WP-12B run `30525165474` 的原 1 秒合同保持 `FAIL/NOT_CLOSED`。DEC-020 已对同一候选批准仅限 WP-13 的 p95≤1.2 秒 Alpha 条件入口；候选漂移即失效，且不得外推 WP-14/production。真人执行前仍必须补齐：
 
 1. 5 名 Learner、2 名独立 Reviewer、1 名 Operator、1 名 QA Recorder 的私有名册；
-2. 冻结候选的完整 SHA、三镜像摘要和一次明确授权的 staging 部署；
+2. 核对冻结候选仍为 `02863d0b670ee9b00b9def3e75bc6699827f555a`、部署 run=`30519669770` 且 staging readiness 与候选一致；
 3. UAT 日期、Recorder、支持联系人和停止联系人；
 4. Reviewer 三类校准样本的私有内容与记录方式。
 
@@ -104,7 +104,7 @@ WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还
 
 ## 7. 当前判定
 
-- WP-13：`PREPARED / HUMAN_UAT_NOT_RUN`
+- WP-13：`AUTHORIZED / CANDIDATE_BOUND / HUMAN_UAT_NOT_RUN`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
 - WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
 - production mutation：`false`

@@ -27,7 +27,7 @@
 | 09 | [测试、UAT 与质量策略](09_TEST_UAT_AND_QUALITY_STRATEGY.md) | 如何在开发前定义“真的可用”？ | 验收场景、门禁、证据标准批准 |
 | 10 | [交付计划与工程规则](10_DELIVERY_PLAN_AND_ENGINEERING_RULES.md) | 如何开发而不重演分支、补丁和并行失控？ | 里程碑、WIP、合并与 DoD 批准 |
 | 11 | [发布、数据导入与运行计划](11_RELEASE_MIGRATION_AND_OPERATIONS_PLAN.md) | 如何上线、导入、观测和恢复？ | 环境、导入、切换、回滚批准 |
-| 12 | [决策、风险与开放问题台账](12_DECISION_RISK_AND_OPEN_QUESTIONS.md) | 哪些决定已锁定，哪些仍阻塞开工？ | 所有 `BLOCKS_G0` 项关闭；DEC-017 锁定 Alpha/RC 无附件边界；DEC-018 延期 Alpha 外部日志/真实通知/告警；DEC-019 延期独立灾备故障域选型至真实 Alpha 稳定 30 日，production 始终 `NO_GO` |
+| 12 | [决策、风险与开放问题台账](12_DECISION_RISK_AND_OPEN_QUESTIONS.md) | 哪些决定已锁定，哪些仍阻塞开工？ | 所有 `BLOCKS_G0` 项关闭；DEC-017 锁定 Alpha/RC 无附件边界；DEC-018/019 延期外部观测与独立灾备故障域；DEC-020 保留 WP-12B 原 FAIL，仅为同一候选批准 WP-13 Alpha 条件入口，production 始终 `NO_GO` |
 | 13 | [需求追溯矩阵](13_REQUIREMENTS_TRACEABILITY_MATRIX.md) | 每条需求由什么设计、接口、数据和测试证明？ | P0 行无空白引用 |
 | 14 | [UI Foundations 与组件合同](14_UI_FOUNDATIONS_AND_COMPONENT_CONTRACT.md) | 视觉、交互和组件如何保持一套正式语言？ | Token、组件状态、无障碍基线批准 |
 | 15 | [P0 内容、Rubric 与运营规范](15_P0_CONTENT_RUBRIC_AND_OPERATIONS_SPEC.md) | 实际交付什么任务内容，主管按什么标准评？ | 任务/Rubric/SLA/Owner 批准 |
@@ -46,8 +46,8 @@
 | 28 | [WP-10 真实附件与文件安全构建证据](28_WP10_FILE_SECURITY_EVIDENCE.md) | 私有对象存储、短时授权、隔离扫描与停用边界实际证明了什么？ | 当前 Alpha/RC 固定无附件的 TSK-001 V1 并 fail closed，结论为 `SECURELY_DISABLED_FOR_ALPHA`；未来启用前重开五项物理门禁 |
 | 29 | [WP-11 真实通知与外部可观测构建证据](29_WP11_NOTIFICATION_OBSERVABILITY_EVIDENCE.md) | 加密接收人、真实飞书适配器、回执、重驱、结构化日志和外部观测合同分别证明了什么？ | 候选 `172c9f6…` 已部署，独立通知应用/secrets 与主机观测通过；DEC-018 将 TLS topic、真实通知和告警演练仅在 Alpha 延期，三项仍 `NOT_RUN`，production 与完整 WP-11 结论仍 `NO_GO` |
 | 30 | [WP-12 候选硬化与灾备构建证据](30_WP12_CANDIDATE_HARDENING_DR_EVIDENCE.md) | RC 的安全、性能、保留删除、异机恢复和回滚门禁实际关闭到什么程度？ | 第一批代码级安全硬化已验证；DEC-019 仅延期独立灾备故障域选型，基础恢复、威胁模型、性能、保留删除和回滚仍未关闭，WP-12 为 `IN_PROGRESS`，production 为 `NO_GO` |
-| 31 | [WP-13～WP-15 真人、时间与生产门禁执行包](31_WP13_WP15_EXECUTION_GATE_KIT.md) | 如何确保真人 UAT、14 天试点和生产批准不被自动化假证据替代？ | 机器合同已准备；WP-13 真人、WP-14 时间、WP-15 生产执行均未开始，production 为 `NO_GO` |
-| 32 | [WP-12B 多租户容量与隔离门禁证据](32_WP12B_MULTI_TENANT_LOAD_AND_ISOLATION_EVIDENCE.md) | 十几个真实组织上线前如何证明多租户并发容量、隔离和事实唯一性？ | 旧正式运行的隔离、事实审计和退役 PASS，但三条写路径性能 FAIL；有界连接池候选已成功部署、WP-12B 尚未运行，WP-13 暂不启动 |
+| 31 | [WP-13～WP-15 真人、时间与生产门禁执行包](31_WP13_WP15_EXECUTION_GATE_KIT.md) | 如何确保真人 UAT、14 天试点和生产批准不被自动化假证据替代？ | WP-13 已按 DEC-020 精确绑定候选并获启动授权，真人结果仍 `NOT_RUN`；WP-14 时间、WP-15 生产执行均未开始，production 为 `NO_GO` |
+| 32 | [WP-12B 多租户容量与隔离门禁证据](32_WP12B_MULTI_TENANT_LOAD_AND_ISOLATION_EVIDENCE.md) | 十几个真实组织上线前如何证明多租户并发容量、隔离和事实唯一性？ | run `30525165474` 的隔离/正确性/退役 PASS、原 1 秒性能 FAIL 均已固化；DEC-020 仅允许同一候选按 ≤1.2 秒进入 WP-13，不记 `WP12B_CLOSED` |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 
 ## 3. 权威顺序
