@@ -113,3 +113,40 @@ def test_prepare_rejects_invalid_notification_recipient_key(
     )
     with pytest.raises(prepare.PrepareError, match="exactly 32 bytes"):
         prepare.prepare(tmp_path / "bundle", "postgres.internal.example", 5432)
+
+
+def test_prepare_web_only_pins_runtime_baseline_and_candidate_web(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    configure(monkeypatch)
+    output = tmp_path / "bundle"
+    prepare.prepare(
+        output, "postgres.internal.example", 5432, mode="web-only"
+    )
+    assert f"APP_RELEASE={prepare.WEB_ONLY_BASELINE}" in (
+        output / "secrets/api.env"
+    ).read_text()
+    assert f"APP_RELEASE={prepare.WEB_ONLY_BASELINE}" in (
+        output / "secrets/worker.env"
+    ).read_text()
+    assert f"APP_RELEASE={prepare.CANDIDATE}" in (
+        output / "secrets/web.env"
+    ).read_text()
+    deployment = (output / ".deployment.env").read_text()
+    assert "DEPLOY_MODE=web-only" in deployment
+    assert f"BASELINE_CANDIDATE={prepare.WEB_ONLY_BASELINE}" in deployment
+    for image in prepare.WEB_ONLY_IMAGES.values():
+        assert image in deployment
+
+
+def test_prepare_rejects_unknown_deploy_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    configure(monkeypatch)
+    with pytest.raises(prepare.PrepareError, match="deploy mode"):
+        prepare.prepare(
+            tmp_path / "bundle",
+            "postgres.internal.example",
+            5432,
+            mode="all-components-plus-web",
+        )

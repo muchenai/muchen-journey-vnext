@@ -144,6 +144,8 @@ def validate_files() -> None:
         "scripts/wp08_dns_record.py",
         "scripts/wp08_rds_network_audit.py",
         "scripts/wp08_security_group.py",
+        "scripts/wp08_web_only.py",
+        "config/wp08_web_only.json",
         ".github/workflows/wp08-edge-mirror.yml",
     ]
     for relative in required:
@@ -238,6 +240,17 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     )
     if any(marker not in script for marker in first_release_cleanup):
         raise StagingError("failed first deployment must stop partial application containers")
+    web_only_markers = (
+        '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" ]]',
+        "verify_web_only_runtime",
+        'timeout --signal=TERM 8m docker pull "$WEB_IMAGE"',
+        "docker compose up -d --no-deps --wait --wait-timeout 180 web",
+        "WP08_WEB_ONLY_ROLLBACK=START",
+        "DEPLOYED_COMPONENTS.json",
+        "WP08_WEB_ONLY_DEPLOY=PASS",
+    )
+    if any(marker not in script for marker in web_only_markers):
+        raise StagingError("bounded Web-only deployment contract is incomplete")
 
 
 def validate_infrastructure() -> None:
@@ -417,7 +430,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     validate_infrastructure()
     workflow = path.read_text()
     required = (
-        "- audit\n          - provision\n          - deploy",
+        "- audit\n          - provision\n          - deploy\n          - deploy-web",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "id: terraform_init",
         "if: inputs.phase == 'audit'",
@@ -426,7 +439,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && inputs.phase == 'deploy' && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -461,6 +474,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
+        "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
+        'if [[ "${{ inputs.phase }}" == "deploy-web" ]]; then',
+        "python3 scripts/wp08_web_only.py check",
+        '--mode "$mode"',
     )
     for marker in required:
         if marker not in workflow:
@@ -524,7 +541,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     for forbidden in ("terraform plan", "terraform apply", "terraform import", "wp08_security_group"):
         if forbidden in audit_step:
             raise StagingError("RDS network audit must remain read-only")
-    print("WP08_STAGING_WORKFLOW=PASS phases=audit,provision,frozen-alpha-deploy")
+    print(
+        "WP08_STAGING_WORKFLOW=PASS"
+        " phases=audit,provision,frozen-alpha-deploy,bounded-web-only"
+    )
 
 
 def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> None:

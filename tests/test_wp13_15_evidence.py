@@ -115,7 +115,10 @@ def passing_release():
 def test_plans_are_exact_and_no_action_is_executed():
     result = validate_plans()
     assert result["status"] == "PASS"
-    assert result["wp13_rebind_state"] == "IMPACT_REVIEWED_PENDING_STAGING_DEPLOY"
+    assert (
+        result["wp13_rebind_state"]
+        == "WEB_ONLY_CONTRACT_READY_RUNTIME_BASELINE_REJECTED"
+    )
     assert result["wp13_rebind_resume_allowed"] is False
     assert result["human_actions_executed"] is False
     assert result["production_mutation_executed"] is False
@@ -127,6 +130,16 @@ def test_candidate_rebind_is_fail_closed_until_a_real_deployment_is_bound():
     assert rebind["runtime_change_scope"] == "WEB_UI_ONLY"
     assert rebind["deployment_run_id"] is None
     assert rebind["human_uat_resume_allowed"] is False
+    assert rebind["latest_deployment_attempt"] == {
+        "run_id": "30556851235",
+        "conclusion": "CANCELLED_TIMEOUT",
+        "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
+        "api_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "worker_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "migration": "0013_wp11_notify_observability",
+        "worker_stale": True,
+        "ssh_ingress_closed": True,
+    }
     assert rebind["wp12b_rerun_executed"] is False
     assert rebind["production_mutation_executed"] is False
 

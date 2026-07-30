@@ -11,12 +11,13 @@ on:
           - audit
           - provision
           - deploy
+          - deploy-web
       candidate:
         description: Exact approved 40-character candidate SHA
         required: true
         type: string
       confirmation:
-        description: Type AUDIT_WP08_RDS_NETWORK or DEPLOY_222096D_TO_VOLCENGINE_STAGING
+        description: Type the reviewed confirmation for audit, full deploy, or bounded Web-only deploy
         required: true
         type: string
 
@@ -35,7 +36,9 @@ jobs:
     if: >-
       inputs.candidate == '222096db506e95db887a8705b22ca4a439d0545d' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase != 'audit' && inputs.confirmation == 'DEPLOY_222096D_TO_VOLCENGINE_STAGING'))
+      (inputs.phase == 'provision' && inputs.confirmation == 'DEPLOY_222096D_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_222096D_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'deploy-web' && inputs.confirmation == 'DEPLOY_WEB_222096D_ON_02863D0_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -122,6 +125,9 @@ jobs:
             git cat-file -e "$candidate:apps/api/journey_api/wp12b_synthetic.py"
             git cat-file -e "$candidate:config/wp12b_multitenant_load.json"
           fi
+          if [[ "${{ inputs.phase }}" == "deploy-web" ]]; then
+            python3 scripts/wp08_web_only.py check
+          fi
           make wp08-staging-apply-check
           echo "TF_VAR_approved_monthly_estimate_cny=$(jq -r .approved_monthly_estimate_cny config/wp08_staging.json)" >>"$GITHUB_ENV"
       - name: Initialize encrypted private TOS state
@@ -184,7 +190,7 @@ jobs:
           terraform show -json "$plan_file" | python3 ../../scripts/wp08_plan_guard.py
           terraform apply -auto-approve "$plan_file"
       - name: Read frozen Alpha pilot infrastructure
-        if: inputs.phase == 'deploy'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'
         id: frozen_infrastructure
         working-directory: infra/staging
         run: |
@@ -208,28 +214,33 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
       - name: Open exact runner SSH ingress
-        if: inputs.phase == 'deploy'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'
         run: |
           python3 -m scripts.wp08_security_group open \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
             --cidr "$WP08_RUNNER_CIDR"
       - name: Prepare private deploy bundle
-        if: inputs.phase == 'deploy'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'
         env:
           WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           bundle="$RUNNER_TEMP/wp08-deploy"
+          mode=full
+          if [[ "${{ inputs.phase }}" == "deploy-web" ]]; then
+            mode=web-only
+          fi
           python3 scripts/wp08_prepare_deploy.py \
             --output "$bundle" \
             --rds-host "${{ steps.frozen_infrastructure.outputs.rds_host }}" \
-            --rds-port "${{ steps.frozen_infrastructure.outputs.rds_port }}"
+            --rds-port "${{ steps.frozen_infrastructure.outputs.rds_port }}" \
+            --mode "$mode"
           cp deploy/staging/compose.yaml deploy/staging/compose.migrate.yaml "$bundle/"
           cp deploy/staging/Caddyfile deploy/staging/grant_runtime.py deploy/staging/deploy.sh "$bundle/"
           chmod 0755 "$bundle/deploy.sh"
           printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$RUNNER_TEMP/wp08-deploy-key"
           chmod 0600 "$RUNNER_TEMP/wp08-deploy-key"
-      - name: Deploy exact registry digests
-        if: inputs.phase == 'deploy'
+      - name: Deploy bounded staging release
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
@@ -249,7 +260,7 @@ jobs:
           trap - EXIT
           ssh-keygen -lf "$RUNNER_TEMP/wp08-known-hosts"
       - name: Verify external TLS and release surface
-        if: inputs.phase == 'deploy'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'
         run: |
           curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors \
             https://staging-vnext.muchenai.com/ >/dev/null
@@ -262,7 +273,7 @@ jobs:
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
       - name: Close SSH ingress
-        if: always() && inputs.phase == 'deploy' && steps.frozen_infrastructure.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \

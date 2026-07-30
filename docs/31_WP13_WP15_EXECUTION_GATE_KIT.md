@@ -21,7 +21,7 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
 | `config/wp13_uat_plan.json` | 精确绑定当前已部署候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 首次真人执行在 `AT-UAT-003` 为 `FAIL` 并停止；旧计划不覆盖该失败事实 |
-| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、不变运行合同及 pending 部署边界 | `IMPACT_REVIEWED_PENDING_STAGING_DEPLOY`；`human_uat_resume_allowed=false` |
+| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署尝试和组件级运行证据 | `WEB_ONLY_CONTRACT_READY_RUNTIME_BASELINE_REJECTED`；`human_uat_resume_allowed=false` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
@@ -111,7 +111,9 @@ WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还
 
 修复已通过 PR #94 合入主线。Mainline run `30550010916` 为 `222096db506e95db887a8705b22ca4a439d0545d` 完成 `ci-main`、候选打包、三镜像 GHCR digest 验证和工件上传；manifest SHA-256 为 `2aa6ec1af6f8db02a1a514419cb4bc181460317f990edc30de772375fe80aecc`。
 
-DEC-021 的影响核对确认 API、Worker、迁移、OpenAPI、Python/Web 锁文件与 Compose 均未漂移，运行代码变化仅为 Web 邀请入口，因此不重跑 WP-12B，并保留原 run 的 `FAIL/NOT_CLOSED`。新候选绑定只写入 pending 合同：`deployment_run_id=null`、`human_uat_resume_allowed=false`。当前 staging 仍运行旧候选；精确新候选完成另行授权的部署和 readiness/revision 核对前，不得恢复 `AT-UAT-003`。
+DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `02863d0…` 未漂移，候选单提交的运行代码变化仅为 Web 邀请入口，因此不重跑 WP-12B，并保留原 run 的 `FAIL/NOT_CLOSED`。full deploy run `30556851235` 在镜像部署阶段超时取消；公开 readiness 显示 Web=`222096db…`，但受权 `/ops` 运行快照显示 API/Worker=`172c9f62…`、migration=`0013`、Worker stale。SSH 已关闭，但该混合状态不是成功部署。
+
+`config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 现建立有界 Web-only 合同。只有运行时 API/Worker 精确等于基线 `02863d0…`、migration=`0014`、schema=3、Worker 非 stale，且 Web/API/Worker 静态兼容全部通过时，才允许只替换 Web；拉取、启动和 Web 回滚均有时间上限。当前 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`，不得恢复 `AT-UAT-003`。
 
 ## 7. 当前判定
 

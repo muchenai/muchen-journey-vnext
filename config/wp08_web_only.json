@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "target_environment": "staging",
+  "region_id": "cn-beijing",
+  "candidate_commit": "222096db506e95db887a8705b22ca4a439d0545d",
+  "candidate_parent": "2fb60d57f9a492fe8e6b48988cba15a758503823",
+  "candidate_artifact_run_id": 30550010916,
+  "web_image_digest": "sha256:a940420f58eb6ef085926c442996f40b66b6870136272c565bfb9b1c2656d1c2",
+  "runtime_baseline": {
+    "candidate_commit": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "api_image_digest": "sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
+    "worker_image_digest": "sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22",
+    "migration_revision": "0014_wp12_data_lifecycle",
+    "config_schema_version": 3,
+    "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f"
+  },
+  "candidate_commit_allowed_paths": [
+    "Makefile",
+    "apps/web/",
+    "docs/13_REQUIREMENTS_TRACEABILITY_MATRIX.md",
+    "docs/31_WP13_WP15_EXECUTION_GATE_KIT.md"
+  ],
+  "baseline_compatibility_paths": [
+    "apps/api/",
+    "apps/worker/",
+    "contracts/openapi.json",
+    "migrations/"
+  ],
+  "runtime_acceptance": {
+    "web_release": "candidate_commit",
+    "api_release": "runtime_baseline.candidate_commit",
+    "worker_release": "runtime_baseline.candidate_commit",
+    "api_status": "READY",
+    "database_status": "READY",
+    "worker_stale": false,
+    "root_http_status": 200,
+    "anonymous_ops_http_status": 401,
+    "anonymous_review_http_status": 401
+  }
+}
