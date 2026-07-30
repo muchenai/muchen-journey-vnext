@@ -150,3 +150,24 @@ def test_prepare_rejects_unknown_deploy_mode(
             5432,
             mode="all-components-plus-web",
         )
+
+
+def test_prepare_runtime_repair_pins_only_the_reviewed_runtime_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    configure(monkeypatch)
+    output = tmp_path / "bundle"
+    prepare.prepare(
+        output, "postgres.internal.example", 5432, mode="runtime-repair"
+    )
+    deployment = (output / ".deployment.env").read_text()
+    assert "DEPLOY_MODE=runtime-repair" in deployment
+    assert f"APP_RELEASE={prepare.WEB_ONLY_BASELINE}" in (
+        output / "secrets/api.env"
+    ).read_text()
+    assert f"APP_RELEASE={prepare.WEB_ONLY_BASELINE}" in (
+        output / "secrets/worker.env"
+    ).read_text()
+    assert f"APP_RELEASE={prepare.CANDIDATE}" in (
+        output / "secrets/web.env"
+    ).read_text()

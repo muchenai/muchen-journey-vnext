@@ -68,6 +68,7 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         "candidate_commit_allowed_paths",
         "baseline_compatibility_paths",
         "runtime_acceptance",
+        "runtime_repair",
     }
     if set(data) != required:
         raise WebOnlyError("Web-only contract keys differ from the reviewed schema")
@@ -131,6 +132,49 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         "anonymous_review_http_status": 401,
     }:
         raise WebOnlyError("runtime acceptance differs from the reviewed fail-closed set")
+    repair = data["runtime_repair"]
+    if not isinstance(repair, dict) or set(repair) != {
+        "allowed_prestate",
+        "allowed_mutations",
+        "forbidden_mutations",
+    }:
+        raise WebOnlyError("runtime repair keys differ from the reviewed schema")
+    if repair["allowed_prestate"] != {
+        "web_release": "candidate_commit",
+        "api_releases": [
+            "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+            "runtime_baseline.candidate_commit",
+        ],
+        "worker_releases": [
+            "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+            "runtime_baseline.candidate_commit",
+        ],
+        "migration_revisions": [
+            "0013_wp11_notify_observability",
+            "runtime_baseline.migration_revision",
+        ],
+        "config_schema_version": 3,
+        "api_status": "READY",
+    }:
+        raise WebOnlyError("runtime repair prestate differs from the reviewed set")
+    if repair["allowed_mutations"] != [
+        "migration_0013_to_0014",
+        "runtime_role_dml_grants",
+        "api_to_baseline_digest",
+        "worker_to_baseline_digest",
+        "release_component_markers",
+    ]:
+        raise WebOnlyError("runtime repair mutations differ from the reviewed set")
+    if repair["forbidden_mutations"] != [
+        "web_container",
+        "seed",
+        "business_facts",
+        "dns",
+        "terraform",
+        "cloud_resources",
+        "wp12b",
+    ]:
+        raise WebOnlyError("runtime repair forbidden set differs from the reviewed set")
     return data
 
 
@@ -235,6 +279,49 @@ def verify_runtime(data: dict[str, object], evidence: dict[str, object]) -> None
         raise WebOnlyError("runtime is not UAT-compatible: " + "; ".join(mismatches))
 
 
+def verify_repair_prestate(
+    data: dict[str, object], evidence: dict[str, object]
+) -> None:
+    expected_keys = {
+        "web_release",
+        "api_release",
+        "worker_release",
+        "worker_heartbeat_release",
+        "migration_revision",
+        "config_schema_version",
+        "api_status",
+        "worker_stale",
+    }
+    if set(evidence) != expected_keys:
+        raise WebOnlyError("runtime repair evidence keys differ from the reviewed schema")
+    baseline = data["runtime_baseline"]
+    assert isinstance(baseline, dict)
+    old = "172c9f62ffdcd4fce31fb4900fdca46b3405ab89"
+    allowed_releases = {old, baseline["candidate_commit"]}
+    mismatches: list[str] = []
+    if evidence["web_release"] != data["candidate_commit"]:
+        mismatches.append("Web is not the reviewed candidate")
+    if evidence["api_release"] not in allowed_releases:
+        mismatches.append("API release is outside the reviewed repair set")
+    if evidence["worker_release"] not in allowed_releases:
+        mismatches.append("Worker release is outside the reviewed repair set")
+    if evidence["worker_heartbeat_release"] not in allowed_releases:
+        mismatches.append("Worker heartbeat release is outside the reviewed repair set")
+    if evidence["migration_revision"] not in {
+        "0013_wp11_notify_observability",
+        baseline["migration_revision"],
+    }:
+        mismatches.append("migration is outside the reviewed forward-only range")
+    if evidence["config_schema_version"] != baseline["config_schema_version"]:
+        mismatches.append("config schema differs from the reviewed baseline")
+    if evidence["api_status"] != "READY":
+        mismatches.append("API is not ready")
+    if not isinstance(evidence["worker_stale"], bool):
+        mismatches.append("Worker stale evidence is not boolean")
+    if mismatches:
+        raise WebOnlyError("runtime repair prestate is not allowed: " + "; ".join(mismatches))
+
+
 def _read_evidence(path: str) -> dict[str, object]:
     raw = sys.stdin.read() if path == "-" else Path(path).read_text()
     payload = json.loads(raw)
@@ -249,6 +336,8 @@ def main() -> None:
     subparsers.add_parser("check")
     verify = subparsers.add_parser("verify-runtime")
     verify.add_argument("--evidence", required=True)
+    repair = subparsers.add_parser("verify-repair-prestate")
+    repair.add_argument("--evidence", required=True)
     args = parser.parse_args()
     try:
         data = load_contract()
@@ -260,14 +349,21 @@ def main() -> None:
                 "WP08_WEB_ONLY_CONTRACT=PASS"
                 f" candidate={data['candidate_commit']}"
                 f" baseline={baseline['candidate_commit']}"
-                " mutation=web-container-only"
+                " modes=web-container-only,runtime-repair"
             )
-        else:
+        elif args.command == "verify-runtime":
             verify_runtime(data, _read_evidence(args.evidence))
             print(
                 "WP08_WEB_ONLY_RUNTIME=PASS"
                 f" web={data['candidate_commit']}"
                 f" api_worker={data['runtime_baseline']['candidate_commit']}"
+            )
+        else:
+            verify_repair_prestate(data, _read_evidence(args.evidence))
+            print(
+                "WP08_RUNTIME_REPAIR_PRESTATE=PASS"
+                f" web={data['candidate_commit']}"
+                " mutation=api-worker-migration-only"
             )
     except (OSError, json.JSONDecodeError, WebOnlyError) as error:
         print(f"WP08_WEB_ONLY_STOPPED: {error}", file=sys.stderr)

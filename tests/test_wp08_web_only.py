@@ -83,3 +83,42 @@ def test_runtime_rejects_unreviewed_evidence_fields():
     evidence["raw_log"] = "forbidden"
     with pytest.raises(web_only.WebOnlyError, match="evidence keys"):
         web_only.verify_runtime(contract, evidence)
+
+
+def repair_prestate(contract: dict[str, object]) -> dict[str, object]:
+    return {
+        "web_release": contract["candidate_commit"],
+        "api_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "worker_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "worker_heartbeat_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "migration_revision": "0013_wp11_notify_observability",
+        "config_schema_version": 3,
+        "api_status": "READY",
+        "worker_stale": True,
+    }
+
+
+def test_runtime_repair_accepts_only_the_observed_bounded_prestate():
+    contract = web_only.load_contract()
+    web_only.verify_repair_prestate(contract, repair_prestate(contract))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("web_release", "02863d0b670ee9b00b9def3e75bc6699827f555a"),
+        ("api_release", "unknown-release"),
+        ("worker_release", "unknown-release"),
+        ("worker_heartbeat_release", "unknown-release"),
+        ("migration_revision", "0012_wp10_file_security"),
+        ("config_schema_version", 2),
+        ("api_status", "DEGRADED"),
+        ("worker_stale", "true"),
+    ),
+)
+def test_runtime_repair_rejects_unreviewed_prestate(field: str, value: object):
+    contract = web_only.load_contract()
+    evidence = repair_prestate(contract)
+    evidence[field] = value
+    with pytest.raises(web_only.WebOnlyError, match="prestate is not allowed"):
+        web_only.verify_repair_prestate(contract, evidence)

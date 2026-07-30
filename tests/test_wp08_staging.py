@@ -230,13 +230,30 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "run --rm --no-deps api alembic upgrade head",
                 "WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE",
                 "docker compose down --remove-orphans",
-                '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" ]]',
+                '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
                 "verify_web_only_runtime",
-                'timeout --signal=TERM 8m docker pull "$WEB_IMAGE"',
+                "verify_runtime_repair_prestate",
+                'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
+                'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+                "alembic upgrade 0014_wp12_data_lifecycle",
                 "docker compose up -d --no-deps --wait --wait-timeout 180 web",
                 "WP08_WEB_ONLY_ROLLBACK=START",
+                "WP08_RUNTIME_REPAIR_ROLLBACK=START",
+                "WP08_RUNTIME_REPAIR=PASS",
+                "DEPLOYED_CANDIDATE.tmp",
                 "DEPLOYED_COMPONENTS.json",
                 "WP08_WEB_ONLY_DEPLOY=PASS",
+                'if [[ "$DEPLOY_MODE" == "runtime-repair" ]]',
+                "verify_runtime_repair_prestate",
+                'docker pull "$API_IMAGE"',
+                'docker pull "$WORKER_IMAGE"',
+                "alembic upgrade 0014_wp12_data_lifecycle",
+                "python /tmp/grant_runtime.py",
+                "docker compose up -d --no-deps --wait --wait-timeout 180 api",
+                "docker compose up -d --no-deps --wait --wait-timeout 180 worker",
+                "verify_web_only_runtime",
+                "write_component_markers",
+                "fi",
             )
         )
     )
@@ -245,6 +262,16 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text('SECRETS="$ROOT/secrets"\n')
     with pytest.raises(staging.StagingError, match="release-local"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            "write_component_markers\nfi",
+            "docker compose up -d --no-deps --wait --wait-timeout 180 web\n"
+            "write_component_markers\nfi",
+        )
+    )
+    with pytest.raises(staging.StagingError, match="mutation boundary"):
         staging.validate_deploy_script(script)
 
     script.write_text(
@@ -395,8 +422,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "          - provision",
             "          - deploy",
             "          - deploy-web",
+            "          - repair-runtime",
             "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
+            "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
             "id: terraform_init",
             'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
@@ -420,9 +449,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git cat-file -e "$candidate:scripts/wp12b_load.py"',
             'git cat-file -e "$candidate:apps/api/journey_api/wp12b_synthetic.py"',
             'git cat-file -e "$candidate:config/wp12b_multitenant_load.json"',
-            'if [[ "${{ inputs.phase }}" == "deploy-web" ]]; then',
+            'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
             "python3 scripts/wp08_web_only.py check",
             '--mode "$mode"',
+            "mode=runtime-repair",
             "      - name: Audit frozen ECS to RDS allowlist binding",
             "        if: inputs.phase == 'audit'",
             "terraform -chdir=infra/staging state pull >\"$state_file\"",
@@ -438,25 +468,25 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'terraform apply -auto-approve "$plan_file"',
             '-var="deploy_cidr=127.0.0.1/32"',
             "      - name: Read frozen Alpha pilot infrastructure",
-            "        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'",
+            "        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "        id: frozen_infrastructure",
             "terraform output -raw staging_public_ip",
             "      - name: Open exact runner SSH ingress",
-            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'",
+            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "python3 -m scripts.wp08_security_group open",
             "      - name: Prepare private deploy bundle",
-            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'",
+            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "      - name: Deploy exact registry digests",
-            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'",
+            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "      - name: Verify external TLS and release surface",
-            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web'",
+            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "https://staging-vnext.muchenai.com/health/ready",
             "https://staging-vnext.muchenai.com/ops",
             "https://staging-vnext.muchenai.com/review",
             "'%{http_code}'",
             '= "401"',
             "      - name: Close SSH ingress",
-            "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+            "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''",
             "python3 -m scripts.wp08_security_group close",
         )
     )

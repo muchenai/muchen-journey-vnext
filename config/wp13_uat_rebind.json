@@ -41,7 +41,15 @@
     "worker_stale": true,
     "ssh_ingress_closed": true
   },
-  "decision": "WEB_ONLY_CONTRACT_READY_RUNTIME_BASELINE_REJECTED",
+  "runtime_repair_contract": {
+    "phase": "repair-runtime",
+    "confirmation": "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
+    "web_mutation": false,
+    "api_worker_baseline": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "migration_target": "0014_wp12_data_lifecycle",
+    "deployment_authorized": false
+  },
+  "decision": "RUNTIME_REPAIR_CONTRACT_READY_UAT_REJECTED",
   "deployment_run_id": null,
   "human_uat_resume_allowed": false,
   "wp12b_rerun_executed": false,

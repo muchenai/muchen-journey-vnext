@@ -130,8 +130,8 @@ def write_env(path: Path, values: dict[str, str]) -> None:
 
 
 def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
-    if mode not in {"full", "web-only"}:
-        raise PrepareError("deploy mode must be full or web-only")
+    if mode not in {"full", "web-only", "runtime-repair"}:
+        raise PrepareError("deploy mode must be full, web-only, or runtime-repair")
     if not re.fullmatch(r"[A-Za-z0-9.-]+", host) or host in {"localhost", "127.0.0.1"}:
         raise PrepareError("RDS host must be one non-local DNS name")
     if port < 1 or port > 65535:
@@ -264,7 +264,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rds-host", required=True)
     parser.add_argument("--rds-port", type=int, required=True)
-    parser.add_argument("--mode", choices=("full", "web-only"), default="full")
+    parser.add_argument(
+        "--mode", choices=("full", "web-only", "runtime-repair"), default="full"
+    )
     args = parser.parse_args()
     try:
         prepare(args.output, args.rds_host, args.rds_port, mode=args.mode)

@@ -36,5 +36,40 @@
     "root_http_status": 200,
     "anonymous_ops_http_status": 401,
     "anonymous_review_http_status": 401
+  },
+  "runtime_repair": {
+    "allowed_prestate": {
+      "web_release": "candidate_commit",
+      "api_releases": [
+        "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "runtime_baseline.candidate_commit"
+      ],
+      "worker_releases": [
+        "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+        "runtime_baseline.candidate_commit"
+      ],
+      "migration_revisions": [
+        "0013_wp11_notify_observability",
+        "runtime_baseline.migration_revision"
+      ],
+      "config_schema_version": 3,
+      "api_status": "READY"
+    },
+    "allowed_mutations": [
+      "migration_0013_to_0014",
+      "runtime_role_dml_grants",
+      "api_to_baseline_digest",
+      "worker_to_baseline_digest",
+      "release_component_markers"
+    ],
+    "forbidden_mutations": [
+      "web_container",
+      "seed",
+      "business_facts",
+      "dns",
+      "terraform",
+      "cloud_resources",
+      "wp12b"
+    ]
   }
 }

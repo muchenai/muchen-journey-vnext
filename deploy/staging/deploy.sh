@@ -12,7 +12,7 @@ fail() {
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
 [[ "${CANDIDATE_COMMIT:-}" == "222096db506e95db887a8705b22ca4a439d0545d" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
-[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" ]] || fail "unexpected deploy mode"
+[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
 [[ "${BASELINE_CANDIDATE:-}" == "02863d0b670ee9b00b9def3e75bc6699827f555a" ]] || fail "unexpected Web-only baseline"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
@@ -54,7 +54,7 @@ grep -qx 'NOTIFICATION_ADAPTER=FEISHU' "$SECRETS/worker.env" || fail "WP-11 work
 grep -qx 'NOTIFICATION_RESULT_URL=https://staging-vnext.muchenai.com/app/result' "$SECRETS/worker.env" || fail "WP-11 notification result URL is not canonical"
 grep -qx 'OBSERVABILITY_SNAPSHOT_SECONDS=60' "$SECRETS/worker.env" || fail "WP-11 observability snapshot cadence is not canonical"
 runtime_release="$CANDIDATE_COMMIT"
-if [[ "$DEPLOY_MODE" == "web-only" ]]; then
+if [[ "$DEPLOY_MODE" != "full" ]]; then
   runtime_release="$BASELINE_CANDIDATE"
 fi
 grep -qx "APP_RELEASE=$runtime_release" "$SECRETS/api.env" || fail "API release differs from the selected runtime"
@@ -74,6 +74,7 @@ verify_web_only_runtime() {
   local compose=(docker compose --project-directory "$release_dir" -f "$release_dir/compose.yaml")
   api_runtime=$("${compose[@]}" exec -T api python -c '
 import json
+import urllib.request
 from sqlalchemy import text
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
@@ -81,6 +82,8 @@ s = SessionLocal()
 revision = s.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
 s.close()
 settings = get_settings()
+health = json.loads(urllib.request.urlopen("http://localhost:8000/health/ready", timeout=3).read())
+assert health == {"status": "ok", "release": settings.app_release}
 print(json.dumps({"release": settings.app_release, "config_schema_version": settings.config_schema_version, "migration_revision": revision, "status": "READY"}))
 ')
   worker_runtime=$("${compose[@]}" exec -T worker python -c '
@@ -113,35 +116,110 @@ assert worker["stale"] is False
 PY
 }
 
+verify_runtime_repair_prestate() {
+  local release_dir=$1
+  local api_runtime worker_runtime web_release
+  local compose=(docker compose --project-directory "$release_dir" -f "$release_dir/compose.yaml")
+  api_runtime=$("${compose[@]}" exec -T api python -c '
+import json
+import urllib.request
+from sqlalchemy import text
+from journey_api.config import get_settings
+from journey_api.db import SessionLocal
+s = SessionLocal()
+revision = s.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+s.close()
+settings = get_settings()
+health = json.loads(urllib.request.urlopen("http://localhost:8000/health/ready", timeout=3).read())
+assert health == {"status": "ok", "release": settings.app_release}
+print(json.dumps({"release": settings.app_release, "config_schema_version": settings.config_schema_version, "migration_revision": revision, "status": "READY"}))
+')
+  worker_runtime=$("${compose[@]}" exec -T worker python -c '
+import json
+import os
+from datetime import UTC, datetime, timedelta
+from sqlalchemy import text
+from journey_api.db import SessionLocal
+s = SessionLocal()
+row = s.execute(text("SELECT release,last_seen_at FROM worker_heartbeats WHERE worker_name=\u0027notification-worker\u0027")).one()
+s.close()
+print(json.dumps({"release": os.environ["APP_RELEASE"], "heartbeat_release": row.release, "stale": row.last_seen_at < datetime.now(UTC) - timedelta(seconds=20)}))
+')
+  web_release=$("${compose[@]}" exec -T web node -e 'process.stdout.write(process.env.APP_RELEASE || "")')
+  python3 - "$CANDIDATE_COMMIT" "$BASELINE_CANDIDATE" "$web_release" "$api_runtime" "$worker_runtime" <<'PY'
+import json
+import sys
+
+candidate, baseline, web_release, api_raw, worker_raw = sys.argv[1:]
+old = "172c9f62ffdcd4fce31fb4900fdca46b3405ab89"
+api = json.loads(api_raw)
+worker = json.loads(worker_raw)
+allowed = {old, baseline}
+assert web_release == candidate
+assert api["release"] in allowed
+assert api["config_schema_version"] == 3
+assert api["migration_revision"] in {
+    "0013_wp11_notify_observability",
+    "0014_wp12_data_lifecycle",
+}
+assert api["status"] == "READY"
+assert worker["release"] in allowed
+assert worker["heartbeat_release"] in allowed
+assert isinstance(worker["stale"], bool)
+PY
+}
+
+write_component_markers() {
+  local previous=$1
+  printf '%s\n' "$previous" >"$ROOT/PREVIOUS_RELEASE"
+  printf '%s\n' "$CANDIDATE_COMMIT" >"$ROOT/DEPLOYED_CANDIDATE.tmp"
+  printf '%s\n' "$CANDIDATE_COMMIT" >"$ROOT/DEPLOYED_WEB_CANDIDATE.tmp"
+  python3 - "$CANDIDATE_COMMIT" "$BASELINE_CANDIDATE" >"$ROOT/DEPLOYED_COMPONENTS.json.tmp" <<'PY'
+import json
+import sys
+
+web, baseline = sys.argv[1:]
+print(json.dumps({"web": web, "api": baseline, "worker": baseline}, sort_keys=True))
+PY
+  chmod 0644 "$ROOT/DEPLOYED_CANDIDATE.tmp" "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_COMPONENTS.json.tmp"
+  ln -sfn "$PWD" "$ROOT/current"
+  mv "$ROOT/DEPLOYED_CANDIDATE.tmp" "$ROOT/DEPLOYED_CANDIDATE"
+  mv "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_WEB_CANDIDATE"
+  mv "$ROOT/DEPLOYED_COMPONENTS.json.tmp" "$ROOT/DEPLOYED_COMPONENTS.json"
+}
+
 if [[ "$DEPLOY_MODE" == "web-only" ]]; then
   [[ -L "$ROOT/current" ]] || fail "Web-only deploy requires an existing current release"
   previous=$(readlink -f "$ROOT/current")
   [[ -d "$previous" && -f "$previous/compose.yaml" ]] || fail "current release is invalid"
   [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "deployed runtime baseline marker is missing"
   [[ "$(cat "$ROOT/DEPLOYED_CANDIDATE")" == "$BASELINE_CANDIDATE" ]] || fail "deployed runtime baseline differs from the Web-only contract"
+  previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
   verify_web_only_runtime "$previous" || fail "runtime baseline is not healthy and compatible"
-  timeout --signal=TERM 8m docker pull "$WEB_IMAGE"
+  timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"
 
   rollback_web() {
     local code=${1:-$?}
-    trap - ERR INT TERM
+    trap - ERR HUP INT TERM
     printf 'WP08_WEB_ONLY_ROLLBACK=START previous=%s\n' "$previous" >&2
     ln -sfn "$previous" "$ROOT/current" || true
-    rm -f "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_COMPONENTS.json.tmp"
+    printf '%s\n' "$previous_candidate_marker" >"$ROOT/DEPLOYED_CANDIDATE" || true
+    rm -f "$ROOT/DEPLOYED_CANDIDATE.tmp" "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_COMPONENTS.json.tmp"
     (
       cd "$previous"
       set -a
       . ./.deployment.env
       set +a
-      timeout --signal=TERM 4m docker compose up -d --no-deps --wait --wait-timeout 180 web
+      timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 web
     ) || true
     exit "$code"
   }
   trap 'rollback_web $?' ERR
+  trap 'rollback_web 129' HUP
   trap 'rollback_web 130' INT
   trap 'rollback_web 143' TERM
 
-  timeout --signal=TERM 4m docker compose up -d --no-deps --wait --wait-timeout 180 web
+  timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 web
   web_release=$(docker compose exec -T web node -e 'process.stdout.write(process.env.APP_RELEASE || "")')
   if [[ "$web_release" != "$CANDIDATE_COMMIT" ]]; then
     printf 'WP08_DEPLOY_ERROR: Web container release differs from the candidate\n' >&2
@@ -152,21 +230,62 @@ if [[ "$DEPLOY_MODE" == "web-only" ]]; then
     rollback_web 1
   fi
 
-  printf '%s\n' "$previous" >"$ROOT/PREVIOUS_RELEASE"
-  printf '%s\n' "$CANDIDATE_COMMIT" >"$ROOT/DEPLOYED_WEB_CANDIDATE.tmp"
-  python3 - "$CANDIDATE_COMMIT" "$BASELINE_CANDIDATE" >"$ROOT/DEPLOYED_COMPONENTS.json.tmp" <<'PY'
-import json
-import sys
-
-web, baseline = sys.argv[1:]
-print(json.dumps({"web": web, "api": baseline, "worker": baseline}, sort_keys=True))
-PY
-  chmod 0644 "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_COMPONENTS.json.tmp"
-  ln -sfn "$PWD" "$ROOT/current"
-  mv "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_WEB_CANDIDATE"
-  mv "$ROOT/DEPLOYED_COMPONENTS.json.tmp" "$ROOT/DEPLOYED_COMPONENTS.json"
-  trap - ERR INT TERM
+  write_component_markers "$previous"
+  trap - ERR HUP INT TERM
   printf 'WP08_WEB_ONLY_DEPLOY=PASS web=%s api_worker=%s\n' "$CANDIDATE_COMMIT" "$BASELINE_CANDIDATE"
+  exit 0
+fi
+
+if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
+  [[ -L "$ROOT/current" ]] || fail "runtime repair requires an existing current release"
+  previous=$(readlink -f "$ROOT/current")
+  [[ -d "$previous" && -f "$previous/compose.yaml" ]] || fail "current release is invalid"
+  [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "deployed candidate marker is missing"
+  previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
+  [[ "$previous_candidate_marker" == "$BASELINE_CANDIDATE" || "$previous_candidate_marker" == "$CANDIDATE_COMMIT" ]] || fail "deployed marker is outside the reviewed repair set"
+  api_container=$(docker compose --project-directory "$previous" -f "$previous/compose.yaml" ps -q api)
+  worker_container=$(docker compose --project-directory "$previous" -f "$previous/compose.yaml" ps -q worker)
+  [[ -n "$api_container" && -n "$worker_container" ]] || fail "API or Worker container is missing"
+  backend_previous=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$api_container")
+  worker_previous=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$worker_container")
+  [[ "$backend_previous" == "$worker_previous" ]] || fail "API and Worker do not share one rollback release"
+  [[ "$backend_previous" == "$ROOT"/releases/* && -f "$backend_previous/compose.yaml" && -f "$backend_previous/.deployment.env" ]] || fail "backend rollback release is outside the staging root"
+  verify_runtime_repair_prestate "$previous" || fail "runtime repair prestate is not reviewed"
+  timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"
+  timeout --signal=TERM --kill-after=30s 8m docker pull "$WORKER_IMAGE"
+
+  rollback_runtime() {
+    local code=${1:-$?}
+    trap - ERR HUP INT TERM
+    printf 'WP08_RUNTIME_REPAIR_ROLLBACK=START backend=%s\n' "$backend_previous" >&2
+    ln -sfn "$previous" "$ROOT/current" || true
+    printf '%s\n' "$previous_candidate_marker" >"$ROOT/DEPLOYED_CANDIDATE" || true
+    rm -f "$ROOT/DEPLOYED_CANDIDATE.tmp" "$ROOT/DEPLOYED_WEB_CANDIDATE.tmp" "$ROOT/DEPLOYED_COMPONENTS.json.tmp"
+    (
+      cd "$backend_previous"
+      set -a
+      . ./.deployment.env
+      set +a
+      timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 api
+      timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 worker
+    ) || true
+    exit "$code"
+  }
+  trap 'rollback_runtime $?' ERR
+  trap 'rollback_runtime 129' HUP
+  trap 'rollback_runtime 130' INT
+  trap 'rollback_runtime 143' TERM
+
+  timeout --signal=TERM --kill-after=30s 5m docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api alembic upgrade 0014_wp12_data_lifecycle
+  timeout --signal=TERM --kill-after=30s 2m docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api python /tmp/grant_runtime.py
+  timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 api
+  timeout --signal=TERM --kill-after=30s 4m docker compose up -d --no-deps --wait --wait-timeout 180 worker
+  verify_web_only_runtime "$PWD" || rollback_runtime 1
+  web_release=$(docker compose exec -T web node -e 'process.stdout.write(process.env.APP_RELEASE || "")')
+  [[ "$web_release" == "$CANDIDATE_COMMIT" ]] || rollback_runtime 1
+  write_component_markers "$previous"
+  trap - ERR HUP INT TERM
+  printf 'WP08_RUNTIME_REPAIR=PASS web=%s api_worker=%s migration=0014_wp12_data_lifecycle\n' "$CANDIDATE_COMMIT" "$BASELINE_CANDIDATE"
   exit 0
 fi
 

@@ -21,7 +21,7 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
 | `config/wp13_uat_plan.json` | 精确绑定当前已部署候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 首次真人执行在 `AT-UAT-003` 为 `FAIL` 并停止；旧计划不覆盖该失败事实 |
-| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署尝试和组件级运行证据 | `WEB_ONLY_CONTRACT_READY_RUNTIME_BASELINE_REJECTED`；`human_uat_resume_allowed=false` |
+| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署尝试、组件级运行证据及有界 runtime repair 合同 | `RUNTIME_REPAIR_CONTRACT_READY_UAT_REJECTED`；`human_uat_resume_allowed=false` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
@@ -113,7 +113,7 @@ WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还
 
 DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `02863d0…` 未漂移，候选单提交的运行代码变化仅为 Web 邀请入口，因此不重跑 WP-12B，并保留原 run 的 `FAIL/NOT_CLOSED`。full deploy run `30556851235` 在镜像部署阶段超时取消；公开 readiness 显示 Web=`222096db…`，但受权 `/ops` 运行快照显示 API/Worker=`172c9f62…`、migration=`0013`、Worker stale。SSH 已关闭，但该混合状态不是成功部署。
 
-`config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 现建立有界 Web-only 合同。只有运行时 API/Worker 精确等于基线 `02863d0…`、migration=`0014`、schema=3、Worker 非 stale，且 Web/API/Worker 静态兼容全部通过时，才允许只替换 Web；拉取、启动和 Web 回滚均有时间上限。当前 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`，不得恢复 `AT-UAT-003`。
+`config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 现建立两段有界合同。正常 Web-only 路径仍要求 API/Worker 精确等于基线 `02863d0…`、migration=`0014`、schema=3、Worker 非 stale；针对已观测混合状态的 `repair-runtime` 只允许前向 migration、runtime DML grant 和固定摘要 API/Worker 替换，明确禁止 Web、seed、业务事实、DNS、Terraform、云资源与 WP-12B 改写。当前只证明合同和现有 prestate 匹配，未获得部署授权、未执行修复；`deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`，不得恢复 `AT-UAT-003`。
 
 ## 7. 当前判定
 
