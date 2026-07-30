@@ -5,6 +5,7 @@ from scripts.wp13_15_evidence import (
     evaluate_pilot,
     evaluate_release,
     evaluate_uat,
+    load_uat_rebind,
     validate_plans,
 )
 
@@ -114,8 +115,20 @@ def passing_release():
 def test_plans_are_exact_and_no_action_is_executed():
     result = validate_plans()
     assert result["status"] == "PASS"
+    assert result["wp13_rebind_state"] == "IMPACT_REVIEWED_PENDING_STAGING_DEPLOY"
+    assert result["wp13_rebind_resume_allowed"] is False
     assert result["human_actions_executed"] is False
     assert result["production_mutation_executed"] is False
+
+
+def test_candidate_rebind_is_fail_closed_until_a_real_deployment_is_bound():
+    rebind = load_uat_rebind()
+    assert rebind["target_candidate_sha"] == "222096db506e95db887a8705b22ca4a439d0545d"
+    assert rebind["runtime_change_scope"] == "WEB_UI_ONLY"
+    assert rebind["deployment_run_id"] is None
+    assert rebind["human_uat_resume_allowed"] is False
+    assert rebind["wp12b_rerun_executed"] is False
+    assert rebind["production_mutation_executed"] is False
 
 
 def test_uat_requires_every_human_status_threshold_and_signature():

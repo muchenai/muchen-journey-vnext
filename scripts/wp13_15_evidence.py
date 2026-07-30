@@ -46,6 +46,10 @@ def load_plans() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     )
 
 
+def load_uat_rebind() -> dict[str, Any]:
+    return load_json(CONFIG_ROOT / "wp13_uat_rebind.json")
+
+
 def exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != expected:
         raise EvidenceError(f"{label} must contain exactly: {', '.join(sorted(expected))}")
@@ -70,6 +74,7 @@ def parse_time(value: Any, label: str) -> datetime:
 
 def validate_plans() -> dict[str, object]:
     uat, pilot, release = load_plans()
+    rebind = load_uat_rebind()
     if uat != {
         "schema_version": 1,
         "environment": "staging",
@@ -153,11 +158,53 @@ def validate_plans() -> dict[str, object]:
         or checks != expected_release_checks
     ):
         raise EvidenceError("WP-15 plan is incomplete")
+    if rebind != {
+        "schema_version": 1,
+        "source_candidate_sha": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+        "target_candidate_sha": "222096db506e95db887a8705b22ca4a439d0545d",
+        "source_deployment_run_id": "30519669770",
+        "candidate_gate_run_id": "30550010916",
+        "candidate_manifest_sha256": "2aa6ec1af6f8db02a1a514419cb4bc181460317f990edc30de772375fe80aecc",
+        "runtime_change_scope": "WEB_UI_ONLY",
+        "unchanged_runtime_contracts": {
+            "backend_tree_oid": "ddacd3a84c85ff14d88b89a80ec00decfc697b4d",
+            "worker_tree_oid": "e1314ea8768db383823290eb7d18068f2a01ae5b",
+            "migrations_tree_oid": "c10e1597e9c701851fa74098e47a04f7f688f6ad",
+            "public_contract_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f",
+            "python_lock_blob_oid": "e3997a3676800cb4e48a146689271cb712fe413e",
+            "web_lock_blob_oid": "0a4f1454eceed7e80612100c813d5106a77e5738",
+            "compose_blob_oid": "4ed5ffbd73b90d125fed7186927509c2161626b0",
+        },
+        "candidate_contract": {
+            "config_schema_version": 3,
+            "migration": "0014_wp12_data_lifecycle",
+            "task_versions_sha256": "c95d66f618a2b337c428d7c905f8c3d9a6cb561a5542ef2181874789fa872620",
+        },
+        "registry_digests": {
+            "api": "sha256:6c98bdf2b4bead95618a4d9ef7116af79fa75b242af05079653056fc81dcbb13",
+            "web": "sha256:a940420f58eb6ef085926c442996f40b66b6870136272c565bfb9b1c2656d1c2",
+            "worker": "sha256:2d505fa9a3e4d37a38cded5ea2789274192eafde039ec05bdc5f9a44957525b7",
+        },
+        "inherited_wp12b_evidence": {
+            "run_id": "30525165474",
+            "original_result": "FAIL",
+            "alpha_p95_budget_seconds": 1.2,
+            "production_p95_budget_seconds": 1.0,
+        },
+        "decision": "IMPACT_REVIEWED_PENDING_STAGING_DEPLOY",
+        "deployment_run_id": None,
+        "human_uat_resume_allowed": False,
+        "wp12b_rerun_executed": False,
+        "production_mutation_executed": False,
+    }:
+        raise EvidenceError("WP-13 candidate rebind differs from DEC-021")
     return {
         "status": PASS,
         "wp13_scenarios": len(uat["scenarios"]),
         "wp14_duration_days": pilot["duration_days"],
         "wp15_required_checks": len(checks),
+        "wp13_rebind_state": rebind["decision"],
+        "wp13_rebind_resume_allowed": rebind["human_uat_resume_allowed"],
         "human_actions_executed": False,
         "production_mutation_executed": False,
     }

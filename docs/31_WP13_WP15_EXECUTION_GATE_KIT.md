@@ -1,8 +1,8 @@
 # WP-13～WP-15 真人、时间与生产门禁执行包
 
-状态：`AUTHORIZED_NOT_STARTED`
+状态：`HUMAN_UAT_STOPPED_PENDING_REDEPLOY`
 
-结论：`MACHINE_CONTRACT_READY / ALPHA_ENTRY_CONDITIONALLY_APPROVED / HUMAN_AND_TIME_EVIDENCE_NOT_RUN / PRODUCTION_NO_GO`
+结论：`UAT-WP13-001_REPAIRED / NEW_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / HUMAN_UAT_STOPPED / PRODUCTION_NO_GO`
 
 ## 1. 第一性原则
 
@@ -20,7 +20,8 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
-| `config/wp13_uat_plan.json` | 精确绑定候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 合同已验证；真人结果 `NOT_RUN` |
+| `config/wp13_uat_plan.json` | 精确绑定当前已部署候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 首次真人执行在 `AT-UAT-003` 为 `FAIL` 并停止；旧计划不覆盖该失败事实 |
+| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、不变运行合同及 pending 部署边界 | `IMPACT_REVIEWED_PENDING_STAGING_DEPLOY`；`human_uat_resume_allowed=false` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
@@ -108,11 +109,13 @@ WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还
 
 修复范围仅限 Web 运营页：复用既有 organization-scoped `POST/GET /ops/invites` 与 revoke 合同，让 Operator 通过已绑定 Reviewer 和已发布 TaskVersion 的可读名称创建 24 小时一次性链接，并查看/撤销最近邀请；不要求人工输入 UUID，不新增 API、数据表、云资源或 IAM 权限。邀请 token 仍只在创建成功后的当前页面状态显示，并放在 `/join#token=…` fragment 中；刷新后不再回显。
 
-该修复在合入、生成新候选、部署并重新绑定 UAT 计划前只属于 `FIX_PREPARED_NOT_DEPLOYED`。由于 DEC-020 精确绑定旧候选，任何新候选都必须先完成影响核对和明确的 UAT 重绑定决定；不得直接把旧候选的条件放行外推给新候选。
+修复已通过 PR #94 合入主线。Mainline run `30550010916` 为 `222096db506e95db887a8705b22ca4a439d0545d` 完成 `ci-main`、候选打包、三镜像 GHCR digest 验证和工件上传；manifest SHA-256 为 `2aa6ec1af6f8db02a1a514419cb4bc181460317f990edc30de772375fe80aecc`。
+
+DEC-021 的影响核对确认 API、Worker、迁移、OpenAPI、Python/Web 锁文件与 Compose 均未漂移，运行代码变化仅为 Web 邀请入口，因此不重跑 WP-12B，并保留原 run 的 `FAIL/NOT_CLOSED`。新候选绑定只写入 pending 合同：`deployment_run_id=null`、`human_uat_resume_allowed=false`。当前 staging 仍运行旧候选；精确新候选完成另行授权的部署和 readiness/revision 核对前，不得恢复 `AT-UAT-003`。
 
 ## 7. 当前判定
 
-- WP-13：`HUMAN_UAT_STOPPED / AT-UAT-003_FAIL / UAT-WP13-001_SEV2 / FIX_PREPARED_NOT_DEPLOYED / NO_GO`
+- WP-13：`HUMAN_UAT_STOPPED / AT-UAT-003_FAIL / UAT-WP13-001_SEV2 / NEW_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / NO_GO`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
 - WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
 - production mutation：`false`
