@@ -1,6 +1,6 @@
 # WP-12B｜多租户容量与隔离门禁证据
 
-状态：`LOCAL_HARNESS_PASS / STAGING_LOAD_FAIL / WP12B_NOT_CLOSED`
+状态：`LOCAL_HARNESS_PASS / STAGING_LOAD_FAIL / WP12B_NOT_CLOSED / ALPHA_UAT_CONDITIONAL_PASS`
 
 日期：2026-07-30
 Owner：Tech Lead + QA/UAT Owner + Release/Ops
@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 的一次性 WP-12B run `30508873351` 完成正式规模测量，隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，该 run 不得重试。连接池修复候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 已由唯一 deploy run `30519669770` 成功部署；其 WP-12B 尚未运行，因此仍为 `NOT_CLOSED`。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 的一次性 WP-12B run `30508873351` 完成正式规模测量，隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，该 run 不得重试。连接池修复候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 已由唯一 deploy run `30519669770` 成功部署，并由唯一 WP-12B run `30525165474` 完成正式规模测量；严格 1 秒门禁仍为 `FAIL/NOT_CLOSED`，但 DEC-020 已为同一候选批准仅限 WP-13 的 Alpha 条件放行。
 
 ## 2. 固定负载合同
 
@@ -131,7 +131,7 @@ PR #90 已将修复合入主线；Mainline Candidate Gate `30511897160` 对精�
 
 2026-07-30，Owner 授权候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 基于主线 `689250ac46ee1bbfb01f102d34705c139999755e` 在火山引擎华北2（北京）的冻结 staging 执行一次 `phase=deploy`，失败不重试、不发送飞书消息、不配置业务接收人。唯一 run `30519669770` 成功：精确候选/artifact/digest、预算合同、加密 state 仅读取、API `20+5`/Worker `2+1` 环境、migration、API/Web/Worker/Edge 健康、外部 TLS/release surface 与匿名 401 均 PASS；`audit/provision/apply` 均跳过，单一 SSH `/32` 已关闭。镜像下载耗时约 36 分钟但仍在 45 分钟门限内完成。该候选不得再次部署。
 
-当前结论更新为 `LOCAL_SHARED_WRITE_DIAGNOSIS_COMPLETE / BOUNDED_POOL_CANDIDATE_DEPLOYED / WP12B_NOT_RUN`。下一单一 WIP 是在获得独立精确授权后只执行一次该候选的 WP-12B；部署成功不能替代性能、数据库 audit、身份 retire 和 SSH close 证据。
+该候选部署后的完整运行、严格门禁结果与 Alpha 条件边界记录在第 14 节。run `30525165474` 已消费且不得重试；后续不得再把状态写回 `WP12B_NOT_RUN`。
 
 ## 13. 关闭条件
 
@@ -144,4 +144,14 @@ WP-12B 只有同时满足以下条件才关闭：
 5. load、数据库 audit、身份 retire 均 PASS，PII-free closure artifact 输出 `WP12B_CLOSED`；
 6. 将精确 run、候选和聚合结果回写本文件及追溯矩阵。
 
-在此之前：WP-13 真人 UAT 不启动，WP-12 仍为 `IN_PROGRESS`，production 继续 `NO_GO`。
+严格关闭条件仍未满足：WP-12 继续 `IN_PROGRESS`，production 继续 `NO_GO`。DEC-020 仅允许同一候选启动 WP-13 真人 UAT，不把 WP-12B 改记为 `CLOSED`。
+
+## 14. 第七次 staging 运行与 Alpha 条件放行
+
+2026-07-30，Owner 授权候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 基于主线 `94e46c54d98437d718dab3b75d2472891b9ecadf` 在现有 staging 只执行一次 WP-12B。GitHub Actions run `30525165474` 完整执行 20 个组织、500 名 Learner、40 名 Reviewer、20 名 Operator、50 峰值并发、600 秒 ×10 req/s 稳态与 60 秒 ×25 req/s 突发，共 10,561 个真实请求；未部署、未新增资源、未发送消息且未重试。
+
+隔离和正确性全部 PASS：HTTP 5xx、409、cross-org leak、unexpected response 均为 0；数据库中 500 Assignment/Submission/Review/Evaluation/Outcome 全部闭环，cross-org mismatch、duplicate fact、incomplete flow 均为 0。收尾同样 PASS：560 个会话全部撤销、560 个合成用户全部禁用，active session/user 均为 0，PII-free artifact 已上传，临时 SSH `/32` 已关闭。
+
+原 1 秒性能门禁仍 FAIL。`learner.submission_create` p95=`1.011632s`，`reviewer.review_finalize` p95=`1.097447s`；其余端点全部通过，其中 `reviewer.review_start=0.962569s`、`learner.assignment_start=0.750130s`，稳态读取均低于 `0.025s`。因此 run `30525165474` 永久保持 `FAIL`、不得重试，且没有生成 `WP12B_CLOSED` closure。
+
+Owner 随后批准 DEC-020：仅对该候选、仅为启动 WP-13 真人 UAT，接受核心同步命令 p95≤1.2 秒并记 `CONDITIONAL_PASS_FOR_ALPHA`。这不是追认 WP-12B 通过，不修改 DEC-013 的 production p95≤1 秒，不授权 WP-14 或 production；候选漂移后条件放行自动失效。

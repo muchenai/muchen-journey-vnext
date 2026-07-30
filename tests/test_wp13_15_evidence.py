@@ -9,7 +9,7 @@ from scripts.wp13_15_evidence import (
 )
 
 
-SHA = "a" * 40
+SHA = "02863d0b670ee9b00b9def3e75bc6699827f555a"
 REF = "b" * 64
 
 
@@ -20,9 +20,9 @@ def passing_uat():
         "candidate_sha": SHA,
         "release_binding": {
             "config_schema_version": 3,
-            "deployment_run_id": "run-uat",
+            "deployment_run_id": "30519669770",
             "migration": "0014_wp12_data_lifecycle",
-            "openapi_sha256": REF,
+            "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f",
         },
         "roster_counts": {
             "learners": 5,
@@ -131,6 +131,22 @@ def test_uat_requires_every_human_status_threshold_and_signature():
         "five_second_understanding",
         "signature.REVIEWER_2",
     }.issubset(set(result["blockers"]))
+
+
+def test_uat_rejects_candidate_drift_from_alpha_entry_gate():
+    failed = passing_uat()
+    failed["candidate_sha"] = "a" * 40
+    result = evaluate_uat(failed)
+    assert result["decision"] == "NO_GO"
+    assert "candidate_drift" in result["blockers"]
+
+
+def test_uat_rejects_release_binding_drift_from_alpha_entry_gate():
+    failed = passing_uat()
+    failed["release_binding"]["deployment_run_id"] = "different-run"
+    result = evaluate_uat(failed)
+    assert result["decision"] == "NO_GO"
+    assert "candidate_binding" in result["blockers"]
 
 
 def test_pilot_cannot_pass_before_real_14_days_or_with_bad_denominators():

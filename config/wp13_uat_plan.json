@@ -1,6 +1,18 @@
 {
   "schema_version": 1,
   "environment": "staging",
+  "entry_gate": {
+    "alpha_p95_budget_seconds": 1.2,
+    "approved_candidate_sha": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "config_schema_version": 3,
+    "decision": "CONDITIONAL_PASS_FOR_ALPHA",
+    "deployment_run_id": "30519669770",
+    "migration": "0014_wp12_data_lifecycle",
+    "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f",
+    "production_p95_budget_seconds": 1.0,
+    "wp12b_original_result": "FAIL",
+    "wp12b_run_id": "30525165474"
+  },
   "roster_minimums": {
     "learners": 5,
     "operators": 1,

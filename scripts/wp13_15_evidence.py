@@ -73,6 +73,18 @@ def validate_plans() -> dict[str, object]:
     if uat != {
         "schema_version": 1,
         "environment": "staging",
+        "entry_gate": {
+            "alpha_p95_budget_seconds": 1.2,
+            "approved_candidate_sha": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+            "config_schema_version": 3,
+            "decision": "CONDITIONAL_PASS_FOR_ALPHA",
+            "deployment_run_id": "30519669770",
+            "migration": "0014_wp12_data_lifecycle",
+            "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f",
+            "production_p95_budget_seconds": 1.0,
+            "wp12b_original_result": "FAIL",
+            "wp12b_run_id": "30525165474",
+        },
         "roster_minimums": {
             "learners": 5,
             "operators": 1,
@@ -176,20 +188,21 @@ def evaluate_uat(document: dict[str, Any]) -> dict[str, object]:
     blockers: list[str] = []
     if document.get("schema_version") != 1 or document.get("environment") != "staging":
         raise EvidenceError("WP-13 evidence schema/environment is invalid")
-    candidate_sha(document, "WP-13 evidence")
+    candidate = candidate_sha(document, "WP-13 evidence")
+    if candidate != plan["entry_gate"]["approved_candidate_sha"]:
+        blockers.append("candidate_drift")
     binding = exact_keys(
         document.get("release_binding"),
         {"config_schema_version", "deployment_run_id", "migration", "openapi_sha256"},
         "WP-13 release binding",
     )
-    if (
-        binding["config_schema_version"] != 3
-        or not isinstance(binding["deployment_run_id"], str)
-        or not binding["deployment_run_id"].strip()
-        or not isinstance(binding["migration"], str)
-        or not binding["migration"].strip()
-        or not valid_reference(binding["openapi_sha256"])
-    ):
+    entry_gate = plan["entry_gate"]
+    if binding != {
+        "config_schema_version": entry_gate["config_schema_version"],
+        "deployment_run_id": entry_gate["deployment_run_id"],
+        "migration": entry_gate["migration"],
+        "openapi_sha256": entry_gate["openapi_sha256"],
+    }:
         blockers.append("candidate_binding")
     roster = exact_keys(
         document.get("roster_counts"), set(plan["roster_minimums"]), "WP-13 roster"

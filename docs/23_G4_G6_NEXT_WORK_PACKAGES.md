@@ -1,13 +1,13 @@
 # 23｜G4–G6 下一批工作包定义
 
 状态：`APPROVED_FOR_BUILD`
-版本：V0.13
+版本：V0.14
 日期：2026-07-30
 建议 Owner：Product Owner + Tech Lead + QA/UAT Owner + Release/Ops Owner  
 依据：00–15 号开发前批准文档，以及 16–22 号 As-Built 已实现事实  
 当前发布判断：`NO_GO`
 
-变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复；旧 WP-12B 正式规模的正确性/隔离/退役 PASS，但三条写路径 p95 超过 1 秒。连接池修复候选 `02863d0…` 已通过 Mainline Candidate Gate，并由唯一 run `30519669770` 成功部署到冻结 staging；其 WP-12B 尚未运行。物理删除、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`。WP-13～WP-15 的防伪造验证合同已准备，WP-12B 关闭前不启动真人 UAT。
+变更说明：WP-07 已关闭；WP-08～WP-15 的编号、范围和顺序已批准。WP-08=`STAGING_ISOLATION_VERIFIED`；WP-09=`IDENTITY_AND_ACCESS_VERIFIED`；WP-10 按 DEC-017 以 `SECURELY_DISABLED_FOR_ALPHA` 关闭；WP-11 外部日志、真实通知和告警按 DEC-018 仅在 Alpha 延期，production 保持 `NO_GO`。WP-12 已完成代码硬化、threat model、数据生命周期 PLAN/Operator 台账、本地性能与本地隔离恢复；候选 `02863d0…` 的 WP-12B run `30525165474` 完成正式规模，隔离、正确性、数据库审计和退役 PASS，但 submission/finalize p95=`1.012/1.097s`，原 1 秒合同保持 FAIL。DEC-020 仅按 p95≤1.2 秒允许同一候选启动 WP-13；物理删除、真实 RPO/RTO 和异机恢复仍未执行，独立故障域按 DEC-019 延期，因此不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO`。
 
 ## 1. 结论
 
@@ -24,7 +24,7 @@ WP-07 → WP-08 → WP-09 → WP-10 → WP-11
       → WP-12 → WP-13 → WP-14 → WP-15
 ```
 
-其中 WP-07～WP-12 以工程和机器证据为主；WP-12B 多租户 staging 门禁关闭前不启动 WP-13。WP-13、WP-14 必须由真实角色完成；WP-15 涉及生产写入和正式切换，必须获得精确候选、环境和窗口的当轮明确授权。
+其中 WP-07～WP-12 以工程和机器证据为主；DEC-020 只为候选 `02863d0…` 建立 WP-13 Alpha 条件入口，不把 WP-12B 改记 `CLOSED`。WP-13、WP-14 必须由真实角色完成；WP-14 仍需 WP-13 签署后的独立启动决定，WP-15 涉及生产写入和正式切换，必须获得精确候选、环境和窗口的当轮明确授权。
 
 ## 2. 进入下一批前必须锁定的执行输入
 
