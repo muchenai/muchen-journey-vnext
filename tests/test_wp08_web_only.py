@@ -88,19 +88,34 @@ def test_runtime_rejects_unreviewed_evidence_fields():
 def repair_prestate(contract: dict[str, object]) -> dict[str, object]:
     return {
         "web_release": contract["candidate_commit"],
-        "api_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
-        "worker_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
-        "worker_heartbeat_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
-        "migration_revision": "0013_wp11_notify_observability",
+        "api_release": contract["candidate_commit"],
+        "worker_release": contract["candidate_commit"],
+        "worker_heartbeat_release": contract["candidate_commit"],
+        "migration_revision": "0014_wp12_data_lifecycle",
         "config_schema_version": 3,
         "api_status": "READY",
-        "worker_stale": True,
+        "worker_stale": False,
     }
 
 
-def test_runtime_repair_accepts_only_the_observed_bounded_prestate():
+def test_runtime_repair_accepts_the_read_only_inventory_prestate():
     contract = web_only.load_contract()
     web_only.verify_repair_prestate(contract, repair_prestate(contract))
+
+
+def test_runtime_repair_retains_the_previous_reviewed_transitional_prestate():
+    contract = web_only.load_contract()
+    evidence = repair_prestate(contract)
+    evidence.update(
+        {
+            "api_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+            "worker_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+            "worker_heartbeat_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
+            "migration_revision": "0013_wp11_notify_observability",
+            "worker_stale": True,
+        }
+    )
+    web_only.verify_repair_prestate(contract, evidence)
 
 
 @pytest.mark.parametrize(

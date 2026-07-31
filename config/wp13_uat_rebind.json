@@ -41,15 +41,38 @@
     "worker_stale": true,
     "ssh_ingress_closed": true
   },
+  "latest_repair_attempt": {
+    "run_id": "30595486997",
+    "conclusion": "FAIL_CLOSED_PRESTATE",
+    "application_or_database_mutation_executed": false,
+    "ssh_ingress_closed": true
+  },
+  "runtime_inventory": {
+    "run_id": "30598785077",
+    "workflow_head_sha": "16c50e4a0164193569fd96a59cb75229dad6906d",
+    "conclusion": "SUCCESS_READ_ONLY",
+    "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
+    "api_release": "222096db506e95db887a8705b22ca4a439d0545d",
+    "worker_release": "222096db506e95db887a8705b22ca4a439d0545d",
+    "worker_heartbeat_release": "222096db506e95db887a8705b22ca4a439d0545d",
+    "migration": "0014_wp12_data_lifecycle",
+    "config_schema_version": 3,
+    "api_status": "READY",
+    "worker_stale": false,
+    "application_or_database_mutation_executed": false,
+    "ssh_ingress_closed": true
+  },
   "runtime_repair_contract": {
     "phase": "repair-runtime",
     "confirmation": "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
     "web_mutation": false,
+    "observed_prestate_run_id": "30598785077",
+    "observed_runtime_release": "222096db506e95db887a8705b22ca4a439d0545d",
     "api_worker_baseline": "02863d0b670ee9b00b9def3e75bc6699827f555a",
     "migration_target": "0014_wp12_data_lifecycle",
     "deployment_authorized": false
   },
-  "decision": "RUNTIME_REPAIR_CONTRACT_READY_UAT_REJECTED",
+  "decision": "RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED",
   "deployment_run_id": null,
   "human_uat_resume_allowed": false,
   "wp12b_rerun_executed": false,

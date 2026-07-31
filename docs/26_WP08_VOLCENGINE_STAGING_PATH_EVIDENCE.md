@@ -254,3 +254,10 @@
 - PR #43 已通过 required check 并以仓库允许的 squash 方式合入受保护主线 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`；PR Fast Gate run `30158813946` 与 Mainline Candidate Gate [`30158877647`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30158877647) 均通过；
 - canonical artifact 未过期且标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`。修复候选固定摘要为 API `sha256:4f205e46…c949`、Web `sha256:ce05e4d4…8ff6`、Worker `sha256:25451ac5…48cc`；机器合同、Terraform candidate、deploy preflight、bundle、workflow artifact run/name 与确认词 `DEPLOY_14C9BA0_TO_VOLCENGINE_STAGING` 原子绑定；
 - 本候选绑定不包含 staging dispatch、云资源写入或 `dad44…` 重试。只有绑定 PR 合入受保护主线后，才能另行取得指名完整候选 `14c9ba073c293da1d4c6b615ea1f07c6c50688fa`、届时绑定主线、冻结基础设施、失败不重试的精确 `phase=deploy` 授权；当前 staging 仍运行 `dad44…`，WP-09、真实身份、真人 UAT 与整体发布继续为 `NOT_RUN/NO_GO`。
+
+## 2026-07-31 运行态只读盘点与 Repair 前置事实
+
+- repair run [`30595486997`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30595486997) 在镜像拉取、migration、grant 和容器替换前 fail closed；精确失败项为 API release 不在旧审查集合，SSH 已关闭，没有应用或数据库写入；
+- PR #98 增加同一 WP-08 workflow 的 `phase=inspect-runtime`，只允许读取固定容器的 Web/API/Worker release、API readiness、Alembic revision、config schema 与 Worker heartbeat release/freshness；禁止镜像、Compose、migration、grant、seed、Terraform plan/apply/import、DNS、消息和 WP-12B；
+- 主线 `16c50e4a0164193569fd96a59cb75229dad6906d` 的唯一 inventory run [`30598785077`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30598785077) 成功：Web/API/Worker/heartbeat 全部为 `222096db506e95db887a8705b22ca4a439d0545d`，migration=`0014_wp12_data_lifecycle`、config schema=3、API ready、Worker 非 stale；部署相关步骤全部 skipped，SSH 已关闭；
+- 本事实只允许把 `222096db…` 加入 repair prestate。repair 目标仍固定为 API/Worker=`02863d0…`，Web 不变；本记录不构成部署授权，不把未完成的 deploy 追认为成功，不激活 UAT，也不改变 production `NO_GO`。

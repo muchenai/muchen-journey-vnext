@@ -93,7 +93,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 `UAT-WP13-001` 的根因是 `/ops` 缺少邀请入口。候选差异核对证明 `apps/api`、`apps/worker`、`migrations` 的 Git tree，以及 OpenAPI、Python/Web 锁文件与 Compose blob 均和候选 `02863d0…` 完全一致；运行态新增只包含邀请入口的 Web UI/Server Action，并复用既有 scoped invite API。重新执行 20 组织/500 Learner 的后端负载不会增加与该缺陷相关的证据，反而会消耗试点时间。
 
-因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。full deploy run `30556851235` 超时后，组件级复验发现 Web 为新候选但 API/Worker、migration 和 heartbeat 不满足已测基线，故 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`。同一 workflow 现增加有界 `repair-runtime`：只接受已观测的 Web=`222096db…`、API/Worker=`172c9f62…|02863d0…`、migration=`0013|0014` prestate，只允许恢复 API/Worker=`02863d0…`、migration=`0014` 和 runtime grant；完整组件/HTTP 复验通过后仍须新 PR 才能激活 UAT。
+因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。full deploy run `30556851235` 超时后曾形成未经合同接受的运行态，故 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`。repair run `30595486997` 在写入前因旧前置集合拒绝 API release；随后只读 inventory run `30598785077` 证明 Web/API/Worker/heartbeat 均为 `222096db…`、migration=`0014`、schema=3、API ready 且 Worker 非 stale。`repair-runtime` 因此只把该实际 revision 加入 prestate，目标仍固定恢复 API/Worker=`02863d0…`、保持 migration=`0014` 并同步 runtime grant；完整组件/HTTP 复验通过后仍须新 PR 才能激活 UAT。
 
 ## 4. 风险台账
 

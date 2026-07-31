@@ -1,6 +1,6 @@
 # WP-13～WP-15 真人、时间与生产门禁执行包
 
-状态：`HUMAN_UAT_STOPPED_PENDING_REDEPLOY`
+状态：`HUMAN_UAT_STOPPED_RUNTIME_REPAIR_PRESTATE_VERIFIED`
 
 结论：`UAT-WP13-001_REPAIRED / NEW_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / HUMAN_UAT_STOPPED / PRODUCTION_NO_GO`
 
@@ -21,7 +21,7 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
 | `config/wp13_uat_plan.json` | 精确绑定当前已部署候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 首次真人执行在 `AT-UAT-003` 为 `FAIL` 并停止；旧计划不覆盖该失败事实 |
-| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署尝试、组件级运行证据及有界 runtime repair 合同 | `RUNTIME_REPAIR_CONTRACT_READY_UAT_REJECTED`；`human_uat_resume_allowed=false` |
+| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署/repair 尝试、只读 runtime inventory 及有界 runtime repair 合同 | `RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED`；`human_uat_resume_allowed=false` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
