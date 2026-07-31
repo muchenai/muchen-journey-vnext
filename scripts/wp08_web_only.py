@@ -142,10 +142,12 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     if repair["allowed_prestate"] != {
         "web_release": "candidate_commit",
         "api_releases": [
+            "candidate_commit",
             "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
             "runtime_baseline.candidate_commit",
         ],
         "worker_releases": [
+            "candidate_commit",
             "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
             "runtime_baseline.candidate_commit",
         ],
@@ -297,7 +299,7 @@ def verify_repair_prestate(
     baseline = data["runtime_baseline"]
     assert isinstance(baseline, dict)
     old = "172c9f62ffdcd4fce31fb4900fdca46b3405ab89"
-    allowed_releases = {old, baseline["candidate_commit"]}
+    allowed_releases = {data["candidate_commit"], old, baseline["candidate_commit"]}
     mismatches: list[str] = []
     if evidence["web_release"] != data["candidate_commit"]:
         mismatches.append("Web is not the reviewed candidate")

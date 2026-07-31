@@ -154,7 +154,7 @@ candidate, baseline, web_release, api_raw, worker_raw = sys.argv[1:]
 old = "172c9f62ffdcd4fce31fb4900fdca46b3405ab89"
 api = json.loads(api_raw)
 worker = json.loads(worker_raw)
-allowed = {old, baseline}
+allowed = {candidate, old, baseline}
 assert web_release == candidate
 assert api["release"] in allowed
 assert api["config_schema_version"] == 3

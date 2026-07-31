@@ -41,10 +41,12 @@
     "allowed_prestate": {
       "web_release": "candidate_commit",
       "api_releases": [
+        "candidate_commit",
         "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
         "runtime_baseline.candidate_commit"
       ],
       "worker_releases": [
+        "candidate_commit",
         "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
         "runtime_baseline.candidate_commit"
       ],

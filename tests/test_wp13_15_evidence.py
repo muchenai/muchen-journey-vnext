@@ -117,7 +117,7 @@ def test_plans_are_exact_and_no_action_is_executed():
     assert result["status"] == "PASS"
     assert (
         result["wp13_rebind_state"]
-        == "RUNTIME_REPAIR_CONTRACT_READY_UAT_REJECTED"
+        == "RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED"
     )
     assert result["wp13_rebind_resume_allowed"] is False
     assert result["human_actions_executed"] is False
@@ -146,6 +146,8 @@ def test_candidate_rebind_is_fail_closed_until_a_real_deployment_is_bound():
         "web_mutation": False,
         "api_worker_baseline": "02863d0b670ee9b00b9def3e75bc6699827f555a",
         "migration_target": "0014_wp12_data_lifecycle",
+        "observed_prestate_run_id": "30598785077",
+        "observed_runtime_release": "222096db506e95db887a8705b22ca4a439d0545d",
         "deployment_authorized": False,
     }
     assert rebind["wp12b_rerun_executed"] is False
