@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`RUNTIME_REPAIR_CONTRACT_READY / RUNTIME_BASELINE_REJECTED / WP12B_FAIL_NO_RETRY / HUMAN_UAT_STOPPED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。唯一 full deploy run `30556851235` 在镜像部署步骤达到 45 分钟上限后取消，SSH 清理成功；只读复验发现 Web 已为 `222096db…`，API/Worker 仍为 `172c9f62…`、migration=`0013_wp11_notify_observability` 且 Worker stale。该混合版本不满足 UAT 入口，不能绑定为成功部署，也不得重跑 WP-12B。
+状态：`RUNTIME_INVENTORY_CONTRACT_READY / RUNTIME_BASELINE_REJECTED / WP12B_FAIL_NO_RETRY / HUMAN_UAT_STOPPED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。唯一 full deploy run `30556851235` 在镜像部署步骤达到 45 分钟上限后取消，SSH 清理成功；后续 repair run `30595486997` 在任何镜像拉取、migration、grant 或容器替换前因 API release 超出已审查前置集合而 fail closed，SSH 清理成功。必须先用 `phase=inspect-runtime` 取得当前 PII-free 运行态 revision，再修改 repair 合同；当前状态不满足 UAT 入口，也不得重跑 WP-12B。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -35,6 +35,7 @@
 - Alpha 应用发布冻结现有基础设施：`phase=deploy` 只做 backend init、`terraform output -raw`、临时 SSH、发布包、Compose 与 TLS smoke，不运行 provider refresh、DNS import、plan 或 apply。基础设施变化只能显式使用 `phase=provision` 并继续通过 saved-plan 破坏性门禁。
 - `phase=deploy-web` 复用同一 workflow、同一冻结 state、同一临时 SSH 开关和同一 `deploy.sh`，不是第二条部署路径。它只拉取固定 Web digest，并仅执行 `docker compose up ... web`；API/Worker 镜像、环境、迁移、seed、DNS 和基础设施不得改变。Web pull 最长 8 分钟、启动最长 4 分钟；失败或取消只回滚 Web。成功证据必须同时包含 Web target revision、API/Worker baseline revision、migration、config schema、Worker 新鲜心跳及三个公开 HTTP 合同。
 - `phase=repair-runtime` 只处理已经观测到的混合状态：Web 必须先为 `222096db…`，API/Worker 与 heartbeat release 只能是 `172c9f62…` 或 `02863d0…`，migration 只能是 `0013` 或 `0014`。它不拉取、不重启 Web；只拉取固定 `02863d0…` API/Worker digest，前向升级到 `0014`、同步 runtime DML 权限并依次替换 API/Worker。API/Worker pull 各最长 8 分钟，migration 5 分钟、授权 2 分钟、两个服务各 4 分钟，所有 timeout 另有 30 秒强制终止。应用失败回滚到容器实际 Compose working directory；`0014` 是加表型前向 migration，不伪造数据库回滚。禁止 seed、业务事实、DNS、Terraform、云资源、Web 或 WP-12B 改写。
+- `phase=inspect-runtime` 是修复前的 PII-free 只读盘点。它从冻结 state 仅读取 ECS 地址与安全组，临时开放当前 runner 的单一 SSH `/32`，在现有容器内只读取 Web/API/Worker release、API readiness release、Alembic revision、config schema 与 Worker heartbeat release/freshness，随后无条件关闭该规则。日志不得包含账号、IP、数据库连接、身份、业务事实或消息内容；禁止镜像拉取、Compose 变更、migration、grant、seed、Terraform plan/apply/import、DNS、消息和 WP-12B。
 - `phase=audit` 只从加密 remote state 读取 ECS、RDS、AllowList 与安全组身份，并用北京地域 `DescribeAllowListDetail` 核对 `AssociateEcsIp` 的有效主网卡 IP；日志只输出计数和一致性布尔值，不输出 IP/资源 ID。结构、身份、IP 或 VPC 不一致立即失败；仅当这些字段全部匹配而实例 `IsLatest=false` 时，允许在同一次 audit 内每 10 秒重读、最多 7 次（总等待不超过 60 秒），窗口耗尽仍 fail closed。该 phase 不运行 refresh/plan/apply/import、不开放 SSH、也不连接数据库。
 - ECS `stopped_mode` 固定为实例当前且该规格支持的 `KeepCharging`；预算按整月运行估算，不在 deploy 时尝试切换计费停止模式。
 - 每条安全组规则只声明实际使用的来源选择器；CIDR 规则不得同时传入空 `prefix_list_id` 或 `source_group_id`，否则 CloudControl 会把空 PrefixList TRN 纳入 IAM 鉴权并越出项目边界。

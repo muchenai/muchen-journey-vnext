@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: Provision changes infrastructure; deploy uses frozen state only
+        description: Provision changes infrastructure; inventory and deploy use frozen state only
         required: true
         type: choice
         options:
@@ -13,12 +13,13 @@ on:
           - deploy
           - deploy-web
           - repair-runtime
+          - inspect-runtime
       candidate:
         description: Exact approved 40-character candidate SHA
         required: true
         type: string
       confirmation:
-        description: Type the reviewed confirmation for audit, full deploy, or bounded Web-only deploy
+        description: Type the reviewed confirmation for audit, inventory, or deployment
         required: true
         type: string
 
@@ -40,7 +41,8 @@ jobs:
       (inputs.phase == 'provision' && inputs.confirmation == 'DEPLOY_222096D_TO_VOLCENGINE_STAGING') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_222096D_TO_VOLCENGINE_STAGING') ||
       (inputs.phase == 'deploy-web' && inputs.confirmation == 'DEPLOY_WEB_222096D_ON_02863D0_STAGING') ||
-      (inputs.phase == 'repair-runtime' && inputs.confirmation == 'REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING'))
+      (inputs.phase == 'repair-runtime' && inputs.confirmation == 'REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING') ||
+      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_222096D_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -192,7 +194,7 @@ jobs:
           terraform show -json "$plan_file" | python3 ../../scripts/wp08_plan_guard.py
           terraform apply -auto-approve "$plan_file"
       - name: Read frozen Alpha pilot infrastructure
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime'
         id: frozen_infrastructure
         working-directory: infra/staging
         run: |
@@ -216,11 +218,26 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
       - name: Open exact runner SSH ingress
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime'
         run: |
           python3 -m scripts.wp08_security_group open \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
             --cidr "$WP08_RUNNER_CIDR"
+      - name: Execute PII-free runtime inventory
+        if: inputs.phase == 'inspect-runtime'
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp08-inventory-key"
+          known_hosts="$RUNNER_TEMP/wp08-inventory-known-hosts"
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$key"
+          chmod 0600 "$key"
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts")
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 - --candidate '${{ inputs.candidate }}'" \
+            <scripts/wp08_runtime_inventory.py
+          ssh-keygen -lf "$known_hosts"
       - name: Prepare private deploy bundle
         if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'
         env:
@@ -277,7 +294,7 @@ jobs:
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
       - name: Close SSH ingress
-        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
