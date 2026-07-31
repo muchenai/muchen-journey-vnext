@@ -261,3 +261,10 @@
 - PR #98 增加同一 WP-08 workflow 的 `phase=inspect-runtime`，只允许读取固定容器的 Web/API/Worker release、API readiness、Alembic revision、config schema 与 Worker heartbeat release/freshness；禁止镜像、Compose、migration、grant、seed、Terraform plan/apply/import、DNS、消息和 WP-12B；
 - 主线 `16c50e4a0164193569fd96a59cb75229dad6906d` 的唯一 inventory run [`30598785077`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30598785077) 成功：Web/API/Worker/heartbeat 全部为 `222096db506e95db887a8705b22ca4a439d0545d`，migration=`0014_wp12_data_lifecycle`、config schema=3、API ready、Worker 非 stale；部署相关步骤全部 skipped，SSH 已关闭；
 - 本事实只允许把 `222096db…` 加入 repair prestate。repair 目标仍固定为 API/Worker=`02863d0…`，Web 不变；本记录不构成部署授权，不把未完成的 deploy 追认为成功，不激活 UAT，也不改变 production `NO_GO`。
+
+## 2026-07-31 有界 Runtime Repair 成功
+
+- PR #99 合入受保护主线 `100e89494b8c42a6b04a86f5bdc26c06ab690fa7`，Mainline Candidate Gate [`30615645332`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30615645332) 通过；
+- 用户随后精确授权一次 `phase=repair-runtime`。唯一 run [`30616573615`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30616573615) 成功，未重试：Web=`222096db506e95db887a8705b22ca4a439d0545d`，API/Worker/heartbeat=`02863d0b670ee9b00b9def3e75bc6699827f555a`，migration=`0014_wp12_data_lifecycle`；
+- workflow 内部组件合同、公开 readiness、root=200、匿名 `/ops`/`/review`=401 与 SSH 撤销全部通过；Terraform、DNS、云资源、seed、消息发送和 WP-12B 未执行；
+- 本记录只恢复 WP-13 技术入口。原 UAT 失败、WP-12B 1 秒性能失败、真人签署缺失、WP-14 真实 14 天与 WP-15 production 门禁继续保持，production 仍为 `NO_GO`。

@@ -70,11 +70,30 @@
     "observed_runtime_release": "222096db506e95db887a8705b22ca4a439d0545d",
     "api_worker_baseline": "02863d0b670ee9b00b9def3e75bc6699827f555a",
     "migration_target": "0014_wp12_data_lifecycle",
-    "deployment_authorized": false
+    "deployment_authorized": true,
+    "authorization_consumed_run_id": "30616573615"
   },
-  "decision": "RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED",
-  "deployment_run_id": null,
-  "human_uat_resume_allowed": false,
+  "successful_runtime_repair": {
+    "run_id": "30616573615",
+    "workflow_head_sha": "100e89494b8c42a6b04a86f5bdc26c06ab690fa7",
+    "conclusion": "SUCCESS",
+    "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
+    "api_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "worker_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "worker_heartbeat_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+    "migration": "0014_wp12_data_lifecycle",
+    "config_schema_version": 3,
+    "api_status": "READY",
+    "worker_stale": false,
+    "root_http_status": 200,
+    "anonymous_ops_http_status": 401,
+    "anonymous_review_http_status": 401,
+    "ssh_ingress_closed": true,
+    "forbidden_mutation_executed": false
+  },
+  "decision": "STAGING_REPAIRED_UAT_READY",
+  "deployment_run_id": "30616573615",
+  "human_uat_resume_allowed": true,
   "wp12b_rerun_executed": false,
   "production_mutation_executed": false
 }

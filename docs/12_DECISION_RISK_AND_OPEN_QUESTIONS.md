@@ -93,7 +93,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 `UAT-WP13-001` 的根因是 `/ops` 缺少邀请入口。候选差异核对证明 `apps/api`、`apps/worker`、`migrations` 的 Git tree，以及 OpenAPI、Python/Web 锁文件与 Compose blob 均和候选 `02863d0…` 完全一致；运行态新增只包含邀请入口的 Web UI/Server Action，并复用既有 scoped invite API。重新执行 20 组织/500 Learner 的后端负载不会增加与该缺陷相关的证据，反而会消耗试点时间。
 
-因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。full deploy run `30556851235` 超时后曾形成未经合同接受的运行态，故 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`。repair run `30595486997` 在写入前因旧前置集合拒绝 API release；随后只读 inventory run `30598785077` 证明 Web/API/Worker/heartbeat 均为 `222096db…`、migration=`0014`、schema=3、API ready 且 Worker 非 stale。`repair-runtime` 因此只把该实际 revision 加入 prestate，目标仍固定恢复 API/Worker=`02863d0…`、保持 migration=`0014` 并同步 runtime grant；完整组件/HTTP 复验通过后仍须新 PR 才能激活 UAT。
+因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可继续使用。full deploy run `30556851235` 和首个 repair run `30595486997` 的失败事实保持不变；只读 inventory run `30598785077` 证明实际 prestate 后，主线 `100e8949…` 的唯一 repair run `30616573615` 成功将 API/Worker/heartbeat 恢复为 `02863d0…`，Web 保持 `222096db…`、migration=`0014`、schema=3、API ready、Worker 非 stale，公开 root=200、匿名 `/ops`/`/review`=401 且 SSH 已关闭。该 run 现绑定为 WP-13 技术入口；不追认 WP-12B 通过、不替代真人 UAT，也不改变 production `NO_GO`。
 
 ## 4. 风险台账
 
@@ -144,7 +144,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 2026-07-30 后续执行决策：Product Owner 明确批准 DEC-020，保留候选 `02863d0…` 的 WP-12B run `30525165474` 为原合同 FAIL，仅按 p95≤1.2 秒条件边界启动同一候选的 WP-13 真人 UAT。该批准不重跑 WP-12B、不再次部署、不启动 WP-14、不修改 DEC-013 production SLO，也不构成 production GO。
 
-2026-07-30 后续执行决策：Product Owner 明确批准 DEC-021，对主线 `222096db…` 执行 Web-only 影响核对、生成候选并准备 UAT 重绑定，不重跑 WP-12B。该批准不授权 staging 部署或恢复 UAT；部署 run 未绑定前 `human_uat_resume_allowed=false`，production 继续 `NO_GO`。
+2026-07-31 执行结果：DEC-021 的唯一有界 repair run `30616573615` 已成功并消费授权；`deployment_run_id` 已绑定、`human_uat_resume_allowed=true`。这只恢复 WP-13 真人执行入口，不把任何人工场景、签署、WP-14 时间窗或 WP-15/production 门禁记为通过，production 继续 `NO_GO`。
 
 ## 7. 签署区
 

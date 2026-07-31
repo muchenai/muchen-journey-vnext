@@ -10,7 +10,7 @@ from scripts.wp13_15_evidence import (
 )
 
 
-SHA = "02863d0b670ee9b00b9def3e75bc6699827f555a"
+SHA = "222096db506e95db887a8705b22ca4a439d0545d"
 REF = "b" * 64
 
 
@@ -21,7 +21,7 @@ def passing_uat():
         "candidate_sha": SHA,
         "release_binding": {
             "config_schema_version": 3,
-            "deployment_run_id": "30519669770",
+            "deployment_run_id": "30616573615",
             "migration": "0014_wp12_data_lifecycle",
             "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f",
         },
@@ -117,19 +117,19 @@ def test_plans_are_exact_and_no_action_is_executed():
     assert result["status"] == "PASS"
     assert (
         result["wp13_rebind_state"]
-        == "RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED"
+        == "STAGING_REPAIRED_UAT_READY"
     )
-    assert result["wp13_rebind_resume_allowed"] is False
+    assert result["wp13_rebind_resume_allowed"] is True
     assert result["human_actions_executed"] is False
     assert result["production_mutation_executed"] is False
 
 
-def test_candidate_rebind_is_fail_closed_until_a_real_deployment_is_bound():
+def test_candidate_rebind_is_bound_to_the_successful_repair_run():
     rebind = load_uat_rebind()
     assert rebind["target_candidate_sha"] == "222096db506e95db887a8705b22ca4a439d0545d"
     assert rebind["runtime_change_scope"] == "WEB_UI_ONLY"
-    assert rebind["deployment_run_id"] is None
-    assert rebind["human_uat_resume_allowed"] is False
+    assert rebind["deployment_run_id"] == "30616573615"
+    assert rebind["human_uat_resume_allowed"] is True
     assert rebind["latest_deployment_attempt"] == {
         "run_id": "30556851235",
         "conclusion": "CANCELLED_TIMEOUT",
@@ -148,7 +148,26 @@ def test_candidate_rebind_is_fail_closed_until_a_real_deployment_is_bound():
         "migration_target": "0014_wp12_data_lifecycle",
         "observed_prestate_run_id": "30598785077",
         "observed_runtime_release": "222096db506e95db887a8705b22ca4a439d0545d",
-        "deployment_authorized": False,
+        "deployment_authorized": True,
+        "authorization_consumed_run_id": "30616573615",
+    }
+    assert rebind["successful_runtime_repair"] == {
+        "run_id": "30616573615",
+        "workflow_head_sha": "100e89494b8c42a6b04a86f5bdc26c06ab690fa7",
+        "conclusion": "SUCCESS",
+        "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
+        "api_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+        "worker_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+        "worker_heartbeat_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
+        "migration": "0014_wp12_data_lifecycle",
+        "config_schema_version": 3,
+        "api_status": "READY",
+        "worker_stale": False,
+        "root_http_status": 200,
+        "anonymous_ops_http_status": 401,
+        "anonymous_review_http_status": 401,
+        "ssh_ingress_closed": True,
+        "forbidden_mutation_executed": False,
     }
     assert rebind["wp12b_rerun_executed"] is False
     assert rebind["production_mutation_executed"] is False
