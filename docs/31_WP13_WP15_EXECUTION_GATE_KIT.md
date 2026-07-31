@@ -1,8 +1,8 @@
 # WP-13～WP-15 真人、时间与生产门禁执行包
 
-状态：`HUMAN_UAT_STOPPED_RUNTIME_REPAIR_PRESTATE_VERIFIED`
+状态：`HUMAN_UAT_READY_STAGING_REPAIRED`
 
-结论：`UAT-WP13-001_REPAIRED / NEW_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / HUMAN_UAT_STOPPED / PRODUCTION_NO_GO`
+结论：`UAT-WP13-001_REPAIRED / CANDIDATE_DEPLOYED / UAT_REBIND_ACTIVE / HUMAN_UAT_READY / PRODUCTION_NO_GO`
 
 ## 1. 第一性原则
 
@@ -20,8 +20,8 @@ WP-13 证明真人能否理解并完成真实闭环，WP-14 证明产品在真�
 
 | 文件 | 固定内容 | 当前事实 |
 | --- | --- | --- |
-| `config/wp13_uat_plan.json` | 精确绑定当前已部署候选 `02863d0…` 和 DEC-020 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 首次真人执行在 `AT-UAT-003` 为 `FAIL` 并停止；旧计划不覆盖该失败事实 |
-| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败部署/repair 尝试、只读 runtime inventory 及有界 runtime repair 合同 | `RUNTIME_REPAIR_PRESTATE_VERIFIED_UAT_REJECTED`；`human_uat_resume_allowed=false` |
+| `config/wp13_uat_plan.json` | 精确绑定当前已部署 Web 候选 `222096db…`、repair run `30616573615` 和 DEC-020/021 Alpha 条件入口；5 Learner、2 Reviewer、1 Operator、1 QA Recorder；AT-UAT-001..008；三类校准；三视口/键盘/200%/辅助技术；5 个签署角色；5 秒理解率 ≥90% | 技术入口已恢复；原 `AT-UAT-003` 失败事实保留，新一轮必须完整重跑并取得真人证据 |
+| `config/wp13_uat_rebind.json` | DEC-021 Web-only 影响核对、新候选 Mainline run/manifest/GHCR 摘要、失败历史、只读 inventory、有界 repair 合同与成功运行态证据 | `STAGING_REPAIRED_UAT_READY`；`human_uat_resume_allowed=true` |
 | `config/wp14_pilot_plan.json` | 14 个自然日；D+1/D+3/D+7/D+14；DEC-010/013 七项阈值 | 合同已验证；观察窗未启动 |
 | `config/wp15_release_plan.json` | 18 项生产前置，包含同一候选、物理隔离、受管密钥、真实通知/观测、异机恢复、RPO/RTO、双人批准和生产观察 | 合同已验证；全部生产动作未授权 |
 
@@ -97,7 +97,7 @@ python3 scripts/wp13_15_evidence.py release-check \
 WP-12B run `30525165474` 的原 1 秒合同保持 `FAIL/NOT_CLOSED`。DEC-020 已对同一候选批准仅限 WP-13 的 p95≤1.2 秒 Alpha 条件入口；候选漂移即失效，且不得外推 WP-14/production。真人执行前仍必须补齐：
 
 1. 5 名 Learner、2 名独立 Reviewer、1 名 Operator、1 名 QA Recorder 的私有名册；
-2. 核对冻结候选仍为 `02863d0b670ee9b00b9def3e75bc6699827f555a`、部署 run=`30519669770` 且 staging readiness 与候选一致；
+2. 核对 Web 候选仍为 `222096db506e95db887a8705b22ca4a439d0545d`、repair run=`30616573615`、API/Worker 基线仍为 `02863d0b670ee9b00b9def3e75bc6699827f555a`，且 staging readiness 与候选一致；
 3. UAT 日期、Recorder、支持联系人和停止联系人；
 4. Reviewer 三类校准样本的私有内容与记录方式。
 
@@ -113,11 +113,11 @@ WP-14 只能在 WP-13 真人签署后开始，并真实经过 14 天。WP-15 还
 
 DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `02863d0…` 未漂移，候选单提交的运行代码变化仅为 Web 邀请入口，因此不重跑 WP-12B，并保留原 run 的 `FAIL/NOT_CLOSED`。full deploy run `30556851235` 在镜像部署阶段超时取消；公开 readiness 显示 Web=`222096db…`，但受权 `/ops` 运行快照显示 API/Worker=`172c9f62…`、migration=`0013`、Worker stale。SSH 已关闭，但该混合状态不是成功部署。
 
-`config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 现建立两段有界合同。正常 Web-only 路径仍要求 API/Worker 精确等于基线 `02863d0…`、migration=`0014`、schema=3、Worker 非 stale；针对已观测混合状态的 `repair-runtime` 只允许前向 migration、runtime DML grant 和固定摘要 API/Worker 替换，明确禁止 Web、seed、业务事实、DNS、Terraform、云资源与 WP-12B 改写。当前只证明合同和现有 prestate 匹配，未获得部署授权、未执行修复；`deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`，不得恢复 `AT-UAT-003`。
+`config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 建立两段有界合同。唯一 repair run [`30616573615`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30616573615) 基于主线 `100e89494b8c42a6b04a86f5bdc26c06ab690fa7` 成功：Web 保持 `222096db…`，API/Worker/heartbeat 恢复 `02863d0…`，migration=`0014`、schema=3、Worker 非 stale；root=200、匿名 `/ops`/`/review`=401，SSH 已关闭。Terraform、DNS、云资源、seed、消息和 WP-12B 均未执行。该 run 现作为 `deployment_run_id` 激活技术 UAT 入口，但不替代真人重跑或签署。
 
 ## 7. 当前判定
 
-- WP-13：`HUMAN_UAT_STOPPED / AT-UAT-003_FAIL / UAT-WP13-001_SEV2 / NEW_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / NO_GO`
+- WP-13：`HUMAN_UAT_READY / PRIOR_AT-UAT-003_FAIL_PRESERVED / UAT-WP13-001_REPAIRED / REBIND_ACTIVE / HUMAN_EVIDENCE_NOT_RUN / NO_GO`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
 - WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
 - production mutation：`false`

@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`RUNTIME_REPAIR_PRESTATE_VERIFIED / RUNTIME_BASELINE_REJECTED / WP12B_FAIL_NO_RETRY / HUMAN_UAT_STOPPED`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。repair run `30595486997` 在任何镜像拉取、migration、grant 或容器替换前因 API release 超出旧前置集合而 fail closed；随后唯一只读 inventory run `30598785077` 证明 Web/API/Worker/heartbeat 均为 `222096db…`、migration=`0014_wp12_data_lifecycle`、schema=3、API ready 且 Worker 非 stale，两次 SSH 清理均成功。repair 前置合同现只按该事实扩展，目标仍为 API/Worker=`02863d0…`；当前状态不满足 UAT 入口，也不得重跑 WP-12B。
+状态：`RUNTIME_REPAIRED / WEB_222096D_API_WORKER_02863D0 / WP12B_FAIL_NO_RETRY / HUMAN_UAT_READY / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。主线 `100e89494b8c42a6b04a86f5bdc26c06ab690fa7` 的唯一 repair run `30616573615` 已成功：Web=`222096db…`，API/Worker/heartbeat=`02863d0…`，migration=`0014_wp12_data_lifecycle`、schema=3、API ready、Worker 非 stale；root=200、匿名 `/ops`/`/review`=401，SSH 已关闭。Terraform、DNS、云资源、seed、消息与 WP-12B 未执行。技术 UAT 入口已恢复，真人场景与签署仍未完成。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
