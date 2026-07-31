@@ -23,6 +23,7 @@ WP09_BOOTSTRAP_WORKFLOW = ROOT / ".github" / "workflows" / "wp09-operator-bootst
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
+RUNTIME_INVENTORY_SCRIPT = ROOT / "scripts" / "wp08_runtime_inventory.py"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
 STAGING_CADDYFILE = ROOT / "deploy" / "staging" / "Caddyfile"
 WEB_READINESS_ROUTE = (
@@ -144,6 +145,7 @@ def validate_files() -> None:
         "scripts/wp08_dns_record.py",
         "scripts/wp08_rds_network_audit.py",
         "scripts/wp08_security_group.py",
+        "scripts/wp08_runtime_inventory.py",
         "scripts/wp08_web_only.py",
         "config/wp08_web_only.json",
         ".github/workflows/wp08-edge-mirror.yml",
@@ -156,7 +158,35 @@ def validate_files() -> None:
     if mode != 0o755:
         raise StagingError("deploy/staging/deploy.sh must be mode 0755")
     validate_deploy_script()
+    validate_runtime_inventory_script()
     validate_staging_compose()
+
+
+def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> None:
+    source = path.read_text()
+    required = (
+        '"docker", "inspect"',
+        '"docker", "exec"',
+        "SELECT version_num FROM alembic_version",
+        "SELECT release,last_seen_at FROM worker_heartbeats",
+        "WP08_RUNTIME_INVENTORY=",
+        "deployed candidate differs from authorized candidate",
+    )
+    if any(marker not in source for marker in required):
+        raise StagingError("runtime inventory script is incomplete")
+    forbidden = (
+        "docker compose up",
+        "docker pull",
+        "alembic upgrade",
+        "journey_api.seed",
+        "grant_runtime",
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "terraform ",
+    )
+    if any(marker in source for marker in forbidden):
+        raise StagingError("runtime inventory script exceeds its read-only boundary")
 
 
 def validate_edge_mirror_workflow(path: Path = EDGE_MIRROR_WORKFLOW) -> None:
@@ -463,7 +493,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     validate_infrastructure()
     workflow = path.read_text()
     required = (
-        "- audit\n          - provision\n          - deploy\n          - deploy-web\n          - repair-runtime",
+        "- audit\n          - provision\n          - deploy\n          - deploy-web\n          - repair-runtime\n          - inspect-runtime",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "id: terraform_init",
         "if: inputs.phase == 'audit'",
@@ -472,7 +502,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -509,6 +539,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
         "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
         "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
+        "INSPECT_RUNTIME_222096D_STAGING",
+        "scripts/wp08_runtime_inventory.py",
         'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
         "python3 scripts/wp08_web_only.py check",
         '--mode "$mode"',
@@ -523,6 +555,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow provision-only step count must be exactly 2")
     if workflow.count("if: inputs.phase == 'audit'") != 1:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
+    if workflow.count("if: inputs.phase == 'inspect-runtime'") != 1:
+        raise StagingError("staging workflow runtime inventory step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
         or workflow.count('git show "$candidate:') != 12
@@ -576,9 +610,25 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     for forbidden in ("terraform plan", "terraform apply", "terraform import", "wp08_security_group"):
         if forbidden in audit_step:
             raise StagingError("RDS network audit must remain read-only")
+    inventory_step_start = workflow.find("- name: Execute PII-free runtime inventory")
+    inventory_step_end = workflow.find("\n      - name:", inventory_step_start + 1)
+    if inventory_step_start < 0 or inventory_step_end < 0:
+        raise StagingError("staging runtime inventory step is missing")
+    inventory_step = workflow[inventory_step_start:inventory_step_end]
+    for forbidden in (
+        "terraform plan",
+        "terraform apply",
+        "terraform import",
+        "docker pull",
+        "deploy.sh",
+        "grant_runtime",
+        "wp12b",
+    ):
+        if forbidden in inventory_step:
+            raise StagingError("runtime inventory must remain read-only")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " phases=audit,provision,frozen-alpha-deploy,bounded-web-only,runtime-repair"
+        " phases=audit,provision,frozen-alpha-deploy,bounded-web-only,runtime-repair,runtime-inventory"
     )
 
 
