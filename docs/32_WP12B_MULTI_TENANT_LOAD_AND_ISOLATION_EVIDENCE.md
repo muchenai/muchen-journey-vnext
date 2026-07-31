@@ -9,7 +9,7 @@ Owner：Tech Lead + QA/UAT Owner + Release/Ops
 
 WP-12B 是 WP-12 的候选门禁，不是 WP-13 真人名册扩展。它使用无真实个人信息的合成组织证明同一候选在多组织并发下仍满足性能预算、组织隔离和事实唯一性；WP-13 继续用一个真实组织验证人能否理解并完成闭环。
 
-当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 的一次性 WP-12B run `30508873351` 完成正式规模测量，隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，该 run 不得重试。连接池修复候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 已由唯一 deploy run `30519669770` 成功部署，并由唯一 WP-12B run `30525165474` 完成正式规模测量；严格 1 秒门禁仍为 `FAIL/NOT_CLOSED`，但 DEC-020 已为同一候选批准仅限 WP-13 的 Alpha 条件放行。
+当前已完成负载合同、合成身份生命周期、真实 HTTP runner、数据库不变量审计、失败后强制身份退役和独立 staging workflow。本地 smoke 已通过；旧候选 `674e51d8ed67f9c29c3d04693376c9ba6f1114e5` 的一次性 WP-12B run `30508873351` 完成正式规模测量，隔离、事实审计和身份退役均 PASS，但三条写路径 p95 超过 1 秒，该 run 不得重试。连接池修复候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 已由唯一 deploy run `30519669770` 成功部署，并由唯一 WP-12B run `30525165474` 完成正式规模测量；严格 1 秒门禁仍为 `FAIL/NOT_CLOSED`。DEC-020/021 仅允许 Web=`222096db…`、API/Worker=`02863d0…` 的运行组合进入 WP-13 Alpha，不改变原性能结论。
 
 ## 2. 固定负载合同
 
@@ -144,7 +144,7 @@ WP-12B 只有同时满足以下条件才关闭：
 5. load、数据库 audit、身份 retire 均 PASS，PII-free closure artifact 输出 `WP12B_CLOSED`；
 6. 将精确 run、候选和聚合结果回写本文件及追溯矩阵。
 
-严格关闭条件仍未满足：WP-12 继续 `IN_PROGRESS`，production 继续 `NO_GO`。DEC-020 仅允许同一候选启动 WP-13 真人 UAT，不把 WP-12B 改记为 `CLOSED`。
+严格关闭条件仍未满足：WP-12 继续 `IN_PROGRESS`，production 继续 `NO_GO`。DEC-020/021 只恢复上述组合的 WP-13 真人 UAT 技术入口，不把 WP-12B 改记为 `CLOSED`。
 
 ## 14. 第七次 staging 运行与 Alpha 条件放行
 
