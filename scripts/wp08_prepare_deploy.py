@@ -15,11 +15,17 @@ from urllib.parse import quote
 
 
 CANDIDATE = "222096db506e95db887a8705b22ca4a439d0545d"
+WEB_ONLY_BASELINE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
 STAGING_HOST = "staging-vnext.muchenai.com"
 IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:6c98bdf2b4bead95618a4d9ef7116af79fa75b242af05079653056fc81dcbb13",
     "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:a940420f58eb6ef085926c442996f40b66b6870136272c565bfb9b1c2656d1c2",
     "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:2d505fa9a3e4d37a38cded5ea2789274192eafde039ec05bdc5f9a44957525b7",
+}
+WEB_ONLY_IMAGES = {
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
+    "WEB_IMAGE": IMAGES["WEB_IMAGE"],
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22",
 }
 SECRET_NAMES = (
     "WP08_MIGRATION_DB_PASSWORD",
@@ -123,7 +129,9 @@ def write_env(path: Path, values: dict[str, str]) -> None:
     path.chmod(0o600)
 
 
-def prepare(output: Path, host: str, port: int) -> None:
+def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
+    if mode not in {"full", "web-only", "runtime-repair"}:
+        raise PrepareError("deploy mode must be full, web-only, or runtime-repair")
     if not re.fullmatch(r"[A-Za-z0-9.-]+", host) or host in {"localhost", "127.0.0.1"}:
         raise PrepareError("RDS host must be one non-local DNS name")
     if port < 1 or port > 65535:
@@ -140,9 +148,11 @@ def prepare(output: Path, host: str, port: int) -> None:
     migration_url = dsn(
         "journey_next_migrator", values["WP08_MIGRATION_DB_PASSWORD"], host, port
     )
+    runtime_release = CANDIDATE if mode == "full" else WEB_ONLY_BASELINE
+    selected_images = IMAGES if mode == "full" else WEB_ONLY_IMAGES
     shared_api = {
         "APP_ENV": "staging",
-        "APP_RELEASE": CANDIDATE,
+        "APP_RELEASE": runtime_release,
         "CONFIG_SCHEMA_VERSION": "3",
         "ALLOWED_HOSTS": f"{STAGING_HOST},api,localhost,127.0.0.1",
         "ALLOW_FIXTURE_IDENTITY": "false",
@@ -168,7 +178,7 @@ def prepare(output: Path, host: str, port: int) -> None:
         secrets / "worker.env",
         {
             "APP_ENV": "staging",
-            "APP_RELEASE": CANDIDATE,
+            "APP_RELEASE": runtime_release,
             "DATABASE_URL": runtime_url,
             "NOTIFICATION_ADAPTER": "FEISHU",
             "NOTIFICATION_RECIPIENT_KEY": values[
@@ -221,9 +231,11 @@ def prepare(output: Path, host: str, port: int) -> None:
     write_env(
         output / ".deployment.env",
         {
+            "DEPLOY_MODE": mode,
             "CANDIDATE_COMMIT": CANDIDATE,
+            "BASELINE_CANDIDATE": WEB_ONLY_BASELINE,
             "STAGING_HOST": STAGING_HOST,
-            **IMAGES,
+            **selected_images,
         },
     )
     private_paths = (
@@ -242,7 +254,9 @@ def prepare(output: Path, host: str, port: int) -> None:
             raise PrepareError(f"incorrect mode for {path.name}")
     if stat.S_IMODE(ca_path.stat().st_mode) != 0o444:
         raise PrepareError("incorrect mode for volcengine-rds-ca.pem")
-    print(f"WP08_DEPLOY_BUNDLE=READY path={output} secret_files=6")
+    print(
+        f"WP08_DEPLOY_BUNDLE=READY path={output} secret_files=6 mode={mode}"
+    )
 
 
 def main() -> None:
@@ -250,9 +264,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rds-host", required=True)
     parser.add_argument("--rds-port", type=int, required=True)
+    parser.add_argument(
+        "--mode", choices=("full", "web-only", "runtime-repair"), default="full"
+    )
     args = parser.parse_args()
     try:
-        prepare(args.output, args.rds_host, args.rds_port)
+        prepare(args.output, args.rds_host, args.rds_port, mode=args.mode)
     except (OSError, PrepareError) as error:
         print(f"WP08_PREPARE_ERROR: {error}", file=sys.stderr)
         raise SystemExit(1) from error

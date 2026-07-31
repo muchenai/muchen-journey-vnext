@@ -144,6 +144,8 @@ def validate_files() -> None:
         "scripts/wp08_dns_record.py",
         "scripts/wp08_rds_network_audit.py",
         "scripts/wp08_security_group.py",
+        "scripts/wp08_web_only.py",
+        "config/wp08_web_only.json",
         ".github/workflows/wp08-edge-mirror.yml",
     ]
     for relative in required:
@@ -238,6 +240,50 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     )
     if any(marker not in script for marker in first_release_cleanup):
         raise StagingError("failed first deployment must stop partial application containers")
+    web_only_markers = (
+        '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
+        "verify_web_only_runtime",
+        "verify_runtime_repair_prestate",
+        'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
+        'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+        'alembic upgrade 0014_wp12_data_lifecycle',
+        "docker compose up -d --no-deps --wait --wait-timeout 180 web",
+        "WP08_WEB_ONLY_ROLLBACK=START",
+        "WP08_RUNTIME_REPAIR_ROLLBACK=START",
+        "WP08_RUNTIME_REPAIR=PASS",
+        "DEPLOYED_CANDIDATE.tmp",
+        "DEPLOYED_COMPONENTS.json",
+        "WP08_WEB_ONLY_DEPLOY=PASS",
+    )
+    if any(marker not in script for marker in web_only_markers):
+        raise StagingError("bounded Web-only deployment contract is incomplete")
+    repair_start = script.find('if [[ "$DEPLOY_MODE" == "runtime-repair" ]]')
+    repair_end = script.find("\nfi", repair_start)
+    if repair_start < 0 or repair_end < 0:
+        raise StagingError("runtime repair branch is missing")
+    repair = script[repair_start:repair_end]
+    repair_required = (
+        "verify_runtime_repair_prestate",
+        'docker pull "$API_IMAGE"',
+        'docker pull "$WORKER_IMAGE"',
+        "alembic upgrade 0014_wp12_data_lifecycle",
+        "python /tmp/grant_runtime.py",
+        "--wait-timeout 180 api",
+        "--wait-timeout 180 worker",
+        "verify_web_only_runtime",
+        "write_component_markers",
+    )
+    if any(marker not in repair for marker in repair_required):
+        raise StagingError("runtime repair branch is incomplete")
+    repair_forbidden = (
+        'docker pull "$WEB_IMAGE"',
+        "--wait-timeout 180 web",
+        "journey_api.seed",
+        "terraform ",
+        "wp12b",
+    )
+    if any(marker in repair for marker in repair_forbidden):
+        raise StagingError("runtime repair exceeds the reviewed mutation boundary")
 
 
 def validate_infrastructure() -> None:
@@ -417,7 +463,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     validate_infrastructure()
     workflow = path.read_text()
     required = (
-        "- audit\n          - provision\n          - deploy",
+        "- audit\n          - provision\n          - deploy\n          - deploy-web\n          - repair-runtime",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "id: terraform_init",
         "if: inputs.phase == 'audit'",
@@ -426,7 +472,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && inputs.phase == 'deploy' && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -461,6 +507,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
+        "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
+        "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
+        'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
+        "python3 scripts/wp08_web_only.py check",
+        '--mode "$mode"',
+        "mode=runtime-repair",
     )
     for marker in required:
         if marker not in workflow:
@@ -524,7 +576,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     for forbidden in ("terraform plan", "terraform apply", "terraform import", "wp08_security_group"):
         if forbidden in audit_step:
             raise StagingError("RDS network audit must remain read-only")
-    print("WP08_STAGING_WORKFLOW=PASS phases=audit,provision,frozen-alpha-deploy")
+    print(
+        "WP08_STAGING_WORKFLOW=PASS"
+        " phases=audit,provision,frozen-alpha-deploy,bounded-web-only,runtime-repair"
+    )
 
 
 def validate_wp09_bootstrap_workflow(path: Path = WP09_BOOTSTRAP_WORKFLOW) -> None:

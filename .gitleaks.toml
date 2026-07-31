@@ -21,4 +21,12 @@ targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
 regexes = ['''"openapi_sha256"\s*:\s*"[0-9a-f]{64}"''']
-paths = ['''(^|/)(config/wp13_uat_plan\.json|scripts/wp13_15_evidence\.py|tests/test_wp13_15_evidence\.py|evidence/private/wp13-uat\.json)$''']
+paths = ['''(^|/)(config/wp08_web_only\.json|config/wp13_uat_plan\.json|scripts/wp13_15_evidence\.py|tests/test_wp13_15_evidence\.py|evidence/private/wp13-uat\.json)$''']
+
+[[allowlists]]
+description = "Component revision evidence stores public Git commit SHAs, not credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''["']?(api_release|api_worker_baseline)["']?\s*[:,]\s*["'][0-9a-f]{40}["']''']
+paths = ['''(^|/)(config/wp13_uat_rebind\.json|scripts/wp13_15_evidence\.py|tests/test_wp08_web_only\.py|tests/test_wp13_15_evidence\.py)$''']

@@ -93,7 +93,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 `UAT-WP13-001` 的根因是 `/ops` 缺少邀请入口。候选差异核对证明 `apps/api`、`apps/worker`、`migrations` 的 Git tree，以及 OpenAPI、Python/Web 锁文件与 Compose blob 均和候选 `02863d0…` 完全一致；运行态新增只包含邀请入口的 Web UI/Server Action，并复用既有 scoped invite API。重新执行 20 组织/500 Learner 的后端负载不会增加与该缺陷相关的证据，反而会消耗试点时间。
 
-因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。`config/wp13_uat_rebind.json` 在部署前固定 `deployment_run_id=null`、`human_uat_resume_allowed=false`；只有精确候选成功部署并完成版本/readiness 核对后，才可通过新的受审 PR 激活 `config/wp13_uat_plan.json`。
+因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可在部署验证后继续使用。该继承不是候选自动放行。full deploy run `30556851235` 超时后，组件级复验发现 Web 为新候选但 API/Worker、migration 和 heartbeat 不满足已测基线，故 `deployment_run_id` 继续为 `null`、`human_uat_resume_allowed=false`。同一 workflow 现增加有界 `repair-runtime`：只接受已观测的 Web=`222096db…`、API/Worker=`172c9f62…|02863d0…`、migration=`0013|0014` prestate，只允许恢复 API/Worker=`02863d0…`、migration=`0014` 和 runtime grant；完整组件/HTTP 复验通过后仍须新 PR 才能激活 UAT。
 
 ## 4. 风险台账
 
@@ -119,7 +119,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-018 | Alpha 延期被误解为生产观测已通过 | 中/高 | 文档或发布门禁把 TLS/真实通知/告警标为 `VERIFIED`，或无外部观测即申请 production | DEC-018；三项保持 `NOT_RUN`；WP-11 保持 `NO_GO`；production release gate 拒绝 | Product/Security/Ops/Release |
 | RSK-019 | 灾备故障域延期演变为无期限无恢复能力 | 中/高 | 没有登记 Alpha 起始日；30 日后不评审；把受管备份存在等同于隔离恢复通过 | DEC-019；30 日成熟触发器；严重事故重新计时；基础备份/恢复工程不停；`off_host_backup_restore` 保持阻塞 | Product/Data/Ops/Release |
 | RSK-020 | Alpha 条件放行被误写成性能门禁通过 | 中/高 | 文档出现 `WP12B_CLOSED`、候选漂移后继续 UAT，或以 1.2 秒申请 production | DEC-020；保留原 run FAIL；WP-13 计划精确绑定候选；production 继续执行 DEC-013 的 1 秒 SLO | Product/Tech/QA/Release |
-| RSK-021 | pending 候选重绑定被误当成已部署 | 中/高 | 新候选未部署即恢复 UAT，或新 UAT 证据仍引用旧 deployment run | DEC-021；独立 pending rebind 合同；deployment run 为空时 resume=false；部署后单独 PR 激活 | Product/Tech/QA/Release |
+| RSK-021 | pending 候选重绑定或混合组件版本被误当成已部署 | 中/高 | Web readiness 为新 SHA，但 API/Worker/migration 仍为旧基线或 Worker stale；新 UAT 证据引用失败 run | DEC-021；组件级 Web-only + runtime-repair 合同；deployment run 为空时 resume=false；Web/API/Worker/migration/HTTP 全部通过后才单独 PR 激活 | Product/Tech/QA/Release |
 
 ## 5. 原开放问题的关闭结论
 
