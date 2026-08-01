@@ -176,7 +176,11 @@ def test_ops_enrollment_commands_are_scoped_reasoned_idempotent_and_audited():
 
     listed = assert_ok(client.get("/api/v1/ops/enrollments", headers=operator_headers))
     item = next(row for row in listed["items"] if row["id"] == str(enrollment_id))
-    assert item["allowed_commands"] == ["assign_reviewer", "cancel_enrollment"]
+    assert item["allowed_commands"] == [
+        "assign_reviewer",
+        "cancel_enrollment",
+        "create_learner_reentry",
+    ]
     assert item["assignment_statuses"] == ["AVAILABLE"]
 
     audit = assert_ok(

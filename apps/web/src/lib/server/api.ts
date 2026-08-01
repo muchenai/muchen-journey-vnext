@@ -414,6 +414,21 @@ export async function identityPageRequest<T>(
   }
 }
 
+export async function learnerPageRequest<T>(path: string): Promise<T> {
+  const cookieStore = await cookies();
+  if (!cookieStore.get(SESSION_COOKIE)?.value) {
+    redirect("/?auth_error=LEARNER_SESSION_EXPIRED");
+  }
+  try {
+    return await apiRequest<T>(path, "LEARNER");
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      redirect("/?auth_error=LEARNER_SESSION_EXPIRED");
+    }
+    throw error;
+  }
+}
+
 export async function anonymousApiRequest<T>(
   path: string,
   init: RequestInit,

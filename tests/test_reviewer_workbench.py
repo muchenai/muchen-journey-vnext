@@ -21,6 +21,8 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     Evaluation,
+    Invite,
+    InviteStatus,
     Organization,
     OutboxEvent,
     Review,
@@ -185,6 +187,144 @@ def finalize_payload(
             for key in RUBRIC_KEYS
         ],
     }
+
+
+def test_learner_reentry_after_revision_required_rotates_session_without_business_fact_changes():
+    flow = create_submission("reentry-after-revision")
+    reviewer = client_for("reviewer-reentry-after-revision")
+    started = assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/start",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"reentry-review-start-{uuid.uuid4()}",
+            },
+            json={"expected_revision": 1},
+        )
+    )
+    feedback = "请补充来源证据，并明确第一步责任人后提交新的修订版本。"
+    assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/finalize",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"reentry-review-finalize-{uuid.uuid4()}",
+            },
+            json=finalize_payload(
+                started["review_revision"],
+                decision="REQUEST_REVISION",
+                needs_work_key="evidence_quality",
+                overall_feedback=feedback,
+            ),
+        )
+    )
+    original_session = assert_ok(flow["learner"].get("/api/v1/session"))
+
+    tracked_models = (
+        User,
+        Enrollment,
+        Assignment,
+        Submission,
+        SubmissionVersion,
+        Review,
+        Evaluation,
+        OutboxEvent,
+    )
+    with SessionLocal() as session:
+        assignment = session.get(Assignment, uuid.UUID(flow["assignment_id"]))
+        assert assignment is not None
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        assert enrollment is not None
+        enrollment_id = enrollment.id
+        enrollment_revision = enrollment.revision
+        before = {
+            model.__tablename__: session.scalar(select(func.count()).select_from(model))
+            for model in tracked_models
+        }
+
+    operator = client_for("operator-create-learner-reentry")
+    idempotency_key = f"learner-reentry-{uuid.uuid4()}"
+    payload = {
+        "expected_revision": enrollment_revision,
+        "expires_in_minutes": 30,
+        "reason": "Learner 会话已过期，需要继续既有修订任务",
+    }
+    created = assert_ok(
+        operator.post(
+            f"/api/v1/ops/enrollments/{enrollment_id}/learner-reentry",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": idempotency_key},
+            json=payload,
+        )
+    )
+    replay = assert_ok(
+        operator.post(
+            f"/api/v1/ops/enrollments/{enrollment_id}/learner-reentry",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": idempotency_key},
+            json=payload,
+        )
+    )
+    assert replay["invite_token"] == created["invite_token"]
+    assert replay["idempotency_replay"] is True
+    duplicate = operator.post(
+        f"/api/v1/ops/enrollments/{enrollment_id}/learner-reentry",
+        headers={**OPERATOR_HEADERS, "Idempotency-Key": f"duplicate-{uuid.uuid4()}"},
+        json=payload,
+    )
+    assert duplicate.status_code == 409
+
+    reentry_client = client_for("learner-reentry-new-browser")
+    exchanged = assert_ok(
+        reentry_client.post(
+            "/api/v1/join/exchange",
+            json={"token": created["invite_token"], "return_to": "/app"},
+        )
+    )
+    assert exchanged["status"] == "PENDING_REENTRY"
+    assert exchanged["flow"] == "REENTRY"
+    confirmed = assert_ok(
+        reentry_client.post(
+            "/api/v1/identity/confirm",
+            headers={"X-CSRF-Token": exchanged["csrf_token"]},
+            json={
+                "display_name": None,
+                "accepted_purpose": True,
+                "return_to": "/app",
+            },
+        )
+    )
+    assert confirmed["user_id"] == original_session["user_id"]
+    assert confirmed["enrollment_status"] == "ACTIVE"
+    assert flow["learner"].get("/api/v1/session").status_code == 401
+    current = assert_ok(reentry_client.get("/api/v1/me/current-action"))
+    assert current["resource_id"] == flow["assignment_id"]
+    assert current["action_type"] == "REVISE_SUBMISSION"
+    detail = assert_ok(
+        reentry_client.get(f"/api/v1/me/assignments/{flow['assignment_id']}")
+    )
+    assert detail["allowed_commands"] == ["submit_revision"]
+    assert detail["latest_revision_feedback"] == feedback
+
+    consumed_again = client_for("learner-reentry-replay").post(
+        "/api/v1/join/exchange",
+        json={"token": created["invite_token"], "return_to": "/app"},
+    )
+    assert consumed_again.status_code == 410
+    with SessionLocal() as session:
+        after = {
+            model.__tablename__: session.scalar(select(func.count()).select_from(model))
+            for model in tracked_models
+        }
+        invite = session.get(Invite, uuid.UUID(created["id"]))
+        assert invite is not None
+        assert invite.token_hash != created["invite_token"]
+        assert invite.status == InviteStatus.CONSUMED
+        assert session.scalar(
+            select(AuditEntry.id).where(
+                AuditEntry.action == "learner_reentry.confirmed",
+                AuditEntry.actor_id == uuid.UUID(original_session["user_id"]),
+            )
+        )
+    assert after == before
 
 
 def create_other_org_review() -> uuid.UUID:

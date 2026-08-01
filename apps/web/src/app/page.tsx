@@ -6,6 +6,7 @@ const AUTH_ERRORS: Record<string, string> = {
   IDENTITY_PROVIDER_DISABLED: "飞书登录尚未完成环境配置。",
   IDENTITY_PROVIDER_UNAVAILABLE: "飞书登录暂时不可用，请稍后重新开始。",
   SESSION_EXPIRED: "当前会话已失效。业务事实未受影响；如仍有权限，请重新使用飞书登录。",
+  LEARNER_SESSION_EXPIRED: "新人会话已失效。已提交的任务与评审事实仍然保留；请联系试点运营获取一次性重新进入链接。",
 };
 
 const IDENTITY_RETURN_PATHS = new Set(["/review", "/ops"]);

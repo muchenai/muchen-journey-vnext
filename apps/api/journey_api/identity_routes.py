@@ -17,6 +17,7 @@ from journey_api.identity import (
     add_audit,
     clear_session_cookies,
     credential_hash,
+    derive_learner_reentry_token,
     derive_invite_token,
     enforce_invite_exchange_limit,
     random_token,
@@ -49,6 +50,7 @@ from journey_api.schemas import (
     CommandOut,
     CommandResponse,
     CreateInviteCommand,
+    CreateLearnerReentryCommand,
     CreateInviteOut,
     CreateInviteResponse,
     IdentityConfirmCommand,
@@ -124,6 +126,34 @@ def deny_exchange(
     )
     session.commit()
     raise ApiError(status_code, code, message)
+
+
+def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrollment]:
+    if invite.target_user_id is None:
+        return []
+    active = list(
+        session.scalars(
+            select(Enrollment).where(
+                Enrollment.organization_id == invite.organization_id,
+                Enrollment.learner_id == invite.target_user_id,
+                Enrollment.status == EnrollmentStatus.ACTIVE,
+            )
+        ).all()
+    )
+    if len(active) != 1:
+        return []
+    enrollment = active[0]
+    if enrollment.reviewer_id != invite.reviewer_id:
+        return []
+    assignment = session.scalar(
+        select(Assignment.id).where(
+            Assignment.organization_id == invite.organization_id,
+            Assignment.enrollment_id == enrollment.id,
+            Assignment.task_version_id == invite.task_version_id,
+            Assignment.status != AssignmentStatus.CANCELLED,
+        )
+    )
+    return [enrollment] if assignment is not None else []
 
 
 @router.post("/ops/invites", response_model=CreateInviteResponse)
@@ -267,6 +297,137 @@ def list_invites(
     )
 
 
+@router.post(
+    "/ops/enrollments/{enrollment_id}/learner-reentry",
+    response_model=CreateInviteResponse,
+)
+def create_learner_reentry(
+    enrollment_id: uuid.UUID,
+    command: CreateLearnerReentryCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "enrollment_id": str(enrollment_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="learner_reentry.create",
+        key=idempotency_key,
+        payload=payload,
+    )
+    settings = get_settings()
+    request_hash = canonical_hash(payload)
+    invite_token = derive_learner_reentry_token(
+        secret=settings.invite_secret,
+        actor_id=actor.id,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if replay is not None:
+        return envelope(request, CreateInviteOut(**replay, invite_token=invite_token))
+
+    enrollment = session.scalar(
+        select(Enrollment)
+        .where(
+            Enrollment.id == enrollment_id,
+            Enrollment.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的 Enrollment。")
+    ensure_revision(enrollment.revision, command.expected_revision)
+    if enrollment.status != EnrollmentStatus.ACTIVE:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有进行中的 Enrollment 可以重新进入。")
+    learner = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == enrollment.learner_id,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.LEARNER,
+        )
+    )
+    if learner is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "Learner 身份已停用或角色已移除。")
+    assignment = session.scalar(
+        select(Assignment)
+        .where(
+            Assignment.organization_id == actor.organization_id,
+            Assignment.enrollment_id == enrollment.id,
+            Assignment.status != AssignmentStatus.CANCELLED,
+        )
+        .order_by(Assignment.position, Assignment.id)
+    )
+    if assignment is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "Enrollment 没有可恢复的当前行动。")
+    now = utc_now()
+    existing_link = session.scalar(
+        select(Invite.id).where(
+            Invite.organization_id == actor.organization_id,
+            Invite.target_user_id == learner.id,
+            Invite.reviewer_id == enrollment.reviewer_id,
+            Invite.task_version_id == assignment.task_version_id,
+            Invite.status == InviteStatus.ACTIVE,
+            Invite.expires_at > now,
+        )
+    )
+    if existing_link is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "已有有效的重新进入链接，请先使用或撤销。")
+
+    purpose = "安全重新进入既有 Muchen Journey 当前行动，不创建新的业务事实"
+    invite = Invite(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        token_hash=credential_hash(settings.invite_secret, "invite", invite_token),
+        purpose=purpose,
+        role=Role.LEARNER,
+        reviewer_id=enrollment.reviewer_id,
+        task_version_id=assignment.task_version_id,
+        target_user_id=learner.id,
+        status=InviteStatus.ACTIVE,
+        expires_at=now + timedelta(minutes=command.expires_in_minutes),
+        created_by=actor.id,
+        revision=1,
+    )
+    session.add(invite)
+    result = {
+        "id": str(invite.id),
+        "purpose": invite.purpose,
+        "role": invite.role.value,
+        "status": invite.status.value,
+        "expires_at": invite.expires_at.isoformat(),
+        "revision": invite.revision,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="learner_reentry.create",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action="learner_reentry.created",
+        resource_type="invite",
+        resource_id=invite.id,
+        result="SUCCESS",
+        details={"role": "LEARNER", "status": "ACTIVE", "reason": command.reason},
+    )
+    session.commit()
+    return envelope(request, CreateInviteOut(**result, invite_token=invite_token))
+
+
 @router.post("/ops/invites/{invite_id}/revoke", response_model=CommandResponse)
 def revoke_invite(
     invite_id: uuid.UUID,
@@ -387,6 +548,7 @@ def exchange_invite(
         deny_exchange(session, request, invite=invite, message="邀请已经交换，不能再次使用。")
 
     created_user = invite.target_user_id is None
+    reentry_enrollment: Enrollment | None = None
     if created_user:
         user = User(
             id=uuid.uuid4(),
@@ -409,33 +571,43 @@ def exchange_invite(
                 code="FORBIDDEN",
                 status_code=403,
             )
-        active_enrollment = session.scalar(
-            select(Enrollment.id).where(
-                Enrollment.organization_id == invite.organization_id,
-                Enrollment.learner_id == user.id,
-                Enrollment.status.in_(
-                    [EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE]
-                ),
-            )
+        active_enrollments = list(
+            session.scalars(
+                select(Enrollment).where(
+                    Enrollment.organization_id == invite.organization_id,
+                    Enrollment.learner_id == user.id,
+                    Enrollment.status.in_(
+                        [EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE]
+                    ),
+                )
+            ).all()
         )
-        if active_enrollment is not None:
-            deny_exchange(
-                session,
-                request,
-                invite=invite,
-                message="该身份已有进行中的 Enrollment。",
-                code="INVALID_STATE_TRANSITION",
-                status_code=409,
-            )
+        matching = matching_reentry_enrollments(session, invite)
+        if active_enrollments:
+            if len(active_enrollments) != 1 or len(matching) != 1:
+                deny_exchange(
+                    session,
+                    request,
+                    invite=invite,
+                    message="该身份已有不匹配的进行中 Enrollment。",
+                    code="INVALID_STATE_TRANSITION",
+                    status_code=409,
+                )
+            reentry_enrollment = matching[0]
 
-    enrollment = Enrollment(
-        id=uuid.uuid4(),
-        organization_id=invite.organization_id,
-        learner_id=user.id,
-        reviewer_id=invite.reviewer_id,
-        status=EnrollmentStatus.PENDING_IDENTITY,
-        revision=1,
-    )
+    if reentry_enrollment is None:
+        enrollment = Enrollment(
+            id=uuid.uuid4(),
+            organization_id=invite.organization_id,
+            learner_id=user.id,
+            reviewer_id=invite.reviewer_id,
+            status=EnrollmentStatus.PENDING_IDENTITY,
+            revision=1,
+        )
+        session.add(enrollment)
+    else:
+        enrollment = reentry_enrollment
+
     join_token = random_token()
     csrf_token = random_token()
     expires_at = min(
@@ -453,16 +625,16 @@ def exchange_invite(
         created_user=created_user,
         expires_at=expires_at,
     )
-    session.add_all([enrollment, context])
+    session.add(context)
     add_audit(
         session,
         request_id=request.state.request_id,
         organization_id=invite.organization_id,
-        action="invite.exchanged",
+        action=("learner_reentry.exchanged" if reentry_enrollment else "invite.exchanged"),
         resource_type="invite",
         resource_id=invite.id,
         result="SUCCESS",
-        details={},
+        details={"flow": "REENTRY" if reentry_enrollment else "JOIN"},
     )
     session.commit()
     max_age = max(1, int((expires_at - now).total_seconds()))
@@ -470,7 +642,8 @@ def exchange_invite(
     return envelope(
         request,
         JoinExchangeOut(
-            status="PENDING_IDENTITY",
+            status="PENDING_REENTRY" if reentry_enrollment else "PENDING_IDENTITY",
+            flow="REENTRY" if reentry_enrollment else "JOIN",
             purpose=invite.purpose,
             expires_at=expires_at,
             csrf_token=csrf_token,
@@ -513,18 +686,33 @@ def confirm_identity(
         select(Enrollment).where(Enrollment.id == context.enrollment_id).with_for_update()
     )
     user = session.scalar(select(User).where(User.id == context.user_id).with_for_update())
+    is_reentry = bool(
+        invite is not None
+        and enrollment is not None
+        and user is not None
+        and not context.created_user
+        and invite.target_user_id == user.id
+        and enrollment.organization_id == invite.organization_id
+        and enrollment.learner_id == user.id
+        and enrollment.status == EnrollmentStatus.ACTIVE
+    )
     if (
         invite is None
         or enrollment is None
         or user is None
         or invite.status != InviteStatus.ACTIVE
         or invite.expires_at <= now
-        or enrollment.status != EnrollmentStatus.PENDING_IDENTITY
+        or (
+            enrollment.status != EnrollmentStatus.PENDING_IDENTITY
+            and not is_reentry
+        )
         or user.status not in {UserStatus.PENDING_IDENTITY, UserStatus.ACTIVE}
     ):
         raise ApiError(410, "INVITE_EXPIRED_OR_REVOKED", "邀请已失效，请联系运营。")
 
     if context.created_user:
+        if command.display_name is None:
+            raise ApiError(422, "VALIDATION_FAILED", "首次加入必须填写显示称呼。")
         user.display_name = command.display_name.strip()
         user.status = UserStatus.ACTIVE
     role_assignment = session.scalar(
@@ -533,7 +721,9 @@ def confirm_identity(
             RoleAssignment.role == Role.LEARNER,
         )
     )
-    if role_assignment is None:
+    if is_reentry and role_assignment is None:
+        raise ApiError(403, "FORBIDDEN", "Learner 角色已移除，不能重新进入。")
+    if not is_reentry and role_assignment is None:
         session.add(
             RoleAssignment(
                 id=uuid.uuid4(),
@@ -542,46 +732,75 @@ def confirm_identity(
                 role=Role.LEARNER,
             )
         )
-    session.add(
-        ExternalIdentity(
+    if not is_reentry:
+        session.add(
+            ExternalIdentity(
+                id=uuid.uuid4(),
+                organization_id=invite.organization_id,
+                user_id=user.id,
+                provider="INVITE",
+                subject=str(invite.id),
+            )
+        )
+        enrollment.status = EnrollmentStatus.ACTIVE
+        enrollment.revision += 1
+        task_version = session.scalar(
+            select(TaskVersion)
+            .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
+            .where(
+                TaskVersion.id == invite.task_version_id,
+                TaskVersion.organization_id == invite.organization_id,
+                TaskDefinition.organization_id == invite.organization_id,
+                TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+            )
+        )
+        if task_version is None:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的任务版本已不可用于新 Assignment。")
+        assignment = Assignment(
             id=uuid.uuid4(),
             organization_id=invite.organization_id,
-            user_id=user.id,
-            provider="INVITE",
-            subject=str(invite.id),
+            enrollment_id=enrollment.id,
+            task_definition_id=task_version.task_definition_id,
+            task_version_id=invite.task_version_id,
+            position=1,
+            status=AssignmentStatus.AVAILABLE,
+            revision=1,
         )
-    )
-    enrollment.status = EnrollmentStatus.ACTIVE
-    enrollment.revision += 1
-    task_version = session.scalar(
-        select(TaskVersion)
-        .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
-        .where(
-            TaskVersion.id == invite.task_version_id,
-            TaskVersion.organization_id == invite.organization_id,
-            TaskDefinition.organization_id == invite.organization_id,
-            TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+        session.add(assignment)
+    else:
+        assignment = session.scalar(
+            select(Assignment).where(
+                Assignment.organization_id == invite.organization_id,
+                Assignment.enrollment_id == enrollment.id,
+                Assignment.task_version_id == invite.task_version_id,
+                Assignment.status != AssignmentStatus.CANCELLED,
+            )
         )
-    )
-    if task_version is None:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的任务版本已不可用于新 Assignment。")
-    assignment = Assignment(
-        id=uuid.uuid4(),
-        organization_id=invite.organization_id,
-        enrollment_id=enrollment.id,
-        task_definition_id=task_version.task_definition_id,
-        task_version_id=invite.task_version_id,
-        position=1,
-        status=AssignmentStatus.AVAILABLE,
-        revision=1,
-    )
-    session.add(assignment)
+        if assignment is None or enrollment.reviewer_id != invite.reviewer_id:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "重新进入链接与当前行动不再匹配。")
     invite.status = InviteStatus.CONSUMED
     invite.consumed_by = user.id
     invite.consumed_at = now
     invite.revision += 1
     context.status = JoinContextStatus.CONFIRMED
     context.confirmed_at = now
+
+    rotated_sessions = []
+    if is_reentry:
+        rotated_sessions = list(
+            session.scalars(
+                select(IdentitySession)
+                .where(
+                    IdentitySession.organization_id == invite.organization_id,
+                    IdentitySession.user_id == user.id,
+                    IdentitySession.role == Role.LEARNER,
+                    IdentitySession.revoked_at.is_(None),
+                )
+                .with_for_update()
+            ).all()
+        )
+        for existing_session in rotated_sessions:
+            existing_session.revoked_at = now
 
     session_token = random_token()
     session_csrf_token = random_token()
@@ -596,19 +815,24 @@ def confirm_identity(
         expires_at=expires_at,
     )
     session.add(identity_session)
-    add_event(session, "invite.consumed.v1", "invite", invite.id)
-    add_event(session, "identity.confirmed.v1", "user", user.id)
-    add_event(session, "enrollment.activated.v1", "enrollment", enrollment.id)
+    if not is_reentry:
+        add_event(session, "invite.consumed.v1", "invite", invite.id)
+        add_event(session, "identity.confirmed.v1", "user", user.id)
+        add_event(session, "enrollment.activated.v1", "enrollment", enrollment.id)
     add_audit(
         session,
         request_id=request.state.request_id,
         organization_id=invite.organization_id,
         actor_id=user.id,
-        action="identity.confirmed",
+        action="learner_reentry.confirmed" if is_reentry else "identity.confirmed",
         resource_type="user",
         resource_id=user.id,
         result="SUCCESS",
-        details={"provider": "INVITE"},
+        details={
+            "provider": "INVITE",
+            "flow": "REENTRY" if is_reentry else "JOIN",
+            "rotated_session_count": len(rotated_sessions),
+        },
     )
     session.commit()
     set_session_cookies(

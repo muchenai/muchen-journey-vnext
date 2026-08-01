@@ -18,6 +18,7 @@ import {
 } from "@/lib/server/api";
 import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
+import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +145,12 @@ export default async function OpsPage({
               </div>
               {enrollment.open_review_status ? (
                 <p className="inline-error">已有 {enrollment.open_review_status} Review；Reviewer 重分配与 Enrollment 取消均被状态机阻断。</p>
+              ) : null}
+              {enrollment.allowed_commands.includes("create_learner_reentry") ? (
+                <LearnerReentryPanel
+                  enrollmentId={enrollment.id}
+                  enrollmentRevision={enrollment.revision}
+                />
               ) : null}
               {enrollment.allowed_commands.includes("assign_reviewer") ? (
                 <form action={assignEnrollmentReviewer} className="ops-command-form">

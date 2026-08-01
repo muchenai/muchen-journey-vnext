@@ -86,8 +86,10 @@ SAFE_AUDIT_KEYS = {
     "content_source_count",
     "decision",
     "feedback_character_count",
+    "flow",
     "reference_material_count",
     "role",
+    "rotated_session_count",
     "rubric_dimension_count",
     "rubric_version",
     "sensitivity",
@@ -556,6 +558,8 @@ def list_enrollments(
         if enrollment.status in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
+        if enrollment.status == EnrollmentStatus.ACTIVE:
+            allowed.append("create_learner_reentry")
         items.append(
             EnrollmentOpsOut(
                 id=enrollment.id,

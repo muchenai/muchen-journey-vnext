@@ -18,6 +18,12 @@ Owner：Liu Mowen（初始 Product + Tech Owner）
 - 邀请创建/交换/消费/撤销、身份确认和退出记录最小化 AuditEntry；领域事实写入同事务 outbox；
 - Web 新增 canonical `/join`，确认后沿用 walking skeleton 的服务端 Current Action 与 Assignment，不引入前端身份状态机。
 
+### 1.1 UAT-WP13-002 后续修复
+
+2026-08-02 真人 UAT 暴露了 WP-01 原合同的真实缺口：Learner session 默认 8 小时，但人工反馈 SLA 为 2 个工作日；原邀请已消费且 ACTIVE Enrollment 又阻止再次加入，因此会话过期后没有安全恢复路径。失败证据按 `UAT-WP13-002/SEV2` 保留，不能以延长 TTL 或新建 Learner/Enrollment 绕过。
+
+修复在既有 Invite/JoinContext/IdentitySession 边界内增加 Operator scoped `POST /ops/enrollments/{id}/learner-reentry`：链接 5–60 分钟、默认 30 分钟，仅存 keyed hash，使用 URL fragment、exchange rate limit、CSRF、单次消费、reason、expected revision 与幂等键。兑换必须匹配同组织原 Learner、唯一 ACTIVE Enrollment、原 Reviewer 和原 TaskVersion；确认只轮换旧 Learner session，不创建或改写 User、RoleAssignment、ExternalIdentity、Enrollment、Assignment、Submission、Review、Evaluation 或业务 Outbox 事实。Web 在缺失/失效 Learner session 时显示明确恢复说明，不再落入通用错误页。该修复尚未部署，真人 UAT 仍为 `NO_GO`。
+
 ## 2. 需求与实现追溯
 
 | 要求/验收 | 实现事实 | 自动化证据 |
