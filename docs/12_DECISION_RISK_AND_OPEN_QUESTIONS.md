@@ -42,6 +42,7 @@
 | DEC-019 | Alpha 灾备故障域延期边界 | Alpha 期间不选择跨地域或其他独立灾备故障域；待真实 Alpha 开放后连续稳定运行 30 个自然日再重开选型。基础备份、恢复可用性、数据完整性与 RPO/RTO 工程工作不取消；异机/独立故障域恢复继续 `NOT_RUN`，WP-12 不得记 `RC_TECHNICALLY_READY`，production 继续 `NO_GO` | `APPROVED` | Alpha 可继续非故障域 WP-12 与真人 UAT；production 恢复门禁不变 | Liu Mowen（Product + Data + Tech + Ops Owner） |
 | DEC-020 | Alpha 性能条件放行 | 候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 的 WP-12B run `30525165474` 保持原 1 秒合同 `FAIL`；仅为启动 WP-13 真人 UAT，接受核心同步命令 p95 ≤1.2 秒的候选级条件边界。该 run 的隔离、正确性、数据库审计、身份退役和 SSH 关闭必须全部保持 PASS；候选漂移立即失效。DEC-013 的 production p95≤1 秒不变，WP-12B 不记 `CLOSED`，production 继续 `NO_GO` | `APPROVED` | 允许该候选启动 WP-13；不授权 WP-14、production、重跑负载或再次部署 | Liu Mowen（Product + Tech + QA/UAT Owner） |
 | DEC-021 | WP-13 Web 修复候选重绑定 | 主线 `222096db506e95db887a8705b22ca4a439d0545d` 相对已测候选仅改变 Web 运行代码；API、Worker、迁移、OpenAPI、Python/Web 锁文件及 Compose 内容保持一致。允许沿用 WP-12B run `30525165474` 的原始 FAIL 与 DEC-020 的 Alpha ≤1.2 秒条件证据来准备新候选 UAT 绑定，不重跑 WP-12B。Mainline run `30550010916` 生成并验证三镜像；在该候选完成一次独立授权的 staging 部署、readiness/版本核对和部署 run 绑定前，真人 UAT 不得恢复，production 继续 `NO_GO` | `APPROVED` | 仅批准影响核对、候选生成和 pending UAT 重绑定；不授权部署、UAT 恢复、WP-14 或 production | Liu Mowen（Product + Tech + QA/UAT Owner） |
+| DEC-022 | 2026-08-03 受控 Alpha 上线 | 停止把完整 production 门禁作为 Alpha 使用前置。候选 `8f77ceec570e2ec5e9c52861fcdc27748d7bb44a` 仅在一次冻结基础设施 staging 部署成功，并完成 readiness/revision、真实邀请、提交、要求修订、安全重新进入和越权拒绝的 20 分钟最小核验后，向单一组织私密名单开放真实使用。附件、真实通知、WP-12B 重跑、灾备故障域和 production 切换继续延期；正式 UAT 未完成、production 继续 `NO_GO` | `APPROVED` | 仅允许受控 Alpha 使用；部署仍需候选、主线、环境和次数的当轮精确授权 | Liu Mowen（Product + Tech + QA/UAT + Release Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -94,6 +95,12 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 `UAT-WP13-001` 的根因是 `/ops` 缺少邀请入口。候选差异核对证明 `apps/api`、`apps/worker`、`migrations` 的 Git tree，以及 OpenAPI、Python/Web 锁文件与 Compose blob 均和候选 `02863d0…` 完全一致；运行态新增只包含邀请入口的 Web UI/Server Action，并复用既有 scoped invite API。重新执行 20 组织/500 Learner 的后端负载不会增加与该缺陷相关的证据，反而会消耗试点时间。
 
 因此 DEC-021 允许为候选 `222096db…` 继承 run `30525165474` 的原始结果：1 秒合同仍为 `FAIL`，仅 Alpha ≤1.2 秒条件边界可继续使用。full deploy run `30556851235` 和首个 repair run `30595486997` 的失败事实保持不变；只读 inventory run `30598785077` 证明实际 prestate 后，主线 `100e8949…` 的唯一 repair run `30616573615` 成功将 API/Worker/heartbeat 恢复为 `02863d0…`，Web 保持 `222096db…`、migration=`0014`、schema=3、API ready、Worker 非 stale，公开 root=200、匿名 `/ops`/`/review`=401 且 SSH 已关闭。该 run 现绑定为 WP-13 技术入口；不追认 WP-12B 通过、不替代真人 UAT，也不改变 production `NO_GO`。
+
+### DEC-022｜为什么受控 Alpha 不再等待全部 production 门禁
+
+真实用户闭环已经能够完成邀请、任务、提交和主管评审，当前最高信息价值来自小规模真实使用，而不是继续重复基础设施修补、合成负载或扩大 UAT 组合。Alpha 上线前仍保留身份授权、业务事实完整性和可恢复运行所需的最小核验；这些是阻止真实伤害的底线，不是追求测试完备性。
+
+候选 `8f77ceec…` 只改变 Learner 安全重新进入所需的 Web/API 身份路径，migration、TaskVersion、依赖锁文件和 Compose 不变。DEC-022 因此允许在精确候选部署成功后，以单一组织私密名单开始真实使用，并将非阻塞体验问题转入上线反馈队列。该决定不把 WP-13 正式真人 UAT、WP-12B、外部观测、通知、恢复或 production release gate 改记为通过。
 
 ## 4. 风险台账
 

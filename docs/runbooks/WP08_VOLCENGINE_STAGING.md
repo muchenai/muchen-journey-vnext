@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`RUNTIME_REPAIRED / WEB_222096D_API_WORKER_02863D0 / WP12B_FAIL_NO_RETRY / HUMAN_UAT_READY / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。主线 `100e89494b8c42a6b04a86f5bdc26c06ab690fa7` 的唯一 repair run `30616573615` 已成功：Web=`222096db…`，API/Worker/heartbeat=`02863d0…`，migration=`0014_wp12_data_lifecycle`、schema=3、API ready、Worker 非 stale；root=200、匿名 `/ops`/`/review`=401，SSH 已关闭。Terraform、DNS、云资源、seed、消息与 WP-12B 未执行。技术 UAT 入口已恢复，真人场景与签署仍未完成。
+状态：`ALPHA_LAUNCH_CANDIDATE_BOUND_PENDING_DEPLOY / CURRENT_WEB_222096D_API_WORKER_02863D0 / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。当前运行态仍为 Web=`222096db…`、API/Worker/heartbeat=`02863d0…`、migration=`0014_wp12_data_lifecycle`；候选 `8f77ceec…` 的绑定只为 2026-08-03 受控 Alpha 上线准备，不代表已部署。Terraform、DNS、云资源、消息和 WP-12B 均不在本次范围；production 继续 `NO_GO`。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -19,6 +19,7 @@
 - 历史已消费候选：`674e51d8ed67f9c29c3d04693376c9ba6f1114e5`；Mainline Candidate Gate `30489417625`、唯一 deploy run `30506961105` 均成功；唯一 WP-12B run `30508873351` 完成 20 组织/500 Learner/10,561 请求，正确性、数据库 audit、560 会话/用户退役、证据上传和 SSH 关闭均 PASS，但 submission/review start/review finalize p95 超过 1 秒，性能门禁 FAIL；该候选不得再次部署或重跑；
 - 当前 API/Worker 性能基线：`02863d0b670ee9b00b9def3e75bc6699827f555a`；PR #90、Mainline Candidate Gate `30511897160` 和唯一 deploy run `30519669770` 均成功；唯一 WP-12B run `30525165474` 完成 20 组织/500 Learner/10,561 请求，隔离、事实审计、560 会话/用户退役、证据上传和 SSH 关闭均 PASS，但 submission/finalize p95=`1.012/1.097s` 超过原 1 秒预算。该基线不得再次部署或重跑 WP-12B；DEC-020/021 仅允许其与 Web=`222096db…` 的已验证组合按 ≤1.2 秒边界启动 WP-13，不能视为 WP-12B 或 production 性能门禁通过；
 - Web 邀请入口修复候选：`222096db506e95db887a8705b22ca4a439d0545d`；Mainline Candidate Gate `30550010916` 已完成完整 CI、候选工件、三镜像 GHCR push 与 digest 验证。full deploy run `30556851235` 超时取消后形成 Web 新、API/Worker 旧的混合状态，未被接受为部署成功。`config/wp08_web_only.json` 现建立有界 Web-only 合同：只允许候选单提交中的 Web/指定证据路径；API、Worker、migration 与 OpenAPI 必须和基线 `02863d0…` 完全兼容；运行时必须先证明 API/Worker=`02863d0…`、migration=`0014_wp12_data_lifecycle`、config schema=3、Worker 非 stale，否则在 Web 写入前停止；
+- 受控 Alpha 上线候选：`8f77ceec570e2ec5e9c52861fcdc27748d7bb44a`；PR #104 修复 Learner 会话连续性与安全重新进入，PR #105 完成 fail-closed UAT 绑定；Mainline Candidate Gate `30709982868` 已完成 CI、SBOM、候选 manifest 和三镜像 GHCR digest 复验。该候选不改变 migration、TaskVersion、锁文件或 Compose；本合同仅允许在另行精确授权后执行一次冻结基础设施 `phase=deploy`，不重跑 WP-12B，不发送消息，不配置业务接收人；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -83,11 +84,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 将原子绑定 Web 邀请入口修复候选 `222096d…`、Mainline run `30550010916`、三个 registry digest、artifact name 和唯一确认词；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
+当前 workflow/config 原子绑定受控 Alpha 候选 `8f77ceec…`、Mainline run `30709982868`、三个 registry digest、artifact name 和唯一确认词；绑定只描述部署合同，不授权 dispatch。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. 历史确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`、`DEPLOY_172C9F6_TO_VOLCENGINE_STAGING`、`DEPLOY_9E1CDB2_TO_VOLCENGINE_STAGING`、`DEPLOY_674E51D_TO_VOLCENGINE_STAGING`、`DEPLOY_02863D0_TO_VOLCENGINE_STAGING` 与已消费的 `DEPLOY_222096D_TO_VOLCENGINE_STAGING` 均不得复用。Web-only 合同使用 `DEPLOY_WEB_222096D_ON_02863D0_STAGING`；当前混合状态的恢复合同使用 `REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING`。两段文本均不构成 dispatch 授权；只有合同 PR 合入、当轮精确主线与一次性授权齐备时才可执行对应 phase。任何前置状态漂移必须零业务写入停止，不得退化为 full deploy 或修改期望基线。
+3. 历史确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`、`DEPLOY_172C9F6_TO_VOLCENGINE_STAGING`、`DEPLOY_9E1CDB2_TO_VOLCENGINE_STAGING`、`DEPLOY_674E51D_TO_VOLCENGINE_STAGING`、`DEPLOY_02863D0_TO_VOLCENGINE_STAGING` 与 `DEPLOY_222096D_TO_VOLCENGINE_STAGING` 均不得复用。新候选只接受 `DEPLOY_8F77CEE_TO_VOLCENGINE_STAGING`；该文本不构成 dispatch 授权。只有合同 PR 合入、当轮精确主线与一次性授权齐备时才可执行 `phase=deploy`。任何前置状态漂移必须零业务写入停止，不得退化为 provision、Web-only、runtime-repair 或修改期望基线。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
