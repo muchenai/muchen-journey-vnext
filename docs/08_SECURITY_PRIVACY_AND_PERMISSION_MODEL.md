@@ -34,6 +34,7 @@
 - session cookie：Secure、HttpOnly、适当 SameSite、短期有效、可撤销；
 - 登录/绑定 state 一次性且防重放；return URL 严格 allowlist；
 - 权限/停用变更后旧会话在可接受窗口内失效；
+- Learner 短期会话不得靠扩大 TTL 跨越异步评审 SLA；过期后只允许同组织 Operator 为原 ACTIVE Enrollment 生成短时、一次性、哈希存储的重新进入链接，确认时轮换旧 Learner session，且不得创建新业务对象；
 - 不接受旧系统 cookie、JWT、Bearer token 或共享 secret；
 - 不在 localStorage/sessionStorage 保存 session/token；
 - 管理员不使用默认密码或共享账号；生产要求个人身份和最小权限。

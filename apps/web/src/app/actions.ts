@@ -85,7 +85,12 @@ export async function exchangeInvite(data: FormData) {
     redirect("/join?code=INVITE_EXPIRED_OR_REVOKED");
   }
   let exchange: {
-    data: { purpose: string; expires_at: string; csrf_token: string };
+    data: {
+      flow: "JOIN" | "REENTRY";
+      purpose: string;
+      expires_at: string;
+      csrf_token: string;
+    };
     setCookies: string[];
   };
   try {
@@ -109,7 +114,11 @@ export async function exchangeInvite(data: FormData) {
   cookieStore.set(
     JOIN_SUMMARY_COOKIE,
     Buffer.from(
-      JSON.stringify({ purpose: exchange.data.purpose, expires_at: exchange.data.expires_at }),
+      JSON.stringify({
+        flow: exchange.data.flow,
+        purpose: exchange.data.purpose,
+        expires_at: exchange.data.expires_at,
+      }),
     ).toString("base64url"),
     { ...options, httpOnly: true },
   );
@@ -119,7 +128,10 @@ export async function exchangeInvite(data: FormData) {
 export async function confirmIdentity(data: FormData) {
   const displayName = data.get("display_name");
   const acceptedPurpose = data.get("accepted_purpose") === "yes";
-  if (typeof displayName !== "string" || !displayName.trim() || displayName.length > 120) {
+  if (
+    displayName !== null
+    && (typeof displayName !== "string" || !displayName.trim() || displayName.length > 120)
+  ) {
     redirect("/join?code=VALIDATION_FAILED");
   }
   if (!acceptedPurpose) redirect("/join?code=PURPOSE_NOT_ACCEPTED");
@@ -139,7 +151,7 @@ export async function confirmIdentity(data: FormData) {
         "X-CSRF-Token": csrfToken,
       },
       body: JSON.stringify({
-        display_name: displayName.trim(),
+        display_name: typeof displayName === "string" ? displayName.trim() : null,
         accepted_purpose: true,
         return_to: "/app",
       }),
@@ -542,6 +554,46 @@ export async function revokeLearnerInvite(data: FormData) {
   });
   revalidatePath("/ops");
   redirect("/ops?updated=invite-revoked#learner-invites");
+}
+
+export type LearnerReentryActionState = {
+  error?: string;
+  requestId?: string;
+  joinPath?: string;
+  expiresAt?: string;
+};
+
+export async function createLearnerReentry(
+  _previousState: LearnerReentryActionState,
+  data: FormData,
+): Promise<LearnerReentryActionState> {
+  try {
+    const enrollmentId = requiredUuid(data, "enrollment_id");
+    const reason = data.get("reason");
+    if (typeof reason !== "string" || reason.trim().length < 10 || reason.length > 500) {
+      return { error: "重新进入理由需为 10–500 个字符。" };
+    }
+    const result = await apiRequest<{ invite_token: string; expires_at: string }>(
+      `/api/v1/ops/enrollments/${enrollmentId}/learner-reentry`,
+      "OPERATOR",
+      {
+        method: "POST",
+        headers: commandHeaders(),
+        body: JSON.stringify({
+          expected_revision: requiredRevision(data),
+          expires_in_minutes: 30,
+          reason: reason.trim(),
+        }),
+      },
+    );
+    revalidatePath("/ops");
+    return {
+      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}`,
+      expiresAt: result.expires_at,
+    };
+  } catch (error) {
+    return submissionError(error);
+  }
 }
 
 export async function configureNotificationEndpoint(data: FormData) {

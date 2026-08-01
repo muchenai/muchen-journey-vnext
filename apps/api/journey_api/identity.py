@@ -48,6 +48,14 @@ def derive_identity_link_token(
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
 
+def derive_learner_reentry_token(
+    *, secret: str, actor_id: uuid.UUID, idempotency_key: str, request_hash: str
+) -> str:
+    material = f"learner-reentry-create-v1:{actor_id}:{idempotency_key}:{request_hash}".encode()
+    digest = hmac.new(secret.encode(), material, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+
 def cookie_secure(settings: Settings | None = None) -> bool:
     current = settings or get_settings()
     return current.app_env in {"staging", "production"}

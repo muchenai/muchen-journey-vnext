@@ -747,6 +747,35 @@
         "title": "CreateInviteResponse",
         "type": "object"
       },
+      "CreateLearnerReentryCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "expires_in_minutes": {
+            "default": 30,
+            "maximum": 60.0,
+            "minimum": 5.0,
+            "title": "Expires In Minutes",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "CreateLearnerReentryCommand",
+        "type": "object"
+      },
       "CreateTaskDefinitionCommand": {
         "additionalProperties": false,
         "properties": {
@@ -1557,10 +1586,17 @@
             "type": "boolean"
           },
           "display_name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Display Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           },
           "return_to": {
             "const": "/app",
@@ -1570,7 +1606,6 @@
           }
         },
         "required": [
-          "display_name",
           "accepted_purpose"
         ],
         "title": "IdentityConfirmCommand",
@@ -1836,6 +1871,14 @@
             "title": "Expires At",
             "type": "string"
           },
+          "flow": {
+            "enum": [
+              "JOIN",
+              "REENTRY"
+            ],
+            "title": "Flow",
+            "type": "string"
+          },
           "purpose": {
             "title": "Purpose",
             "type": "string"
@@ -1846,13 +1889,17 @@
             "type": "string"
           },
           "status": {
-            "const": "PENDING_IDENTITY",
+            "enum": [
+              "PENDING_IDENTITY",
+              "PENDING_REENTRY"
+            ],
             "title": "Status",
             "type": "string"
           }
         },
         "required": [
           "status",
+          "flow",
           "purpose",
           "expires_at",
           "csrf_token",
@@ -6329,6 +6376,81 @@
           }
         },
         "summary": "Cancel Enrollment"
+      }
+    },
+    "/api/v1/ops/enrollments/{enrollment_id}/learner-reentry": {
+      "post": {
+        "operationId": "create_learner_reentry_api_v1_ops_enrollments__enrollment_id__learner_reentry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "enrollment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Enrollment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLearnerReentryCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInviteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Learner Reentry"
       }
     },
     "/api/v1/ops/enrollments/{enrollment_id}/reviewer": {

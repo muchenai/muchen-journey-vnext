@@ -108,6 +108,16 @@ class CreateInviteCommand(StrictModel):
     target_user_id: UUID | None = None
 
 
+class CreateLearnerReentryCommand(RevisionCommand):
+    expires_in_minutes: int = Field(default=30, ge=5, le=60)
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reentry_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class RevokeInviteCommand(RevisionCommand):
     reason: str = Field(min_length=10, max_length=500)
 
@@ -324,7 +334,8 @@ class JoinExchangeCommand(StrictModel):
 
 
 class JoinExchangeOut(StrictModel):
-    status: Literal["PENDING_IDENTITY"]
+    status: Literal["PENDING_IDENTITY", "PENDING_REENTRY"]
+    flow: Literal["JOIN", "REENTRY"]
     purpose: str
     expires_at: datetime
     csrf_token: str
@@ -337,7 +348,7 @@ class JoinExchangeResponse(StrictModel):
 
 
 class IdentityConfirmCommand(StrictModel):
-    display_name: str = Field(min_length=1, max_length=120)
+    display_name: str | None = Field(default=None, min_length=1, max_length=120)
     accepted_purpose: Literal[True]
     return_to: Literal["/app"] = "/app"
 

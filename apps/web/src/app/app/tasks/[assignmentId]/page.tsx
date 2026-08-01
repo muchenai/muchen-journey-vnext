@@ -4,7 +4,7 @@ import {
   deleteSubmissionAttachment,
   startAssignment,
 } from "@/app/actions";
-import { apiRequest, Assignment } from "@/lib/server/api";
+import { Assignment, learnerPageRequest } from "@/lib/server/api";
 import { AttachmentUploader } from "./attachment-uploader";
 import { SubmissionComposer } from "./submission-composer";
 
@@ -19,9 +19,8 @@ export default async function TaskPage({
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
-  const assignment = await apiRequest<Assignment>(
+  const assignment = await learnerPageRequest<Assignment>(
     `/api/v1/me/assignments/${encodeURIComponent(assignmentId)}`,
-    "LEARNER",
   );
   const canStart = assignment.allowed_commands.includes("start");
   const submitCommand = assignment.allowed_commands.find((command) =>

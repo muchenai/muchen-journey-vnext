@@ -354,6 +354,48 @@ def test_existing_identity_is_reused_and_disabled_identity_is_rejected():
     assert disabled.json()["error"]["code"] == "FORBIDDEN"
 
 
+def test_learner_reentry_creation_is_operator_only_revision_guarded_and_scoped():
+    created, _ = create_invite()
+    learner, confirmed, _ = exchange_and_confirm(
+        str(created["invite_token"]), "reentry-creation-scope"
+    )
+    with SessionLocal() as session:
+        enrollment = session.scalar(
+            select(Enrollment).where(
+                Enrollment.learner_id == uuid.UUID(str(confirmed["user_id"])),
+                Enrollment.organization_id == ORGANIZATION_ID,
+                Enrollment.status == EnrollmentStatus.ACTIVE,
+            )
+        )
+        assert enrollment is not None
+        enrollment_id = enrollment.id
+        revision = enrollment.revision
+    payload = {
+        "expected_revision": revision,
+        "expires_in_minutes": 30,
+        "reason": "恢复现有 Learner 会话并继续原任务",
+    }
+    learner_denied = learner.post(
+        f"/api/v1/ops/enrollments/{enrollment_id}/learner-reentry",
+        headers={"Idempotency-Key": f"learner-denied-{uuid.uuid4()}"},
+        json=payload,
+    )
+    assert learner_denied.status_code == 403
+    missing = client_for("operator-reentry-cross-scope").post(
+        f"/api/v1/ops/enrollments/{uuid.uuid4()}/learner-reentry",
+        headers={**operator_headers, "Idempotency-Key": f"missing-{uuid.uuid4()}"},
+        json=payload,
+    )
+    assert missing.status_code == 404
+    stale = client_for("operator-reentry-stale").post(
+        f"/api/v1/ops/enrollments/{enrollment_id}/learner-reentry",
+        headers={**operator_headers, "Idempotency-Key": f"stale-{uuid.uuid4()}"},
+        json={**payload, "expected_revision": revision + 1},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "VERSION_CONFLICT"
+
+
 def test_old_credentials_open_redirect_and_state_replay_are_rejected():
     old_credentials = client_for("old-credentials")
     old_credentials.cookies.set("legacy_session", "legacy-token")

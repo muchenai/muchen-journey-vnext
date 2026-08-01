@@ -73,11 +73,14 @@
 | GET | `/ops/enrollments` | 查询授权范围 Enrollment |
 | PUT | `/ops/enrollments/{id}/reviewer` | 分配/更换 reviewer，记录前后值与理由 |
 | POST | `/ops/enrollments/{id}/cancel` | 受控取消，要求 reason |
+| POST | `/ops/enrollments/{id}/learner-reentry` | 为原 Learner/Enrollment 生成 5–60 分钟一次性重新进入链接；要求 reason、expected revision 与幂等键 |
 | GET/POST | `/ops/task-definitions` | 创建草稿/查看任务定义 |
 | POST | `/ops/task-definitions/{id}/publish` | 发布不可变 TaskVersion |
 | GET | `/ops/audit` | 按权限查询审计元数据 |
 
 不开放任意字段编辑、SQL 控制台或“修复 status”接口。新的纠错需求必须增加有业务语义的命令。
+
+Learner 重新进入复用 Invite 的哈希、限流、一次性交换、CSRF 与撤销边界，但 `join/exchange` 必须返回 `flow=REENTRY`，`identity/confirm` 只能轮换原 Learner session。该路径不得创建或修改 User、RoleAssignment、ExternalIdentity、Enrollment、Assignment、Submission、Review、Evaluation、Outcome、Handoff 或业务 Outbox 事实。
 
 ## 7. Current Action 示例
 

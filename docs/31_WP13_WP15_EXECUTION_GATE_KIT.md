@@ -115,9 +115,17 @@ DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `028
 
 `config/wp08_web_only.json`、`scripts/wp08_web_only.py` 与同一 `staging.yml/deploy.sh` 建立两段有界合同。唯一 repair run [`30616573615`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30616573615) 基于主线 `100e89494b8c42a6b04a86f5bdc26c06ab690fa7` 成功：Web 保持 `222096db…`，API/Worker/heartbeat 恢复 `02863d0…`，migration=`0014`、schema=3、Worker 非 stale；root=200、匿名 `/ops`/`/review`=401，SSH 已关闭。Terraform、DNS、云资源、seed、消息和 WP-12B 均未执行。该 run 现作为 `deployment_run_id` 激活技术 UAT 入口，但不替代真人重跑或签署。
 
+### 6.2 UAT-WP13-002｜Learner 会话连续性
+
+2026-08-02 的 Round-2 真人路径已经完成真实邀请、任务提交和 Reviewer `REQUEST_REVISION`。Learner 在提交约 11 小时后返回 `/app`，页面显示通用服务端错误摘要 `3990910455`，无法进入修订工作区。截图只证明 Web 错误页，不单独证明 API 401；但代码与时间合同显示 Learner session 固定 8 小时，Learner 页面没有 Reviewer/Operator 已有的过期恢复处理，原一次性邀请又已消费，因此将该结果按 `UAT-WP13-002/SEV2` 记录并停止 `AT-UAT-002`。
+
+修复不延长 session TTL，也不创建新的身份或业务闭环。Operator 只能对同组织原 ACTIVE Enrollment 生成默认 30 分钟的一次性重新进入链接；服务端校验原 Learner、Enrollment、Reviewer 与 TaskVersion，确认后轮换旧 Learner session，并保持原 Submission/Review/Evaluation 与修订反馈不变。API 回归显式比较重新进入前后的 User、Enrollment、Assignment、SubmissionVersion、Review、Evaluation 和业务 Outbox 计数；Web 对缺失或 API 401 的 Learner session 显示联系运营获取替换链接的明确提示。
+
+本节当前只记录代码修复与本地机器验证准备，不代表 staging 已部署或 UAT 缺陷已关闭。原截图和失败结论保持，只有修复经 PR 合入、独立授权部署，并由原真人角色从“看到修订反馈”重新执行 `AT-UAT-002` 后，才允许更新结果。
+
 ## 7. 当前判定
 
-- WP-13：`HUMAN_UAT_READY / PRIOR_AT-UAT-003_FAIL_PRESERVED / UAT-WP13-001_REPAIRED / REBIND_ACTIVE / HUMAN_EVIDENCE_NOT_RUN / NO_GO`
+- WP-13：`UAT-WP13-002_SEV2 / REPAIR_CODE_READY_NOT_DEPLOYED / PRIOR_FAILURES_PRESERVED / HUMAN_UAT_STOPPED / NO_GO`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
 - WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
 - production mutation：`false`

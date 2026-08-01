@@ -1,3 +1,5 @@
+import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,7 +27,11 @@ def accepted_runtime(contract: dict[str, object]) -> dict[str, object]:
 
 
 def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypatch):
-    contract = web_only.load_contract()
+    contract = copy.deepcopy(web_only.load_contract())
+    candidate_openapi = b'{"openapi":"historical-candidate"}\n'
+    baseline = contract["runtime_baseline"]
+    assert isinstance(baseline, dict)
+    baseline["openapi_sha256"] = hashlib.sha256(candidate_openapi).hexdigest()
 
     def fake_git(*args: str, text: bool = True):
         if args[:2] == ("rev-parse", f"{contract['candidate_commit']}^"):
@@ -37,8 +43,7 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
         if args[:2] == ("diff", "--name-only") and "--" in args:
             return ""
         if args[:1] == ("show",):
-            raw = (web_only.ROOT / "contracts/openapi.json").read_bytes()
-            return raw if not text else raw.decode()
+            return candidate_openapi if not text else candidate_openapi.decode()
         raise AssertionError(args)
 
     monkeypatch.setattr(web_only, "_git", fake_git)

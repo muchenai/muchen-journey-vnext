@@ -15,7 +15,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   PURPOSE_NOT_ACCEPTED: "确认邀请用途后才能继续。",
 };
 
-type JoinSummary = { purpose: string; expires_at: string };
+type JoinSummary = {
+  flow: "JOIN" | "REENTRY";
+  purpose: string;
+  expires_at: string;
+};
 
 function parseSummary(value: string | undefined): JoinSummary | null {
   if (!value) return null;
@@ -35,11 +39,12 @@ export default async function JoinPage({
   const cookieStore = await cookies();
   const summary = parseSummary(cookieStore.get("journey_next_join_summary")?.value);
   const errorMessage = query.code ? ERROR_MESSAGES[query.code] ?? "邀请处理失败，请联系运营。" : null;
+  const isReentry = summary?.flow === "REENTRY";
 
   return (
     <section className="content-narrow">
-      <p className="eyebrow">受邀加入</p>
-      <h1>确认身份，进入唯一当前行动。</h1>
+      <p className="eyebrow">{isReentry ? "安全重新进入" : "受邀加入"}</p>
+      <h1>{isReentry ? "确认重新进入，继续原有当前行动。" : "确认身份，进入唯一当前行动。"}</h1>
       {errorMessage ? (
         <div className="notice" role="alert">
           <strong>{errorMessage}</strong>
@@ -54,13 +59,21 @@ export default async function JoinPage({
             身份确认窗口截至 {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
           </p>
           <form action={confirmIdentity}>
-            <label htmlFor="display-name">你希望显示的称呼</label>
-            <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
+            {!isReentry ? (
+              <>
+                <label htmlFor="display-name">你希望显示的称呼</label>
+                <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
+              </>
+            ) : (
+              <p className="notice">本次只恢复原有 Learner 会话，不会创建新人、Enrollment、Assignment 或新提交。</p>
+            )}
             <label className="consent-row">
               <input type="checkbox" name="accepted_purpose" value="yes" required />
               我已确认本次邀请用途并同意继续
             </label>
-            <button className="button primary" type="submit">确认身份并进入</button>
+            <button className="button primary" type="submit">
+              {isReentry ? "确认并重新进入" : "确认身份并进入"}
+            </button>
           </form>
         </article>
       ) : (

@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 import { logoutSession } from "@/app/actions";
-import { apiRequest, CurrentAction, hasVNextSession } from "@/lib/server/api";
+import { CurrentAction, hasVNextSession, learnerPageRequest } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function LearnerHome() {
   const [action, hasSession] = await Promise.all([
-    apiRequest<CurrentAction>("/api/v1/me/current-action", "LEARNER"),
+    learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
     hasVNextSession(),
   ]);
   const opensTask = ["START_OR_CONTINUE_TASK", "REVISE_SUBMISSION"].includes(

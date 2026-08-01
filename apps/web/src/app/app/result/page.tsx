@@ -1,4 +1,4 @@
-import { apiRequest, Result, Timeline } from "@/lib/server/api";
+import { learnerPageRequest, Result, Timeline } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +34,8 @@ function timelineDetail(eventType: string, details: Timeline["items"][number]["d
 
 export default async function ResultPage() {
   const [result, timeline] = await Promise.all([
-    apiRequest<Result>("/api/v1/me/result", "LEARNER"),
-    apiRequest<Timeline>("/api/v1/me/timeline?limit=100", "LEARNER"),
+    learnerPageRequest<Result>("/api/v1/me/result"),
+    learnerPageRequest<Timeline>("/api/v1/me/timeline?limit=100"),
   ]);
   const notificationEvidence = result.notification.external_delivery_confirmed
     ? "飞书服务已确认接受通知请求。"
