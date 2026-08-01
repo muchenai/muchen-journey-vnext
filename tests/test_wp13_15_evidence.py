@@ -115,60 +115,35 @@ def passing_release():
 def test_plans_are_exact_and_no_action_is_executed():
     result = validate_plans()
     assert result["status"] == "PASS"
-    assert (
-        result["wp13_rebind_state"]
-        == "STAGING_REPAIRED_UAT_READY"
-    )
-    assert result["wp13_rebind_resume_allowed"] is True
+    assert result["wp13_rebind_state"] == "REPAIR_CANDIDATE_BOUND_PENDING_STAGING_DEPLOY"
+    assert result["wp13_rebind_resume_allowed"] is False
     assert result["human_actions_executed"] is False
     assert result["production_mutation_executed"] is False
 
 
-def test_candidate_rebind_is_bound_to_the_successful_repair_run():
+def test_repair_candidate_rebind_is_fail_closed_until_a_new_deployment_is_bound():
     rebind = load_uat_rebind()
-    assert rebind["target_candidate_sha"] == "222096db506e95db887a8705b22ca4a439d0545d"
-    assert rebind["runtime_change_scope"] == "WEB_UI_ONLY"
-    assert rebind["deployment_run_id"] == "30616573615"
-    assert rebind["human_uat_resume_allowed"] is True
-    assert rebind["latest_deployment_attempt"] == {
-        "run_id": "30556851235",
-        "conclusion": "CANCELLED_TIMEOUT",
-        "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
-        "api_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
-        "worker_release": "172c9f62ffdcd4fce31fb4900fdca46b3405ab89",
-        "migration": "0013_wp11_notify_observability",
-        "worker_stale": True,
-        "ssh_ingress_closed": True,
+    assert rebind["target_candidate_sha"] == "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a"
+    assert rebind["candidate_gate_run_id"] == "30709982868"
+    assert rebind["runtime_change_scope"] == "WEB_API_IDENTITY_REENTRY"
+    assert rebind["source_runtime_binding"]["deployment_run_id"] == "30616573615"
+    assert rebind["prior_binding_evidence"]["latest_deployment_attempt"]["conclusion"] == "CANCELLED_TIMEOUT"
+    assert rebind["prior_binding_evidence"]["latest_repair_attempt"]["conclusion"] == "FAIL_CLOSED_PRESTATE"
+    assert rebind["prior_binding_evidence"]["successful_runtime_repair"]["run_id"] == "30616573615"
+    assert rebind["stopped_uat_incident"] == {
+        "id": "UAT-WP13-002",
+        "severity": "SEV2",
+        "status": "REPAIR_CANDIDATE_BOUND_NOT_DEPLOYED",
+        "prior_business_facts_preserved": True,
+        "human_reverification_required": True,
     }
-    assert rebind["runtime_repair_contract"] == {
-        "phase": "repair-runtime",
-        "confirmation": "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
-        "web_mutation": False,
-        "api_worker_baseline": "02863d0b670ee9b00b9def3e75bc6699827f555a",
-        "migration_target": "0014_wp12_data_lifecycle",
-        "observed_prestate_run_id": "30598785077",
-        "observed_runtime_release": "222096db506e95db887a8705b22ca4a439d0545d",
-        "deployment_authorized": True,
-        "authorization_consumed_run_id": "30616573615",
-    }
-    assert rebind["successful_runtime_repair"] == {
-        "run_id": "30616573615",
-        "workflow_head_sha": "100e89494b8c42a6b04a86f5bdc26c06ab690fa7",
-        "conclusion": "SUCCESS",
-        "web_release": "222096db506e95db887a8705b22ca4a439d0545d",
-        "api_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
-        "worker_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
-        "worker_heartbeat_release": "02863d0b670ee9b00b9def3e75bc6699827f555a",
-        "migration": "0014_wp12_data_lifecycle",
-        "config_schema_version": 3,
-        "api_status": "READY",
-        "worker_stale": False,
-        "root_http_status": 200,
-        "anonymous_ops_http_status": 401,
-        "anonymous_review_http_status": 401,
-        "ssh_ingress_closed": True,
-        "forbidden_mutation_executed": False,
-    }
+    assert rebind["deployment_run_id"] is None
+    assert rebind["deployment_authorized"] is False
+    assert rebind["human_uat_resume_allowed"] is False
+    assert (
+        rebind["inherited_wp12b_evidence"]["performance_inheritance_decision"]
+        == "REQUIRES_REASSESSMENT_BEFORE_UAT_RESUME"
+    )
     assert rebind["wp12b_rerun_executed"] is False
     assert rebind["production_mutation_executed"] is False
 
