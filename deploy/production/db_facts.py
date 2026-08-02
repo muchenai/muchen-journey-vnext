@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 
 from sqlalchemy import create_engine, text
 from journey_api.config import get_settings
@@ -12,6 +13,10 @@ from journey_api.config import get_settings
 
 engine = create_engine(get_settings().database_url)
 with engine.connect() as connection:
+    if os.getenv("REQUIRE_READ_ONLY") == "true":
+        read_only = connection.execute(text("SHOW transaction_read_only")).scalar_one()
+        if read_only != "on":
+            raise RuntimeError("PII-free facts connection is not read-only")
     migration = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     tables = connection.execute(
         text(
