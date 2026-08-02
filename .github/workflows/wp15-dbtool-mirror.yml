@@ -1,0 +1,41 @@
+name: WP-15 Database Tool Mirror
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type MIRROR_POSTGRES_17_6_DBTOOL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: wp15-dbtool-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: inputs.confirmation == 'MIRROR_POSTGRES_17_6_DBTOOL'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Copy the exact PostgreSQL 17.6 manifest to project GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest=sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
+          source="docker.io/library/postgres:17.6-bookworm@$digest"
+          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-17.6-bookworm-f3bd19c606e4"
+          docker buildx imagetools create --tag "$target" "$source"
+          actual=$(docker buildx imagetools inspect "$target" --raw | sha256sum | awk '{print "sha256:" $1}')
+          test "$actual" = "$digest"
+          docker buildx imagetools inspect "${target%@*}@$digest" >/dev/null
+          printf 'WP15_DBTOOL_MIRROR=PASS digest=%s\n' "$digest"

@@ -43,6 +43,7 @@
 | DEC-020 | Alpha 性能条件放行 | 候选 `02863d0b670ee9b00b9def3e75bc6699827f555a` 的 WP-12B run `30525165474` 保持原 1 秒合同 `FAIL`；仅为启动 WP-13 真人 UAT，接受核心同步命令 p95 ≤1.2 秒的候选级条件边界。该 run 的隔离、正确性、数据库审计、身份退役和 SSH 关闭必须全部保持 PASS；候选漂移立即失效。DEC-013 的 production p95≤1 秒不变，WP-12B 不记 `CLOSED`，production 继续 `NO_GO` | `APPROVED` | 允许该候选启动 WP-13；不授权 WP-14、production、重跑负载或再次部署 | Liu Mowen（Product + Tech + QA/UAT Owner） |
 | DEC-021 | WP-13 Web 修复候选重绑定 | 主线 `222096db506e95db887a8705b22ca4a439d0545d` 相对已测候选仅改变 Web 运行代码；API、Worker、迁移、OpenAPI、Python/Web 锁文件及 Compose 内容保持一致。允许沿用 WP-12B run `30525165474` 的原始 FAIL 与 DEC-020 的 Alpha ≤1.2 秒条件证据来准备新候选 UAT 绑定，不重跑 WP-12B。Mainline run `30550010916` 生成并验证三镜像；在该候选完成一次独立授权的 staging 部署、readiness/版本核对和部署 run 绑定前，真人 UAT 不得恢复，production 继续 `NO_GO` | `APPROVED` | 仅批准影响核对、候选生成和 pending UAT 重绑定；不授权部署、UAT 恢复、WP-14 或 production | Liu Mowen（Product + Tech + QA/UAT Owner） |
 | DEC-022 | 2026-08-03 受控 Alpha 上线 | 停止把完整 production 门禁作为 Alpha 使用前置。候选 `8f77ceec570e2ec5e9c52861fcdc27748d7bb44a` 仅在一次冻结基础设施 staging 部署成功，并完成 readiness/revision、真实邀请、提交、要求修订、安全重新进入和越权拒绝的 20 分钟最小核验后，向单一组织私密名单开放真实使用。附件、真实通知、WP-12B 重跑、灾备故障域和 production 切换继续延期；正式 UAT 未完成、production 继续 `NO_GO` | `APPROVED` | 仅允许受控 Alpha 使用；部署仍需候选、主线、环境和次数的当轮精确授权 | Liu Mowen（Product + Tech + QA/UAT + Release Owner） |
+| DEC-023 | 受控 Alpha 正式域名切换 | 候选 `8f77ceec…` 已完成一条真实“提交→要求修订→安全重新进入→再次提交→通过”闭环。允许以 `journey.muchenai.com` 作为单一组织私密名单的正式 Alpha 入口：production Compose/DB/application secrets 与 staging 逻辑隔离，现阶段共享北京 ECS/RDS/Caddy 故障域；先完成加密异机备份和空库隔离恢复，再配置 TLS/OAuth/canonical URL；维护页为一键止血，旧站 DNS 仅作入口级回退，禁止回写或覆盖 vNext 新事实；staging 永久保留。该决定不把 WP-13 全量签署、WP-14、WP-11 延期项、WP-12B 原 FAIL 或完整 production release gate 记为通过 | `APPROVED` | 授权本手册三项最小切换动作；仍限单组织 Alpha，30 日后重开故障域 | Liu Mowen（Product + Data + Security + Tech + Ops + Release Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -102,6 +103,12 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 候选 `8f77ceec…` 只改变 Learner 安全重新进入所需的 Web/API 身份路径，migration、TaskVersion、依赖锁文件和 Compose 不变。DEC-022 因此允许在精确候选部署成功后，以单一组织私密名单开始真实使用，并将非阻塞体验问题转入上线反馈队列。该决定不把 WP-13 正式真人 UAT、WP-12B、外部观测、通知、恢复或 production release gate 改记为通过。
 
+### DEC-023｜为什么正式域名可以先服务受控 Alpha
+
+当前旧站没有活跃学员，而 vNext 已由真人完成一条包含修订的完整业务闭环。继续把域名切换绑定到所有延期门禁，会推迟真实问题学习；直接把 staging 域名改名，又会失去安全测试环境并混合真实数据。最小可逆方案是保留同一低成本物理资源，在其内建立独立 production Compose、数据库和应用 secret，由同一个 Caddy 按 Host 分流，staging 持续在线。
+
+这一方案只提供逻辑隔离，不提供独立故障域。它必须先完成源库只读备份、空白 production 库隔离恢复、加密异机保存和恢复事实一致性证明；正式域名只能在 TLS、OAuth 回调、allowed host 和 canonical URL 同时正确后切换。发生安全或数据完整性问题时先一键维护，不用旧备份覆盖新事实；旧站 DNS 只恢复入口，不恢复旧站为事实源。完整 production GO 仍需后续 WP-13/14/15 证据，不因域名变更自动获得。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
@@ -127,6 +134,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-019 | 灾备故障域延期演变为无期限无恢复能力 | 中/高 | 没有登记 Alpha 起始日；30 日后不评审；把受管备份存在等同于隔离恢复通过 | DEC-019；30 日成熟触发器；严重事故重新计时；基础备份/恢复工程不停；`off_host_backup_restore` 保持阻塞 | Product/Data/Ops/Release |
 | RSK-020 | Alpha 条件放行被误写成性能门禁通过 | 中/高 | 文档出现 `WP12B_CLOSED`、候选漂移后继续 UAT，或以 1.2 秒申请 production | DEC-020；保留原 run FAIL；WP-13 计划精确绑定候选；production 继续执行 DEC-013 的 1 秒 SLO | Product/Tech/QA/Release |
 | RSK-021 | pending 候选重绑定或混合组件版本被误当成已部署 | 中/高 | Web readiness 为新 SHA，但 API/Worker/migration 仍为旧基线或 Worker stale；新 UAT 证据引用失败 run | DEC-021；组件级 Web-only + runtime-repair 合同；deployment run 为空时 resume=false；Web/API/Worker/migration/HTTP 全部通过后才单独 PR 激活 | Product/Tech/QA/Release |
+| RSK-022 | 受控 Alpha 正式域名被误解为完整 production GO | 中/高 | 对外扩大名单、关闭 staging、把延期门禁写成 PASS，或共享 ECS/RDS 故障被当作独立灾备 | DEC-023；入口标记受控 Alpha；逻辑隔离、异机加密备份、维护模式、私密名单和 30 日故障域复审 | Product/Data/Security/Ops/Release |
 
 ## 5. 原开放问题的关闭结论
 
@@ -157,10 +165,10 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 | 角色 | 姓名 | 已批准 DEC | 未批准 DEC | 结论 | 日期 |
 | --- | --- | --- | --- | --- | --- |
-| Product Owner | Liu Mowen | DEC-001..021 | 真人试点结果 | BUILD GO | 2026-07-30 |
-| Tech Lead | Liu Mowen | DEC-001..021 | 物理生产资源验证 | BUILD GO | 2026-07-30 |
-| Data Owner | Liu Mowen | DEC-001..016/019 | 恢复演练证据 | BUILD GO | 2026-07-28 |
+| Product Owner | Liu Mowen | DEC-001..023 | 完整 WP-13/14 结果 | CONTROLLED ALPHA GO | 2026-08-02 |
+| Tech Lead | Liu Mowen | DEC-001..023 | 独立生产故障域 | CONTROLLED ALPHA GO | 2026-08-02 |
+| Data Owner | Liu Mowen | DEC-001..016/019/023 | 独立故障域恢复 | CONTROLLED ALPHA GO | 2026-08-02 |
 | Design Owner | Liu Mowen | DEC-015/016 | 真人 5 秒测试 | BUILD GO | 2026-07-20 |
-| Security/Privacy | Liu Mowen | DEC-006/008/012/014/017/018 | 生产安全门禁 | BUILD GO | 2026-07-28 |
-| QA/UAT | Liu Mowen | DEC-007/010/016/020/021 | 真人 UAT | BUILD GO | 2026-07-30 |
-| Release/Ops | Liu Mowen | DEC-003/013/014/018/019 | 发布/观察证据 | BUILD GO | 2026-07-28 |
+| Security/Privacy | Liu Mowen | DEC-006/008/012/014/017/018/023 | 完整生产安全门禁 | CONTROLLED ALPHA GO | 2026-08-02 |
+| QA/UAT | Liu Mowen | DEC-007/010/016/020..023 | 完整真人 UAT | CONTROLLED ALPHA GO | 2026-08-02 |
+| Release/Ops | Liu Mowen | DEC-003/013/014/018/019/023 | 完整发布/观察证据 | CONTROLLED ALPHA GO | 2026-08-02 |
