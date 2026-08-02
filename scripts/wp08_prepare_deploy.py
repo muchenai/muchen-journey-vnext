@@ -17,6 +17,7 @@ from urllib.parse import quote
 CANDIDATE = "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a"
 WEB_ONLY_BASELINE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
 STAGING_HOST = "staging-vnext.muchenai.com"
+PRODUCTION_HOST = "journey.muchenai.com"
 IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:553055d921f75bc7f7df0e176d5176f0546ee7f75f37e9757a0be09edf3520ff",
     "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:401e5158fdcf7be11a3b2539fdbeb7c222ff9813267aa7c3cbcd7a2f9e24f1f5",
@@ -214,6 +215,7 @@ def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
         secrets / "edge.env",
         {
             "STAGING_HOST": STAGING_HOST,
+            "PRODUCTION_HOST": PRODUCTION_HOST,
             "ACME_EMAIL": values["WP08_ACME_EMAIL"],
         },
     )

@@ -164,6 +164,21 @@ resource "volcenginecc_rdspostgresql_database" "staging" {
   owner              = volcenginecc_rdspostgresql_db_account.migration.account_name
 }
 
+# Alpha production shares the existing managed RDS instance to stay within the
+# approved budget, while preserving a hard logical boundary from staging.
+resource "volcenginecc_rdspostgresql_database" "production" {
+  instance_id        = volcenginecc_rdspostgresql_instance.staging.instance_id
+  db_name            = "journey_next_production"
+  character_set_name = "utf8"
+  collate            = "C.UTF-8"
+  c_type             = "C.UTF-8"
+  owner              = volcenginecc_rdspostgresql_db_account.migration.account_name
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "volcenginecc_tos_bucket" "attachments" {
   name                  = var.tos_bucket_name
   project_name          = var.project_name

@@ -1,0 +1,274 @@
+name: WP-15 Controlled Alpha Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Exact reviewed production-alpha operation
+        required: true
+        type: choice
+        options:
+          - preflight
+          - bootstrap-db
+          - backup-restore
+          - deploy
+          - maintenance
+          - live
+          - inspect
+      candidate:
+        description: Exact approved candidate SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact phase confirmation from the cutover runbook
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: wp15-controlled-alpha-production
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    if: >-
+      inputs.candidate == '8f77ceec570e2ec5e9c52861fcdc27748d7bb44a' &&
+      ((inputs.phase == 'preflight' && inputs.confirmation == 'PREFLIGHT_WP15_ALPHA_PRODUCTION') ||
+      (inputs.phase == 'bootstrap-db' && inputs.confirmation == 'CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB') ||
+      (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
+      (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
+      (inputs.phase == 'live' && inputs.confirmation == 'ROUTE_JOURNEY_TO_PRODUCTION_WEB') ||
+      (inputs.phase == 'inspect' && inputs.confirmation == 'INSPECT_WP15_ALPHA_PRODUCTION'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+      WP08_MIGRATION_DB_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      WP08_RUNTIME_DB_PASSWORD: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      WP09_IDENTITY_SUBJECT_SECRET: ${{ secrets.WP09_IDENTITY_SUBJECT_SECRET }}
+      WP09_FEISHU_APP_ID: ${{ secrets.WP09_FEISHU_APP_ID }}
+      WP09_FEISHU_APP_SECRET: ${{ secrets.WP09_FEISHU_APP_SECRET }}
+      WP11_NOTIFICATION_RECIPIENT_KEY: ${{ secrets.WP11_NOTIFICATION_RECIPIENT_KEY }}
+      WP11_FEISHU_APP_ID: ${{ secrets.WP11_FEISHU_APP_ID }}
+      WP11_FEISHU_APP_SECRET: ${{ secrets.WP11_FEISHU_APP_SECRET }}
+      WP08_RDS_CA_PEM_B64: ${{ secrets.WP08_RDS_CA_PEM_B64 }}
+      WP08_ACME_EMAIL: ${{ secrets.WP08_ACME_EMAIL }}
+      WP15_SESSION_SECRET: ${{ secrets.WP15_SESSION_SECRET }}
+      WP15_INVITE_SECRET: ${{ secrets.WP15_INVITE_SECRET }}
+      WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
+      WP15_BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Verify reviewed contract and immutable candidate
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "${{ inputs.candidate }}" = "$(jq -r .candidate_sha config/wp15_alpha_cutover.json)"
+          test "$(jq -r .candidate_gate_run_id config/wp15_alpha_cutover.json)" = 30709982868
+          git cat-file -e "${{ inputs.candidate }}^{commit}"
+          python3 scripts/wp15_alpha_cutover.py
+      - name: Initialize encrypted shared Alpha state
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen infrastructure without changing it
+        if: inputs.phase != 'bootstrap-db'
+        id: frozen
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          rds_host=$(terraform output -raw rds_private_host)
+          rds_port=$(terraform output -raw rds_private_port)
+          tos_bucket=$(terraform output -raw tos_bucket_name)
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$tos_bucket"; do
+            test -n "$value"
+            echo "::add-mask::$value"
+          done
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+          echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
+          echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+          echo "tos_bucket=$tos_bucket" >>"$GITHUB_OUTPUT"
+      - name: Create only the empty isolated production database
+        if: inputs.phase == 'bootstrap-db'
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/wp15-production-db.tfplan"
+          terraform plan -out="$plan" -var="deploy_cidr=127.0.0.1/32" \
+            -target=volcenginecc_rdspostgresql_database.production
+          terraform show -json "$plan" | python3 -c '
+          import json,sys
+          p=json.load(sys.stdin)
+          changed=[]
+          for r in p.get("resource_changes",[]):
+              actions=r["change"]["actions"]
+              if actions not in (["no-op"],["read"]): changed.append((r["address"],actions))
+          assert changed == [("volcenginecc_rdspostgresql_database.production",["create"])], changed
+          print("WP15_PRODUCTION_DB_PLAN=PASS create=1 destructive=0")
+          '
+          terraform apply -auto-approve "$plan"
+      - name: Prepare bounded SSH access
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress,sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP15_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp15-key"
+          chmod 0600 "$RUNNER_TEMP/wp15-key"
+      - name: Prepare owner-only runtime bundle
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'deploy'
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/wp15-bundle"
+          python3 scripts/wp15_prepare_production.py --output "$bundle" \
+            --rds-host "${{ steps.frozen.outputs.rds_host }}" \
+            --rds-port "${{ steps.frozen.outputs.rds_port }}"
+          cp deploy/production/compose.yaml deploy/production/compose.migrate.yaml "$bundle/"
+          cp deploy/production/deploy.sh deploy/production/backup_restore.sh deploy/production/db_facts.py "$bundle/"
+          cp deploy/production/grant_runtime.py "$bundle/"
+          chmod 0755 "$bundle/deploy.sh" "$bundle/backup_restore.sh"
+          if [[ "${{ inputs.phase }}" == deploy ]]; then
+            rm -f "$bundle/secrets/backup.env" "$bundle/secrets/source-facts.env" \
+              "$bundle/secrets/target-facts.env" "$bundle/backup_restore.sh" "$bundle/db_facts.py"
+          fi
+      - name: Execute isolated backup and restore proof
+        if: inputs.phase == 'backup-restore'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          release="/srv/journey-next-production/restore-proofs/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && ./backup_restore.sh"
+          artifact=$(ssh "${opts[@]}" root@"$public_ip" "find /srv/journey-next-production/backups -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-")
+          test -n "$artifact"
+          mkdir -p "$RUNNER_TEMP/wp15-proof"
+          scp "${opts[@]}" root@"$public_ip":"$artifact/journey-next.dump.enc" "$RUNNER_TEMP/wp15-proof/"
+          scp "${opts[@]}" root@"$public_ip":"$artifact/backup-manifest.json" "$RUNNER_TEMP/wp15-proof/"
+          scp "${opts[@]}" root@"$public_ip":"$artifact/source-facts.json" "$RUNNER_TEMP/wp15-proof/"
+          scp "${opts[@]}" root@"$public_ip":"$artifact/target-facts.json" "$RUNNER_TEMP/wp15-proof/"
+          aws s3 cp "$RUNNER_TEMP/wp15-proof/journey-next.dump.enc" \
+            "s3://${{ steps.frozen.outputs.tos_bucket }}/production-backups/$GITHUB_RUN_ID/journey-next.dump.enc" --only-show-errors
+          aws s3 cp "$RUNNER_TEMP/wp15-proof/backup-manifest.json" \
+            "s3://${{ steps.frozen.outputs.tos_bucket }}/production-backups/$GITHUB_RUN_ID/backup-manifest.json" --only-show-errors
+          ssh "${opts[@]}" root@"$public_ip" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf '$release'"
+          rm -f "$RUNNER_TEMP/wp15-proof/journey-next.dump.enc"
+      - name: Upload PII-free restore proof
+        if: inputs.phase == 'backup-restore'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp15-backup-restore-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/wp15-proof/backup-manifest.json
+            ${{ runner.temp }}/wp15-proof/source-facts.json
+            ${{ runner.temp }}/wp15-proof/target-facts.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Deploy isolated production runtime without DNS mutation
+        if: inputs.phase == 'deploy'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          release="/srv/journey-next-production/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./.deployment.env && set +a && ./deploy.sh"
+          scp "${opts[@]}" deploy/staging/Caddyfile root@"$public_ip":/srv/journey-next-staging/current/Caddyfile
+          scp "${opts[@]}" "$RUNNER_TEMP/wp15-bundle/edge.env" root@"$public_ip":/srv/journey-next-staging/current/secrets/edge.env
+          ssh "${opts[@]}" root@"$public_ip" "chmod 0600 /srv/journey-next-staging/current/secrets/edge.env && cd /srv/journey-next-staging/current && docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile && docker compose exec -T edge caddy reload --config /etc/caddy/Caddyfile && docker logout ghcr.io >/dev/null 2>&1 || true"
+          test "$(curl -sS --resolve "journey.muchenai.com:80:$public_ip" -o /dev/null -w '%{http_code}' http://journey.muchenai.com/)" = 308
+      - name: Route the production host to maintenance or live runtime
+        if: inputs.phase == 'maintenance' || inputs.phase == 'live'
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          source=deploy/staging/Caddyfile
+          if [[ "${{ inputs.phase }}" == maintenance ]]; then
+            source=deploy/production/Caddyfile.maintenance
+          fi
+          scp "${opts[@]}" "$source" root@"$public_ip":/srv/journey-next-staging/current/Caddyfile
+          ssh "${opts[@]}" root@"$public_ip" "cd /srv/journey-next-staging/current && docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile && docker compose exec -T edge caddy reload --config /etc/caddy/Caddyfile"
+          test "$(curl -sS --resolve "journey.muchenai.com:80:$public_ip" -o /dev/null -w '%{http_code}' http://journey.muchenai.com/)" = 308
+          if [[ "${{ inputs.phase }}" == maintenance ]]; then
+            ssh "${opts[@]}" root@"$public_ip" "grep -Fq 'respond \"Muchen Journey 正在进行短时维护，请稍后重试。\" 503' /srv/journey-next-staging/current/Caddyfile"
+          else
+            ssh "${opts[@]}" root@"$public_ip" "grep -Fq 'reverse_proxy production-web:3000' /srv/journey-next-staging/current/Caddyfile"
+          fi
+      - name: Inspect runtime without business-data output
+        if: inputs.phase == 'inspect'
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          ssh "${opts[@]}" root@"$public_ip" 'set -e; test -L /srv/journey-next-staging/current; if test -L /srv/journey-next-production/current; then cat /srv/journey-next-production/DEPLOYED_CANDIDATE; docker ps --format "{{.Names}} {{.Status}}" | grep -E "journey-next-(staging|production)"; else echo WP15_PRODUCTION_RUNTIME=NOT_DEPLOYED; fi'
+      - name: Preflight result
+        if: inputs.phase == 'preflight'
+        run: |
+          test '${{ steps.frozen.outputs.public_ip }}' != ''
+          test '${{ steps.frozen.outputs.rds_host }}' != ''
+          test '${{ steps.frozen.outputs.tos_bucket }}' != ''
+          echo 'WP15_ALPHA_PRODUCTION_PREFLIGHT=PASS mutation=false'
+      - name: Close temporary SSH ingress
+        if: always() && (inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        run: |
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$WP15_RUNNER_CIDR"
+          echo 'WP15_SSH_INGRESS=CLOSED'

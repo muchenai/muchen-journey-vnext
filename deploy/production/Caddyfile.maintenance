@@ -1,0 +1,21 @@
+{
+  admin off
+  email {$ACME_EMAIL}
+}
+
+{$STAGING_HOST} {
+  encode zstd gzip
+  reverse_proxy web:3000
+}
+
+{$PRODUCTION_HOST} {
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Retry-After "300"
+    -Server
+  }
+  respond "Muchen Journey 正在进行短时维护，请稍后重试。" 503
+}

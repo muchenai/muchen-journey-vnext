@@ -12,6 +12,7 @@ fail() {
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
 [[ "${CANDIDATE_COMMIT:-}" == "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
+[[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
 [[ "${BASELINE_CANDIDATE:-}" == "02863d0b670ee9b00b9def3e75bc6699827f555a" ]] || fail "unexpected Web-only baseline"
 
@@ -64,7 +65,10 @@ api_recipient_key=$(sed -n 's/^NOTIFICATION_RECIPIENT_KEY=//p' "$SECRETS/api.env
 worker_recipient_key=$(sed -n 's/^NOTIFICATION_RECIPIENT_KEY=//p' "$SECRETS/worker.env")
 [[ -n "$api_recipient_key" && "$api_recipient_key" == "$worker_recipient_key" ]] || fail "API and Worker recipient keys must be identical and non-empty"
 unset api_recipient_key worker_recipient_key
-! grep -R -E 'journey\.muchenai\.com|muchen-journey-production|LOCAL_TEST' "$SECRETS"/*.env >/dev/null || fail "legacy or local-only configuration found"
+! grep -R -E 'journey\.muchenai\.com|muchen-journey-production|LOCAL_TEST' \
+  "$SECRETS/api.env" "$SECRETS/migration.env" "$SECRETS/worker.env" "$SECRETS/web.env" \
+  >/dev/null || fail "production or local-only configuration found in staging runtime"
+grep -qx 'PRODUCTION_HOST=journey.muchenai.com' "$SECRETS/edge.env" || fail "production edge host differs"
 
 docker compose -f compose.yaml -f compose.migrate.yaml config --quiet
 

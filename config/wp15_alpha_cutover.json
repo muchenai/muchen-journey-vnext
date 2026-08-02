@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "candidate_sha": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
+  "candidate_gate_run_id": "30709982868",
+  "region": "cn-beijing",
+  "production_host": "journey.muchenai.com",
+  "staging_host": "staging-vnext.muchenai.com",
+  "staging_database": "journey_next_staging",
+  "production_database": "journey_next_production",
+  "production_compose_project": "journey-next-production",
+  "shared_edge_network": "journey-next-staging_default",
+  "migration": "0014_wp12_data_lifecycle",
+  "config_schema_version": 3,
+  "database_tool": {
+    "source": "docker.io/library/postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+    "target": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-17.6-bookworm-f3bd19c606e4",
+    "expected_digest": "sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3"
+  },
+  "backup": {
+    "format": "postgres-custom",
+    "encryption": "AES-256-CBC-PBKDF2-HMAC-SHA256",
+    "off_host_target": "existing-private-tos-bucket/production-backups",
+    "restore_target_must_be_empty": true,
+    "source_database_is_never_modified": true
+  },
+  "rollback": {
+    "maintenance_mode": "ONE_CLICK_WORKFLOW",
+    "legacy_dns_record_private_evidence_required": true,
+    "dns_ttl_seconds": 600,
+    "staging_remains_online": true
+  },
+  "fault_domain": {
+    "logical_runtime_and_database_isolation": true,
+    "physical_ecs_and_rds_shared_for_alpha": true,
+    "independent_fault_domain_deferred_days": 30
+  }
+}

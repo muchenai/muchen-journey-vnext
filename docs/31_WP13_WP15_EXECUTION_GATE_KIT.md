@@ -1,8 +1,8 @@
 # WP-13～WP-15 真人、时间与生产门禁执行包
 
-状态：`HUMAN_UAT_STOPPED_REPAIR_CANDIDATE_BOUND`
+状态：`CONTROLLED_ALPHA_MINIMUM_HUMAN_LOOP_PASSED`
 
-结论：`UAT-WP13-002_REPAIR_CANDIDATE_GENERATED / REBIND_PENDING_STAGING_DEPLOY / HUMAN_UAT_STOPPED / PRODUCTION_NO_GO`
+结论：`ONE_REAL_REVISION_LOOP_PASS / FULL_WP13_UNSIGNED / WP14_NOT_STARTED / CONTROLLED_ALPHA_DOMAIN_CUTOVER_APPROVED / FULL_PRODUCTION_NO_GO`
 
 ## 1. 第一性原则
 
@@ -123,13 +123,21 @@ DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `028
 
 修复已通过 PR #104 以主线 `8f77ceec570e2ec5e9c52861fcdc27748d7bb44a` 合入。Mainline run [`30709982868`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30709982868) 完成 `ci-main`、三组件镜像、SBOM、manifest、GHCR 推送与摘要复验；manifest SHA-256 为 `a7de07e531de4ee86562a04674d8807e4a9ce5cfc77fc8adcc98f4111809d637`。候选保持 migration=`0014`、schema=3、TaskVersion artifact 不变；API/Web/OpenAPI 改变，Worker 源码、迁移、锁文件和 Compose 不变。
 
-该候选现在只完成 fail-closed UAT 绑定：`deployment_run_id=null`、`deployment_authorized=false`、`human_uat_resume_allowed=false`。当前 staging 仍是 Web=`222096db…`、API/Worker=`02863d0…` 的已修复基线；本次没有部署、没有重跑 WP-12B、没有执行真人动作，也没有改变既有业务事实。原截图和失败结论保持，只有另行完成候选性能继承评估、精确授权部署、readiness/revision 核对，并由真人角色从“看到修订反馈”重新执行 `AT-UAT-002` 后，才允许更新结果。
+候选随后由 staging deploy run `30729705773` 成功部署；公开 readiness 与受权运行快照确认 Web/API/Worker=`8f77ceec…`、migration=`0014_wp12_data_lifecycle`、schema=3。没有重跑 WP-12B，原 1 秒性能 FAIL 继续保留。
+
+真人随后完成同一条受控业务事实的最小修订闭环：Operator 生成安全重新进入路径，Learner 看到原 `REQUEST_REVISION` 反馈、再次提交新 SubmissionVersion，Reviewer 最终判断 `PASS`，Learner 进入 `COMPLETED`。原失败截图和旧 Submission/Review 事实均未被覆盖。该结果关闭 `UAT-WP13-002` 的本场景真人复验，但样本不足以把完整 WP-13 记为 `UAT_SIGNED`。
+
+### 6.3 DEC-023｜正式域名受控 Alpha 路径
+
+基于上述真人最小闭环，Owner 授权将 `journey.muchenai.com` 切换为单一组织私密名单的正式 Alpha 入口。受保护主线新增唯一运行手册 `docs/runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md`：先把当前 staging 数据库只读备份并恢复到空白 `journey_next_production`，比较 migration/schema/逐表计数并把加密 dump 保存到现有私有 TOS；再部署独立 production Compose/application secrets，并配置 TLS、飞书正式回调、allowed host 与 canonical result URL；维护页是一键止血，旧站 DNS 只允许入口回退，不允许覆盖或写回 vNext 业务事实；staging 始终保留。
+
+该路径共享现有北京 ECS/RDS/Caddy 物理故障域，仅实现逻辑隔离。它是 DEC-019 的 30 日 Alpha 延期边界，不是完整 production isolation。WP-11 延期项、WP-12B 原 FAIL、完整 WP-13 签署和 WP-14 仍未完成，因此正式域名开放不等同 `RELEASE_GO`。
 
 ## 7. 当前判定
 
-- WP-13：`UAT-WP13-002_SEV2 / REPAIR_CANDIDATE_BOUND_PENDING_STAGING_DEPLOY / PRIOR_FAILURES_PRESERVED / HUMAN_UAT_STOPPED / NO_GO`
+- WP-13：`ONE_REAL_REVISION_LOOP_PASS / UAT-WP13-002_SCENARIO_REVERIFIED / FULL_UAT_UNSIGNED`
 - WP-14：`NOT_STARTED / WAITING_FOR_WP13 / REAL_14_DAYS_REQUIRED`
-- WP-15：`NO_GO / WAITING_FOR_WP13_WP14_AND_PRODUCTION_GATES`
+- WP-15：`CONTROLLED_ALPHA_DOMAIN_CUTOVER_APPROVED / FULL_RELEASE_GATE_NO_GO`
 - production mutation：`false`
 
-因此本文件不是 WP-13、WP-14 或 WP-15 完成证明。
+因此本文件只证明最小真人修订闭环和受控 Alpha 切换授权，不是完整 WP-13、WP-14 或 WP-15 完成证明。
