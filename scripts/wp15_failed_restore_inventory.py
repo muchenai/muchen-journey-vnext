@@ -30,14 +30,25 @@ def inventory(root: Path) -> dict:
             raise CleanupError(f"plaintext dump is unsafe: {directory.name}")
         if not regular_file(dump):
             continue
+        source = directory / "source-facts.json"
+        target = directory / "target-facts.json"
+        for facts_file in (source, target):
+            if facts_file.exists() and not regular_file(facts_file):
+                raise CleanupError(f"facts file is unsafe: {directory.name}/{facts_file.name}")
+        facts_status = "COMPLETE"
+        facts = None
+        if not source.exists():
+            facts_status = "MISSING_SOURCE_FACTS"
+        elif not target.exists():
+            facts_status = "MISSING_TARGET_FACTS"
+        else:
+            facts = compare(load_facts(source), load_facts(target))
         artifacts.append(
             {
                 "directory_timestamp": directory.name,
                 "plaintext_bytes": dump.stat().st_size,
-                "facts": compare(
-                    load_facts(directory / "source-facts.json"),
-                    load_facts(directory / "target-facts.json"),
-                ),
+                "facts_status": facts_status,
+                "facts": facts,
             }
         )
     if len(artifacts) != 2:
