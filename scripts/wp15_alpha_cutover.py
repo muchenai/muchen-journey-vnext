@@ -113,6 +113,7 @@ def validate_files(contract: dict) -> None:
         "restore-artifact-inventory",
         "cleanup-known-plaintext",
         "restore-drill-temp",
+        "archive-temp-restore",
         "restore-diff-cleanup",
         "deploy",
         "maintenance",
@@ -134,6 +135,9 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_TEMP_RESTORE_DATABASE=READY", "production workflow")
     require(workflow, "--database journey_next_restore_20260803", "production workflow")
     require(workflow, "--restore-target-database", "production workflow")
+    require(workflow, "ARCHIVE_TEMP_RESTORE_20260802T181906Z_TO_GITHUB", "production workflow")
+    require(workflow, "scripts/wp15_archive_restore_proof.py", "production workflow")
+    require(workflow, "wp15-temp-restore-proof-30760806984", "production workflow")
     require(workflow, "INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE", "production workflow")
     require(workflow, "python3 -m scripts.wp15_failed_restore_inventory", "production workflow")
     require(workflow, "COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT", "production workflow")

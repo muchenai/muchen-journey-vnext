@@ -38,11 +38,12 @@
 7. `restore-artifact-inventory`：确认词 `INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE`。只对备份根目录做文件类型、目录时间戳和字节数盘点，并读取失败时已经保存的 PII-free source/target facts；不得打开 dump、连接数据库或删除文件。必须恰好发现两个安全的普通明文文件；facts 完整时输出差异，任一侧未生成时显式记录 `MISSING_SOURCE_FACTS` 或 `MISSING_TARGET_FACTS`，不得猜测或补查业务库。最后清理 inventory bundle 并关闭临时 SSH。
 8. `cleanup-known-plaintext`：确认词 `DELETE_INVENTORIED_PLAINTEXT_DUMPS_20260802`。仅当备份根目录的全部明文 dump 精确等于 inventory 已证明的 `20260802T104651Z/6838622 bytes` 与 `20260802T150149Z/6838889 bytes` 两项时，删除这两个 `journey-next.dump`；目录、facts 和数据库保持不变。任何第三项、尺寸变化、verify dump 或符号链接均在删除前拒绝。
 9. `restore-drill-temp`：确认词 `CREATE_AND_RESTORE_JOURNEY_NEXT_RESTORE_20260803`。在同一 RDS 实例内只创建允许名单中的 `journey_next_restore_20260803`，Owner 固定为 migrator，并把 `public` Owner 修正为 migrator；不修改或清理 `journey_next_production`。恢复摘要排除易变运行态表 `worker_heartbeats`，但 schema 仍覆盖该表；dump 前后分别生成业务摘要且必须完全一致，再恢复到空白临时库并比较 migration、schema、逐表计数、逐表业务指纹和 ACTIVE 通知接收人数。任何失败均由 EXIT trap 删除明文 dump；成功后只保留加密且已解密校验的工件并上传私有 TOS。
-10. 失败恢复诊断仅用于 run `30753376010`：`restore-diff-cleanup`，确认词 `COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT`。它使用只读事务重新生成源库/目标库的 PII-free migration、schema、逐表计数、逐表内容指纹和 ACTIVE 通知接收人数；只输出相等性、差异表名和计数，不输出业务正文。仅当授权时间窗内恰有一个“存在 `journey-next.dump` 且不存在加密 dump/manifest”的目录、并且备份根目录不存在其他明文 dump 时，才删除该目录内的 `journey-next.dump` 和可选 verify dump；保留 PII-free facts，不修改数据库、不恢复、不上传该失败备份。无论成功或失败都清理诊断 bundle 并关闭临时 SSH。
-11. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接 production DB；Caddy 预装正式 host 路由。
-12. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
-13. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
-14. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
+10. run `30760806984` 已完成数据库备份、临时库恢复、源/目标摘要比对和加密解密校验；仅在向现有 FNS TOS 的未授权 `production-backups/` 路径归档时收到 `InvalidPathAccess`。不得重做已通过的数据库恢复。`archive-temp-restore` 使用确认词 `ARCHIVE_TEMP_RESTORE_20260802T181906Z_TO_GITHUB`，只从精确目录读取加密工件、HMAC manifest 与 PII-free facts，确认不存在明文 dump、摘要相等且密文 SHA-256 匹配后，归档至私有 GitHub Actions artifact（30 天）；不连接数据库、不修改 TOS、不部署。
+11. 失败恢复诊断仅用于 run `30753376010`：`restore-diff-cleanup`，确认词 `COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT`。它使用只读事务重新生成源库/目标库的 PII-free migration、schema、逐表计数、逐表内容指纹和 ACTIVE 通知接收人数；只输出相等性、差异表名和计数，不输出业务正文。仅当授权时间窗内恰有一个“存在 `journey-next.dump` 且不存在加密 dump/manifest”的目录、并且备份根目录不存在其他明文 dump 时，才删除该目录内的 `journey-next.dump` 和可选 verify dump；保留 PII-free facts，不修改数据库、不恢复、不上传该失败备份。无论成功或失败都清理诊断 bundle 并关闭临时 SSH。
+12. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接 production DB；Caddy 预装正式 host 路由。
+13. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
+14. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
+15. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
 
 ## 4. 一键止血与旧站回退
 
