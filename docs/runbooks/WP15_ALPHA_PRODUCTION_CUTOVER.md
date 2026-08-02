@@ -56,6 +56,8 @@ run `30761555236` 已把维护版 Caddyfile 写入磁盘，但 Compose 因未加
 
 run `30761728579` 进一步证明运行中的 edge 仍持有部署前环境，缺少 `PRODUCTION_HOST`；新文件在 validate 阶段被拒绝，仍未 reload。最终路径固定为：先用新 `edge.env` 启动一次性 edge 命令完成离线 Caddy 校验，成功后只强制重建 edge 服务，再在新容器内复验；不重建 Web/API/Worker。
 
+run `30761897473` 在一次性容器创建阶段因镜像 entrypoint 不包含 `caddy` 而拒绝 `validate` 命令；edge 未重建。受审命令必须显式为 `caddy validate`，其他步骤保持不变。
+
 ### 旧站 DNS 回退
 
 只有在 vNext 入口持续不可用且维护页不足以止血时，按私有证据把阿里云 `journey` A 记录恢复为原值。旧站不得接收或合并 vNext 已产生的业务事实；回退仅恢复入口展示，不构成数据回滚。DNS 切回后继续保留 staging 与 production DB，等待新候选前滚修复。

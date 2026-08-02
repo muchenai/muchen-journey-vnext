@@ -126,7 +126,7 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
     require(workflow, ". ./.deployment.env", "production workflow")
     require(workflow, "set -e; cd /srv/journey-next-staging/current", "production workflow")
-    require(workflow, "docker compose run --rm --no-deps edge validate", "production workflow")
+    require(workflow, "docker compose run --rm --no-deps edge caddy validate", "production workflow")
     require(workflow, "docker compose up -d --no-deps --force-recreate edge", "production workflow")
     require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
