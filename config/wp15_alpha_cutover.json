@@ -6,7 +6,8 @@
   "production_host": "journey.muchenai.com",
   "staging_host": "staging-vnext.muchenai.com",
   "staging_database": "journey_next_staging",
-  "production_database": "journey_next_production",
+  "production_database": "journey_next_restore_20260803",
+  "preserved_failed_restore_database": "journey_next_production",
   "production_compose_project": "journey-next-production",
   "shared_edge_network": "journey-next-staging_default",
   "migration": "0014_wp12_data_lifecycle",
@@ -22,7 +23,7 @@
   "backup": {
     "format": "postgres-custom",
     "encryption": "AES-256-CBC-PBKDF2-HMAC-SHA256",
-    "off_host_target": "existing-private-tos-bucket/production-backups",
+    "off_host_target": "private-github-actions-artifact/30-days",
     "restore_target_must_be_empty": true,
     "source_database_is_never_modified": true
   },

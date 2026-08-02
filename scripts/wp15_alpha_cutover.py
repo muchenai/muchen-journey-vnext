@@ -51,7 +51,8 @@ def load_contract(path: Path = CONTRACT) -> dict:
         "production_host": "journey.muchenai.com",
         "staging_host": "staging-vnext.muchenai.com",
         "staging_database": "journey_next_staging",
-        "production_database": "journey_next_production",
+        "production_database": "journey_next_restore_20260803",
+        "preserved_failed_restore_database": "journey_next_production",
         "production_compose_project": "journey-next-production",
         "shared_edge_network": "journey-next-staging_default",
         "migration": "0014_wp12_data_lifecycle",
@@ -205,12 +206,13 @@ def validate_files(contract: dict) -> None:
         raise CutoverError("production compose must not bind public ports")
 
     require(deploy, "APP_ENV=production", "production deploy")
-    require(deploy, "journey_next_production", "production deploy")
+    require(deploy, "journey_next_restore_20260803", "production deploy")
+    require(deploy, "preserved failed restore database", "production deploy")
     require(deploy, "docker compose up -d --remove-orphans --wait", "production deploy")
     require(deploy, "WP15_PRODUCTION_DEPLOY=PASS", "production deploy")
     if "python -m journey_api.seed" in deploy:
         raise CutoverError("production deploy must not seed business facts")
-    require(grant, 'DATABASE = "journey_next_production"', "production runtime grant")
+    require(grant, 'DATABASE = "journey_next_restore_20260803"', "production runtime grant")
     if "journey_next_staging" in grant:
         raise CutoverError("production runtime grant references the staging database")
 

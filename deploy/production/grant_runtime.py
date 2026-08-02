@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 
 
 RUNTIME_ROLE = "journey_next_runtime"
-DATABASE = "journey_next_production"
+DATABASE = "journey_next_restore_20260803"
 
 
 def main() -> None:

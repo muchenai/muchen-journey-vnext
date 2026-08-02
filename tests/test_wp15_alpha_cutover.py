@@ -12,6 +12,8 @@ def test_contract_locks_candidate_hosts_databases_and_fault_domain():
     assert value["production_host"] == "journey.muchenai.com"
     assert value["staging_host"] == "staging-vnext.muchenai.com"
     assert value["production_database"] != value["staging_database"]
+    assert value["production_database"] == "journey_next_restore_20260803"
+    assert value["preserved_failed_restore_database"] == "journey_next_production"
     assert value["fault_domain"]["physical_ecs_and_rds_shared_for_alpha"] is True
 
 

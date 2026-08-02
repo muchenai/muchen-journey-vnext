@@ -43,13 +43,14 @@ def test_prepare_locks_production_hosts_database_and_remote_relative_backup_inpu
     backup = (output / "secrets/backup.env").read_text()
     edge = (output / "edge.env").read_text()
     assert "APP_ENV=production" in api
-    assert "journey_next_production" in api
+    assert "journey_next_restore_20260803" in api
+    assert "journey_next_production" not in api
     assert "journey_next_staging" not in api
     assert "ALLOWED_HOSTS=journey.muchenai.com,production-api,localhost,127.0.0.1" in api
     assert "FEISHU_OAUTH_REDIRECT_URI=https://journey.muchenai.com/auth/feishu/callback" in api
     assert "NOTIFICATION_RESULT_URL=https://journey.muchenai.com/app/result" in worker
     assert "SOURCE_DATABASE=journey_next_staging" in backup
-    assert "TARGET_DATABASE=journey_next_production" in backup
+    assert "TARGET_DATABASE=journey_next_restore_20260803" in backup
     assert "CA_PATH=" not in backup
     assert str(tmp_path) not in backup
     assert "STAGING_HOST=staging-vnext.muchenai.com" in edge
@@ -77,10 +78,10 @@ def test_prepare_can_target_exact_temporary_restore_database(
         output,
         "postgres.internal.example",
         5432,
-        prepare.RESTORE_DATABASE,
+        prepare.FAILED_RESTORE_DATABASE,
     )
     backup = (output / "secrets/backup.env").read_text()
     target_facts = (output / "secrets/target-facts.env").read_text()
-    assert f"TARGET_DATABASE={prepare.RESTORE_DATABASE}" in backup
-    assert f"/{prepare.RESTORE_DATABASE}?sslmode=verify-full" in target_facts
-    assert "TARGET_DATABASE=journey_next_production" not in backup
+    assert f"TARGET_DATABASE={prepare.FAILED_RESTORE_DATABASE}" in backup
+    assert f"/{prepare.FAILED_RESTORE_DATABASE}?sslmode=verify-full" in target_facts
+    assert "TARGET_DATABASE=journey_next_restore_20260803" not in backup

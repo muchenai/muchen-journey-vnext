@@ -13,8 +13,8 @@ from urllib.parse import quote
 
 CANDIDATE = "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a"
 PRODUCTION_HOST = "journey.muchenai.com"
-PRODUCTION_DATABASE = "journey_next_production"
-RESTORE_DATABASE = "journey_next_restore_20260803"
+PRODUCTION_DATABASE = "journey_next_restore_20260803"
+FAILED_RESTORE_DATABASE = "journey_next_production"
 STAGING_DATABASE = "journey_next_staging"
 IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:553055d921f75bc7f7df0e176d5176f0546ee7f75f37e9757a0be09edf3520ff",
@@ -61,7 +61,7 @@ def prepare(
         raise PrepareError("RDS host is invalid")
     if not 1 <= port <= 65535:
         raise PrepareError("RDS port is invalid")
-    if restore_target_database not in {PRODUCTION_DATABASE, RESTORE_DATABASE}:
+    if restore_target_database not in {PRODUCTION_DATABASE, FAILED_RESTORE_DATABASE}:
         raise PrepareError("restore target database is outside the reviewed allowlist")
     migration_password = require("WP08_MIGRATION_DB_PASSWORD", 20)
     runtime_password = require("WP08_RUNTIME_DB_PASSWORD", 20)
@@ -158,7 +158,7 @@ def main() -> None:
     parser.add_argument("--rds-port", type=int, required=True)
     parser.add_argument(
         "--restore-target-database",
-        choices=(PRODUCTION_DATABASE, RESTORE_DATABASE),
+        choices=(PRODUCTION_DATABASE, FAILED_RESTORE_DATABASE),
         default=PRODUCTION_DATABASE,
     )
     args = parser.parse_args()
