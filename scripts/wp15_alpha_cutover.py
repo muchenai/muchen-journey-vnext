@@ -18,6 +18,7 @@ PRODUCTION_GRANT = ROOT / "deploy" / "production" / "grant_runtime.py"
 BACKUP_RESTORE = ROOT / "deploy" / "production" / "backup_restore.sh"
 SCHEMA_AUDIT = ROOT / "deploy" / "production" / "schema_audit.sh"
 FAILED_RESTORE_CLEANUP = ROOT / "scripts" / "wp15_failed_restore_cleanup.py"
+FAILED_RESTORE_INVENTORY = ROOT / "scripts" / "wp15_failed_restore_inventory.py"
 STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
@@ -92,6 +93,7 @@ def validate_files(contract: dict) -> None:
     backup = BACKUP_RESTORE.read_text()
     schema_audit = SCHEMA_AUDIT.read_text()
     failed_restore_cleanup = FAILED_RESTORE_CLEANUP.read_text()
+    failed_restore_inventory = FAILED_RESTORE_INVENTORY.read_text()
     caddy = STAGING_CADDY.read_text()
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
@@ -106,6 +108,7 @@ def validate_files(contract: dict) -> None:
         "schema-audit",
         "schema-owner-repair",
         "backup-restore",
+        "restore-artifact-inventory",
         "restore-diff-cleanup",
         "deploy",
         "maintenance",
@@ -119,6 +122,9 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
     require(workflow, "WP15_SCHEMA_AUDIT_BUNDLE=CLEANED", "production workflow")
     require(workflow, "WP15_RESTORE_DIAGNOSTIC_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "WP15_RESTORE_INVENTORY_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE", "production workflow")
+    require(workflow, "python3 -m scripts.wp15_failed_restore_inventory", "production workflow")
     require(workflow, "COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT", "production workflow")
     require(workflow, "PGOPTIONS=-c default_transaction_read_only=on", "production workflow")
     require(workflow, "REQUIRE_READ_ONLY=true", "production workflow")
@@ -232,6 +238,19 @@ def validate_files(contract: dict) -> None:
         require(failed_restore_cleanup, marker, "failed restore cleanup")
     if re.search(r"(?i)DROP\s+DATABASE|TRUNCATE|DELETE\s+FROM", failed_restore_cleanup):
         raise CutoverError("failed restore cleanup must not mutate database contents")
+
+    for marker in (
+        'expected exactly two plaintext restore artifacts',
+        'directory_timestamp',
+        'plaintext_bytes',
+        'dump_contents_read',
+        'database_connected',
+        'files_deleted',
+        'WP15_FAILED_RESTORE_INVENTORY=PASS',
+    ):
+        require(failed_restore_inventory, marker, "failed restore inventory")
+    if re.search(r"(?i)unlink|remove|rmtree|DROP\s+DATABASE|TRUNCATE|DELETE\s+FROM", failed_restore_inventory):
+        raise CutoverError("failed restore inventory must remain read-only")
 
     require(caddy, "{$STAGING_HOST}", "edge Caddyfile")
     require(caddy, "{$PRODUCTION_HOST}", "edge Caddyfile")
