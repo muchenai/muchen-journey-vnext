@@ -31,7 +31,7 @@
 
 1. `WP-15 Database Tool Mirror`：确认词 `MIRROR_POSTGRES_17_6_DBTOOL`；只复制固定 PostgreSQL 17.6 digest 到项目 GHCR。
 2. `WP-15 Controlled Alpha Production / preflight`：确认词 `PREFLIGHT_WP15_ALPHA_PRODUCTION`；只读。
-3. `bootstrap-db`：确认词 `CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB`；Terraform saved plan 只允许创建 `volcenginecc_rdspostgresql_database.production`。
+3. `bootstrap-db`：确认词 `CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB`；使用签名 RDS API 只创建或核验精确的 `journey_next_production`，随后导入加密 Terraform state；不执行 plan/apply，不触碰六项冻结基础设施资源。
 4. `backup-restore`：确认词 `BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION`；目标库非空或 ACTIVE 通知接收人非 0 即拒绝。输出加密 dump 到现有私有 TOS `production-backups/<run-id>/`，并比较源/目标 migration、schema hash、逐表计数和逐表内容指纹；最终加密工件必须实际解密并与原 dump SHA-256 相等。
 5. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接 production DB；Caddy 预装正式 host 路由。
 6. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
