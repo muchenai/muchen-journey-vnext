@@ -32,11 +32,13 @@
 1. `WP-15 Database Tool Mirror`：确认词 `MIRROR_POSTGRES_17_6_DBTOOL`；client-only Dockerfile 从固定 PostgreSQL 17.6 amd64 manifest 只提取 `psql`、`pg_dump`、`pg_restore` 及动态库闭包。发布工作流采用已审查、已生成的 GHCR manifest digest，不重复压缩构建层；仅以 `--prefer-index=false` 复标同一 manifest，并核验三个客户端版本及压缩层总量不超过 6 MB。
 2. `WP-15 Controlled Alpha Production / preflight`：确认词 `PREFLIGHT_WP15_ALPHA_PRODUCTION`；只读。
 3. `bootstrap-db`：确认词 `CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB`；使用签名 RDS API 只创建或核验精确的 `journey_next_production`，随后导入加密 Terraform state；不执行 plan/apply，不触碰六项冻结基础设施资源。
-4. `backup-restore`：确认词 `BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION`；先在 600 秒内预取并校验固定 client-only 镜像，超时则在访问数据库前停止。目标库非空或 ACTIVE 通知接收人非 0 即拒绝。输出加密 dump 到现有私有 TOS `production-backups/<run-id>/`，并比较源/目标 migration、schema hash、逐表计数和逐表内容指纹；最终加密工件必须实际解密并与原 dump SHA-256 相等。无论成功或失败，都清理当次 owner-only bundle；修复路径同时清理已取消 run `30735084290` 的遗留 bundle。
-5. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接 production DB；Caddy 预装正式 host 路由。
-6. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
-7. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
-8. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
+4. `schema-audit`：确认词 `AUDIT_JOURNEY_NEXT_PRODUCTION_SCHEMA`；以 `default_transaction_read_only=on` 读取 `public` schema Owner、ACL、表数及 migrator 的 USAGE/CREATE 判定。目标库非空立即停止；无论成功或失败都清理 owner-only audit bundle 并关闭临时 SSH。
+5. 如空库审计显示 migrator 不是 Owner 或缺少 CREATE，仅通过 RDS Schema 管理把 `public` Owner/CREATE 修正给 `journey_next_migrator`；不得改变其他账号、表或数据库事实。
+6. `backup-restore`：确认词 `BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION`；先在 600 秒内预取并校验固定 client-only 镜像，超时则在访问数据库前停止。目标库非空或 ACTIVE 通知接收人非 0 即拒绝。输出加密 dump 到现有私有 TOS `production-backups/<run-id>/`，并比较源/目标 migration、schema hash、逐表计数和逐表内容指纹；最终加密工件必须实际解密并与原 dump SHA-256 相等。无论成功或失败，都清理当次 owner-only bundle；修复路径同时清理已取消 run `30735084290` 的遗留 bundle。
+7. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接 production DB；Caddy 预装正式 host 路由。
+8. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
+9. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
+10. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
 
 ## 4. 一键止血与旧站回退
 

@@ -16,6 +16,7 @@ PRODUCTION_COMPOSE = ROOT / "deploy" / "production" / "compose.yaml"
 PRODUCTION_DEPLOY = ROOT / "deploy" / "production" / "deploy.sh"
 PRODUCTION_GRANT = ROOT / "deploy" / "production" / "grant_runtime.py"
 BACKUP_RESTORE = ROOT / "deploy" / "production" / "backup_restore.sh"
+SCHEMA_AUDIT = ROOT / "deploy" / "production" / "schema_audit.sh"
 STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
@@ -87,6 +88,7 @@ def validate_files(contract: dict) -> None:
     deploy = PRODUCTION_DEPLOY.read_text()
     grant = PRODUCTION_GRANT.read_text()
     backup = BACKUP_RESTORE.read_text()
+    schema_audit = SCHEMA_AUDIT.read_text()
     caddy = STAGING_CADDY.read_text()
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
@@ -97,6 +99,7 @@ def validate_files(contract: dict) -> None:
     for phase in (
         "preflight",
         "bootstrap-db",
+        "schema-audit",
         "backup-restore",
         "deploy",
         "maintenance",
@@ -108,6 +111,7 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
     require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "WP15_SCHEMA_AUDIT_BUNDLE=CLEANED", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
     require(workflow, "terraform -chdir=infra/staging import", "production workflow")
     require(workflow, "terraform show -json | jq -er", "production workflow")
@@ -175,6 +179,21 @@ def validate_files(contract: dict) -> None:
         require(backup, marker, "backup/restore script")
     if re.search(r"dropdb|DROP\s+DATABASE", backup, re.IGNORECASE):
         raise CutoverError("backup/restore script must never drop a database")
+
+    for marker in (
+        "default_transaction_read_only=on",
+        "pg_get_userbyid",
+        "nspacl::text",
+        "has_schema_privilege",
+        "TARGET_DATABASE_NOT_EMPTY",
+        "WP15_PRODUCTION_PUBLIC_SCHEMA_AUDIT=PASS mutation=false target_empty=true",
+    ):
+        require(schema_audit, marker, "production schema audit")
+    if re.search(
+        r"(?im)^\s*(ALTER|CREATE|DROP|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|DELETE)\b",
+        schema_audit,
+    ):
+        raise CutoverError("production schema audit contains a mutating SQL command")
 
     require(caddy, "{$STAGING_HOST}", "edge Caddyfile")
     require(caddy, "{$PRODUCTION_HOST}", "edge Caddyfile")
