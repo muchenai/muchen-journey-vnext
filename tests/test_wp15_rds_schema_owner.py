@@ -67,3 +67,27 @@ def test_already_repaired_owner_is_idempotent(monkeypatch):
         == "EXACT_OWNER_ALREADY_PRESENT"
     )
     assert calls == ["DescribeSchemas"]
+
+
+def test_repairs_exact_temporary_restore_database(monkeypatch):
+    database = schema_owner.RESTORE_DATABASE_NAME
+    results = iter([
+        {"Schemas": [{"DBName": database, "SchemaName": "public", "Owner": schema_owner.EXPECTED_PREVIOUS_OWNER}]},
+        {},
+        {"Schemas": [{"DBName": database, "SchemaName": "public", "Owner": schema_owner.OWNER}]},
+    ])
+    calls = []
+
+    def fake_request(action, body, *_args, **_kwargs):
+        calls.append((action, body))
+        return next(results)
+
+    monkeypatch.setattr(schema_owner, "_request", fake_request)
+    assert schema_owner.repair_and_verify(
+        "postgres-1bf539167c33",
+        "ak",
+        "sk",
+        database_name=database,
+        sleeper=lambda _seconds: None,
+    ) == "OWNER_REPAIRED_AND_VERIFIED"
+    assert calls[1][1]["SchemaInfo"][0]["DBName"] == database

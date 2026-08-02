@@ -21,6 +21,8 @@ API_REGION = "cn-beijing"
 API_SERVICE = "rds_postgresql"
 API_VERSION = "2022-01-01"
 DATABASE_NAME = "journey_next_production"
+RESTORE_DATABASE_NAME = "journey_next_restore_20260803"
+ALLOWED_DATABASES = {DATABASE_NAME, RESTORE_DATABASE_NAME}
 SCHEMA_NAME = "public"
 OWNER = "journey_next_migrator"
 EXPECTED_PREVIOUS_OWNER = "pg_rds_superuser"
@@ -91,7 +93,7 @@ def _request(
     return result if isinstance(result, dict) else {}
 
 
-def _schema(result: dict[str, object]) -> dict[str, object]:
+def _schema(result: dict[str, object], database_name: str = DATABASE_NAME) -> dict[str, object]:
     schemas = result.get("Schemas")
     if not isinstance(schemas, list):
         raise ProductionSchemaOwnerError("RDS schema list is invalid")
@@ -99,7 +101,7 @@ def _schema(result: dict[str, object]) -> dict[str, object]:
         item
         for item in schemas
         if isinstance(item, dict)
-        and item.get("DBName") == DATABASE_NAME
+        and item.get("DBName") == database_name
         and item.get("SchemaName") == SCHEMA_NAME
     ]
     if len(matches) != 1:
@@ -116,14 +118,17 @@ def repair_and_verify(
     attempts: int = 20,
     interval_seconds: float = 3.0,
     sleeper: Callable[[float], None] = time.sleep,
+    database_name: str = DATABASE_NAME,
 ) -> str:
     if not INSTANCE_ID.fullmatch(instance_id):
         raise ProductionSchemaOwnerError("RDS instance identifier is invalid")
     if attempts < 1:
         raise ValueError("attempts must be positive")
+    if database_name not in ALLOWED_DATABASES:
+        raise ProductionSchemaOwnerError("database is outside the reviewed allowlist")
     lookup = {
         "InstanceId": instance_id,
-        "DBName": DATABASE_NAME,
+        "DBName": database_name,
         "PageNumber": 1,
         "PageSize": 100,
     }
@@ -134,7 +139,8 @@ def repair_and_verify(
             access_key,
             secret_key,
             session_token=session_token,
-        )
+        ),
+        database_name,
     )
     current_owner = current.get("Owner")
     if current_owner == OWNER:
@@ -147,7 +153,7 @@ def repair_and_verify(
         {
             "InstanceId": instance_id,
             "SchemaInfo": [
-                {"DBName": DATABASE_NAME, "SchemaName": SCHEMA_NAME, "Owner": OWNER}
+                {"DBName": database_name, "SchemaName": SCHEMA_NAME, "Owner": OWNER}
             ],
         },
         access_key,
@@ -162,7 +168,8 @@ def repair_and_verify(
                 access_key,
                 secret_key,
                 session_token=session_token,
-            )
+            ),
+            database_name,
         )
         if updated.get("Owner") == OWNER:
             return "OWNER_REPAIRED_AND_VERIFIED"
@@ -174,6 +181,7 @@ def repair_and_verify(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--instance-id", required=True)
+    parser.add_argument("--database", choices=sorted(ALLOWED_DATABASES), default=DATABASE_NAME)
     args = parser.parse_args()
     access_key = os.environ.get("VOLCENGINE_ACCESS_KEY", "")
     secret_key = os.environ.get("VOLCENGINE_SECRET_KEY", "")
@@ -184,6 +192,7 @@ def main() -> None:
         access_key,
         secret_key,
         session_token=os.environ.get("VOLCENGINE_SESSION_TOKEN", ""),
+        database_name=args.database,
     )
     print(f"WP15_PRODUCTION_SCHEMA_OWNER=PASS outcome={outcome}")
 

@@ -15,6 +15,7 @@ on:
           - backup-restore
           - restore-artifact-inventory
           - cleanup-known-plaintext
+          - restore-drill-temp
           - restore-diff-cleanup
           - deploy
           - maintenance
@@ -49,6 +50,7 @@ jobs:
       (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION') ||
       (inputs.phase == 'restore-artifact-inventory' && inputs.confirmation == 'INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE') ||
       (inputs.phase == 'cleanup-known-plaintext' && inputs.confirmation == 'DELETE_INVENTORIED_PLAINTEXT_DUMPS_20260802') ||
+      (inputs.phase == 'restore-drill-temp' && inputs.confirmation == 'CREATE_AND_RESTORE_JOURNEY_NEXT_RESTORE_20260803') ||
       (inputs.phase == 'restore-diff-cleanup' && inputs.confirmation == 'COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
       (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
@@ -161,8 +163,19 @@ jobs:
           terraform -chdir=infra/staging state show \
             volcenginecc_rdspostgresql_database.production >/dev/null
           echo 'WP15_PRODUCTION_DB_STATE=ADOPTED'
+      - name: Create exact temporary restore database and repair its public owner
+        if: inputs.phase == 'restore-drill-temp'
+        run: |
+          set -euo pipefail
+          python3 -m scripts.wp15_rds_database \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' \
+            --database journey_next_restore_20260803
+          python3 -m scripts.wp15_rds_schema_owner \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' \
+            --database journey_next_restore_20260803
+          echo 'WP15_TEMP_RESTORE_DATABASE=READY database=journey_next_restore_20260803'
       - name: Prepare bounded SSH access
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -215,13 +228,18 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Prepare owner-only runtime bundle
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy'
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp15-bundle"
+          restore_target=journey_next_production
+          if [[ "${{ inputs.phase }}" == restore-drill-temp ]]; then
+            restore_target=journey_next_restore_20260803
+          fi
           python3 scripts/wp15_prepare_production.py --output "$bundle" \
             --rds-host "${{ steps.frozen.outputs.rds_host }}" \
-            --rds-port "${{ steps.frozen.outputs.rds_port }}"
+            --rds-port "${{ steps.frozen.outputs.rds_port }}" \
+            --restore-target-database "$restore_target"
           cp deploy/production/compose.yaml deploy/production/compose.migrate.yaml "$bundle/"
           cp deploy/production/deploy.sh deploy/production/backup_restore.sh deploy/production/db_facts.py "$bundle/"
           cp deploy/production/schema_audit.sh "$bundle/"
@@ -271,7 +289,7 @@ jobs:
           grep -Fq 'migrator_create=t' <<<"$after"
           echo 'WP15_PRODUCTION_SCHEMA_OWNER_REPAIR=PASS target_empty=true other_roles_changed=false'
       - name: Execute isolated backup and restore proof
-        if: inputs.phase == 'backup-restore'
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -299,7 +317,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf '$release'"
           rm -f "$RUNNER_TEMP/wp15-proof/journey-next.dump.enc"
       - name: Upload PII-free restore proof
-        if: inputs.phase == 'backup-restore'
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp15-backup-restore-${{ github.run_id }}
@@ -382,7 +400,7 @@ jobs:
           test '${{ steps.frozen.outputs.tos_bucket }}' != ''
           echo 'WP15_ALPHA_PRODUCTION_PREFLIGHT=PASS mutation=false'
       - name: Remove owner-only restore bundle
-        if: always() && inputs.phase == 'backup-restore' && steps.frozen.outputs.public_ip != ''
+        if: always() && (inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp') && steps.frozen.outputs.public_ip != ''
         run: |
           set -euo pipefail
           public_ip='${{ steps.frozen.outputs.public_ip }}'
@@ -422,7 +440,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "set -e; cleanup='/srv/journey-next-production/plaintext-cleanups/$GITHUB_RUN_ID'; case \"\$cleanup\" in /srv/journey-next-production/plaintext-cleanups/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$cleanup\""
           echo 'WP15_PLAINTEXT_CLEANUP_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
-        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \

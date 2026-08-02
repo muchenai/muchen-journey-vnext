@@ -14,6 +14,7 @@ from urllib.parse import quote
 CANDIDATE = "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a"
 PRODUCTION_HOST = "journey.muchenai.com"
 PRODUCTION_DATABASE = "journey_next_production"
+RESTORE_DATABASE = "journey_next_restore_20260803"
 STAGING_DATABASE = "journey_next_staging"
 IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:553055d921f75bc7f7df0e176d5176f0546ee7f75f37e9757a0be09edf3520ff",
@@ -50,11 +51,18 @@ def write_env(path: Path, values: dict[str, str], mode: int = 0o600) -> None:
     path.chmod(mode)
 
 
-def prepare(output: Path, host: str, port: int) -> None:
+def prepare(
+    output: Path,
+    host: str,
+    port: int,
+    restore_target_database: str = PRODUCTION_DATABASE,
+) -> None:
     if not re.fullmatch(r"[A-Za-z0-9.-]+", host) or host in {"localhost", "127.0.0.1"}:
         raise PrepareError("RDS host is invalid")
     if not 1 <= port <= 65535:
         raise PrepareError("RDS port is invalid")
+    if restore_target_database not in {PRODUCTION_DATABASE, RESTORE_DATABASE}:
+        raise PrepareError("restore target database is outside the reviewed allowlist")
     migration_password = require("WP08_MIGRATION_DB_PASSWORD", 20)
     runtime_password = require("WP08_RUNTIME_DB_PASSWORD", 20)
     session_secret = require("WP15_SESSION_SECRET", 32)
@@ -76,7 +84,7 @@ def prepare(output: Path, host: str, port: int) -> None:
     secrets = output / "secrets"
     secrets.mkdir(mode=0o700)
     runtime_url = dsn("journey_next_runtime", runtime_password, host, port, PRODUCTION_DATABASE)
-    migration_url = dsn("journey_next_migrator", migration_password, host, port, PRODUCTION_DATABASE)
+    migration_url = dsn("journey_next_migrator", migration_password, host, port, restore_target_database)
     source_url = dsn("journey_next_migrator", migration_password, host, port, STAGING_DATABASE)
     shared = {
         "APP_ENV": "production",
@@ -119,7 +127,7 @@ def prepare(output: Path, host: str, port: int) -> None:
         "API_INTERNAL_URL": "http://production-api:8000", "ALLOW_FIXTURE_IDENTITY": "false",
     })
     write_env(secrets / "backup.env", {
-        "SOURCE_DATABASE": STAGING_DATABASE, "TARGET_DATABASE": PRODUCTION_DATABASE,
+        "SOURCE_DATABASE": STAGING_DATABASE, "TARGET_DATABASE": restore_target_database,
         "RDS_HOST": host, "RDS_PORT": str(port), "MIGRATION_DB_PASSWORD": migration_password,
         "WP15_BACKUP_KEY": backup_key, "DBTOOL_IMAGE": DBTOOL_IMAGE, "API_IMAGE": IMAGES["API_IMAGE"],
     })
@@ -148,9 +156,14 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rds-host", required=True)
     parser.add_argument("--rds-port", type=int, required=True)
+    parser.add_argument(
+        "--restore-target-database",
+        choices=(PRODUCTION_DATABASE, RESTORE_DATABASE),
+        default=PRODUCTION_DATABASE,
+    )
     args = parser.parse_args()
     try:
-        prepare(args.output, args.rds_host, args.rds_port)
+        prepare(args.output, args.rds_host, args.rds_port, args.restore_target_database)
     except (OSError, PrepareError) as error:
         raise SystemExit(f"WP15_PREPARE_ERROR: {error}") from error
 

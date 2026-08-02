@@ -12,6 +12,7 @@ from journey_api.config import get_settings
 
 
 engine = create_engine(get_settings().database_url)
+volatile_tables = {"worker_heartbeats"}
 with engine.connect() as connection:
     if os.getenv("REQUIRE_READ_ONLY") == "true":
         read_only = connection.execute(text("SHOW transaction_read_only")).scalar_one()
@@ -30,6 +31,8 @@ with engine.connect() as connection:
     for table in tables:
         if not table.replace("_", "").isalnum():
             raise RuntimeError("unsafe table name")
+        if table in volatile_tables:
+            continue
         counts[table] = connection.execute(text(f'SELECT count(*) FROM "{table}"')).scalar_one()
         content_fingerprints[table] = connection.execute(
             text(

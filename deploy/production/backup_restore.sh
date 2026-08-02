@@ -8,7 +8,10 @@ fail() {
 
 [[ "${EUID}" -eq 0 ]] || fail "backup_restore.sh must run as root"
 [[ "${SOURCE_DATABASE:-}" == "journey_next_staging" ]] || fail "unexpected source database"
-[[ "${TARGET_DATABASE:-}" == "journey_next_production" ]] || fail "unexpected target database"
+case "${TARGET_DATABASE:-}" in
+  journey_next_production|journey_next_restore_20260803) ;;
+  *) fail "unexpected target database" ;;
+esac
 [[ "$SOURCE_DATABASE" != "$TARGET_DATABASE" ]] || fail "source and target must differ"
 [[ "${DBTOOL_IMAGE:-}" == *"@sha256:"* ]] || fail "database tool is not digest pinned"
 [[ -n "${WP15_BACKUP_KEY:-}" && ${#WP15_BACKUP_KEY} -ge 32 ]] || fail "backup key is missing or short"
@@ -28,8 +31,14 @@ install -d -m 0700 "$root"
 plain="$root/journey-next.dump"
 encrypted="$root/journey-next.dump.enc"
 source_facts="$root/source-facts.json"
+source_facts_before="$root/source-facts-before.json"
 target_facts="$root/target-facts.json"
 manifest="$root/backup-manifest.json"
+verify_dump="$root/journey-next.verify.dump"
+cleanup_plaintext() {
+  rm -f -- "$plain" "$verify_dump"
+}
+trap cleanup_plaintext EXIT
 
 pg() {
   docker run --rm --network host \
@@ -44,6 +53,12 @@ pg() {
 target_tables=$(pg psql -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator -d "$TARGET_DATABASE" -Atqc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")
 [[ "$target_tables" == "0" ]] || fail "TARGET_DATABASE_NOT_EMPTY"
 
+docker run --rm --network host \
+  --env-file "$SOURCE_FACTS_ENV" \
+  -v "$CA_PATH:/run/secrets/volcengine-rds-ca.pem:ro" \
+  -v "$FACTS_SCRIPT:/tmp/db_facts.py:ro" \
+  "$API_IMAGE" python /tmp/db_facts.py >"$source_facts_before"
+
 pg pg_dump -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator -d "$SOURCE_DATABASE" \
   --format=custom --compress=9 --no-owner --no-acl --file=/backup/journey-next.dump
 
@@ -52,6 +67,8 @@ docker run --rm --network host \
   -v "$CA_PATH:/run/secrets/volcengine-rds-ca.pem:ro" \
   -v "$FACTS_SCRIPT:/tmp/db_facts.py:ro" \
   "$API_IMAGE" python /tmp/db_facts.py >"$source_facts"
+
+cmp -s "$source_facts_before" "$source_facts" || fail "source business facts changed during backup"
 
 pg pg_restore -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator -d "$TARGET_DATABASE" \
   --exit-on-error --no-owner --no-acl /backup/journey-next.dump
@@ -77,22 +94,21 @@ plain_sha=$(sha256sum "$plain" | awk '{print $1}')
 WP15_BACKUP_KEY="$WP15_BACKUP_KEY" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$plain" -out "$encrypted" -pass env:WP15_BACKUP_KEY
 rm -f "$plain"
-verify_dump="$root/journey-next.verify.dump"
 WP15_BACKUP_KEY="$WP15_BACKUP_KEY" openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
   -in "$encrypted" -out "$verify_dump" -pass env:WP15_BACKUP_KEY
 [[ "$(sha256sum "$verify_dump" | awk '{print $1}')" == "$plain_sha" ]] || fail "encrypted backup decrypt verification failed"
 rm -f "$verify_dump"
 encrypted_sha=$(sha256sum "$encrypted" | awk '{print $1}')
 facts_sha=$(sha256sum "$source_facts" | awk '{print $1}')
-WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$manifest" "$run_id" "$plain_sha" "$encrypted_sha" "$facts_sha" <<'PY'
+WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$manifest" "$run_id" "$plain_sha" "$encrypted_sha" "$facts_sha" "$TARGET_DATABASE" <<'PY'
 import hashlib, hmac, json, os, sys
-path, run_id, plain_sha, encrypted_sha, facts_sha = sys.argv[1:]
+path, run_id, plain_sha, encrypted_sha, facts_sha, target_database = sys.argv[1:]
 body = {
   "schema_version": 1,
   "run_id": run_id,
   "candidate_sha": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
   "source_database": "journey_next_staging",
-  "isolated_restore_database": "journey_next_production",
+  "isolated_restore_database": target_database,
   "migration": "0014_wp12_data_lifecycle",
   "decrypted_backup_sha256": plain_sha,
   "encrypted_backup_sha256": encrypted_sha,
