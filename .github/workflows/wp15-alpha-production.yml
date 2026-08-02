@@ -234,10 +234,7 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp15-bundle"
-          restore_target=journey_next_production
-          if [[ "${{ inputs.phase }}" == restore-drill-temp ]]; then
-            restore_target=journey_next_restore_20260803
-          fi
+          restore_target=journey_next_restore_20260803
           python3 scripts/wp15_prepare_production.py --output "$bundle" \
             --rds-host "${{ steps.frozen.outputs.rds_host }}" \
             --rds-port "${{ steps.frozen.outputs.rds_port }}" \
