@@ -28,6 +28,11 @@ def accepted_runtime(contract: dict[str, object]) -> dict[str, object]:
 
 def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypatch):
     contract = copy.deepcopy(web_only.load_contract())
+    assert contract["status"] == "RETIRED"
+    assert (
+        contract["superseded_by_candidate"]
+        == "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a"
+    )
     candidate_openapi = b'{"openapi":"historical-candidate"}\n'
     baseline = contract["runtime_baseline"]
     assert isinstance(baseline, dict)
@@ -79,6 +84,15 @@ def test_contract_rejects_widened_allowed_paths(tmp_path: Path):
     contract = tmp_path / "wp08_web_only.json"
     contract.write_text(json.dumps(payload))
     with pytest.raises(web_only.WebOnlyError, match="allowed paths"):
+        web_only.load_contract(contract)
+
+
+def test_contract_cannot_be_reactivated(tmp_path: Path):
+    payload = json.loads(web_only.CONTRACT.read_text())
+    payload["status"] = "ACTIVE"
+    contract = tmp_path / "wp08_web_only.json"
+    contract.write_text(json.dumps(payload))
+    with pytest.raises(web_only.WebOnlyError, match="remain retired"):
         web_only.load_contract(contract)
 
 

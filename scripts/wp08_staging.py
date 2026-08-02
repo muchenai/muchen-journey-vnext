@@ -492,8 +492,21 @@ def check(phase: str) -> None:
 def validate_workflow(path: Path = WORKFLOW) -> None:
     validate_infrastructure()
     workflow = path.read_text()
+    jobs_start = workflow.find("jobs:\n")
+    guard_end = workflow.find("    runs-on:", jobs_start)
+    if jobs_start >= 0 and guard_end >= 0:
+        job_guard = workflow[jobs_start:guard_end]
+        retired_dispatches = (
+            "inputs.phase == 'provision'",
+            "inputs.phase == 'deploy-web'",
+            "inputs.phase == 'repair-runtime'",
+        )
+        if any(marker in job_guard for marker in retired_dispatches):
+            raise StagingError(
+                "controlled Alpha candidate must not dispatch retired mutation phases"
+            )
     required = (
-        "- audit\n          - provision\n          - deploy\n          - deploy-web\n          - repair-runtime\n          - inspect-runtime",
+        "- audit\n          - deploy\n          - inspect-runtime",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "id: terraform_init",
         "if: inputs.phase == 'audit'",
@@ -537,9 +550,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
-        "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
-        "INSPECT_RUNTIME_222096D_STAGING",
+        "INSPECT_RUNTIME_8F77CEE_STAGING",
         "scripts/wp08_runtime_inventory.py",
         'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
         "python3 scripts/wp08_web_only.py check",
@@ -628,7 +639,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("runtime inventory must remain read-only")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " phases=audit,provision,frozen-alpha-deploy,bounded-web-only,runtime-repair,runtime-inventory"
+        " dispatch=audit,frozen-alpha-deploy,runtime-inventory"
+        " retired=provision,bounded-web-only,runtime-repair"
     )
 
 
