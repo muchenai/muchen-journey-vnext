@@ -124,6 +124,8 @@ def validate_files(contract: dict) -> None:
         require(workflow, f"- {phase}", "production workflow")
     require(workflow, "environment: staging", "production workflow")
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
+    require(workflow, ". ./.deployment.env", "production workflow")
+    require(workflow, "set -e; cd /srv/journey-next-staging/current", "production workflow")
     require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
     require(workflow, "WP15_SCHEMA_AUDIT_BUNDLE=CLEANED", "production workflow")
