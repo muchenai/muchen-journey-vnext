@@ -21,6 +21,7 @@ STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 RDS_DATABASE = ROOT / "scripts" / "wp15_rds_database.py"
+RDS_SCHEMA_OWNER = ROOT / "scripts" / "wp15_rds_schema_owner.py"
 DBTOOL_DOCKERFILE = ROOT / "deploy" / "production" / "dbtool" / "Dockerfile"
 DBTOOL_MIRROR = ROOT / ".github" / "workflows" / "wp15-dbtool-mirror.yml"
 
@@ -93,6 +94,7 @@ def validate_files(contract: dict) -> None:
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
     rds_database = RDS_DATABASE.read_text()
+    rds_schema_owner = RDS_SCHEMA_OWNER.read_text()
     dbtool_dockerfile = DBTOOL_DOCKERFILE.read_text()
     dbtool_mirror = DBTOOL_MIRROR.read_text()
 
@@ -100,6 +102,7 @@ def validate_files(contract: dict) -> None:
         "preflight",
         "bootstrap-db",
         "schema-audit",
+        "schema-owner-repair",
         "backup-restore",
         "deploy",
         "maintenance",
@@ -112,6 +115,8 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
     require(workflow, "WP15_SCHEMA_AUDIT_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "python3 -m scripts.wp15_rds_schema_owner", "production workflow")
+    require(workflow, "WP15_PRODUCTION_SCHEMA_OWNER_REPAIR=PASS", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
     require(workflow, "terraform -chdir=infra/staging import", "production workflow")
     require(workflow, "terraform show -json | jq -er", "production workflow")
@@ -133,6 +138,17 @@ def validate_files(contract: dict) -> None:
         "EXACT_DATABASE_ALREADY_PRESENT",
     ):
         require(rds_database, marker, "production RDS bootstrap")
+    for marker in (
+        'DATABASE_NAME = "journey_next_production"',
+        'SCHEMA_NAME = "public"',
+        'OWNER = "journey_next_migrator"',
+        'EXPECTED_PREVIOUS_OWNER = "pg_rds_superuser"',
+        '"ModifySchemaOwner"',
+        '"DescribeSchemas"',
+        '"SchemaInfo"',
+        "OWNER_REPAIRED_AND_VERIFIED",
+    ):
+        require(rds_schema_owner, marker, "production RDS schema owner repair")
 
     tool = contract["database_tool"]
     require(dbtool_dockerfile, f"FROM {tool['build_source']} AS source", "database tool Dockerfile")

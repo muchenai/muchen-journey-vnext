@@ -11,6 +11,7 @@ on:
           - preflight
           - bootstrap-db
           - schema-audit
+          - schema-owner-repair
           - backup-restore
           - deploy
           - maintenance
@@ -41,6 +42,7 @@ jobs:
       ((inputs.phase == 'preflight' && inputs.confirmation == 'PREFLIGHT_WP15_ALPHA_PRODUCTION') ||
       (inputs.phase == 'bootstrap-db' && inputs.confirmation == 'CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB') ||
       (inputs.phase == 'schema-audit' && inputs.confirmation == 'AUDIT_JOURNEY_NEXT_PRODUCTION_SCHEMA') ||
+      (inputs.phase == 'schema-owner-repair' && inputs.confirmation == 'REPAIR_EMPTY_PRODUCTION_PUBLIC_SCHEMA_OWNER') ||
       (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
       (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
@@ -154,7 +156,7 @@ jobs:
             volcenginecc_rdspostgresql_database.production >/dev/null
           echo 'WP15_PRODUCTION_DB_STATE=ADOPTED'
       - name: Prepare bounded SSH access
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -169,7 +171,7 @@ jobs:
           printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp15-key"
           chmod 0600 "$RUNNER_TEMP/wp15-key"
       - name: Prepare owner-only runtime bundle
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy'
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp15-bundle"
@@ -198,6 +200,31 @@ jobs:
           tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
           ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && timeout 600 docker pull \"\$DBTOOL_IMAGE\" >/dev/null && ./schema_audit.sh"
+      - name: Repair only the empty production public schema owner
+        if: inputs.phase == 'schema-owner-repair'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          release="/srv/journey-next-production/schema-audits/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          before=$(ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && timeout 600 docker pull \"\$DBTOOL_IMAGE\" >/dev/null && ./schema_audit.sh")
+          printf '%s\n' "$before"
+          grep -Fq 'owner=pg_rds_superuser ' <<<"$before"
+          grep -Fq 'table_count=0 ' <<<"$before"
+          grep -Fq 'migrator_create=f' <<<"$before"
+          python3 -m scripts.wp15_rds_schema_owner \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}'
+          after=$(ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && ./schema_audit.sh")
+          printf '%s\n' "$after"
+          grep -Fq 'owner=journey_next_migrator ' <<<"$after"
+          grep -Fq 'table_count=0 ' <<<"$after"
+          grep -Fq 'migrator_create=t' <<<"$after"
+          echo 'WP15_PRODUCTION_SCHEMA_OWNER_REPAIR=PASS target_empty=true other_roles_changed=false'
       - name: Execute isolated backup and restore proof
         if: inputs.phase == 'backup-restore'
         env:
@@ -295,7 +322,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "set -e; current='/srv/journey-next-production/restore-proofs/$GITHUB_RUN_ID'; abandoned='/srv/journey-next-production/restore-proofs/30735084290'; case \"\$current\" in /srv/journey-next-production/restore-proofs/[0-9]*) ;; *) exit 64;; esac; test \"\$abandoned\" = '/srv/journey-next-production/restore-proofs/30735084290'; rm -rf -- \"\$current\" \"\$abandoned\"; docker logout ghcr.io >/dev/null 2>&1 || true"
           echo 'WP15_RESTORE_BUNDLE=CLEANED'
       - name: Remove owner-only schema audit bundle
-        if: always() && inputs.phase == 'schema-audit' && steps.frozen.outputs.public_ip != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair') && steps.frozen.outputs.public_ip != ''
         run: |
           set -euo pipefail
           public_ip='${{ steps.frozen.outputs.public_ip }}'
@@ -303,7 +330,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "set -e; audit='/srv/journey-next-production/schema-audits/$GITHUB_RUN_ID'; case \"\$audit\" in /srv/journey-next-production/schema-audits/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$audit\"; docker logout ghcr.io >/dev/null 2>&1 || true"
           echo 'WP15_SCHEMA_AUDIT_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
-        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
