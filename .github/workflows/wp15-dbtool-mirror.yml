@@ -32,8 +32,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          digest=sha256:1c655698e315dcfdf91fe9995eb6449ad10a710c4b9dfa0c8d5100925e89814b
-          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1c655698e315"
+          digest=sha256:1f6d35be511f9a127d06caa2148579fe4605b8986ffd36b4576e4306388cc818
+          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1f6d35be511f"
           docker buildx build \
             --platform linux/amd64 \
             --provenance=false \
