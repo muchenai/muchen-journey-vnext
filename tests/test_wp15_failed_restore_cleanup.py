@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.wp15_failed_restore_cleanup import CleanupError, run
+from scripts.wp15_failed_restore_inventory import inventory
 
 
 def facts(*, changed: bool = False) -> dict:
@@ -116,3 +117,27 @@ def test_refuses_invalid_facts_before_deleting(tmp_path: Path) -> None:
         run(args)
 
     assert (path / "journey-next.dump").exists()
+
+
+def test_inventory_reports_two_artifacts_without_reading_or_deleting_dumps(
+    tmp_path: Path,
+) -> None:
+    first = failed_directory(tmp_path)
+    second = tmp_path / "backups" / "20260802T140000Z"
+    second.mkdir()
+    (second / "journey-next.dump").write_bytes(b"older plaintext")
+    for directory in (first, second):
+        (directory / "source-facts.json").write_text(json.dumps(facts()))
+        (directory / "target-facts.json").write_text(json.dumps(facts(changed=True)))
+
+    result = inventory(tmp_path / "backups")
+
+    assert result["artifact_count"] == 2
+    assert result["dump_contents_read"] is False
+    assert result["files_deleted"] == 0
+    assert [item["directory_timestamp"] for item in result["artifacts"]] == [
+        "20260802T140000Z",
+        "20260802T150130Z",
+    ]
+    assert (first / "journey-next.dump").exists()
+    assert (second / "journey-next.dump").exists()
