@@ -120,7 +120,12 @@ jobs:
           security_group_id=$(terraform output -raw staging_security_group_id)
           rds_host=$(terraform output -raw rds_private_host)
           rds_port=$(terraform output -raw rds_private_port)
-          rds_instance_id=$(terraform output -raw rds_instance_id)
+          rds_instance_id=$(terraform show -json | jq -er '
+            [.values.root_module.resources[]
+              | select(.address == "volcenginecc_rdspostgresql_instance.staging")
+              | .values.instance_id]
+            | if length == 1 then .[0] else error("expected one frozen RDS instance") end
+          ')
           tos_bucket=$(terraform output -raw tos_bucket_name)
           for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$rds_instance_id" "$tos_bucket"; do
             test -n "$value"

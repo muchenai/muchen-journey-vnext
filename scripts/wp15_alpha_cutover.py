@@ -97,6 +97,7 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
     require(workflow, "terraform -chdir=infra/staging import", "production workflow")
+    require(workflow, "terraform show -json | jq -er", "production workflow")
     require(workflow, "TF_VAR_approved_monthly_estimate_cny", "production workflow")
     if "terraform destroy" in workflow or "dropdb" in workflow:
         raise CutoverError("production workflow contains a destructive infrastructure/database command")
