@@ -14,9 +14,9 @@
   "database_tool": {
     "build_source": "docker.io/library/postgres:17.6-alpine3.22@sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be",
     "source_date_epoch": 1761154839,
-    "source": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:1f6d35be511f9a127d06caa2148579fe4605b8986ffd36b4576e4306388cc818",
-    "target": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1f6d35be511f",
-    "expected_digest": "sha256:1f6d35be511f9a127d06caa2148579fe4605b8986ffd36b4576e4306388cc818",
+    "source": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9",
+    "target": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-3a8282847477",
+    "expected_digest": "sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9",
     "max_compressed_bytes": 6000000
   },
   "backup": {

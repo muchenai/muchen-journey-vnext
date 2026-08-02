@@ -137,9 +137,10 @@ def validate_files(contract: dict) -> None:
     for marker in (
         tool["expected_digest"],
         tool["target"],
-        f"SOURCE_DATE_EPOCH={tool['source_date_epoch']}",
-        "--provenance=false",
-        "--sbom=false",
+        "--prefer-index=false",
+        "psql --version",
+        "pg_dump --version",
+        "pg_restore --version",
         'test "$size" -le 6000000',
     ):
         require(dbtool_mirror, marker, "database tool mirror")
