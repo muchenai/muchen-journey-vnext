@@ -112,7 +112,6 @@ jobs:
             -backend-config="skip_s3_checksum=true"
           terraform validate
       - name: Read frozen infrastructure without changing it
-        if: inputs.phase != 'bootstrap-db'
         id: frozen
         working-directory: infra/staging
         run: |
@@ -121,8 +120,9 @@ jobs:
           security_group_id=$(terraform output -raw staging_security_group_id)
           rds_host=$(terraform output -raw rds_private_host)
           rds_port=$(terraform output -raw rds_private_port)
+          rds_instance_id=$(terraform output -raw rds_instance_id)
           tos_bucket=$(terraform output -raw tos_bucket_name)
-          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$tos_bucket"; do
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$rds_instance_id" "$tos_bucket"; do
             test -n "$value"
             echo "::add-mask::$value"
           done
@@ -130,26 +130,22 @@ jobs:
           echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+          echo "rds_instance_id=$rds_instance_id" >>"$GITHUB_OUTPUT"
           echo "tos_bucket=$tos_bucket" >>"$GITHUB_OUTPUT"
       - name: Create only the empty isolated production database
         if: inputs.phase == 'bootstrap-db'
-        working-directory: infra/staging
         run: |
           set -euo pipefail
-          plan="$RUNNER_TEMP/wp15-production-db.tfplan"
-          terraform plan -out="$plan" -var="deploy_cidr=127.0.0.1/32" \
-            -target=volcenginecc_rdspostgresql_database.production
-          terraform show -json "$plan" | python3 -c '
-          import json,sys
-          p=json.load(sys.stdin)
-          changed=[]
-          for r in p.get("resource_changes",[]):
-              actions=r["change"]["actions"]
-              if actions not in (["no-op"],["read"]): changed.append((r["address"],actions))
-          assert changed == [("volcenginecc_rdspostgresql_database.production",["create"])], changed
-          print("WP15_PRODUCTION_DB_PLAN=PASS create=1 destructive=0")
-          '
-          terraform apply -auto-approve "$plan"
+          python3 -m scripts.wp15_rds_database \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}'
+          if ! terraform -chdir=infra/staging state list | grep -Fxq 'volcenginecc_rdspostgresql_database.production'; then
+            terraform -chdir=infra/staging import \
+              volcenginecc_rdspostgresql_database.production \
+              '${{ steps.frozen.outputs.rds_instance_id }}|journey_next_production'
+          fi
+          terraform -chdir=infra/staging state show \
+            volcenginecc_rdspostgresql_database.production >/dev/null
+          echo 'WP15_PRODUCTION_DB_STATE=ADOPTED'
       - name: Prepare bounded SSH access
         if: inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |

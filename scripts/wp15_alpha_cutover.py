@@ -19,6 +19,7 @@ BACKUP_RESTORE = ROOT / "deploy" / "production" / "backup_restore.sh"
 STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
+RDS_DATABASE = ROOT / "scripts" / "wp15_rds_database.py"
 
 
 class CutoverError(RuntimeError):
@@ -80,6 +81,7 @@ def validate_files(contract: dict) -> None:
     caddy = STAGING_CADDY.read_text()
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
+    rds_database = RDS_DATABASE.read_text()
 
     for phase in (
         "preflight",
@@ -93,12 +95,26 @@ def validate_files(contract: dict) -> None:
         require(workflow, f"- {phase}", "production workflow")
     require(workflow, "environment: staging", "production workflow")
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
-    require(workflow, "-target=volcenginecc_rdspostgresql_database.production", "production workflow")
+    require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
+    require(workflow, "terraform -chdir=infra/staging import", "production workflow")
     require(workflow, "TF_VAR_approved_monthly_estimate_cny", "production workflow")
     if "terraform destroy" in workflow or "dropdb" in workflow:
         raise CutoverError("production workflow contains a destructive infrastructure/database command")
     if "aliyun" in workflow.lower() or "dns:Update" in workflow:
         raise CutoverError("deployment workflow must not mutate parent-zone DNS")
+    bootstrap = workflow.split(
+        "- name: Create only the empty isolated production database", 1
+    )[1].split("- name: Prepare bounded SSH access", 1)[0]
+    if "terraform plan" in bootstrap or "terraform apply" in bootstrap:
+        raise CutoverError("database bootstrap must not plan/apply frozen infrastructure")
+    for marker in (
+        'DATABASE_NAME = "journey_next_production"',
+        'OWNER = "journey_next_migrator"',
+        '"CreateDatabase"',
+        '"DescribeDatabases"',
+        "EXACT_DATABASE_ALREADY_PRESENT",
+    ):
+        require(rds_database, marker, "production RDS bootstrap")
 
     require(compose, "name: journey-next-production", "production compose")
     require(compose, "journey-next-staging_default", "production compose")

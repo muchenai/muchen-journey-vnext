@@ -29,6 +29,10 @@ output "rds_private_port" {
   ]))
 }
 
+output "rds_instance_id" {
+  value = volcenginecc_rdspostgresql_instance.staging.instance_id
+}
+
 output "tos_bucket_name" {
   value = volcenginecc_tos_bucket.attachments.name
 }
