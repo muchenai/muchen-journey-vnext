@@ -52,6 +52,8 @@
 
 触发 `maintenance`，确认词 `ROUTE_JOURNEY_TO_MAINTENANCE`。它只将正式 host 切到 503 维护页；staging 保持可用，production 数据库和容器不删除。恢复当前 production Web 使用 `live`，确认词 `ROUTE_JOURNEY_TO_PRODUCTION_WEB`。
 
+run `30761555236` 已把维护版 Caddyfile 写入磁盘，但 Compose 因未加载 staging `.deployment.env` 而在 validate/reload 前停止，所以运行中的 edge 配置未变。修复要求 reload 命令显式加载既有镜像变量，并且只有 `docker logout` 可以忽略失败，validate/reload 不得被尾部 `|| true` 吞掉。
+
 ### 旧站 DNS 回退
 
 只有在 vNext 入口持续不可用且维护页不足以止血时，按私有证据把阿里云 `journey` A 记录恢复为原值。旧站不得接收或合并 vNext 已产生的业务事实；回退仅恢复入口展示，不构成数据回滚。DNS 切回后继续保留 staging 与 production DB，等待新候选前滚修复。
