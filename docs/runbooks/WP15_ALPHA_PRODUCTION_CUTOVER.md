@@ -29,7 +29,7 @@
 
 所有 workflow 都必须从受保护 `main` 手动触发；每个有副作用阶段只执行一次，失败不自动重试。
 
-1. `WP-15 Database Tool Mirror`：确认词 `MIRROR_POSTGRES_17_6_DBTOOL`；从固定 PostgreSQL 17.6 amd64 manifest 可复现构建仅含 `psql`、`pg_dump`、`pg_restore` 及动态库闭包的 client-only 镜像，压缩层总量不得超过 6 MB，再以固定 digest 发布到项目 GHCR。
+1. `WP-15 Database Tool Mirror`：确认词 `MIRROR_POSTGRES_17_6_DBTOOL`；client-only Dockerfile 从固定 PostgreSQL 17.6 amd64 manifest 只提取 `psql`、`pg_dump`、`pg_restore` 及动态库闭包。发布工作流采用已审查、已生成的 GHCR manifest digest，不重复压缩构建层；仅以 `--prefer-index=false` 复标同一 manifest，并核验三个客户端版本及压缩层总量不超过 6 MB。
 2. `WP-15 Controlled Alpha Production / preflight`：确认词 `PREFLIGHT_WP15_ALPHA_PRODUCTION`；只读。
 3. `bootstrap-db`：确认词 `CREATE_EMPTY_JOURNEY_NEXT_PRODUCTION_DB`；使用签名 RDS API 只创建或核验精确的 `journey_next_production`，随后导入加密 Terraform state；不执行 plan/apply，不触碰六项冻结基础设施资源。
 4. `backup-restore`：确认词 `BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION`；先在 600 秒内预取并校验固定 client-only 镜像，超时则在访问数据库前停止。目标库非空或 ACTIVE 通知接收人非 0 即拒绝。输出加密 dump 到现有私有 TOS `production-backups/<run-id>/`，并比较源/目标 migration、schema hash、逐表计数和逐表内容指纹；最终加密工件必须实际解密并与原 dump SHA-256 相等。无论成功或失败，都清理当次 owner-only bundle；修复路径同时清理已取消 run `30735084290` 的遗留 bundle。

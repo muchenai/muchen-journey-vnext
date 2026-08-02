@@ -20,7 +20,7 @@ IMAGES = {
     "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:401e5158fdcf7be11a3b2539fdbeb7c222ff9813267aa7c3cbcd7a2f9e24f1f5",
     "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:16bf2c7515d68fab164704438b23f691917213c8946a8c3dff8a4116fb3df0c7",
 }
-DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:1f6d35be511f9a127d06caa2148579fe4605b8986ffd36b4576e4306388cc818"
+DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
 
 
 class PrepareError(RuntimeError):

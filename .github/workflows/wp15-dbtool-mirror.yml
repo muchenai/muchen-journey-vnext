@@ -27,23 +27,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Build and publish the exact minimal PostgreSQL 17.6 client
+      - name: Adopt and verify the exact minimal PostgreSQL 17.6 client
         shell: bash
         run: |
           set -euo pipefail
-          digest=sha256:1f6d35be511f9a127d06caa2148579fe4605b8986ffd36b4576e4306388cc818
-          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1f6d35be511f"
-          docker buildx build \
-            --platform linux/amd64 \
-            --provenance=false \
-            --sbom=false \
-            --build-arg SOURCE_DATE_EPOCH=1761154839 \
-            --output "type=image,name=$target,push=true,rewrite-timestamp=true" \
-            deploy/production/dbtool
+          digest=sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9
+          source="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@$digest"
+          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-3a8282847477"
+          docker buildx imagetools create --prefer-index=false --tag "$target" "$source"
           actual=$(docker buildx imagetools inspect "$target" --raw | sha256sum | awk '{print "sha256:" $1}')
           test "$actual" = "$digest"
           docker buildx imagetools inspect "${target%@*}@$digest" >/dev/null
           size=$(docker buildx imagetools inspect "$target" --raw | jq '[.layers[].size] | add')
           test "$size" -le 6000000
+          docker pull --platform linux/amd64 "$source" >/dev/null
+          docker run --rm --platform linux/amd64 "$source" psql --version | grep -Fx 'psql (PostgreSQL) 17.6'
+          docker run --rm --platform linux/amd64 "$source" pg_dump --version | grep -Fx 'pg_dump (PostgreSQL) 17.6'
+          docker run --rm --platform linux/amd64 "$source" pg_restore --version | grep -Fx 'pg_restore (PostgreSQL) 17.6'
           printf 'WP15_DBTOOL_MIRROR=PASS digest=%s compressed_bytes=%s\n' "$digest" "$size"
