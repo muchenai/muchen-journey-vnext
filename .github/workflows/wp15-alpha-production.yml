@@ -390,7 +390,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./.deployment.env && set +a && ./deploy.sh"
           scp "${opts[@]}" deploy/staging/Caddyfile root@"$public_ip":/srv/journey-next-staging/current/Caddyfile
           scp "${opts[@]}" "$RUNNER_TEMP/wp15-bundle/edge.env" root@"$public_ip":/srv/journey-next-staging/current/secrets/edge.env
-          ssh "${opts[@]}" root@"$public_ip" "set -e; chmod 0600 /srv/journey-next-staging/current/secrets/edge.env; cd /srv/journey-next-staging/current; set -a; . ./.deployment.env; set +a; docker compose run --rm --no-deps edge validate --config /etc/caddy/Caddyfile; docker compose up -d --no-deps --force-recreate edge; docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile; docker logout ghcr.io >/dev/null 2>&1 || true"
+          ssh "${opts[@]}" root@"$public_ip" "set -e; chmod 0600 /srv/journey-next-staging/current/secrets/edge.env; cd /srv/journey-next-staging/current; set -a; . ./.deployment.env; set +a; docker compose run --rm --no-deps edge caddy validate --config /etc/caddy/Caddyfile; docker compose up -d --no-deps --force-recreate edge; docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile; docker logout ghcr.io >/dev/null 2>&1 || true"
           test "$(curl -sS --resolve "journey.muchenai.com:80:$public_ip" -o /dev/null -w '%{http_code}' http://journey.muchenai.com/)" = 308
       - name: Route the production host to maintenance or live runtime
         if: inputs.phase == 'maintenance' || inputs.phase == 'live'
@@ -403,7 +403,7 @@ jobs:
             source=deploy/production/Caddyfile.maintenance
           fi
           scp "${opts[@]}" "$source" root@"$public_ip":/srv/journey-next-staging/current/Caddyfile
-          ssh "${opts[@]}" root@"$public_ip" "set -e; cd /srv/journey-next-staging/current; set -a; . ./.deployment.env; set +a; docker compose run --rm --no-deps edge validate --config /etc/caddy/Caddyfile; docker compose up -d --no-deps --force-recreate edge; docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile"
+          ssh "${opts[@]}" root@"$public_ip" "set -e; cd /srv/journey-next-staging/current; set -a; . ./.deployment.env; set +a; docker compose run --rm --no-deps edge caddy validate --config /etc/caddy/Caddyfile; docker compose up -d --no-deps --force-recreate edge; docker compose exec -T edge caddy validate --config /etc/caddy/Caddyfile"
           test "$(curl -sS --resolve "journey.muchenai.com:80:$public_ip" -o /dev/null -w '%{http_code}' http://journey.muchenai.com/)" = 308
           if [[ "${{ inputs.phase }}" == maintenance ]]; then
             ssh "${opts[@]}" root@"$public_ip" "grep -Fq 'respond \"Muchen Journey 正在进行短时维护，请稍后重试。\" 503' /srv/journey-next-staging/current/Caddyfile"
