@@ -112,6 +112,7 @@ def validate_files(contract: dict) -> None:
         "backup-restore",
         "restore-artifact-inventory",
         "cleanup-known-plaintext",
+        "restore-drill-temp",
         "restore-diff-cleanup",
         "deploy",
         "maintenance",
@@ -129,6 +130,10 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_PLAINTEXT_CLEANUP_BUNDLE=CLEANED", "production workflow")
     require(workflow, "DELETE_INVENTORIED_PLAINTEXT_DUMPS_20260802", "production workflow")
     require(workflow, "python3 -m scripts.wp15_known_plaintext_cleanup", "production workflow")
+    require(workflow, "CREATE_AND_RESTORE_JOURNEY_NEXT_RESTORE_20260803", "production workflow")
+    require(workflow, "WP15_TEMP_RESTORE_DATABASE=READY", "production workflow")
+    require(workflow, "--database journey_next_restore_20260803", "production workflow")
+    require(workflow, "--restore-target-database", "production workflow")
     require(workflow, "INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE", "production workflow")
     require(workflow, "python3 -m scripts.wp15_failed_restore_inventory", "production workflow")
     require(workflow, "COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT", "production workflow")
@@ -156,6 +161,8 @@ def validate_files(contract: dict) -> None:
         '"CreateDatabase"',
         '"DescribeDatabases"',
         "EXACT_DATABASE_ALREADY_PRESENT",
+        'RESTORE_DATABASE_NAME = "journey_next_restore_20260803"',
+        "database_name not in ALLOWED_DATABASES",
     ):
         require(rds_database, marker, "production RDS bootstrap")
     for marker in (
@@ -167,6 +174,8 @@ def validate_files(contract: dict) -> None:
         '"DescribeSchemas"',
         '"SchemaInfo"',
         "OWNER_REPAIRED_AND_VERIFIED",
+        'RESTORE_DATABASE_NAME = "journey_next_restore_20260803"',
+        "database_name not in ALLOWED_DATABASES",
     ):
         require(rds_schema_owner, marker, "production RDS schema owner repair")
 
@@ -211,10 +220,14 @@ def validate_files(contract: dict) -> None:
         "encrypted backup decrypt verification failed",
         'active_notification_recipients"] == 0',
         "WP15_BACKUP_RESTORE=PASS",
+        "source business facts changed during backup",
+        "trap cleanup_plaintext EXIT",
+        "journey_next_restore_20260803",
     ):
         require(backup, marker, "backup/restore script")
     if re.search(r"dropdb|DROP\s+DATABASE", backup, re.IGNORECASE):
         raise CutoverError("backup/restore script must never drop a database")
+    require((ROOT / "deploy" / "production" / "db_facts.py").read_text(), 'volatile_tables = {"worker_heartbeats"}', "PII-free database facts")
 
     for marker in (
         "default_transaction_read_only=on",

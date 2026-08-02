@@ -21,6 +21,8 @@ API_REGION = "cn-beijing"
 API_SERVICE = "rds_postgresql"
 API_VERSION = "2022-01-01"
 DATABASE_NAME = "journey_next_production"
+RESTORE_DATABASE_NAME = "journey_next_restore_20260803"
+ALLOWED_DATABASES = {DATABASE_NAME, RESTORE_DATABASE_NAME}
 OWNER = "journey_next_migrator"
 CHARACTER_SET = "utf8"
 COLLATE = "C.UTF-8"
@@ -92,7 +94,7 @@ def _request(
     return result if isinstance(result, dict) else {}
 
 
-def _database(result: dict[str, object]) -> dict[str, object] | None:
+def _database(result: dict[str, object], database_name: str = DATABASE_NAME) -> dict[str, object] | None:
     databases = result.get("Databases")
     if databases is None:
         return None
@@ -101,16 +103,16 @@ def _database(result: dict[str, object]) -> dict[str, object] | None:
     matches = [
         item
         for item in databases
-        if isinstance(item, dict) and item.get("DBName") == DATABASE_NAME
+        if isinstance(item, dict) and item.get("DBName") == database_name
     ]
     if len(matches) > 1:
         raise ProductionDatabaseError("RDS returned duplicate production databases")
     return matches[0] if matches else None
 
 
-def validate_database(database: dict[str, object]) -> None:
+def validate_database(database: dict[str, object], database_name: str = DATABASE_NAME) -> None:
     expected = {
-        "DBName": DATABASE_NAME,
+        "DBName": database_name,
         "CharacterSetName": CHARACTER_SET,
         "Collate": COLLATE,
         "CType": C_TYPE,
@@ -134,12 +136,15 @@ def create_and_verify(
     attempts: int = 20,
     interval_seconds: float = 3.0,
     sleeper: Callable[[float], None] = time.sleep,
+    database_name: str = DATABASE_NAME,
 ) -> str:
     if not INSTANCE_ID.fullmatch(instance_id):
         raise ProductionDatabaseError("RDS instance identifier is invalid")
     if attempts < 1:
         raise ValueError("attempts must be positive")
-    lookup = {"InstanceId": instance_id, "DBName": DATABASE_NAME}
+    if database_name not in ALLOWED_DATABASES:
+        raise ProductionDatabaseError("database is outside the reviewed allowlist")
+    lookup = {"InstanceId": instance_id, "DBName": database_name}
     existing = _database(
         _request(
             "DescribeDatabases",
@@ -147,10 +152,11 @@ def create_and_verify(
             access_key,
             secret_key,
             session_token=session_token,
-        )
+        ),
+        database_name,
     )
     if existing is not None:
-        validate_database(existing)
+        validate_database(existing, database_name)
         return "EXACT_DATABASE_ALREADY_PRESENT"
 
     _request(
@@ -174,10 +180,11 @@ def create_and_verify(
                 access_key,
                 secret_key,
                 session_token=session_token,
-            )
+            ),
+            database_name,
         )
         if database is not None and database.get("DBStatus") == "Available":
-            validate_database(database)
+            validate_database(database, database_name)
             return "CREATED_AND_VERIFIED"
         if attempt < attempts:
             sleeper(interval_seconds)
@@ -187,6 +194,7 @@ def create_and_verify(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--instance-id", required=True)
+    parser.add_argument("--database", choices=sorted(ALLOWED_DATABASES), default=DATABASE_NAME)
     args = parser.parse_args()
     access_key = os.environ.get("VOLCENGINE_ACCESS_KEY", "")
     secret_key = os.environ.get("VOLCENGINE_SECRET_KEY", "")
@@ -197,6 +205,7 @@ def main() -> None:
         access_key,
         secret_key,
         session_token=os.environ.get("VOLCENGINE_SESSION_TOKEN", ""),
+        database_name=args.database,
     )
     print(f"WP15_PRODUCTION_DATABASE=PASS outcome={outcome}")
 

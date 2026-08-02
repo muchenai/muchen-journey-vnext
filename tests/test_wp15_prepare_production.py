@@ -66,3 +66,21 @@ def test_prepare_rejects_reused_production_secrets(
     )
     with pytest.raises(prepare.PrepareError, match="must be independent"):
         prepare.prepare(tmp_path / "bundle", "postgres.internal.example", 5432)
+
+
+def test_prepare_can_target_exact_temporary_restore_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    configure(monkeypatch)
+    output = tmp_path / "bundle"
+    prepare.prepare(
+        output,
+        "postgres.internal.example",
+        5432,
+        prepare.RESTORE_DATABASE,
+    )
+    backup = (output / "secrets/backup.env").read_text()
+    target_facts = (output / "secrets/target-facts.env").read_text()
+    assert f"TARGET_DATABASE={prepare.RESTORE_DATABASE}" in backup
+    assert f"/{prepare.RESTORE_DATABASE}?sslmode=verify-full" in target_facts
+    assert "TARGET_DATABASE=journey_next_production" not in backup

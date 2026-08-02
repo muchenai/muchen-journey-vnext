@@ -70,3 +70,21 @@ def test_mismatched_existing_database_fails_closed() -> None:
 def test_rejects_unbounded_instance_identifier() -> None:
     with pytest.raises(module.ProductionDatabaseError, match="identifier"):
         module.create_and_verify("bad", "access", "secret")
+
+
+def test_create_allows_only_exact_temporary_restore_database() -> None:
+    temporary = exact_database()
+    temporary["DBName"] = module.RESTORE_DATABASE_NAME
+    with patch.object(module, "_request", return_value={"Databases": [temporary]}) as request:
+        assert module.create_and_verify(
+            "postgres-12345678",
+            "access",
+            "secret",
+            database_name=module.RESTORE_DATABASE_NAME,
+        ) == "EXACT_DATABASE_ALREADY_PRESENT"
+    assert request.call_args.args[1]["DBName"] == module.RESTORE_DATABASE_NAME
+
+    with pytest.raises(module.ProductionDatabaseError, match="allowlist"):
+        module.create_and_verify(
+            "postgres-12345678", "access", "secret", database_name="unreviewed"
+        )
