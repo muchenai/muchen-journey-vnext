@@ -58,6 +58,8 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         raise WebOnlyError(f"cannot read Web-only contract: {error}") from error
     required = {
         "schema_version",
+        "status",
+        "superseded_by_candidate",
         "target_environment",
         "region_id",
         "candidate_commit",
@@ -72,8 +74,11 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     }
     if set(data) != required:
         raise WebOnlyError("Web-only contract keys differ from the reviewed schema")
-    if data["schema_version"] != 1:
-        raise WebOnlyError("Web-only contract schema must be 1")
+    if data["schema_version"] != 2:
+        raise WebOnlyError("Web-only contract schema must be 2")
+    if data["status"] != "RETIRED":
+        raise WebOnlyError("Web-only contract must remain retired")
+    _require_full_sha(data["superseded_by_candidate"], "superseded_by_candidate")
     if data["target_environment"] != "staging" or data["region_id"] != "cn-beijing":
         raise WebOnlyError("Web-only target must be cn-beijing staging")
     _require_full_sha(data["candidate_commit"], "candidate_commit")
@@ -232,13 +237,11 @@ def check_repository(data: dict[str, object]) -> None:
         raise WebOnlyError("candidate OpenAPI differs from the reviewed baseline")
 
     wp08 = json.loads(WP08_CONTRACT.read_text())
-    if wp08.get("candidate_commit") != candidate:
-        raise WebOnlyError("WP-08 candidate and Web-only candidate differ")
-    if wp08.get("candidate_artifact_run_id") != data["candidate_artifact_run_id"]:
-        raise WebOnlyError("WP-08 artifact run and Web-only artifact run differ")
-    digests = wp08.get("candidate_image_digests", {})
-    if not isinstance(digests, dict) or digests.get("web") != data["web_image_digest"]:
-        raise WebOnlyError("WP-08 Web digest and Web-only digest differ")
+    superseded_by = str(data["superseded_by_candidate"])
+    if wp08.get("candidate_commit") != superseded_by:
+        raise WebOnlyError("retired Web-only contract superseder differs from WP-08")
+    if superseded_by == candidate:
+        raise WebOnlyError("retired Web-only candidate must not remain deployable")
 
 
 def verify_runtime(data: dict[str, object], evidence: dict[str, object]) -> None:
@@ -349,9 +352,11 @@ def main() -> None:
             assert isinstance(baseline, dict)
             print(
                 "WP08_WEB_ONLY_CONTRACT=PASS"
+                " status=RETIRED"
                 f" candidate={data['candidate_commit']}"
+                f" superseded_by={data['superseded_by_candidate']}"
                 f" baseline={baseline['candidate_commit']}"
-                " modes=web-container-only,runtime-repair"
+                " modes=historical-validation-only"
             )
         elif args.command == "verify-runtime":
             verify_runtime(data, _read_evidence(args.evidence))
