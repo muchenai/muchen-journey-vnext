@@ -16,6 +16,7 @@ on:
           - restore-artifact-inventory
           - cleanup-known-plaintext
           - restore-drill-temp
+          - archive-temp-restore
           - restore-diff-cleanup
           - deploy
           - maintenance
@@ -51,6 +52,7 @@ jobs:
       (inputs.phase == 'restore-artifact-inventory' && inputs.confirmation == 'INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE') ||
       (inputs.phase == 'cleanup-known-plaintext' && inputs.confirmation == 'DELETE_INVENTORIED_PLAINTEXT_DUMPS_20260802') ||
       (inputs.phase == 'restore-drill-temp' && inputs.confirmation == 'CREATE_AND_RESTORE_JOURNEY_NEXT_RESTORE_20260803') ||
+      (inputs.phase == 'archive-temp-restore' && inputs.confirmation == 'ARCHIVE_TEMP_RESTORE_20260802T181906Z_TO_GITHUB') ||
       (inputs.phase == 'restore-diff-cleanup' && inputs.confirmation == 'COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
       (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
@@ -175,7 +177,7 @@ jobs:
             --database journey_next_restore_20260803
           echo 'WP15_TEMP_RESTORE_DATABASE=READY database=journey_next_restore_20260803'
       - name: Prepare bounded SSH access
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'archive-temp-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -315,16 +317,42 @@ jobs:
           aws s3 cp "$RUNNER_TEMP/wp15-proof/backup-manifest.json" \
             "s3://${{ steps.frozen.outputs.tos_bucket }}/production-backups/$GITHUB_RUN_ID/backup-manifest.json" --only-show-errors
           ssh "${opts[@]}" root@"$public_ip" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf '$release'"
-          rm -f "$RUNNER_TEMP/wp15-proof/journey-next.dump.enc"
-      - name: Upload PII-free restore proof
+      - name: Upload encrypted restore proof
         if: inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp15-backup-restore-${{ github.run_id }}
           path: |
+            ${{ runner.temp }}/wp15-proof/journey-next.dump.enc
             ${{ runner.temp }}/wp15-proof/backup-manifest.json
             ${{ runner.temp }}/wp15-proof/source-facts.json
             ${{ runner.temp }}/wp15-proof/target-facts.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Archive exact successful temporary restore proof
+        if: inputs.phase == 'archive-temp-restore'
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          source=/srv/journey-next-production/backups/20260802T181906Z
+          ssh "${opts[@]}" root@"$public_ip" "set -e; test -d '$source' && test ! -L '$source'; for name in journey-next.dump.enc backup-manifest.json source-facts.json target-facts.json; do test -f '$source/'\"\$name\" && test ! -L '$source/'\"\$name\"; done; test ! -e '$source/journey-next.dump'; test ! -e '$source/journey-next.verify.dump'"
+          destination="$RUNNER_TEMP/wp15-archived-proof"
+          install -d -m 0700 "$destination"
+          for name in journey-next.dump.enc backup-manifest.json source-facts.json target-facts.json; do
+            scp "${opts[@]}" root@"$public_ip":"$source/$name" "$destination/$name"
+          done
+          python3 scripts/wp15_archive_restore_proof.py --directory "$destination"
+      - name: Upload exact encrypted temporary restore proof
+        if: inputs.phase == 'archive-temp-restore'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp15-temp-restore-proof-30760806984
+          path: |
+            ${{ runner.temp }}/wp15-archived-proof/journey-next.dump.enc
+            ${{ runner.temp }}/wp15-archived-proof/backup-manifest.json
+            ${{ runner.temp }}/wp15-archived-proof/source-facts.json
+            ${{ runner.temp }}/wp15-archived-proof/target-facts.json
           if-no-files-found: error
           retention-days: 30
       - name: Compare failed restore and remove only its plaintext dump
@@ -407,6 +435,11 @@ jobs:
           opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
           ssh "${opts[@]}" root@"$public_ip" "set -e; current='/srv/journey-next-production/restore-proofs/$GITHUB_RUN_ID'; abandoned='/srv/journey-next-production/restore-proofs/30735084290'; case \"\$current\" in /srv/journey-next-production/restore-proofs/[0-9]*) ;; *) exit 64;; esac; test \"\$abandoned\" = '/srv/journey-next-production/restore-proofs/30735084290'; rm -rf -- \"\$current\" \"\$abandoned\"; docker logout ghcr.io >/dev/null 2>&1 || true"
           echo 'WP15_RESTORE_BUNDLE=CLEANED'
+      - name: Remove local encrypted restore proof
+        if: always() && (inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'archive-temp-restore')
+        run: |
+          rm -rf -- "$RUNNER_TEMP/wp15-proof" "$RUNNER_TEMP/wp15-archived-proof"
+          echo 'WP15_LOCAL_RESTORE_PROOF=CLEANED'
       - name: Remove owner-only schema audit bundle
         if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair') && steps.frozen.outputs.public_ip != ''
         run: |
@@ -440,7 +473,7 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "set -e; cleanup='/srv/journey-next-production/plaintext-cleanups/$GITHUB_RUN_ID'; case \"\$cleanup\" in /srv/journey-next-production/plaintext-cleanups/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$cleanup\""
           echo 'WP15_PLAINTEXT_CLEANUP_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
-        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-drill-temp' || inputs.phase == 'archive-temp-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
