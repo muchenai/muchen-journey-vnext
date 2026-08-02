@@ -12,7 +12,7 @@ fail() {
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
 [[ "${CANDIDATE_COMMIT:-}" == "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a" ]] || fail "unexpected candidate"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
-[[ "${PRODUCTION_DATABASE:-}" == "journey_next_production" ]] || fail "unexpected production database"
+[[ "${PRODUCTION_DATABASE:-}" == "journey_next_restore_20260803" ]] || fail "unexpected production database"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
@@ -38,7 +38,8 @@ grep -qx 'APP_ENV=production' "$SECRETS/worker.env" || fail "worker APP_ENV=prod
 grep -qx 'ALLOWED_HOSTS=journey.muchenai.com,production-api,localhost,127.0.0.1' "$SECRETS/api.env" || fail "allowed hosts differ"
 grep -qx 'FEISHU_OAUTH_REDIRECT_URI=https://journey.muchenai.com/auth/feishu/callback' "$SECRETS/api.env" || fail "OAuth callback differs"
 grep -qx 'NOTIFICATION_RESULT_URL=https://journey.muchenai.com/app/result' "$SECRETS/worker.env" || fail "canonical result URL differs"
-grep -q '/journey_next_production?' "$SECRETS/api.env" || fail "API is not bound to journey_next_production"
+grep -q '/journey_next_restore_20260803?' "$SECRETS/api.env" || fail "API is not bound to the verified restore database"
+! grep -q '/journey_next_production?' "$SECRETS"/*.env || fail "production bundle references the preserved failed restore database"
 ! grep -q '/journey_next_staging?' "$SECRETS"/*.env || fail "production bundle references staging database"
 grep -qx 'APP_RELEASE=8f77ceec570e2ec5e9c52861fcdc27748d7bb44a' "$SECRETS/api.env" || fail "API release differs"
 grep -qx 'APP_RELEASE=8f77ceec570e2ec5e9c52861fcdc27748d7bb44a' "$SECRETS/worker.env" || fail "Worker release differs"
@@ -90,4 +91,4 @@ if [[ -n "$previous" && "$previous" != "$PWD" ]]; then
   printf '%s\n' "$previous" >"$ROOT/PREVIOUS_RELEASE"
 fi
 trap - ERR
-printf 'WP15_PRODUCTION_DEPLOY=PASS candidate=%s database=journey_next_production\n' "$CANDIDATE_COMMIT"
+printf 'WP15_PRODUCTION_DEPLOY=PASS candidate=%s database=journey_next_restore_20260803\n' "$CANDIDATE_COMMIT"
