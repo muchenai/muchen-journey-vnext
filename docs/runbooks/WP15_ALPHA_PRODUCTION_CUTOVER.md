@@ -54,6 +54,8 @@
 
 run `30761555236` 已把维护版 Caddyfile 写入磁盘，但 Compose 因未加载 staging `.deployment.env` 而在 validate/reload 前停止，所以运行中的 edge 配置未变。修复要求 reload 命令显式加载既有镜像变量，并且只有 `docker logout` 可以忽略失败，validate/reload 不得被尾部 `|| true` 吞掉。
 
+run `30761728579` 进一步证明运行中的 edge 仍持有部署前环境，缺少 `PRODUCTION_HOST`；新文件在 validate 阶段被拒绝，仍未 reload。最终路径固定为：先用新 `edge.env` 启动一次性 edge 命令完成离线 Caddy 校验，成功后只强制重建 edge 服务，再在新容器内复验；不重建 Web/API/Worker。
+
 ### 旧站 DNS 回退
 
 只有在 vNext 入口持续不可用且维护页不足以止血时，按私有证据把阿里云 `journey` A 记录恢复为原值。旧站不得接收或合并 vNext 已产生的业务事实；回退仅恢复入口展示，不构成数据回滚。DNS 切回后继续保留 staging 与 production DB，等待新候选前滚修复。
