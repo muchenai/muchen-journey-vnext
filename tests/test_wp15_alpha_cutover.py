@@ -24,6 +24,15 @@ def test_contract_rejects_unpinned_database_tool(tmp_path: Path):
         cutover.load_contract(path)
 
 
+def test_contract_rejects_oversized_database_tool(tmp_path: Path):
+    value = cutover.load_contract()
+    value["database_tool"]["max_compressed_bytes"] = 6_000_001
+    path = tmp_path / "contract.json"
+    path.write_text(json.dumps(value))
+    with pytest.raises(cutover.CutoverError, match="size ceiling"):
+        cutover.load_contract(path)
+
+
 def test_reviewed_files_are_fail_closed_and_execute_no_mutation():
     if not cutover.WORKFLOW.exists():
         pytest.skip("runtime image intentionally excludes GitHub workflow files")

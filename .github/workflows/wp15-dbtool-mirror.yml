@@ -27,15 +27,23 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Copy the exact PostgreSQL 17.6 manifest to project GHCR
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build and publish the exact minimal PostgreSQL 17.6 client
         shell: bash
         run: |
           set -euo pipefail
-          digest=sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
-          source="docker.io/library/postgres:17.6-bookworm@$digest"
-          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-17.6-bookworm-f3bd19c606e4"
-          docker buildx imagetools create --tag "$target" "$source"
+          digest=sha256:1c655698e315dcfdf91fe9995eb6449ad10a710c4b9dfa0c8d5100925e89814b
+          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1c655698e315"
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
+            --build-arg SOURCE_DATE_EPOCH=1761154839 \
+            --output "type=image,name=$target,push=true,rewrite-timestamp=true" \
+            deploy/production/dbtool
           actual=$(docker buildx imagetools inspect "$target" --raw | sha256sum | awk '{print "sha256:" $1}')
           test "$actual" = "$digest"
           docker buildx imagetools inspect "${target%@*}@$digest" >/dev/null
-          printf 'WP15_DBTOOL_MIRROR=PASS digest=%s\n' "$digest"
+          size=$(docker buildx imagetools inspect "$target" --raw | jq '[.layers[].size] | add')
+          test "$size" -le 6000000
+          printf 'WP15_DBTOOL_MIRROR=PASS digest=%s compressed_bytes=%s\n' "$digest" "$size"

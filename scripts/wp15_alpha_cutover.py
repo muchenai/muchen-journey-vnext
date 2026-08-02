@@ -20,6 +20,8 @@ STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 RDS_DATABASE = ROOT / "scripts" / "wp15_rds_database.py"
+DBTOOL_DOCKERFILE = ROOT / "deploy" / "production" / "dbtool" / "Dockerfile"
+DBTOOL_MIRROR = ROOT / ".github" / "workflows" / "wp15-dbtool-mirror.yml"
 
 
 class CutoverError(RuntimeError):
@@ -59,6 +61,13 @@ def load_contract(path: Path = CONTRACT) -> dict:
         raise CutoverError("database tool digest is invalid")
     if not tool.get("source", "").endswith("@" + digest):
         raise CutoverError("database tool source is not digest pinned")
+    build_source = tool.get("build_source", "")
+    if not re.fullmatch(r"docker\.io/library/postgres:17\.6-alpine3\.22@sha256:[0-9a-f]{64}", build_source):
+        raise CutoverError("database tool build source is not an exact PostgreSQL 17.6 amd64 manifest")
+    if tool.get("source_date_epoch") != 1761154839:
+        raise CutoverError("database tool reproducible timestamp differs")
+    if not 0 < tool.get("max_compressed_bytes", 0) <= 6_000_000:
+        raise CutoverError("database tool size ceiling is invalid")
     backup = value.get("backup", {})
     if backup.get("restore_target_must_be_empty") is not True:
         raise CutoverError("restore target must fail closed when non-empty")
@@ -82,6 +91,8 @@ def validate_files(contract: dict) -> None:
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
     rds_database = RDS_DATABASE.read_text()
+    dbtool_dockerfile = DBTOOL_DOCKERFILE.read_text()
+    dbtool_mirror = DBTOOL_MIRROR.read_text()
 
     for phase in (
         "preflight",
@@ -95,6 +106,8 @@ def validate_files(contract: dict) -> None:
         require(workflow, f"- {phase}", "production workflow")
     require(workflow, "environment: staging", "production workflow")
     require(workflow, "WP15_SSH_INGRESS=CLOSED", "production workflow")
+    require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
+    require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
     require(workflow, "terraform -chdir=infra/staging import", "production workflow")
     require(workflow, "terraform show -json | jq -er", "production workflow")
@@ -116,6 +129,20 @@ def validate_files(contract: dict) -> None:
         "EXACT_DATABASE_ALREADY_PRESENT",
     ):
         require(rds_database, marker, "production RDS bootstrap")
+
+    tool = contract["database_tool"]
+    require(dbtool_dockerfile, f"FROM {tool['build_source']} AS source", "database tool Dockerfile")
+    for marker in ("psql", "pg_dump", "pg_restore", "FROM scratch"):
+        require(dbtool_dockerfile, marker, "database tool Dockerfile")
+    for marker in (
+        tool["expected_digest"],
+        tool["target"],
+        f"SOURCE_DATE_EPOCH={tool['source_date_epoch']}",
+        "--provenance=false",
+        "--sbom=false",
+        'test "$size" -le 6000000',
+    ):
+        require(dbtool_mirror, marker, "database tool mirror")
 
     require(compose, "name: journey-next-production", "production compose")
     require(compose, "journey-next-staging_default", "production compose")
