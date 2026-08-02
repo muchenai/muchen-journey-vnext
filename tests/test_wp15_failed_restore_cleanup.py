@@ -80,6 +80,25 @@ def test_refuses_ambiguous_failed_directories_without_deleting(tmp_path: Path) -
     assert (second / "journey-next.dump").exists()
 
 
+def test_inventory_reports_missing_target_facts_without_opening_dump(tmp_path: Path) -> None:
+    first = failed_directory(tmp_path)
+    second = tmp_path / "backups" / "20260802T140000Z"
+    second.mkdir()
+    (second / "journey-next.dump").write_bytes(b"older plaintext")
+    for directory in (first, second):
+        (directory / "source-facts.json").write_text(json.dumps(facts()))
+        (directory / "target-facts.json").unlink(missing_ok=True)
+
+    result = inventory(tmp_path / "backups")
+
+    assert [item["facts_status"] for item in result["artifacts"]] == [
+        "MISSING_TARGET_FACTS",
+        "MISSING_TARGET_FACTS",
+    ]
+    assert all(item["facts"] is None for item in result["artifacts"])
+    assert result["files_deleted"] == 0
+
+
 def test_refuses_plaintext_outside_authorized_window_without_deleting(tmp_path: Path) -> None:
     args = arguments(tmp_path)
     authorized = failed_directory(tmp_path)

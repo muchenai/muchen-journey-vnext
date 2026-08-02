@@ -243,6 +243,8 @@ def validate_files(contract: dict) -> None:
         'expected exactly two plaintext restore artifacts',
         'directory_timestamp',
         'plaintext_bytes',
+        'facts_status',
+        'MISSING_TARGET_FACTS',
         'dump_contents_read',
         'database_connected',
         'files_deleted',
