@@ -14,6 +14,7 @@ on:
           - schema-owner-repair
           - backup-restore
           - restore-artifact-inventory
+          - cleanup-known-plaintext
           - restore-diff-cleanup
           - deploy
           - maintenance
@@ -47,6 +48,7 @@ jobs:
       (inputs.phase == 'schema-owner-repair' && inputs.confirmation == 'REPAIR_EMPTY_PRODUCTION_PUBLIC_SCHEMA_OWNER') ||
       (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION') ||
       (inputs.phase == 'restore-artifact-inventory' && inputs.confirmation == 'INVENTORY_TWO_PLAINTEXT_RESTORE_ARTIFACTS_NO_DELETE') ||
+      (inputs.phase == 'cleanup-known-plaintext' && inputs.confirmation == 'DELETE_INVENTORIED_PLAINTEXT_DUMPS_20260802') ||
       (inputs.phase == 'restore-diff-cleanup' && inputs.confirmation == 'COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
       (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
@@ -160,7 +162,7 @@ jobs:
             volcenginecc_rdspostgresql_database.production >/dev/null
           echo 'WP15_PRODUCTION_DB_STATE=ADOPTED'
       - name: Prepare bounded SSH access
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -192,6 +194,24 @@ jobs:
         with:
           name: wp15-plaintext-restore-inventory-${{ github.run_id }}
           path: ${{ runner.temp }}/wp15-restore-inventory/restore-artifact-inventory.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Delete only the two inventoried plaintext dumps
+        if: inputs.phase == 'cleanup-known-plaintext'
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          release="/srv/journey-next-production/plaintext-cleanups/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -czf - scripts/wp15_failed_restore_cleanup.py scripts/wp15_known_plaintext_cleanup.py | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
+          ssh "${opts[@]}" root@"$public_ip" "cd '$release' && python3 -m scripts.wp15_known_plaintext_cleanup /srv/journey-next-production/backups" | tee "$RUNNER_TEMP/wp15-plaintext-cleanup.log"
+      - name: Upload plaintext cleanup evidence
+        if: inputs.phase == 'cleanup-known-plaintext'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp15-plaintext-cleanup-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp15-plaintext-cleanup.log
           if-no-files-found: error
           retention-days: 30
       - name: Prepare owner-only runtime bundle
@@ -393,8 +413,16 @@ jobs:
           opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
           ssh "${opts[@]}" root@"$public_ip" "set -e; inventory='/srv/journey-next-production/restore-inventories/$GITHUB_RUN_ID'; case \"\$inventory\" in /srv/journey-next-production/restore-inventories/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$inventory\""
           echo 'WP15_RESTORE_INVENTORY_BUNDLE=CLEANED'
+      - name: Remove plaintext cleanup bundle
+        if: always() && inputs.phase == 'cleanup-known-plaintext' && steps.frozen.outputs.public_ip != ''
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          ssh "${opts[@]}" root@"$public_ip" "set -e; cleanup='/srv/journey-next-production/plaintext-cleanups/$GITHUB_RUN_ID'; case \"\$cleanup\" in /srv/journey-next-production/plaintext-cleanups/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$cleanup\""
+          echo 'WP15_PLAINTEXT_CLEANUP_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
-        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-artifact-inventory' || inputs.phase == 'cleanup-known-plaintext' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \

@@ -8,6 +8,7 @@ import pytest
 
 from scripts.wp15_failed_restore_cleanup import CleanupError, run
 from scripts.wp15_failed_restore_inventory import inventory
+from scripts.wp15_known_plaintext_cleanup import AUTHORIZED, cleanup
 
 
 def facts(*, changed: bool = False) -> dict:
@@ -97,6 +98,22 @@ def test_inventory_reports_missing_target_facts_without_opening_dump(tmp_path: P
     ]
     assert all(item["facts"] is None for item in result["artifacts"])
     assert result["files_deleted"] == 0
+
+
+def test_known_plaintext_cleanup_requires_exact_inventory(tmp_path: Path) -> None:
+    root = tmp_path / "backups"
+    for directory, size in AUTHORIZED.items():
+        path = root / directory
+        path.mkdir(parents=True)
+        (path / "journey-next.dump").write_bytes(b"x" * size)
+        (path / "source-facts.json").write_text("{}")
+
+    result = cleanup(root)
+
+    assert result["plaintext_artifacts_remaining"] == 0
+    assert result["facts_files_preserved"] is True
+    assert result["database_mutation_executed"] is False
+    assert all((root / directory / "source-facts.json").exists() for directory in AUTHORIZED)
 
 
 def test_refuses_plaintext_outside_authorized_window_without_deleting(tmp_path: Path) -> None:
