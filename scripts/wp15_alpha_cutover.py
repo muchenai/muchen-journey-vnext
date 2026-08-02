@@ -136,6 +136,7 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_TEMP_RESTORE_DATABASE=READY", "production workflow")
     require(workflow, "--database journey_next_restore_20260803", "production workflow")
     require(workflow, "--restore-target-database", "production workflow")
+    require(workflow, "restore_target=journey_next_restore_20260803", "production workflow")
     require(workflow, "ARCHIVE_TEMP_RESTORE_20260802T181906Z_TO_GITHUB", "production workflow")
     require(workflow, "scripts/wp15_archive_restore_proof.py", "production workflow")
     require(workflow, "wp15-temp-restore-proof-30760806984", "production workflow")

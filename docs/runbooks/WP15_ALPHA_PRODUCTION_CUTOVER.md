@@ -41,6 +41,7 @@
 10. run `30760806984` 已完成数据库备份、临时库恢复、源/目标摘要比对和加密解密校验；仅在向现有 FNS TOS 的未授权 `production-backups/` 路径归档时收到 `InvalidPathAccess`。不得重做已通过的数据库恢复。`archive-temp-restore` 使用确认词 `ARCHIVE_TEMP_RESTORE_20260802T181906Z_TO_GITHUB`，只从精确目录读取加密工件、HMAC manifest 与 PII-free facts，确认不存在明文 dump、摘要相等且密文 SHA-256 匹配后，归档至私有 GitHub Actions artifact（30 天）；不连接数据库、不修改 TOS、不部署。
 11. 失败恢复诊断仅用于 run `30753376010`：`restore-diff-cleanup`，确认词 `COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT`。它使用只读事务重新生成源库/目标库的 PII-free migration、schema、逐表计数、逐表内容指纹和 ACTIVE 通知接收人数；只输出相等性、差异表名和计数，不输出业务正文。仅当授权时间窗内恰有一个“存在 `journey-next.dump` 且不存在加密 dump/manifest”的目录、并且备份根目录不存在其他明文 dump 时，才删除该目录内的 `journey-next.dump` 和可选 verify dump；保留 PII-free facts，不修改数据库、不恢复、不上传该失败备份。无论成功或失败都清理诊断 bundle 并关闭临时 SSH。
 12. `deploy`：确认词 `DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION`；不修改 DNS。Web/API/Worker 只连接已验证并提升的 `journey_next_restore_20260803`；禁止引用保留现场 `journey_next_production`；Caddy 预装正式 host 路由。
+    - run `30761268308` 在容器启动前被 bundle 门禁拒绝：workflow 仍把 migration/backup target 设为保留现场库；没有启动 production runtime、没有修改数据库、Caddy 或 DNS。修复只把 owner-only bundle 的默认 target 与已提升运行库对齐，失败 run 不直接重试。
 13. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
 14. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
 15. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
