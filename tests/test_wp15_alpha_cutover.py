@@ -40,3 +40,12 @@ def test_reviewed_files_are_fail_closed_and_execute_no_mutation():
     assert result["status"] == "PASS"
     assert result["staging_preserved"] is True
     assert result["production_mutation_executed"] is False
+
+
+def test_schema_audit_is_read_only_and_stops_on_nonempty_target():
+    if not cutover.SCHEMA_AUDIT.exists():
+        pytest.skip("runtime image intentionally excludes production deployment files")
+    source = cutover.SCHEMA_AUDIT.read_text()
+    assert "default_transaction_read_only=on" in source
+    assert "TARGET_DATABASE_NOT_EMPTY" in source
+    assert "WP15_PRODUCTION_PUBLIC_SCHEMA_AUDIT=PASS mutation=false" in source
