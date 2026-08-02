@@ -97,6 +97,8 @@ jobs:
           test "$(jq -r .candidate_gate_run_id config/wp15_alpha_cutover.json)" = 30709982868
           git cat-file -e "${{ inputs.candidate }}^{commit}"
           python3 scripts/wp15_alpha_cutover.py
+          estimate=$(jq -er '.approved_monthly_estimate_cny | select(. > 0 and . <= 800)' config/wp08_staging.json)
+          echo "TF_VAR_approved_monthly_estimate_cny=$estimate" >>"$GITHUB_ENV"
       - name: Initialize encrypted shared Alpha state
         working-directory: infra/staging
         run: |
