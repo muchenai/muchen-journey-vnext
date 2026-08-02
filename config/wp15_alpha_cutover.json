@@ -12,9 +12,12 @@
   "migration": "0014_wp12_data_lifecycle",
   "config_schema_version": 3,
   "database_tool": {
-    "source": "docker.io/library/postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
-    "target": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-17.6-bookworm-f3bd19c606e4",
-    "expected_digest": "sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3"
+    "build_source": "docker.io/library/postgres:17.6-alpine3.22@sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be",
+    "source_date_epoch": 1761154839,
+    "source": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:1c655698e315dcfdf91fe9995eb6449ad10a710c4b9dfa0c8d5100925e89814b",
+    "target": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-1c655698e315",
+    "expected_digest": "sha256:1c655698e315dcfdf91fe9995eb6449ad10a710c4b9dfa0c8d5100925e89814b",
+    "max_compressed_bytes": 6000000
   },
   "backup": {
     "format": "postgres-custom",

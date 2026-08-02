@@ -194,6 +194,8 @@ jobs:
           ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
           tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && timeout 600 docker pull \"\$DBTOOL_IMAGE\" >/dev/null && test \"\$(docker image inspect --format '{{.RepoDigests}}' \"\$DBTOOL_IMAGE\")\" != '[]' && docker run --rm \"\$DBTOOL_IMAGE\" pg_dump --version | grep -Fx 'pg_dump (PostgreSQL) 17.6'"
+          echo 'WP15_DBTOOL_PREFETCH=PASS max_seconds=600'
           ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && ./backup_restore.sh"
           artifact=$(ssh "${opts[@]}" root@"$public_ip" "find /srv/journey-next-production/backups -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-")
           test -n "$artifact"
@@ -268,6 +270,14 @@ jobs:
           test '${{ steps.frozen.outputs.rds_host }}' != ''
           test '${{ steps.frozen.outputs.tos_bucket }}' != ''
           echo 'WP15_ALPHA_PRODUCTION_PREFLIGHT=PASS mutation=false'
+      - name: Remove owner-only restore bundle
+        if: always() && inputs.phase == 'backup-restore' && steps.frozen.outputs.public_ip != ''
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          ssh "${opts[@]}" root@"$public_ip" "set -e; current='/srv/journey-next-production/restore-proofs/$GITHUB_RUN_ID'; abandoned='/srv/journey-next-production/restore-proofs/30735084290'; case \"\$current\" in /srv/journey-next-production/restore-proofs/[0-9]*) ;; *) exit 64;; esac; test \"\$abandoned\" = '/srv/journey-next-production/restore-proofs/30735084290'; rm -rf -- \"\$current\" \"\$abandoned\"; docker logout ghcr.io >/dev/null 2>&1 || true"
+          echo 'WP15_RESTORE_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
         if: always() && (inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
