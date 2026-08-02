@@ -17,6 +17,7 @@ PRODUCTION_DEPLOY = ROOT / "deploy" / "production" / "deploy.sh"
 PRODUCTION_GRANT = ROOT / "deploy" / "production" / "grant_runtime.py"
 BACKUP_RESTORE = ROOT / "deploy" / "production" / "backup_restore.sh"
 SCHEMA_AUDIT = ROOT / "deploy" / "production" / "schema_audit.sh"
+FAILED_RESTORE_CLEANUP = ROOT / "scripts" / "wp15_failed_restore_cleanup.py"
 STAGING_CADDY = ROOT / "deploy" / "staging" / "Caddyfile"
 MAINTENANCE_CADDY = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
@@ -90,6 +91,7 @@ def validate_files(contract: dict) -> None:
     grant = PRODUCTION_GRANT.read_text()
     backup = BACKUP_RESTORE.read_text()
     schema_audit = SCHEMA_AUDIT.read_text()
+    failed_restore_cleanup = FAILED_RESTORE_CLEANUP.read_text()
     caddy = STAGING_CADDY.read_text()
     maintenance = MAINTENANCE_CADDY.read_text()
     infra = INFRA_MAIN.read_text()
@@ -104,6 +106,7 @@ def validate_files(contract: dict) -> None:
         "schema-audit",
         "schema-owner-repair",
         "backup-restore",
+        "restore-diff-cleanup",
         "deploy",
         "maintenance",
         "live",
@@ -115,6 +118,11 @@ def validate_files(contract: dict) -> None:
     require(workflow, "WP15_DBTOOL_PREFETCH=PASS max_seconds=600", "production workflow")
     require(workflow, "WP15_RESTORE_BUNDLE=CLEANED", "production workflow")
     require(workflow, "WP15_SCHEMA_AUDIT_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "WP15_RESTORE_DIAGNOSTIC_BUNDLE=CLEANED", "production workflow")
+    require(workflow, "COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT", "production workflow")
+    require(workflow, "PGOPTIONS=-c default_transaction_read_only=on", "production workflow")
+    require(workflow, "REQUIRE_READ_ONLY=true", "production workflow")
+    require(workflow, "python3 ./wp15_failed_restore_cleanup.py", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_schema_owner", "production workflow")
     require(workflow, "WP15_PRODUCTION_SCHEMA_OWNER_REPAIR=PASS", "production workflow")
     require(workflow, "python3 -m scripts.wp15_rds_database", "production workflow")
@@ -210,6 +218,20 @@ def validate_files(contract: dict) -> None:
         schema_audit,
     ):
         raise CutoverError("production schema audit contains a mutating SQL command")
+
+    for marker in (
+        'failed_workflow_run_id',
+        'expected exactly one failed plaintext backup',
+        'journey-next.dump.enc',
+        'backup-manifest.json',
+        'plaintext_dumps_remaining',
+        'database_mutation_executed',
+        'WP15_FAILED_RESTORE_DIFF=',
+        'WP15_FAILED_RESTORE_CLEANUP=PASS',
+    ):
+        require(failed_restore_cleanup, marker, "failed restore cleanup")
+    if re.search(r"(?i)DROP\s+DATABASE|TRUNCATE|DELETE\s+FROM", failed_restore_cleanup):
+        raise CutoverError("failed restore cleanup must not mutate database contents")
 
     require(caddy, "{$STAGING_HOST}", "edge Caddyfile")
     require(caddy, "{$PRODUCTION_HOST}", "edge Caddyfile")

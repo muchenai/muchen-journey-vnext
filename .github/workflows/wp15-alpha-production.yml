@@ -13,6 +13,7 @@ on:
           - schema-audit
           - schema-owner-repair
           - backup-restore
+          - restore-diff-cleanup
           - deploy
           - maintenance
           - live
@@ -44,6 +45,7 @@ jobs:
       (inputs.phase == 'schema-audit' && inputs.confirmation == 'AUDIT_JOURNEY_NEXT_PRODUCTION_SCHEMA') ||
       (inputs.phase == 'schema-owner-repair' && inputs.confirmation == 'REPAIR_EMPTY_PRODUCTION_PUBLIC_SCHEMA_OWNER') ||
       (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_STAGING_RESTORE_ISOLATED_PRODUCTION') ||
+      (inputs.phase == 'restore-diff-cleanup' && inputs.confirmation == 'COMPARE_FAILED_RESTORE_30753376010_AND_REMOVE_PLAINTEXT') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_CONTROLLED_ALPHA_PRODUCTION') ||
       (inputs.phase == 'maintenance' && inputs.confirmation == 'ROUTE_JOURNEY_TO_MAINTENANCE') ||
       (inputs.phase == 'live' && inputs.confirmation == 'ROUTE_JOURNEY_TO_PRODUCTION_WEB') ||
@@ -156,7 +158,7 @@ jobs:
             volcenginecc_rdspostgresql_database.production >/dev/null
           echo 'WP15_PRODUCTION_DB_STATE=ADOPTED'
       - name: Prepare bounded SSH access
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect'
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -171,7 +173,7 @@ jobs:
           printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp15-key"
           chmod 0600 "$RUNNER_TEMP/wp15-key"
       - name: Prepare owner-only runtime bundle
-        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy'
+        if: inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy'
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp15-bundle"
@@ -182,6 +184,7 @@ jobs:
           cp deploy/production/deploy.sh deploy/production/backup_restore.sh deploy/production/db_facts.py "$bundle/"
           cp deploy/production/schema_audit.sh "$bundle/"
           cp deploy/production/grant_runtime.py "$bundle/"
+          cp scripts/wp15_failed_restore_cleanup.py "$bundle/"
           chmod 0755 "$bundle/deploy.sh" "$bundle/backup_restore.sh" "$bundle/schema_audit.sh"
           if [[ "${{ inputs.phase }}" == deploy ]]; then
             rm -f "$bundle/secrets/backup.env" "$bundle/secrets/source-facts.env" \
@@ -264,6 +267,29 @@ jobs:
             ${{ runner.temp }}/wp15-proof/target-facts.json
           if-no-files-found: error
           retention-days: 30
+      - name: Compare failed restore and remove only its plaintext dump
+        if: inputs.phase == 'restore-diff-cleanup'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          release="/srv/journey-next-production/restore-diagnostics/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$public_ip" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp15-bundle" -czf - . | ssh "${opts[@]}" root@"$public_ip" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$public_ip" "cd '$release' && set -a && . ./secrets/backup.env && set +a && timeout 600 docker pull \"\$API_IMAGE\" >/dev/null && docker run --rm --network host --env-file ./secrets/source-facts.env -e 'PGOPTIONS=-c default_transaction_read_only=on' -e REQUIRE_READ_ONLY=true -v '$release/secrets/volcengine-rds-ca.pem':/run/secrets/volcengine-rds-ca.pem:ro -v '$release/db_facts.py':/tmp/db_facts.py:ro \"\$API_IMAGE\" python /tmp/db_facts.py >source-live.json && docker run --rm --network host --env-file ./secrets/target-facts.env -e 'PGOPTIONS=-c default_transaction_read_only=on' -e REQUIRE_READ_ONLY=true -v '$release/secrets/volcengine-rds-ca.pem':/run/secrets/volcengine-rds-ca.pem:ro -v '$release/db_facts.py':/tmp/db_facts.py:ro \"\$API_IMAGE\" python /tmp/db_facts.py >target-live.json && python3 ./wp15_failed_restore_cleanup.py --backup-root /srv/journey-next-production/backups --source-facts ./source-live.json --target-facts ./target-live.json --output ./restore-diff-cleanup.json --failed-workflow-run-id 30753376010 --created-after 2026-08-02T15:00:37Z --created-before 2026-08-02T15:02:06Z"
+          mkdir -p "$RUNNER_TEMP/wp15-restore-diagnostic"
+          scp "${opts[@]}" root@"$public_ip":"$release/restore-diff-cleanup.json" "$RUNNER_TEMP/wp15-restore-diagnostic/"
+      - name: Upload PII-free failed restore diagnostic
+        if: inputs.phase == 'restore-diff-cleanup'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp15-failed-restore-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp15-restore-diagnostic/restore-diff-cleanup.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Deploy isolated production runtime without DNS mutation
         if: inputs.phase == 'deploy'
         env:
@@ -329,8 +355,16 @@ jobs:
           opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
           ssh "${opts[@]}" root@"$public_ip" "set -e; audit='/srv/journey-next-production/schema-audits/$GITHUB_RUN_ID'; case \"\$audit\" in /srv/journey-next-production/schema-audits/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$audit\"; docker logout ghcr.io >/dev/null 2>&1 || true"
           echo 'WP15_SCHEMA_AUDIT_BUNDLE=CLEANED'
+      - name: Remove owner-only restore diagnostic bundle
+        if: always() && inputs.phase == 'restore-diff-cleanup' && steps.frozen.outputs.public_ip != ''
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
+          ssh "${opts[@]}" root@"$public_ip" "set -e; diagnostic='/srv/journey-next-production/restore-diagnostics/$GITHUB_RUN_ID'; case \"\$diagnostic\" in /srv/journey-next-production/restore-diagnostics/[0-9]*) ;; *) exit 64;; esac; rm -rf -- \"\$diagnostic\"; docker logout ghcr.io >/dev/null 2>&1 || true"
+          echo 'WP15_RESTORE_DIAGNOSTIC_BUNDLE=CLEANED'
       - name: Close temporary SSH ingress
-        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'schema-audit' || inputs.phase == 'schema-owner-repair' || inputs.phase == 'backup-restore' || inputs.phase == 'restore-diff-cleanup' || inputs.phase == 'deploy' || inputs.phase == 'maintenance' || inputs.phase == 'live' || inputs.phase == 'inspect') && steps.frozen.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
