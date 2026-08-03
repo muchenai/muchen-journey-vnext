@@ -18,6 +18,7 @@ class PrototypeParser(HTMLParser):
         self.result_states: set[str] = set()
         self.buttons = 0
         self.paragraphs = 0
+        self.route_points = 0
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         values = dict(attrs)
@@ -29,6 +30,10 @@ class PrototypeParser(HTMLParser):
             self.buttons += 1
         if tag == "p":
             self.paragraphs += 1
+        if "route-point" in (values.get("class") or "").split():
+            self.route_points += 1
+            require(bool(values.get("aria-label")), "route points need accessible names")
+            require(bool(values.get("aria-describedby")), "route points need tooltip relationships")
 
 
 def require(condition: bool, message: str) -> None:
@@ -48,6 +53,7 @@ def main() -> None:
     require("prefers-reduced-motion" in html, "reduced-motion support is required")
     require("旅程" in html and "当前任务" in html and "里程碑" in html and "反馈" in html and "完成" in html, "narrative stages are incomplete")
     require(parser.paragraphs <= 8, "prototype relies on too many explanatory paragraphs")
+    require(parser.route_points == 3, "the route must expose exactly three progressive-disclosure points")
     require("接下来约 60 分钟" not in html and "你只需关注" not in html, "redundant explanatory copy returned")
     require("revise: ['done', 'done', 'current', '']" in html, "revision must remain visually incomplete")
     require("/review" not in html and "/ops" not in html, "professional tools must not be included in the Learner prototype")

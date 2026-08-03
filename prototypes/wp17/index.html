@@ -119,6 +119,21 @@
     .route-line { position: relative; height: 145px; margin-top: 20px; }
     .route-line svg { width: 100%; height: 100%; overflow: visible; }
     .route-line path { stroke-dasharray: 8 9; animation: trail 10s linear infinite; }
+    .route-point { position: absolute; z-index: 2; width: 25px; height: 25px; padding: 0; border: 3px solid rgba(255,255,255,.48); border-radius: 50%; cursor: help; background: #fff0c8; box-shadow: 0 6px 14px rgba(2,32,45,.24); }
+    .route-point::after { content: ""; position: absolute; inset: -8px; border: 1px solid rgba(255,255,255,.34); border-radius: 50%; opacity: 0; transform: scale(.75); transition: opacity .16s ease, transform .16s ease; }
+    .route-point:hover::after, .route-point:focus-visible::after, .route-point[aria-expanded="true"]::after { opacity: 1; transform: none; }
+    .route-point.start { left: 1px; bottom: 7px; }
+    .route-point.feedback { left: calc(50% - 12px); top: 56px; background: #fff; }
+    .route-point.finish { right: -1px; top: 8px; background: var(--gold); }
+    .route-tooltip { position: absolute; bottom: calc(100% + 13px); left: 50%; width: max-content; max-width: 165px; padding: 8px 10px; border-radius: 10px; color: var(--ink); background: #fff; box-shadow: 0 10px 30px rgba(5,30,44,.24); font-size: 12px; font-weight: 750; line-height: 1.45; opacity: 0; pointer-events: none; transform: translate(-50%, 6px); transition: opacity .16s ease, transform .16s ease; }
+    .route-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top-color: #fff; }
+    .route-point.start .route-tooltip { left: -2px; transform: translate(0, 6px); }
+    .route-point.start .route-tooltip::after { left: 13px; }
+    .route-point.finish .route-tooltip { right: -2px; left: auto; transform: translate(0, 6px); }
+    .route-point.finish .route-tooltip::after { right: 8px; left: auto; }
+    .route-point:hover .route-tooltip, .route-point:focus-visible .route-tooltip, .route-point[aria-expanded="true"] .route-tooltip { opacity: 1; transform: translate(-50%, 0); }
+    .route-point.start:hover .route-tooltip, .route-point.start:focus-visible .route-tooltip, .route-point.start[aria-expanded="true"] .route-tooltip,
+    .route-point.finish:hover .route-tooltip, .route-point.finish:focus-visible .route-tooltip, .route-point.finish[aria-expanded="true"] .route-tooltip { transform: translate(0, 0); }
     .reviewer-card { display: flex; gap: 15px; align-items: center; padding: 24px; }
     .avatar { display: grid; flex: 0 0 auto; place-items: center; width: 52px; height: 52px; border-radius: 18px; color: #1b5b58; background: var(--teal-soft); font-weight: 900; }
     .reviewer-card small { display: block; margin-top: 2px; color: var(--muted); }
@@ -243,9 +258,12 @@
         <aside class="side-stack">
           <div class="card route-card">
             <p class="route-number">ROUTE · 01</p>
-            <h2>四个路标</h2>
-            <div class="route-line" aria-hidden="true">
-              <svg viewBox="0 0 320 150" fill="none"><path d="M12 120C58 30 108 146 156 70C204 -5 248 74 306 25" stroke="rgba(255,255,255,.75)" stroke-width="3" stroke-linecap="round"/><circle cx="12" cy="120" r="8" fill="#fff0c8"/><circle cx="156" cy="70" r="8" fill="#fff"/><circle cx="306" cy="25" r="11" fill="#e2a63b"/></svg>
+            <h2>三个关键点</h2>
+            <div class="route-line">
+              <svg viewBox="0 0 320 150" fill="none" aria-hidden="true"><path d="M12 120C58 30 108 146 156 70C204 -5 248 74 306 25" stroke="rgba(255,255,255,.75)" stroke-width="3" stroke-linecap="round"/></svg>
+              <button class="route-point start" type="button" aria-label="启程" aria-describedby="route-tip-start" aria-expanded="false"><span class="route-tooltip" id="route-tip-start" role="tooltip">确认身份，进入任务</span></button>
+              <button class="route-point feedback" type="button" aria-label="主管反馈" aria-describedby="route-tip-feedback" aria-expanded="false"><span class="route-tooltip" id="route-tip-feedback" role="tooltip">提交后，主管开始评审</span></button>
+              <button class="route-point finish" type="button" aria-label="完成旅程" aria-describedby="route-tip-finish" aria-expanded="false"><span class="route-tooltip" id="route-tip-finish" role="tooltip">通过后，里程碑点亮</span></button>
             </div>
           </div>
           <div class="card reviewer-card">
@@ -358,6 +376,13 @@
       resultPanels.forEach((panel) => { panel.hidden = panel.dataset.resultPanel !== button.dataset.result; });
       setStages(button.dataset.result);
     }));
+
+    const routePoints = [...document.querySelectorAll('.route-point')];
+    routePoints.forEach((point) => point.addEventListener('click', (event) => {
+      event.stopPropagation();
+      routePoints.forEach((candidate) => candidate.setAttribute('aria-expanded', String(candidate === point && point.getAttribute('aria-expanded') !== 'true')));
+    }));
+    document.addEventListener('click', () => routePoints.forEach((point) => point.setAttribute('aria-expanded', 'false')));
   </script>
 </body>
 </html>
