@@ -1,8 +1,8 @@
 # 05｜领域模型、状态机与数据合同
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+版本：V0.2
+日期：2026-08-03
 文档 Owner：Tech Lead + Data Owner  
 原则：新模型从业务事实推导，不从旧表、旧 JSON、旧 API 或旧枚举翻译而来。
 
@@ -31,7 +31,10 @@ P0 不拆成微服务；模块通过明确接口和数据库约束隔离。未�
 | `ExternalIdentity` | provider, subject, user_id, verified_at | provider + subject 全局/组织内唯一 |
 | `RoleAssignment` | user_id, role, scope, valid_from/to | 权限有范围和有效期 |
 | `Invite` | id, token_hash, purpose, expires_at, status | 存哈希不存明文 token；消费/撤销原子 |
-| `Enrollment` | id, organization_id, learner_id, cohort_id, reviewer_id, status, revision | learner + active program 唯一 |
+| `Enrollment` | id, organization_id, learner_id, cohort_id, reviewer_id, journey_version_id, status, revision | learner + active program 唯一；固定引用进入时 JourneyVersion |
+| `JourneyDefinition` | id, stable_key | 正式旅程稳定身份，不含可变阶段内容 |
+| `JourneyVersion` | journey_id, version, status, published_at | 发布后不可变；固定阶段数量、顺序与策略 |
+| `JourneyStageVersion` | journey_version_id, stable_key, stage_kind, order, task_version_id, completion_policy, prerequisites | 同一 JourneyVersion 内 stable_key/order 唯一；只编排、不复制运行状态 |
 | `TaskDefinition` | id, stable_key | 只是稳定身份，不含可变内容 |
 | `TaskVersion` | task_id, version, content, rubric, published_at | 发布后不可变；Assignment 固定引用版本 |
 | `Assignment` | id, enrollment_id, task_version_id, status, revision | 一个 Enrollment 同一任务最多一个有效实例 |
@@ -41,6 +44,7 @@ P0 不拆成微服务；模块通过明确接口和数据库约束隔离。未�
 | `Review` | id, assignment_id, submission_version_id, reviewer_id, status, revision | 固定引用一个提交版本；每轮只有一个有效 final |
 | `Evaluation` | review_id, decision, rubric_scores, feedback | final 后不可变；人工责任人明确 |
 | `Outcome` | enrollment_id, source_evaluation_id, status, next_step | 只能由有效 Evaluation 产生 |
+| `JourneyOutcomeEvidence` | outcome_id, journey_stage_version_id, evaluation_id | 正式 Journey 每个能力评测恰好一个有效来源；不可变且同组织 |
 | `NotificationDelivery` | event_id, recipient, channel, status, attempts | 不拥有业务事实；按 event/recipient/channel 幂等 |
 | `DomainEvent` | id, type, aggregate, payload_version, occurred_at | append-only；消费者按 event id 幂等 |
 | `AuditEntry` | actor, action, resource, result, request_id, occurred_at | append-only；敏感正文最小化 |
@@ -82,16 +86,19 @@ AVAILABLE → IN_PROGRESS → SUBMITTED → IN_REVIEW
 AVAILABLE / IN_PROGRESS / NEEDS_REVISION / SUBMITTED → CANCELLED（受控运营命令）
 ```
 
+`DEC-024` 后，正式探索营的宝藏阶段还允许 `IN_PROGRESS → COMPLETED`。该迁移只适用于固定 `completion_policy=LEARNER_EVIDENCE` 的 JourneyStageVersion；命令必须在同一事务中创建满足 TaskVersion 必需字段的不可变 SubmissionVersion。它不产生 Evaluation、能力 PASS 或 Outcome。`REVIEW_REQUIRED` 阶段继续禁止绕过 Reviewer。
+
 允许命令：
 
 | 当前状态 | 命令 | 下一状态 | 关键约束 |
 | --- | --- | --- | --- |
 | AVAILABLE | start | IN_PROGRESS | owner 本人；expected revision |
 | IN_PROGRESS | submit | SUBMITTED | 创建不可变 SubmissionVersion；附件 READY |
+| IN_PROGRESS | complete_evidence | COMPLETED | 仅 `LEARNER_EVIDENCE`；创建不可变证据；无 Evaluation/Outcome |
 | NEEDS_REVISION | submit_revision | SUBMITTED | version_no + 1；旧版本不变 |
 | SUBMITTED | start_review | IN_REVIEW | 明确 reviewer；固定 submission version |
 | IN_REVIEW | finalize_revision | NEEDS_REVISION | Evaluation 原子写入 |
-| IN_REVIEW | finalize_pass | COMPLETED | Evaluation + Outcome/next action 原子或可恢复 |
+| IN_REVIEW | finalize_pass | COMPLETED | Evaluation + next action 原子；仅在旅程完成条件满足时生成 Outcome |
 
 禁止从 `SUBMITTED` 直接变 `COMPLETED`；禁止覆盖 final Evaluation；禁止前端 PATCH 任意 status。
 
@@ -128,6 +135,12 @@ PENDING → SENDING → DELIVERED
 
 响应包含：`action_type`、`resource_id`、`title`、`reason`、`allowed_commands`、`revision`。不返回旧状态映射或兼容 fallback。
 
+### 4.1 正式 Journey 编排
+
+存在 JourneyVersion 时，Resolver 不按数据库创建时间猜测下一任务，而按不可变 JourneyStageVersion 顺序选择第一个未完成且前置条件满足的阶段。Day 0 与四个宝藏完成后才开放三个能力评测；三个评测都存在有效人工结论后才允许产生正式 Journey Outcome。
+
+Journey Progress 只能从 Enrollment、Assignment、SubmissionVersion、Review 和 Evaluation 推导。不得建立可由前端或运营任意写入的 `current_stage` 第二事实源；如需缓存投影，必须可从权威事实重建并带 projection revision。
+
 ## 5. 事务与一致性
 
 - start、submit、start_review、finalize 使用数据库事务和行级/乐观并发控制；
@@ -136,7 +149,7 @@ PENDING → SENDING → DELIVERED
 - 通知、分析和非关键投影异步处理；
 - 同一业务命令通过 `(actor, command, idempotency_key)` 唯一；
 - finalized review 与 Evaluation 唯一；
-- Outcome 必须引用产生它的 Evaluation；
+- Alpha Outcome 必须引用产生它的 Evaluation；正式 Journey Outcome 还必须通过 JourneyOutcomeEvidence 完整引用三个能力评测的有效 Evaluation；
 - 所有外键包含组织范围校验或通过约束/服务层保证不跨组织。
 
 ## 6. 数据所有权
@@ -200,3 +213,4 @@ PENDING → SENDING → DELIVERED
 - `AT-DATA-006`：通知失败不污染业务事务；
 - `AT-DATA-007`：离线导入可重放且拒绝项不自动修正；
 - `AT-DATA-008`：备份恢复后 schema、计数、约束和业务指纹一致。
+- `AT-DATA-009`：JourneyVersion 固定、阶段顺序、前置条件、完成策略、跨组织和并发完成不变量全部通过；缺任一四加三事实时无法产生正式 Outcome。

@@ -1,8 +1,8 @@
 # 13｜需求追溯矩阵
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.7
-日期：2026-07-28
+版本：V0.8
+日期：2026-08-03
 文档 Owner：Product Owner + QA Owner  
 规则：P0 任一行缺少设计、数据/API 或验收引用，不得进入开发；实现 PR 必须引用对应 ID。
 
@@ -20,6 +20,10 @@
 | REQ-BR-008 运营处理 | JRN-003/005；`/ops` | Invite、Enrollment、TaskDefinition/TaskVersion、Audit、ImportBatch/ImportRecord、WorkerHeartbeat | task definition publish；`GET /api/v1/ops/enrollments|audit|runtime-status`；`PUT /api/v1/ops/enrollments/{id}/reviewer`；`POST /api/v1/ops/enrollments/{id}/cancel`；离线 import CLI | Operator role + organization/object scope + reason + expected revision + idempotency；审计 allowlist/裁剪；无通用状态编辑器 | 运营命令/权限/并发/重放矩阵；AT-UAT-008；AT-SEC-011；AT-ISO-006；AT-DATA-007 | WP-06 本地实现并自动化；真人 Operator UAT、真实旧系统导入和发布运行 `NOT_RUN`；见 22 |
 | REQ-BR-009 通知 | JRN-006；`/app/result` | OutboxEvent、NotificationDelivery、NotificationAttempt、LocalNotificationReceipt | notification.requested；本地 worker | organization + recipient + outcome 复合 scope；最小 payload/log；lease/retry/dedupe；非 local/test fail closed | AT-SEC-008；故障/崩溃/并发注入；AT-UAT-006 | WP-05 本地适配器实现并自动化；真实 Feishu/邮件收件 `NOT_RUN`，通知不阻塞核心结果；见 21 |
 | REQ-BR-010 不可变历史 | 全旅程；`/app/result` timeline/history | SubmissionVersion、Review/Evaluation、Outcome/Handoff、OutboxEvent/NotificationAttempt | submission history；`GET /me/timeline`；所有写事件 | role + organization + owner + object 裁剪；事件/日志最小化；历史事实 DB 不可覆盖 | AT-DATA-005；审计结构测试 | WP-05 完成跨域时间线与 Outcome/Handoff/NotificationAttempt 不可变证明；早期 Task/Submission/Review 历史证据仍见 18/19/20；见 21 |
+| REQ-BR-011 版本化探索营旅程 | JRN-007；`/app` 旅程投影 | JourneyDefinition/Version/StageVersion、Enrollment、Resolver | Journey config publish/read；Current Action | organization + audience；发布后不可变；在途版本固定 | AT-PRODUCT-001；AT-DATA-009；AT-UX-010 | WP-18 产品合同已批准；schema/API/migration 与运行实现 `NOT_STARTED`；见 34 |
+| REQ-BR-012 四个认知宝藏 | JRN-007；`/app/tasks/{id}` | JourneyStageVersion、TaskVersion、Assignment、SubmissionVersion | current-action、start、complete_evidence、history | Learner owner + org；内容 audience；禁止伪造 Evaluation | AT-CONTENT-009；AT-DATA-009；AT-UX-010 | 四个稳定内容身份和证据性质已恢复；最终正文、材料审查和实现 `NOT_STARTED`；见 34 |
+| REQ-BR-013 三个能力评测 | JRN-007/002；task/review/result | TaskVersion、Assignment、SubmissionVersion、Review、Evaluation | 复用 submit/start_review/finalize/history | Learner/Reviewer explicit scope + org；固定版本；人工结论 | AT-CONTENT-010；AT-DATA-003/005/009；AT-UAT-009 | 三个稳定评测身份已恢复；题面、Rubric 校准和实现 `NOT_STARTED`；见 34 |
+| REQ-BR-014 完整旅程结果 | JRN-007；`/app/result` | JourneyVersion、Assignment、Evaluation、JourneyOutcomeEvidence、Outcome/Handoff | result/timeline；outcome.created/handoff.ready | 完整性服务端强制；缺阶段拒绝；来源评价不可变 | AT-PRODUCT-001；AT-DATA-009；AT-UAT-009 | 完成不变量已批准；完整四加三真人结果 `NOT_RUN`；见 34 |
 
 ## 2. Greenfield 隔离追溯
 
@@ -61,6 +65,7 @@
 | --- | --- | --- | --- | --- |
 | `/join` | BR-001/002 | join exchange、identity confirm | Invite + Enrollment | UX-001/003；SEC-001/004 |
 | `/app` | BR-003/007 | current-action、result | Enrollment/Assignment/Outcome | UX-001/002/003 |
+| `/app` Journey 投影 | BR-011/012/013/014 | JourneyVersion + current-action；只读 progress projection | JourneyVersion + 权威 Assignment/Submission/Evaluation 事实 | PRODUCT-001；UX-010；DATA-009 |
 | `/app/tasks/{id}` | BR-004/006 | assignment、start、submit、attachments | Assignment/Submission | UX-002/003/006/007 |
 | `/app/result` | BR-006/007/009/010 | `GET /me/result`、`GET /me/timeline` | Evaluation/Outcome/Handoff/NotificationDelivery + immutable facts | UX-003；UAT-002/006；SEC-008 |
 | `/review` | BR-005 | review list | Review | UX-004；SEC-002/003 |
@@ -102,6 +107,7 @@
 | DEC-014 | 02 资源、08 密钥、11 发布/事故 |
 | DEC-015 | 04 体验、14 UI token/组件、09 可访问性验收 |
 | DEC-016 | 03 P0 范围、05 TaskVersion、07 配置 API、09 UAT、15 内容/Rubric |
+| DEC-024 | 03 正式产品范围、04 JRN-007/IA、05 Journey/状态、10 WP-18～23、12 风险、13 追溯、15 内容、33/34 体验与重接 |
 
 ## 7. PR 与发布使用规则
 
@@ -153,3 +159,4 @@ CI 后续应验证：
 | WP-13 内容校准与真人 UAT | DEC-007/010/016/020/021/022/023；AT-UAT-001..008；AT-CONTENT-001..008；AT-UX-001/002/004/005/007 | 候选 `8f77ceec…` 绑定 Mainline run `30709982868` 和 staging deploy run `30729705773`；Web/API/Worker、migration 与 schema 已核对。`UAT-WP13-002` 安全重新进入保持同一 Learner/Enrollment/Assignment 与不可变历史，只轮换 session；见 31 | 真人已完成邀请、首次提交、`REQUEST_REVISION`、安全重新进入、查看反馈、再次提交与最终 `PASS` 的一条真实闭环；原失败保留。完整 5 Learner/2 Reviewer/签署矩阵仍未完成 | `ONE_REAL_REVISION_LOOP_PASS / UAT-WP13-002_SCENARIO_REVERIFIED / FULL_UAT_UNSIGNED` |
 | WP-14 14 天独立试点 | DEC-010/013/016；KPI-001..007 | 强制同一候选、真实 14 日、D+1/3/7/14 不可提前、原始分子分母和七项批准阈值；见 31 | WP-13 尚未签署，观察窗未启动；机器测试仅证明验证器拒绝提前/失败证据 | `NOT_STARTED / REAL_TIME_REQUIRED` |
 | WP-15 生产切换与观察 | DEC-003/010/013/014/019/023；ISO-MUST-007/008/009/010/012 | 完整 release gate 保持 18 项检查与双人批准；DEC-023 另建受保护的受控 Alpha 路径，锁定候选、独立 production DB/Compose/secrets、加密异机备份+空库恢复、双域名 Caddy、正式 OAuth/canonical URL 和维护页；见 31 与 WP15 runbook | run `30760806984` 的备份/恢复/一致性证明通过但 TOS 归档步骤失败；精确密文由 run `30761088830` 成功私有归档。维护/TLS `30779397520` 与 live `30779441351` 通过；正式域名 root/readiness=200、候选精确、匿名受限路由=401、正式 OAuth 与 staging 回归通过。共享 ECS/RDS/Caddy 物理故障域仍延期 30 日 | `CONTROLLED_ALPHA_LIVE / FULL_RELEASE_GATE_NO_GO / MUTATION_TRUE` |
+| WP-18 正式产品真相恢复 | DEC-024；REQ-BR-011..014；AT-PRODUCT-001；AT-DATA-009；AT-CONTENT-009/010；AT-UX-010；AT-UAT-009 | 旧归档只读对照、四/五宝藏歧义关闭、四宝藏＋三评测稳定身份、TSK-001 重定位、vNext 重接与单一 WIP 合同；见 34 | 无运行代码、数据库、云资源、历史事实或部署变更；最终内容材料、schema/API/migration、真实完整旅程仍未执行 | `PRODUCT_TRUTH_RECOVERED / IMPLEMENTATION_NOT_STARTED / LIVE_ALPHA_UNCHANGED` |
