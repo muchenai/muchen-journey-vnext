@@ -53,7 +53,10 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
     monkeypatch.setattr(
         inventory,
         "_caddy_upstreams",
-        lambda: {"production": "production-web:3000", "staging": "web:3000"},
+        lambda: {
+            "production": "production-web:3000",
+            "staging": "journey-next-staging-web-1:3000",
+        },
     )
 
     def container_json(container: str, _code: str):
@@ -92,7 +95,7 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
         "compose_singleton_services": True,
         "caddy_upstreams": {
             "production": "production-web:3000",
-            "staging": "web:3000",
+            "staging": "journey-next-staging-web-1:3000",
         },
         "deployed_candidate": CANDIDATE,
         "heartbeat_release": API,
@@ -125,7 +128,10 @@ def test_inventory_rejects_missing_or_malformed_revision_evidence(
     monkeypatch.setattr(
         inventory,
         "_caddy_upstreams",
-        lambda: {"production": "production-web:3000", "staging": "web:3000"},
+        lambda: {
+            "production": "production-web:3000",
+            "staging": "journey-next-staging-web-1:3000",
+        },
     )
     monkeypatch.setattr(
         inventory,
@@ -280,7 +286,7 @@ def test_caddy_inventory_outputs_only_safe_upstreams(monkeypatch):
         "_run",
         lambda *_args: """
 {$STAGING_HOST} {
-  reverse_proxy web:3000
+  reverse_proxy journey-next-staging-web-1:3000
 }
 {$PRODUCTION_HOST} {
   reverse_proxy production-web:3000
@@ -290,7 +296,7 @@ def test_caddy_inventory_outputs_only_safe_upstreams(monkeypatch):
 
     assert inventory._caddy_upstreams() == {
         "production": "production-web:3000",
-        "staging": "web:3000",
+        "staging": "journey-next-staging-web-1:3000",
     }
 
 

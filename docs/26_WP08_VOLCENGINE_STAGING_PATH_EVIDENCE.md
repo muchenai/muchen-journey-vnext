@@ -282,3 +282,15 @@
 - 根因是 `scripts/wp08_prepare_deploy.py` 已把 `PRODUCTION_HOST=journey.muchenai.com` 写入 edge 环境，却漏写到 `deploy.sh` 实际 source 的 `.deployment.env`。失败发生在 `docker compose pull`、migration、runtime grant、seed、容器替换和 `current` symlink 更新之前；外部 staging 继续运行旧 Web-only release，匿名 `/ops` 与 `/review` 仍为 401，临时 SSH 已输出 `WP08_SSH_INGRESS=CLOSED`；
 - 失败仅留下 root-only 目录 `/srv/journey-next-staging/releases/ef0a512cf357001cfd8cb6803f65cc17ae697325-30808632624`。修复 PR 增加 `.deployment.env` 的生产 host、单元回归测试和一次性 `cleanup-failed-release`。清理脚本精确绑定候选/run，并在删除前拒绝 `current`、回退标记、部署标记、Docker working directory、符号链接、硬链接或 bundle 内容漂移；release-local 环境文件先安全擦除；
 - 清理不是部署，不读取业务表正文、不修改数据库、DNS、Terraform、云资源、消息、接收人或 WP-12B。清理通过后 staging 仍应保持旧 release；新的 deploy 必须由用户基于合入后的完整主线 SHA 单独授权，production 继续 `NO_GO`。
+
+## 2026-08-03 ef0a512 内部部署完成与公开路由根因
+
+- 修复后的唯一 deploy run [`30817611873`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30817611873) 已完成 migration `0015_wp19_formal_journey`、Web/API/Worker/Edge 启动与内部 readiness；部署标记和四个运行组件均为候选 `ef0a512…`。该 run 的单次公开 readiness 命中候选，但没有覆盖共享 Docker DNS 的非确定性。
+- PR [#140](https://github.com/muchenai2024-creator/muchen-journey-vnext/pull/140) 将 `phase=inspect-runtime` 扩为 PII-free 拓扑 inventory；唯一只读 run [`30823210293`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30823210293) 确认 staging 四服务各只有一个运行容器、均属于同一 candidate release 和 Compose project，API ready、Worker heartbeat 新鲜，临时 SSH 已关闭。
+- inventory 同时确认 staging Web 在共享网络拥有 `web` 与 `journey-next-staging-web-1` 两个别名，Caddy staging upstream 为 `web:3000`，production upstream 为 `production-web:3000`。production Compose 的 `web` 服务也加入该共享网络，Docker Compose 自动注册通用服务名 `web`；随后 20 次独立公网 readiness 全部返回旧 production Web release `8e56e759…`。因此根因是共享网络 DNS alias 冲突，不是候选镜像、应用启动、数据库或 DNS 失败。
+
+## 2026-08-03 Edge-only 确定性路由修复合同
+
+- staging Caddyfile 仅把 upstream 从通用 `web:3000` 改为 inventory 已验证的唯一 `journey-next-staging-web-1:3000`；production upstream `production-web:3000`、TLS、域名、安全头和日志策略保持不变。官方 Caddy 合同说明当前 `admin off` 不支持管理 API reload，因此首次应用必须重建一次 Edge，不能把未受支持的“热加载”当作零中断证据。
+- 新 `phase=repair-edge-route` 固定候选、确认词、旧 production release 与 Edge digest，先验证两个 Web 的直接 readiness 和共享 alias prestate，再用现行 Caddy binary validate。唯一变更命令为 `docker compose ... up -d --no-deps --force-recreate --pull never edge`；禁止 image pull、Web/API/Worker、migration、grant、seed、Terraform、DNS、云资源、消息和 WP-12B。
+- 公开验收要求 12 轮连续新连接均得到 staging 候选、production 既有 release、两个根页面 200 与 staging 两个受保护路由 401，避免单次探针再次掩盖 Docker DNS 轮询。应用或验收失败时，root-only 备份原位恢复并只重建 Edge；成功后删除临时状态。临时 SSH 仍由 `always()` 无条件关闭。本合同本身不构成 mutation dispatch 授权，production 继续 `NO_GO`。

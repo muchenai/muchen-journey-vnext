@@ -13,7 +13,7 @@
     Referrer-Policy "strict-origin-when-cross-origin"
     -Server
   }
-  reverse_proxy web:3000
+  reverse_proxy journey-next-staging-web-1:3000
   log {
     output stdout
     format json

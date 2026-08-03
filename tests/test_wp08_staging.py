@@ -346,7 +346,11 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
     monkeypatch.setattr(staging, "WEB_PROXY", proxy)
     monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
     caddyfile = tmp_path / "Caddyfile"
-    caddyfile.write_text("log_skip /auth/feishu*\n")
+    caddyfile.write_text(
+        "log_skip /auth/feishu*\n"
+        "reverse_proxy journey-next-staging-web-1:3000\n"
+        "reverse_proxy production-web:3000\n"
+    )
     monkeypatch.setattr(staging, "STAGING_CADDYFILE", caddyfile)
     compose = tmp_path / "compose.yaml"
     compose.write_text(
@@ -358,6 +362,19 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
         f"    image: {staging.EDGE_IMAGE}\n"
     )
     staging.validate_staging_compose(compose)
+
+    caddyfile.write_text(
+        "log_skip /auth/feishu*\n"
+        "reverse_proxy web:3000\n"
+        "reverse_proxy production-web:3000\n"
+    )
+    with pytest.raises(staging.StagingError, match="unique Web network alias"):
+        staging.validate_staging_compose(compose)
+    caddyfile.write_text(
+        "log_skip /auth/feishu*\n"
+        "reverse_proxy journey-next-staging-web-1:3000\n"
+        "reverse_proxy production-web:3000\n"
+    )
 
     compose.write_text(
         "services:\n"
@@ -388,7 +405,11 @@ def test_staging_web_requires_dynamic_per_request_csp_nonce(tmp_path: Path, monk
     monkeypatch.setattr(staging, "WEB_PROXY", proxy)
     monkeypatch.setattr(staging, "WEB_LAYOUT", layout)
     caddyfile = tmp_path / "Caddyfile"
-    caddyfile.write_text("log_skip /auth/feishu*\n")
+    caddyfile.write_text(
+        "log_skip /auth/feishu*\n"
+        "reverse_proxy journey-next-staging-web-1:3000\n"
+        "reverse_proxy production-web:3000\n"
+    )
     monkeypatch.setattr(staging, "STAGING_CADDYFILE", caddyfile)
     compose = tmp_path / "compose.yaml"
     compose.write_text(
@@ -421,12 +442,14 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "- audit",
             "          - deploy",
             "          - inspect-runtime",
+            "          - repair-edge-route",
             "          - cleanup-failed-release",
             "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
             "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
             "INSPECT_RUNTIME_EF0A512_STAGING",
+            "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
             "id: terraform_init",
             'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
@@ -469,15 +492,29 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'terraform apply -auto-approve "$plan_file"',
             '-var="deploy_cidr=127.0.0.1/32"',
             "      - name: Read frozen Alpha pilot infrastructure",
-            "        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'",
+            "        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release'",
             "        id: frozen_infrastructure",
             "terraform output -raw staging_public_ip",
             "      - name: Open exact runner SSH ingress",
-            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'",
+            "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release'",
             "python3 -m scripts.wp08_security_group open",
             "      - name: Execute PII-free runtime inventory",
             "if: inputs.phase == 'inspect-runtime'",
             "scripts/wp08_runtime_inventory.py",
+            "      - name: Apply reviewed Edge route repair",
+            "id: edge_repair_apply",
+            "if: inputs.phase == 'repair-edge-route'",
+            "scripts/wp08_edge_route_repair.py",
+            "      - name: Verify deterministic staging and preserved production routes",
+            "if: inputs.phase == 'repair-edge-route'",
+            "https://journey.muchenai.com/health/ready",
+            "8e56e759152efcbf17f4373f2132e02a8762af81",
+            "      - name: Roll back Edge route after failed verification",
+            "if: failure() && inputs.phase == 'repair-edge-route'",
+            "steps.edge_repair_apply.outcome == 'success'",
+            "steps.edge_repair_apply.outcome == 'failure'",
+            "      - name: Remove successful Edge repair state",
+            "if: success() && inputs.phase == 'repair-edge-route'",
             "      - name: Remove exact failed pre-start release",
             "if: inputs.phase == 'cleanup-failed-release'",
             "scripts/wp08_failed_release_cleanup.py",
@@ -494,7 +531,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "'%{http_code}'",
             '= "401"',
             "      - name: Close SSH ingress",
-            "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+            "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
             "python3 -m scripts.wp08_security_group close",
         )
     )
