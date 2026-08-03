@@ -114,9 +114,12 @@ wp13-15-plan-check:
 wp15-alpha-cutover-check:
 	python3 scripts/wp15_alpha_cutover.py
 
+wp16-web-only-check:
+	python3 scripts/wp16_web_only.py
+
 ci-fast:
 	$(MAKE) web-install
-	$(MAKE) traceability-check legacy-reference-scan wp08-web-only-check wp08-workflow-check wp11-staging-audit-check wp12-hardening-check wp12b-contract-check wp13-15-plan-check wp15-alpha-cutover-check secret-scan dependency-audit
+	$(MAKE) traceability-check legacy-reference-scan wp08-web-only-check wp08-workflow-check wp11-staging-audit-check wp12-hardening-check wp12b-contract-check wp13-15-plan-check wp15-alpha-cutover-check wp16-web-only-check secret-scan dependency-audit
 	$(MAKE) api-test openapi-check wp12-data-lifecycle-check web-static
 
 ci-main:
