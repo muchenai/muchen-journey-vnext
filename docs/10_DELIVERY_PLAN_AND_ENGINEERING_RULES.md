@@ -1,8 +1,8 @@
 # 10｜交付计划与工程规则
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.3
-日期：2026-07-21
+版本：V0.4
+日期：2026-08-03
 文档 Owner：Tech Lead + Product Owner  
 目标：以一个稳定候选完成一个真实闭环；控制 WIP 和共享改动，避免通过大量并行分支制造集成债务。  
 变更说明：根据 WP-01 的 39 分 32 秒实测增加执行节奏、耗时口径与技能选择规则；根据 WP-01～WP-07 横向复盘增加六项 P0 开工硬规则，并记录 `muchen-journey-ops` V0.3 兼容闭环。
@@ -80,6 +80,22 @@
 覆盖 `REQ-BR-008`、版本化配置、离线导入、审计、备份恢复、告警和发布。
 
 完成：没有通用 status editor；导入可重放；运行演练通过。
+
+### 正式探索营产品恢复列车｜WP-17～WP-23
+
+受控 Alpha 已证明单任务闭环后，`DEC-024` 明确区分“验证基座的 TSK-001”与“正式探索营产品”。后续仍按单一 WIP 推进：
+
+| 工作包 | 唯一目标 | 明确非范围 | 退出条件 |
+| --- | --- | --- | --- |
+| WP-17 Learner Experience 原型 | 锁定首屏、旅程、任务、反馈与结果的视觉语言 | 正式阶段数量、API、数据、部署 | `VISUAL_DIRECTION_CLOSED`；三个原型点不得当产品地图 |
+| WP-18 正式产品真相恢复 | 锁定 Day 0＋四宝藏＋三评测＋结果，并映射 vNext 基座 | 代码、迁移、材料原文上线、部署 | `DEC-024`、REQ/AT、领域差距与后续顺序批准；见 34 |
+| WP-19 Journey Composition | 实现 JourneyDefinition/Version/Stage、顺序和 Current Action | 完整内容皮肤、Reviewer UI 重构 | migration/domain/API/Web 最小路径与 DATA-009 自动化通过 |
+| WP-20 Four Treasures Content | 发布四个宝藏的批准 TaskVersion 和 Learner 证据路径 | 三评测、综合结果皮肤 | CONTENT-009、版权/audience、版本和浏览器路径通过 |
+| WP-21 Three Ability Assessments | 发布三评测、Rubric 和修订闭环 | 总分排名、自动人事判断 | CONTENT-010、独立 Reviewer 校准与权限/并发矩阵通过 |
+| WP-22 Formal Learner Experience | 把 WP-17 视觉语言接入真实四加三状态 | `/review`、`/ops` 游戏皮肤 | PRODUCT-001、UX-010、三视口/键盘/减弱动效通过 |
+| WP-23 Full Journey UAT | 真人完成四宝藏、三评测、至少一次修订和最终结果 | 自动化代替真人、扩大 production 名单 | UAT-009 与正式签署通过 |
+
+WP-19 未关闭前不得并行启动 WP-20～23；正式内容不能通过修改当前 TSK-001 在途版本进入系统。
 
 工作包按端到端价值拆分，不允许同时建立多个“空模块框架”再等待集成。
 

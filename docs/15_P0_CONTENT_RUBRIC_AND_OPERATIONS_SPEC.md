@@ -1,10 +1,10 @@
 # 15｜P0 内容、Rubric 与运营规范
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+版本：V0.2
+日期：2026-08-03
 文档 Owner：Product/Content Owner + Reviewer Owner  
-批准结论：P0 只交付 TSK-001“问题洞察与行动建议”，使用 Rubric V1 和两工作日 Reviewer SLA。
+批准结论：首个 Alpha 只交付 TSK-001“问题洞察与行动建议”，使用 Rubric V1 和两工作日 Reviewer SLA；`DEC-024` 将正式探索营内容目标恢复为四个认知宝藏和三个能力评测。
 
 ## 1. 目标
 
@@ -29,6 +29,28 @@ TSK-001 V1 内容：
 4. 给出一个可在两周内观察的验证指标与停止/调整条件。
 
 如果 TSK-002 不能证明是完成同一闭环所必需，应移出 P0。
+
+### 2.1 TSK-001 的 Alpha 证据边界
+
+TSK-001 已用于证明 vNext 的真实提交、主管要求修订、Learner 安全重新进入、再次提交和通过闭环。已发布版本及全部历史事实继续不可变保留。
+
+TSK-001 不等同于旧正式探索营的任一宝藏或能力评测，正式定位为 `ALPHA_VALIDATION_TASK / OUTSIDE_FORMAL_EXPLORATION_JOURNEY`。不得仅为了复用当前实现而把它改名或强行映射进四加三结构。
+
+### 2.2 正式探索营内容目标
+
+`DEC-024` 锁定以下稳定内容身份；本节批准结构、目的与证据类型，不自动批准旧材料原文上线：
+
+| 稳定键 | 名称 | 内容目的 | 证据/评审性质 |
+| --- | --- | --- | --- |
+| `TRE-001-COMPANY-VALUES` | 公司与 Muchener 价值 | 理解公司问题、业务定位和成长要求 | Learner 认知证据，不评分能力 |
+| `TRE-002-AI-DATA-BASICS` | AI 数据与模型基础 | 理解模型局限、人工反馈和证据链 | Learner 认知证据，不评分能力 |
+| `TRE-003-PROJECT-AWARENESS` | 项目认知 | 理解客户场景、项目价值和质量责任 | Learner 认知证据，不评分能力 |
+| `TRE-004-DELIVERY-FIT` | 项目交付与组织适配 | 理解角色、责任边界和提报机制 | Learner 认知证据，不评分能力 |
+| `ASM-001-RULE-BREAKDOWN` | 规则拆解 | 证明能拆出目标、维度、红线和提报点 | Reviewer Rubric + 可修订结论 |
+| `ASM-002-MODEL-JUDGEMENT` | 模型回答判断 | 证明能比较回答并给出可复核理由 | Reviewer Rubric + 可修订结论 |
+| `ASM-003-BOUNDARY-ESCALATION` | 边界识别与提报 | 证明能识别不确定性并提出有效问题 | Reviewer Rubric + 可修订结论 |
+
+旧内容进入新 TaskVersion 前必须重新完成：来源/版权核验、敏感度与 audience 审查、当前业务有效性复核、完成标准映射、三类 Reviewer 校准样本和 Learner 无口头解释理解测试。完整映射见 34 号文档。
 
 ## 3. TaskVersion 内容合同
 
@@ -165,6 +187,8 @@ P0 可以用受控管理命令/配置文件发布，不必建设复杂 CMS，但
 - `AT-CONTENT-006`：撤销/替代内容后新旧对象行为清楚；
 - `AT-CONTENT-007`：反馈能指向具体修改，Learner 可完成 revision；
 - `AT-CONTENT-008`：敏感度、版权和 audience 审查通过。
+- `AT-CONTENT-009`：目标 Learner 无口头解释能说出四个宝藏各自为何存在、需留下什么证据。
+- `AT-CONTENT-010`：三个能力评测的题面、Rubric 和明显通过/明显需修订/边界样本由独立 Reviewer 完成校准。
 
 ## 12. G0/G4 完成清单
 

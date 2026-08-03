@@ -60,7 +60,14 @@ def main() -> None:
     require("从问题出发。" not in html, "superseded first-screen proposition returned")
     require("revise: ['done', 'done', 'current', '']" in html, "revision must remain visually incomplete")
     require("/review" not in html and "/ops" not in html, "professional tools must not be included in the Learner prototype")
-    require("PROTOTYPE_APPROVED_FOR_HUMAN_TEST" in doc, "approved prototype must remain bounded to human testing")
+    require(
+        "VISUAL_DIRECTION_CLOSED / FORMAL_ROUTE_IMPLEMENTATION_BLOCKED_BY_WP18" in doc,
+        "closed visual direction must remain blocked from formal route implementation",
+    )
+    require(
+        "不代表正式阶段数量" in doc and "不得原样接入产品路由" in doc,
+        "three visual route points must not be treated as the formal journey map",
+    )
     require("/review" in doc and "/ops" in doc, "document must preserve professional-tool exclusions")
     require("不得一次性重写全部路由" in doc, "single-WIP implementation boundary is missing")
 
