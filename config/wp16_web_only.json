@@ -1,0 +1,12 @@
+{
+  "status": "APPROVED_WEB_ONLY",
+  "candidate_sha": "8e56e759152efcbf17f4373f2132e02a8762af81",
+  "candidate_parent": "82415989c19ccce03af1ded19f0b0369adab0e34",
+  "baseline_runtime_sha": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
+  "candidate_gate_run_id": 30783916512,
+  "web_image": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:c86b4a443ecdc9160c5cb59b742c5c7882ea46aaf401e0a487d3bdad11d86d6f",
+  "targets": [
+    "staging",
+    "production"
+  ]
+}

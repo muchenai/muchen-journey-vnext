@@ -1,0 +1,152 @@
+name: WP-16 Web-only Rapid Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact approved Web candidate SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact Web-only deployment confirmation
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: wp16-web-only-staging-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      inputs.candidate == '8e56e759152efcbf17f4373f2132e02a8762af81' &&
+      inputs.confirmation == 'DEPLOY_8E56E75_WEB_ONLY_STAGING_PRODUCTION'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Verify immutable Web-only contract
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "${{ inputs.candidate }}" = "$(jq -r .candidate_sha config/wp16_web_only.json)"
+          test "$(jq -r .candidate_gate_run_id config/wp16_web_only.json)" = 30783916512
+          python3 scripts/wp16_web_only.py
+          echo "WP16_CANDIDATE=$(jq -r .candidate_sha config/wp16_web_only.json)" >>"$GITHUB_ENV"
+          echo "WP16_BASELINE=$(jq -r .baseline_runtime_sha config/wp16_web_only.json)" >>"$GITHUB_ENV"
+          echo "WP16_WEB_IMAGE=$(jq -r .web_image config/wp16_web_only.json)" >>"$GITHUB_ENV"
+      - name: Initialize frozen shared state
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen host and security group
+        id: frozen
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          test -n "$public_ip"
+          test -n "$security_group_id"
+          echo "::add-mask::$public_ip"
+          echo "::add-mask::$security_group_id"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open bounded SSH ingress
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress, sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP16_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp16-key"
+          chmod 0600 "$RUNNER_TEMP/wp16-key"
+      - name: Deploy exact Web image to staging then production
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp16-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp16-known-hosts")
+          remote_script="/tmp/wp16-web-only-$GITHUB_RUN_ID.sh"
+          scp "${opts[@]}" deploy/production/web_only.sh root@"$public_ip":"$remote_script"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$public_ip" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$public_ip" "cd /srv/journey-next-staging/current && WP16_CANDIDATE='$WP16_CANDIDATE' WP16_BASELINE='$WP16_BASELINE' WP16_WEB_IMAGE='$WP16_WEB_IMAGE' WP16_PUBLIC_URL='https://staging-vnext.muchenai.com' WP16_MARKER='/srv/journey-next-staging/DEPLOYED_WEB_CANDIDATE' bash '$remote_script'"
+          ssh "${opts[@]}" root@"$public_ip" "cd /srv/journey-next-production/current && WP16_CANDIDATE='$WP16_CANDIDATE' WP16_BASELINE='$WP16_BASELINE' WP16_WEB_IMAGE='$WP16_WEB_IMAGE' WP16_PUBLIC_URL='https://journey.muchenai.com' WP16_MARKER='/srv/journey-next-production/DEPLOYED_WEB_CANDIDATE' bash '$remote_script'"
+          test "$(curl -fsS https://staging-vnext.muchenai.com/health/ready | jq -r .release)" = "$WP16_CANDIDATE"
+          test "$(curl -fsS https://journey.muchenai.com/health/ready | jq -r .release)" = "$WP16_CANDIDATE"
+          mkdir -p "$RUNNER_TEMP/wp16-evidence"
+          jq -n \
+            --arg candidate "$WP16_CANDIDATE" \
+            --arg baseline "$WP16_BASELINE" \
+            '{status:"PASS",candidate:$candidate,api_worker_baseline:$baseline,targets:["staging","production"],infrastructure:"FROZEN"}' \
+            >"$RUNNER_TEMP/wp16-evidence/web-only-deploy.json"
+      - name: Upload PII-free deployment evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp16-web-only-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp16-evidence/web-only-deploy.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove remote helper and registry session
+        if: always() && steps.frozen.outputs.public_ip != ''
+        run: |
+          set -euo pipefail
+          public_ip='${{ steps.frozen.outputs.public_ip }}'
+          opts=(-i "$RUNNER_TEMP/wp16-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp16-known-hosts")
+          ssh "${opts[@]}" root@"$public_ip" "rm -f -- '/tmp/wp16-web-only-$GITHUB_RUN_ID.sh'; docker logout ghcr.io >/dev/null 2>&1 || true" || true
+      - name: Close temporary SSH ingress
+        if: always() && steps.frozen.outputs.security_group_id != ''
+        run: |
+          set -euo pipefail
+          if [[ -n "${WP16_RUNNER_CIDR:-}" ]]; then
+            python3 -m scripts.wp08_security_group close \
+              --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+              --cidr "$WP16_RUNNER_CIDR"
+            echo 'WP16_SSH_INGRESS=CLOSED'
+          fi
