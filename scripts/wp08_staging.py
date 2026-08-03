@@ -550,7 +550,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        "INSPECT_RUNTIME_8F77CEE_STAGING",
+        "INSPECT_RUNTIME_EF0A512_STAGING",
         "scripts/wp08_runtime_inventory.py",
         'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
         "python3 scripts/wp08_web_only.py check",

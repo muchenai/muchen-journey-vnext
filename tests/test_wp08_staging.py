@@ -424,7 +424,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
-            "INSPECT_RUNTIME_8F77CEE_STAGING",
+            "INSPECT_RUNTIME_EF0A512_STAGING",
             "id: terraform_init",
             'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
