@@ -133,7 +133,7 @@ DEC-021 的影响核对确认 API、Worker、迁移与 OpenAPI 相对基线 `028
 
 该路径共享现有北京 ECS/RDS/Caddy 物理故障域，仅实现逻辑隔离。它是 DEC-019 的 30 日 Alpha 延期边界，不是完整 production isolation。WP-11 延期项、WP-12B 原 FAIL、完整 WP-13 签署和 WP-14 仍未完成，因此正式域名开放不等同 `RELEASE_GO`。
 
-执行证据：run `30760806984` 完成源库只读备份、临时库隔离恢复、schema/逐表计数/业务指纹与加密解密一致性证明；run `30761088830` 把精确密文、HMAC manifest 与 PII-free facts 保存为 30 天私有 Actions artifact。正式飞书回调保存后，DNS 指向 vNext；maintenance run `30779397520` 在正确 DNS 下重建 edge、签发 TLS 并验证 503 止血页，live run `30779441351` 恢复 production Web。最终黑盒结果为：`journey.muchenai.com` root=200、readiness release=`8f77ceec…`、匿名 `/ops`=`401`、匿名 `/review`=`401`、OAuth `redirect_uri=https://journey.muchenai.com/auth/feishu/callback`；staging root/readiness 继续 200。未执行 DNS 回退，也未覆盖任何 vNext 业务事实。
+执行证据：run `30760806984` 完成源库只读备份、临时库隔离恢复、schema/逐表计数/业务指纹与加密解密一致性证明，但 TOS 归档 `InvalidPathAccess` 使该工作流结论保持 `failure`；run `30761088830` 随后把同一精确密文、HMAC manifest 与 PII-free facts 保存为 30 天私有 Actions artifact。正式飞书回调保存后，DNS 指向 vNext；maintenance run `30779397520` 在正确 DNS 下重建 edge、签发 TLS 并验证 503 止血页，live run `30779441351` 恢复 production Web。最终黑盒结果为：`journey.muchenai.com` root=200、readiness release=`8f77ceec…`、匿名 `/ops`=`401`、匿名 `/review`=`401`、OAuth `redirect_uri=https://journey.muchenai.com/auth/feishu/callback`；staging root/readiness 继续 200。未执行 DNS 回退，也未覆盖任何 vNext 业务事实。
 
 ## 7. 当前判定
 
