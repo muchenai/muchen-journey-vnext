@@ -103,7 +103,9 @@
     h1 { position: relative; z-index: 1; max-width: 760px; margin-bottom: 20px; font-size: clamp(42px, 6.2vw, 80px); line-height: 1.06; letter-spacing: -.055em; }
     h2 { font-size: clamp(28px, 3.5vw, 44px); line-height: 1.15; letter-spacing: -.035em; }
     h3 { font-size: 18px; }
-    .lede { position: relative; z-index: 1; max-width: 620px; color: #4d5e7a; font-size: clamp(17px, 2vw, 21px); }
+    .signal-row { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .signal { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; color: #485a78; background: rgba(255,255,255,.72); font-size: 14px; font-weight: 750; }
+    .signal i { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(226,166,59,.13); }
     .actions { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
     .primary, .secondary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 52px; border-radius: 15px; padding: 0 22px; border: 1px solid transparent; cursor: pointer; font-weight: 800; }
     .primary { color: #fff; background: var(--blue); box-shadow: 0 12px 26px rgba(49,95,214,.24); }
@@ -112,13 +114,15 @@
 
     .side-stack { display: grid; grid-template-rows: 1fr auto; gap: 24px; }
     .route-card { padding: 30px; background: linear-gradient(155deg, rgba(20,125,120,.94), rgba(23,75,103,.96)); color: #fff; }
-    .route-card p { color: rgba(255,255,255,.74); }
+    .route-number { margin: 0; color: #b8ede9; font-size: 12px; font-weight: 850; letter-spacing: .14em; }
+    .route-card h2 { margin: 12px 0 0; font-size: 34px; }
     .route-line { position: relative; height: 145px; margin-top: 20px; }
     .route-line svg { width: 100%; height: 100%; overflow: visible; }
     .route-line path { stroke-dasharray: 8 9; animation: trail 10s linear infinite; }
     .reviewer-card { display: flex; gap: 15px; align-items: center; padding: 24px; }
     .avatar { display: grid; flex: 0 0 auto; place-items: center; width: 52px; height: 52px; border-radius: 18px; color: #1b5b58; background: var(--teal-soft); font-weight: 900; }
-    .reviewer-card p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+    .reviewer-card small { display: block; margin-top: 2px; color: var(--muted); }
+    .presence { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #2ca27f; box-shadow: 0 0 0 4px rgba(44,162,127,.12); }
 
     .workspace-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; }
     .mission { padding: 30px; }
@@ -127,18 +131,15 @@
     .identity-list { display: grid; gap: 10px; margin: 28px 0; }
     .identity-item { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
     .identity-item span { color: var(--muted); }
-    .mini-milestones { display: grid; gap: 12px; }
-    .mini-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; color: var(--muted); font-size: 14px; }
-    .mini-step b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 9px; background: #edf2fa; color: var(--ink); }
-    .mini-step.active { color: var(--ink); font-weight: 700; }
-    .mini-step.active b { color: #fff; background: var(--blue); }
+    .progress-orbit { display: grid; place-items: center; width: 118px; aspect-ratio: 1; margin: 34px auto 0; border-radius: 50%; background: conic-gradient(var(--blue) 0 75%, #e5ebf4 75% 100%); }
+    .progress-orbit::before { content: "3 / 4"; display: grid; place-items: center; width: 88px; aspect-ratio: 1; border-radius: 50%; color: var(--blue-deep); background: #fff; font-size: 22px; font-weight: 900; }
 
     .composer { padding: clamp(26px, 4vw, 46px); }
     .composer-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 26px; }
     .status-pill { white-space: nowrap; padding: 7px 11px; border-radius: 999px; color: #275553; background: var(--teal-soft); font-size: 13px; font-weight: 800; }
-    .prompt { padding: 18px 20px; margin-bottom: 22px; border-left: 4px solid var(--gold); border-radius: 4px 14px 14px 4px; background: #fff9ea; }
-    .prompt strong { display: block; margin-bottom: 3px; }
-    .prompt p { margin-bottom: 0; color: #655b45; }
+    .brief-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-bottom: 22px; }
+    .brief-item { display: grid; place-items: center; min-height: 74px; padding: 10px; border-radius: 16px; color: #655b45; background: #fff9ea; text-align: center; font-size: 14px; font-weight: 800; }
+    .brief-item b { display: block; color: var(--gold); font-size: 20px; line-height: 1; }
     textarea { width: 100%; min-height: 250px; resize: vertical; padding: 20px; border: 1px solid #cdd7e7; border-radius: 18px; color: var(--ink); background: rgba(255,255,255,.82); }
     .composer-foot { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-top: 16px; color: var(--muted); font-size: 14px; }
 
@@ -150,7 +151,6 @@
     .result-pass .result-icon { color: #795000; background: var(--gold-soft); box-shadow: 0 0 0 12px rgba(226,166,59,.10); animation: milestone .65s cubic-bezier(.2,.85,.25,1.3) both; }
     .result-revise .result-icon { color: #8b454a; background: var(--rose-soft); }
     .result-card h1 { margin: 0 auto 18px; font-size: clamp(40px, 6vw, 70px); }
-    .result-card .lede { margin: 0 auto 28px; }
     .feedback { max-width: 680px; margin: 34px auto 0; padding: 26px; border: 1px solid var(--line); border-radius: 21px; background: rgba(255,255,255,.66); text-align: left; }
     .feedback-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
     .feedback-head .avatar { width: 42px; height: 42px; border-radius: 14px; }
@@ -161,9 +161,6 @@
     .spark.one { top: 14%; left: 18%; }
     .spark.two { top: 22%; right: 16%; animation-delay: .35s; }
     .spark.three { top: 37%; right: 8%; animation-delay: .48s; }
-
-    .footer-note { margin-top: 38px; text-align: center; color: var(--muted); font-size: 13px; }
-    .scope-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.58); }
 
     @keyframes arrive { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
     @keyframes trail { to { stroke-dashoffset: -68; } }
@@ -196,6 +193,7 @@
       .actions, .composer-foot { align-items: stretch; flex-direction: column; }
       .primary, .secondary { width: 100%; }
       .composer-head { flex-direction: column; }
+      .brief-grid { grid-template-columns: repeat(2, 1fr); }
       .result-switch { width: 100%; }
       .result-switch button { flex: 1; }
     }
@@ -231,26 +229,28 @@
     <section class="view" data-panel="entry" aria-labelledby="entry-title">
       <div class="hero-grid">
         <article class="card hero">
-          <p class="eyebrow">你的旅程从一个真实问题开始</p>
-          <h1 id="entry-title">把观察，走成一次行动。</h1>
-          <p class="lede">接下来约 60 分钟，你会完成一个真实任务。试点主管会在 2 个工作日内给出反馈，陪你把想法走到可执行。</p>
+          <p class="eyebrow">探索营 · 行动任务 01</p>
+          <h1 id="entry-title">从问题出发。</h1>
+          <div class="signal-row" aria-label="任务摘要">
+            <span class="signal"><i aria-hidden="true"></i>60 分钟</span>
+            <span class="signal"><i aria-hidden="true" style="background:var(--teal)"></i>主管陪伴</span>
+            <span class="signal"><i aria-hidden="true" style="background:var(--blue)"></i>一次闭环</span>
+          </div>
           <div class="actions">
-            <button class="primary" type="button" data-jump="task">确认身份并开始 <span aria-hidden="true">→</span></button>
-            <button class="secondary" type="button">先看看任务会怎样进行</button>
+            <button class="primary" type="button" data-jump="task">开始 <span aria-hidden="true">→</span></button>
           </div>
         </article>
         <aside class="side-stack">
           <div class="card route-card">
-            <p class="eyebrow" style="color:#b8ede9">今日路线</p>
-            <h2>四个路标，一次闭环</h2>
-            <p>你只需关注眼前这一步，系统会保留进度与反馈。</p>
+            <p class="route-number">ROUTE · 01</p>
+            <h2>四个路标</h2>
             <div class="route-line" aria-hidden="true">
               <svg viewBox="0 0 320 150" fill="none"><path d="M12 120C58 30 108 146 156 70C204 -5 248 74 306 25" stroke="rgba(255,255,255,.75)" stroke-width="3" stroke-linecap="round"/><circle cx="12" cy="120" r="8" fill="#fff0c8"/><circle cx="156" cy="70" r="8" fill="#fff"/><circle cx="306" cy="25" r="11" fill="#e2a63b"/></svg>
             </div>
           </div>
           <div class="card reviewer-card">
             <div class="avatar" aria-hidden="true">评</div>
-            <div><strong>试点主管会陪你完成</strong><p>提交后 2 个工作日内反馈 · 每次反馈都有明确下一步</p></div>
+            <div><strong><span class="presence" aria-hidden="true"></span>试点主管</strong><small>2 个工作日内回应</small></div>
           </div>
         </aside>
       </div>
@@ -261,26 +261,24 @@
         <aside class="card mission">
           <p class="mission-number">MISSION · TSK-001 V1</p>
           <h2 id="task-title">问题洞察与行动建议</h2>
-          <p>把一个真实问题转化为有依据、可执行、可验证的行动方案。</p>
           <div class="identity-list">
             <div class="identity-item"><span>当前里程碑</span><strong>形成行动方案</strong></div>
             <div class="identity-item"><span>预计投入</span><strong>60 分钟</strong></div>
             <div class="identity-item"><span>反馈人</span><strong>试点主管</strong></div>
           </div>
-          <h3>完成路径</h3>
-          <div class="mini-milestones">
-            <div class="mini-step active"><b>1</b><span>说明真实问题与影响对象</span></div>
-            <div class="mini-step"><b>2</b><span>写下至少两条可核对事实</span></div>
-            <div class="mini-step"><b>3</b><span>给出三步以内的行动建议</span></div>
-            <div class="mini-step"><b>4</b><span>定义验证指标与停止条件</span></div>
-          </div>
+          <div class="progress-orbit" role="img" aria-label="四项交付要求已完成三项"></div>
         </aside>
         <article class="card composer">
           <div class="composer-head">
             <div><p class="eyebrow">当前任务 · 第 1 个里程碑</p><h2>先把真实问题说清楚</h2></div>
             <span class="status-pill">草稿已安全保存</span>
           </div>
-          <div class="prompt"><strong>提示</strong><p>用 100–200 字说明一个真实、具体的问题，以及它影响了谁。事实与假设请分开写。</p></div>
+          <div class="brief-grid" aria-label="交付要求">
+            <div class="brief-item"><b>1</b>真实问题</div>
+            <div class="brief-item"><b>2</b>可核对事实</div>
+            <div class="brief-item"><b>≤3</b>行动步骤</div>
+            <div class="brief-item"><b>✓</b>停止条件</div>
+          </div>
           <label for="answer"><strong>你的行动记录</strong></label>
           <textarea id="answer">在新项目交接中，成员往往只收到文档，没有机会确认自己是否真正理解下一步。过去两次交接中，均出现负责人不清楚和验证标准缺失的情况。
 
@@ -302,9 +300,8 @@
       <article class="card result-card result-pass result-panel" data-result-panel="pass">
         <span class="spark one"></span><span class="spark two"></span><span class="spark three"></span>
         <div class="result-icon" aria-hidden="true">✓</div>
-        <p class="eyebrow">里程碑已点亮 · 主管评审通过</p>
-        <h1 id="result-title">你完成了这段旅程。</h1>
-        <p class="lede">行动方案已被确认。系统已保留你的提交、主管结论与完成时间，下一步回到真实工作中验证它。</p>
+        <p class="eyebrow">主管评审通过</p>
+        <h1 id="result-title">里程碑完成。</h1>
         <div class="feedback">
           <div class="feedback-head"><div class="avatar">评</div><div><strong>来自试点主管的反馈</strong><br><small>刚刚完成评审</small></div></div>
           <p>问题边界清楚，证据和行动可以互相验证。尤其是“接收人复述 + 48 小时检查”让方案具备了真正的闭环。</p>
@@ -315,9 +312,8 @@
 
       <article class="card result-card result-revise result-panel" data-result-panel="revise" hidden>
         <div class="result-icon" aria-hidden="true">↻</div>
-        <p class="eyebrow" style="color:var(--rose)">主管已给出反馈 · 等待你继续</p>
-        <h1>不是退回，是带着反馈再走一步。</h1>
-        <p class="lede">你的事实已经保留，不必重新开始。补清一个关键条件后，再次提交即可。</p>
+        <p class="eyebrow" style="color:var(--rose)">主管反馈已到达</p>
+        <h1>带着反馈，再走一步。</h1>
         <div class="feedback">
           <div class="feedback-head"><div class="avatar">评</div><div><strong>试点主管希望你补充</strong><br><small>反馈会保留在下一次提交中</small></div></div>
           <p>行动步骤已经明确，请再写出：如果 48 小时后仍没有结果，谁来决定停止、调整或升级处理？</p>
@@ -327,7 +323,6 @@
       </article>
     </section>
 
-    <p class="footer-note"><span class="scope-badge">原型范围：Learner `/` · `/join` · `/app` · 任务页 · 结果页</span></p>
   </main>
 
   <script>
@@ -337,13 +332,19 @@
     const stageState = {
       entry: ['current', '', '', ''],
       task: ['done', 'current', '', ''],
-      result: ['done', 'done', 'done', 'current']
+      pass: ['done', 'done', 'done', 'current'],
+      revise: ['done', 'done', 'current', '']
     };
+
+    function setStages(state) {
+      stages.forEach((stage, index) => { stage.className = `stage ${stageState[state][index]}`.trim(); });
+    }
 
     function showView(name) {
       viewButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === name)));
       viewPanels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; });
-      stages.forEach((stage, index) => { stage.className = `stage ${stageState[name][index]}`.trim(); });
+      const resultState = document.querySelector('[data-result][aria-pressed="true"]');
+      setStages(name === 'result' ? resultState.dataset.result : name);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -355,6 +356,7 @@
     resultButtons.forEach((button) => button.addEventListener('click', () => {
       resultButtons.forEach((candidate) => candidate.setAttribute('aria-pressed', String(candidate === button)));
       resultPanels.forEach((panel) => { panel.hidden = panel.dataset.resultPanel !== button.dataset.result; });
+      setStages(button.dataset.result);
     }));
   </script>
 </body>
