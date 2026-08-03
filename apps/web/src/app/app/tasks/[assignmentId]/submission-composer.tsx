@@ -20,6 +20,7 @@ export function SubmissionComposer({
   attachments,
   submissionIdempotencyKey,
   draftIdempotencyKey,
+  requiresReview,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -29,6 +30,7 @@ export function SubmissionComposer({
   attachments: Attachment[];
   submissionIdempotencyKey: string;
   draftIdempotencyKey: string;
+  requiresReview: boolean;
 }) {
   const [body, setBody] = useState(initialBody);
   const [submitState, submitAction, submitPending] = useActionState(
@@ -51,7 +53,7 @@ export function SubmissionComposer({
         value={submissionIdempotencyKey}
       />
       <input type="hidden" name="draft_idempotency_key" value={draftIdempotencyKey} />
-      <label htmlFor="submission-body">你的交付内容</label>
+      <label htmlFor="submission-body">写下你的判断</label>
       <textarea
         id="submission-body"
         name="body"
@@ -61,7 +63,7 @@ export function SubmissionComposer({
         value={body}
         onChange={(event) => setBody(event.target.value)}
       />
-      <p className="status-meta">正文会随“保存草稿”写入服务端；提交冲突不会清空当前输入。</p>
+      <p className="status-meta">草稿会安全保存；提交后保留原始版本。</p>
 
       {attachments.length > 0 ? (
         <fieldset>
@@ -96,7 +98,9 @@ export function SubmissionComposer({
             ? "正在提交…"
             : command === "submit_revision"
               ? "提交修订版本"
-              : "提交给主管"}
+              : requiresReview
+                ? "交给 Reviewer"
+                : "完成这一站"}
         </button>
         <button
           className="button secondary"

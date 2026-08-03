@@ -80,6 +80,23 @@ class TaskDefinitionStatus(str, enum.Enum):
     WITHDRAWN = "WITHDRAWN"
 
 
+class JourneyDefinitionStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    WITHDRAWN = "WITHDRAWN"
+
+
+class JourneyStageKind(str, enum.Enum):
+    DAY_0 = "DAY_0"
+    TREASURE = "TREASURE"
+    ASSESSMENT = "ASSESSMENT"
+
+
+class JourneyCompletionPolicy(str, enum.Enum):
+    LEARNER_EVIDENCE = "LEARNER_EVIDENCE"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
 class ReviewStatus(str, enum.Enum):
     ASSIGNED = "ASSIGNED"
     IN_REVIEW = "IN_REVIEW"
@@ -198,6 +215,13 @@ class ExternalIdentity(Base):
 
 class Invite(Base):
     __tablename__ = "invites"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["journey_version_id", "organization_id"],
+            ["journey_versions.id", "journey_versions.organization_id"],
+            name="fk_invites_journey_version_organization",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -206,6 +230,9 @@ class Invite(Base):
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False))
     reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     task_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("task_versions.id"))
+    journey_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
     target_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     status: Mapped[InviteStatus] = mapped_column(Enum(InviteStatus, native_enum=False), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
@@ -353,6 +380,9 @@ class TaskVersion(Base):
         UniqueConstraint(
             "id", "task_definition_id", name="uq_task_versions_id_definition"
         ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_task_versions_id_organization"
+        ),
         CheckConstraint("version >= 1", name="ck_task_versions_positive_version"),
         CheckConstraint(
             "estimated_duration_minutes BETWEEN 1 AND 480",
@@ -400,6 +430,117 @@ class TaskVersion(Base):
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class JourneyDefinition(Base):
+    __tablename__ = "journey_definitions"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "stable_key",
+            name="uq_journey_definitions_organization_key",
+        ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_journey_definitions_id_organization"
+        ),
+        CheckConstraint(
+            "revision >= 1", name="ck_journey_definitions_positive_revision"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    stable_key: Mapped[str] = mapped_column(String(80))
+    status: Mapped[JourneyDefinitionStatus] = mapped_column(
+        Enum(JourneyDefinitionStatus, native_enum=False)
+    )
+    revision: Mapped[int] = mapped_column(default=1)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class JourneyVersion(Base):
+    __tablename__ = "journey_versions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["journey_definition_id", "organization_id"],
+            ["journey_definitions.id", "journey_definitions.organization_id"],
+            name="fk_journey_versions_definition_organization",
+        ),
+        UniqueConstraint(
+            "journey_definition_id",
+            "version",
+            name="uq_journey_versions_definition_version",
+        ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_journey_versions_id_organization"
+        ),
+        CheckConstraint("version >= 1", name="ck_journey_versions_positive_version"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    journey_definition_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    version: Mapped[int]
+    title: Mapped[str] = mapped_column(String(180))
+    purpose: Mapped[str] = mapped_column(Text)
+    change_summary: Mapped[str] = mapped_column(Text)
+    content_review_note: Mapped[str] = mapped_column(Text)
+    published_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    reviewed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class JourneyStageVersion(Base):
+    __tablename__ = "journey_stage_versions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["journey_version_id", "organization_id"],
+            ["journey_versions.id", "journey_versions.organization_id"],
+            name="fk_journey_stages_version_organization",
+        ),
+        ForeignKeyConstraint(
+            ["task_version_id", "organization_id"],
+            ["task_versions.id", "task_versions.organization_id"],
+            name="fk_journey_stages_task_organization",
+        ),
+        UniqueConstraint(
+            "journey_version_id", "stable_key", name="uq_journey_stages_version_key"
+        ),
+        UniqueConstraint(
+            "journey_version_id", "position", name="uq_journey_stages_version_position"
+        ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_journey_stages_id_organization"
+        ),
+        CheckConstraint("position >= 0", name="ck_journey_stages_nonnegative_position"),
+        CheckConstraint(
+            "(stage_kind IN ('DAY_0', 'TREASURE') AND completion_policy = 'LEARNER_EVIDENCE') "
+            "OR (stage_kind = 'ASSESSMENT' AND completion_policy = 'REVIEW_REQUIRED')",
+            name="ck_journey_stages_kind_policy",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    journey_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    stable_key: Mapped[str] = mapped_column(String(80))
+    position: Mapped[int]
+    stage_kind: Mapped[JourneyStageKind] = mapped_column(
+        Enum(JourneyStageKind, native_enum=False)
+    )
+    completion_policy: Mapped[JourneyCompletionPolicy] = mapped_column(
+        Enum(JourneyCompletionPolicy, native_enum=False)
+    )
+    task_version_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    title: Mapped[str] = mapped_column(String(180))
+    short_description: Mapped[str] = mapped_column(String(300))
+
+
 class Enrollment(Base):
     __tablename__ = "enrollments"
     __table_args__ = (
@@ -409,12 +550,23 @@ class Enrollment(Base):
             "learner_id",
             name="uq_enrollments_fixed_owner_scope",
         ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_enrollments_id_organization"
+        ),
+        ForeignKeyConstraint(
+            ["journey_version_id", "organization_id"],
+            ["journey_versions.id", "journey_versions.organization_id"],
+            name="fk_enrollments_journey_version_organization",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    journey_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
     status: Mapped[EnrollmentStatus] = mapped_column(Enum(EnrollmentStatus, native_enum=False))
     revision: Mapped[int] = mapped_column(default=1)
 
@@ -427,10 +579,20 @@ class Assignment(Base):
             ["task_versions.id", "task_versions.task_definition_id"],
             name="fk_assignments_task_version_definition",
         ),
+        ForeignKeyConstraint(
+            ["journey_stage_version_id", "organization_id"],
+            ["journey_stage_versions.id", "journey_stage_versions.organization_id"],
+            name="fk_assignments_journey_stage_organization",
+        ),
         UniqueConstraint(
             "enrollment_id", "task_definition_id", name="uq_assignments_enrollment_task"
         ),
         UniqueConstraint("enrollment_id", "position", name="uq_assignments_enrollment_position"),
+        UniqueConstraint(
+            "enrollment_id",
+            "journey_stage_version_id",
+            name="uq_assignments_enrollment_journey_stage",
+        ),
         CheckConstraint("position >= 1", name="ck_assignments_positive_position"),
     )
 
@@ -439,6 +601,9 @@ class Assignment(Base):
     enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id"), index=True)
     task_definition_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("task_definitions.id"))
     task_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("task_versions.id"))
+    journey_stage_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
     position: Mapped[int] = mapped_column(default=1)
     status: Mapped[AssignmentStatus] = mapped_column(Enum(AssignmentStatus, native_enum=False))
     revision: Mapped[int] = mapped_column(default=1)
@@ -723,6 +888,9 @@ class Evaluation(Base):
             "assignment_id",
             name="uq_evaluations_outcome_scope",
         ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_evaluations_id_organization"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -778,6 +946,12 @@ class Outcome(Base):
             "learner_id",
             name="uq_outcomes_recipient_scope",
         ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "enrollment_id",
+            name="uq_outcomes_id_organization_enrollment",
+        ),
         UniqueConstraint("assignment_id", name="uq_outcomes_assignment"),
         CheckConstraint("status = 'HANDOFF_READY'", name="ck_outcomes_handoff_ready"),
     )
@@ -790,6 +964,44 @@ class Outcome(Base):
     source_evaluation_id: Mapped[uuid.UUID] = mapped_column(unique=True)
     status: Mapped[str] = mapped_column(String(40))
     summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class JourneyOutcomeEvidence(Base):
+    __tablename__ = "journey_outcome_evidence"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["outcome_id", "organization_id", "enrollment_id"],
+            ["outcomes.id", "outcomes.organization_id", "outcomes.enrollment_id"],
+            name="fk_journey_evidence_outcome_scope",
+        ),
+        ForeignKeyConstraint(
+            ["evaluation_id", "organization_id"],
+            ["evaluations.id", "evaluations.organization_id"],
+            name="fk_journey_evidence_evaluation_scope",
+        ),
+        ForeignKeyConstraint(
+            ["journey_stage_version_id", "organization_id"],
+            ["journey_stage_versions.id", "journey_stage_versions.organization_id"],
+            name="fk_journey_evidence_stage_scope",
+        ),
+        UniqueConstraint(
+            "outcome_id",
+            "journey_stage_version_id",
+            name="uq_journey_outcome_evidence_stage",
+        ),
+        UniqueConstraint(
+            "evaluation_id", name="uq_journey_outcome_evidence_evaluation"
+        ),
+    )
+
+    outcome_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    journey_stage_version_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

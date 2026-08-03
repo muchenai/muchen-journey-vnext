@@ -5,9 +5,15 @@ import { useActionState, useState } from "react";
 import {
   createLearnerInvite,
   InviteActionState,
+  publishFormalJourney,
   revokeLearnerInvite,
 } from "@/app/actions";
-import { OpsIdentityAccess, OpsInvite, OpsTaskDefinition } from "@/lib/server/api";
+import {
+  OpsFormalJourney,
+  OpsIdentityAccess,
+  OpsInvite,
+  OpsTaskDefinition,
+} from "@/lib/server/api";
 
 const INITIAL_STATE: InviteActionState = {};
 
@@ -28,9 +34,11 @@ const STATUS_LABELS: Record<OpsInvite["status"], string> = {
 function CreateInviteForm({
   reviewers,
   tasks,
+  journeys,
 }: {
   reviewers: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
+  journeys: OpsFormalJourney[];
 }) {
   const [state, action, pending] = useActionState(createLearnerInvite, INITIAL_STATE);
   const [copied, setCopied] = useState(false);
@@ -61,12 +69,12 @@ function CreateInviteForm({
     );
   }
 
-  if (reviewers.length === 0 || taskVersions.length === 0) {
+  if (reviewers.length === 0 || (journeys.length === 0 && taskVersions.length === 0)) {
     return (
       <p className="inline-error" role="alert">
         {reviewers.length === 0
           ? "当前没有已绑定飞书身份的 Reviewer；请先在本页“飞书身份访问”完成绑定。"
-          : "当前没有已发布的任务版本；不能创建无法进入真实闭环的邀请。"}
+          : "当前没有已发布的正式旅程或兼容任务版本；不能创建邀请。"}
       </p>
     );
   }
@@ -84,17 +92,30 @@ function CreateInviteForm({
           ))}
         </select>
       </label>
-      <label>
-        首个任务
-        <select name="task_version_id" required defaultValue="">
-          <option value="" disabled>选择已发布任务版本</option>
-          {taskVersions.map((version) => (
-            <option key={version.id} value={version.id}>
-              {version.stableKey} · V{version.version} · {version.title}
-            </option>
-          ))}
-        </select>
-      </label>
+      {journeys.length > 0 ? (
+        <label>
+          固定旅程
+          <select name="journey_version_id" required defaultValue={journeys[0].id}>
+            {journeys.map((journey) => (
+              <option key={journey.id} value={journey.id}>
+                {journey.title} · V{journey.version} · {journey.stages.length} 站
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <label>
+          兼容任务（仅旧 Alpha）
+          <select name="task_version_id" required defaultValue="">
+            <option value="" disabled>选择已发布任务版本</option>
+            {taskVersions.map((version) => (
+              <option key={version.id} value={version.id}>
+                {version.stableKey} · V{version.version} · {version.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="invite-purpose-field">
         邀请用途
         <input
@@ -102,7 +123,11 @@ function CreateInviteForm({
           required
           minLength={3}
           maxLength={200}
-          defaultValue="加入 Muchen Journey Alpha 试点并完成首个真实任务"
+          defaultValue={
+            journeys.length > 0
+              ? "加入 Muchen Journey 受控内测并完成正式探索营"
+              : "安全重新进入旧 Alpha 单任务兼容路径"
+          }
           autoComplete="off"
         />
       </label>
@@ -123,10 +148,12 @@ export function InviteManagementPanel({
   invites,
   identityAccess,
   tasks,
+  journeys,
 }: {
   invites: OpsInvite[];
   identityAccess: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
+  journeys: OpsFormalJourney[];
 }) {
   const reviewers = identityAccess.filter(
     (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
@@ -134,7 +161,35 @@ export function InviteManagementPanel({
 
   return (
     <>
-      <CreateInviteForm reviewers={reviewers} tasks={tasks} />
+      {journeys.length === 0 && reviewers.length > 0 ? (
+        <form action={publishFormalJourney} className="ops-command-form invite-create-form">
+          <div>
+            <strong>正式探索营尚未发布</strong>
+            <p className="status-meta">
+              发布后固定为 Day 0、四个宝藏、三个能力评测；正文版本不可原地修改。
+            </p>
+          </div>
+          <label>
+            已完成线下复核的 Reviewer
+            <select name="reviewed_by" required defaultValue="">
+              <option value="" disabled>选择独立 Reviewer</option>
+              {reviewers.map((reviewer) => (
+                <option key={reviewer.user_id} value={reviewer.user_id}>
+                  {reviewer.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="checkbox-row">
+            <input name="review_acknowledged" type="checkbox" required />
+            我确认该 Reviewer 已复核本次受控内测 V1；发布后正文不可原地修改
+          </label>
+          <button className="button secondary" type="submit">
+            发布受控内测 V1
+          </button>
+        </form>
+      ) : null}
+      <CreateInviteForm reviewers={reviewers} tasks={tasks} journeys={journeys} />
       <h3>最近邀请</h3>
       {invites.length === 0 ? <p>尚未创建新人邀请。</p> : null}
       <ul className="ops-list invite-list">

@@ -90,7 +90,7 @@ export function ReviewWorkbench({
         </p>
       ) : (
         <p className="status-meta">
-          四个维度都必须评分并写具体反馈；全部达标才能通过，要求修订时至少一项需标为待改进。
+          每个固定维度都必须评分并写具体反馈；全部达标才能通过，要求修订时至少一项需标为待改进。
         </p>
       )}
       <ActionError state={finalState} />
@@ -104,6 +104,11 @@ export function ReviewWorkbench({
         />
         {dimensions.map((dimension, index) => (
           <fieldset className="rubric-dimension" key={dimension.dimension_key}>
+            <input
+              type="hidden"
+              name="rubric_dimension_key"
+              value={dimension.dimension_key}
+            />
             <legend>
               {index + 1}. {dimension.title}
             </legend>
@@ -153,7 +158,7 @@ export function ReviewWorkbench({
           <div className="decision-grid">
             <label className="decision-choice">
               <input type="radio" name="overall_decision" value="APPROVE" required />
-              <span><strong>通过</strong>四个维度全部达标，任务完成。</span>
+              <span><strong>通过</strong>全部固定维度达标，本阶段完成。</span>
             </label>
             <label className="decision-choice">
               <input

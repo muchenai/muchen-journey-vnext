@@ -396,13 +396,6 @@ export async function startReview(
   redirect(`/review/${reviewId}?started=yes`);
 }
 
-const REVIEW_RUBRIC_KEYS = [
-  "problem_clarity",
-  "evidence_quality",
-  "action_feasibility",
-  "validation_design",
-] as const;
-
 export async function finalizeReview(
   _previousState: ReviewActionState,
   data: FormData,
@@ -426,7 +419,18 @@ export async function finalizeReview(
     ) {
       throw new Error("总体反馈需为 10–2000 个字符。");
     }
-    const rubricEvaluations = REVIEW_RUBRIC_KEYS.map((dimensionKey) => {
+    const rubricKeys = data.getAll("rubric_dimension_key");
+    if (
+      rubricKeys.length < 1
+      || rubricKeys.length > 6
+      || rubricKeys.some(
+        (key) => typeof key !== "string" || !/^[a-z][a-z0-9_]{2,59}$/.test(key),
+      )
+      || new Set(rubricKeys).size !== rubricKeys.length
+    ) {
+      throw new Error("Rubric 维度配置无效，请刷新后重试。");
+    }
+    const rubricEvaluations = (rubricKeys as string[]).map((dimensionKey) => {
       const rating = data.get(`${dimensionKey}_rating`);
       const feedback = data.get(`${dimensionKey}_feedback`);
       if (rating !== "MEETS" && rating !== "NEEDS_WORK") {
@@ -511,7 +515,19 @@ export async function createLearnerInvite(
 ): Promise<InviteActionState> {
   try {
     const reviewerId = requiredUuid(data, "reviewer_id");
-    const taskVersionId = requiredUuid(data, "task_version_id");
+    const journeyValue = data.get("journey_version_id");
+    const taskValue = data.get("task_version_id");
+    const journeyVersionId =
+      typeof journeyValue === "string" && journeyValue
+        ? requiredUuid(data, "journey_version_id")
+        : null;
+    const taskVersionId =
+      typeof taskValue === "string" && taskValue
+        ? requiredUuid(data, "task_version_id")
+        : null;
+    if ((journeyVersionId === null) === (taskVersionId === null)) {
+      return { error: "请选择一个正式旅程或一个兼容任务版本。" };
+    }
     const purpose = data.get("purpose");
     if (typeof purpose !== "string" || purpose.trim().length < 3 || purpose.length > 200) {
       return { error: "邀请用途需为 3–200 个字符。" };
@@ -528,6 +544,7 @@ export async function createLearnerInvite(
           role: "LEARNER",
           reviewer_id: reviewerId,
           task_version_id: taskVersionId,
+          journey_version_id: journeyVersionId,
           target_user_id: null,
         }),
       },
@@ -540,6 +557,22 @@ export async function createLearnerInvite(
   } catch (error) {
     return submissionError(error);
   }
+}
+
+export async function publishFormalJourney(data: FormData) {
+  const reviewedBy = requiredUuid(data, "reviewed_by");
+  const reviewAcknowledged = data.get("review_acknowledged") === "on";
+  await apiRequest("/api/v1/ops/formal-journeys/publish", "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      reviewed_by: reviewedBy,
+      expected_absent: true,
+      review_acknowledged: reviewAcknowledged,
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=formal-journey-published#learner-invites");
 }
 
 export async function revokeLearnerInvite(data: FormData) {

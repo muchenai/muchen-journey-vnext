@@ -10,6 +10,16 @@ const AUTH_ERRORS: Record<string, string> = {
 };
 
 const IDENTITY_RETURN_PATHS = new Set(["/review", "/ops"]);
+const ROUTE_PREVIEW = [
+  ["启程", "带着一个问题出发"],
+  ["价值", "看见你愿意成为谁"],
+  ["模型", "理解判断为何会出错"],
+  ["项目", "把答案放回真实场景"],
+  ["交付", "分清判断与提报边界"],
+  ["规则", "拆出目标、维度与红线"],
+  ["判断", "用证据比较模型回答"],
+  ["边界", "在不确定中做谨慎判断"],
+] as const;
 
 export default async function Home({
   searchParams,
@@ -22,17 +32,28 @@ export default async function Home({
     ? query.return_to
     : null;
   return (
-    <section className="hero product-home">
-      <p className="eyebrow">从行动开始</p>
-      <h1>把一个真实问题，变成清晰的下一步。</h1>
-      <p className="lede">
-        围绕你正在面对的问题，完成一次行动、获得具体反馈，然后继续前进。
-      </p>
-      <div className="action-row">
-        <Link className="button primary" href="/app">
-          继续我的行动
+    <section className="learner-landing">
+      <div className="landing-copy">
+        <p className="journey-whisper">It&apos;s a long game.</p>
+        <h1>这里，没有标准答案。</h1>
+        <Link className="button primary landing-cta" href="/app">
+          继续旅程 <span aria-hidden="true">→</span>
         </Link>
       </div>
+      <ol className="landing-route" aria-label="探索营路线预览">
+        {ROUTE_PREVIEW.map(([title, hint], index) => (
+          <li key={title}>
+            <span
+              className="landing-route-node"
+              data-hint={`${title} · ${hint}`}
+              tabIndex={0}
+              aria-label={`第 ${index + 1} 站：${title}。${hint}`}
+            >
+              <i aria-hidden="true" />
+            </span>
+          </li>
+        ))}
+      </ol>
       {authError ? (
         <div className="inline-error" role="alert">
           <p>{AUTH_ERRORS[authError] ?? "身份登录没有完成，请重新开始或联系运营。"}</p>
@@ -43,27 +64,8 @@ export default async function Home({
           ) : null}
         </div>
       ) : null}
-      <section className="journey-intro" aria-labelledby="journey-intro-title">
-        <h2 id="journey-intro-title">一次只走好一步</h2>
-        <ol className="journey-steps">
-          <li>
-            <strong>看清当前任务</strong>
-            <span>知道现在要解决什么，以及完成的标准。</span>
-          </li>
-          <li>
-            <strong>提交真实成果</strong>
-            <span>用自己的工作内容回应问题，而不是完成形式。</span>
-          </li>
-          <li>
-            <strong>带着反馈继续</strong>
-            <span>获得具体建议，明确下一步行动。</span>
-          </li>
-        </ol>
-      </section>
-      <p className="role-entry">
-        首次加入请打开运营同学发送的专属邀请链接。主管可从
-        <Link href="/auth/feishu?return_to=%2Freview">评审入口</Link>
-        登录。
+      <p className="landing-footnote">
+        首次进入使用专属邀请 · <Link href="/auth/feishu?return_to=%2Freview">Reviewer</Link>
       </p>
     </section>
   );

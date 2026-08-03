@@ -22,6 +22,7 @@ from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.journey_service import assignment_stage, lock_active_learner_assignment
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -32,6 +33,7 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     Evaluation,
+    JourneyCompletionPolicy,
     OutboxEvent,
     OutboxStatus,
     Review,
@@ -94,19 +96,9 @@ def ensure_revision(actual: int, expected: int) -> None:
 def lock_learner_assignment(
     session: Session, actor: Actor, assignment_id: uuid.UUID
 ) -> Assignment:
-    assignment = session.scalar(
-        select(Assignment)
-        .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
-        .where(
-            Assignment.id == assignment_id,
-            Assignment.organization_id == actor.organization_id,
-            Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
-        )
-        .with_for_update()
+    assignment, _enrollment = lock_active_learner_assignment(
+        session, actor, assignment_id
     )
-    if assignment is None:
-        raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
     return assignment
 
 
@@ -718,19 +710,31 @@ def submit_assignment(
     enrollment = session.get(Enrollment, assignment.enrollment_id)
     if enrollment is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
-    review = Review(
-        id=uuid.uuid4(),
-        organization_id=assignment.organization_id,
-        assignment_id=assignment.id,
-        submission_id=submission.id,
-        submission_version_id=version.id,
-        reviewer_id=enrollment.reviewer_id,
-        status=ReviewStatus.ASSIGNED,
-        revision=1,
+    stage = assignment_stage(session, assignment)
+    learner_evidence = bool(
+        stage is not None
+        and stage.completion_policy == JourneyCompletionPolicy.LEARNER_EVIDENCE
     )
-    session.add(review)
+    if learner_evidence and assignment.status == AssignmentStatus.NEEDS_REVISION:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "认知证据阶段不进入评审修订。")
+    if not learner_evidence:
+        review = Review(
+            id=uuid.uuid4(),
+            organization_id=assignment.organization_id,
+            assignment_id=assignment.id,
+            submission_id=submission.id,
+            submission_version_id=version.id,
+            reviewer_id=enrollment.reviewer_id,
+            status=ReviewStatus.ASSIGNED,
+            revision=1,
+        )
+        session.add(review)
     submission.current_version_no = version_no
-    assignment.status = AssignmentStatus.SUBMITTED
+    assignment.status = (
+        AssignmentStatus.COMPLETED
+        if learner_evidence
+        else AssignmentStatus.SUBMITTED
+    )
     assignment.revision += 1
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
@@ -752,7 +756,14 @@ def submit_assignment(
         payload=payload,
         response=result.model_dump(mode="json"),
     )
-    add_event(session, "submission.created.v1", "submission", submission.id)
+    add_event(
+        session,
+        "journey_stage.evidence_completed.v1"
+        if learner_evidence
+        else "submission.created.v1",
+        "assignment" if learner_evidence else "submission",
+        assignment.id if learner_evidence else submission.id,
+    )
     add_audit(
         session,
         request=request,
@@ -765,6 +776,9 @@ def submit_assignment(
             "submission_id": str(submission.id),
             "version_no": version.version_no,
             "attachment_count": len(attachments),
+            "completion_policy": (
+                stage.completion_policy.value if stage is not None else "LEGACY_REVIEW"
+            ),
         },
     )
     session.commit()

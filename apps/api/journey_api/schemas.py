@@ -57,13 +57,13 @@ class CompleteAttachmentCommand(StrictModel):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-ReviewerDimensionKey = Literal[
-    "problem_clarity", "evidence_quality", "action_feasibility", "validation_design"
-]
+ReviewerDimensionKey = str
 
 
 class RubricEvaluationCommand(StrictModel):
-    dimension_key: ReviewerDimensionKey
+    dimension_key: ReviewerDimensionKey = Field(
+        min_length=3, max_length=60, pattern=r"^[a-z][a-z0-9_]+$"
+    )
     rating: Literal["MEETS", "NEEDS_WORK"]
     feedback: str = Field(min_length=5, max_length=500)
 
@@ -87,15 +87,9 @@ class FinalizeReviewCommand(RevisionCommand):
 
     @model_validator(mode="after")
     def validate_rubric_dimensions(self) -> "FinalizeReviewCommand":
-        expected = {
-            "problem_clarity",
-            "evidence_quality",
-            "action_feasibility",
-            "validation_design",
-        }
         actual = {item.dimension_key for item in self.rubric_evaluations}
-        if actual != expected or len(actual) != len(self.rubric_evaluations):
-            raise ValueError("Rubric V1 requires each approved dimension exactly once")
+        if len(actual) != len(self.rubric_evaluations):
+            raise ValueError("Rubric dimensions must be unique")
         return self
 
 
@@ -104,8 +98,15 @@ class CreateInviteCommand(StrictModel):
     expires_in_hours: int = Field(ge=1, le=168)
     role: Literal["LEARNER"] = "LEARNER"
     reviewer_id: UUID
-    task_version_id: UUID
+    task_version_id: UUID | None = None
+    journey_version_id: UUID | None = None
     target_user_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_invite_target(self) -> "CreateInviteCommand":
+        if (self.task_version_id is None) == (self.journey_version_id is None):
+            raise ValueError("Invite must target exactly one task or journey version")
+        return self
 
 
 class CreateLearnerReentryCommand(RevisionCommand):
@@ -210,13 +211,13 @@ class CreateTaskDefinitionCommand(StrictModel):
         return value.strip().upper()
 
 
-RubricDimensionKey = Literal[
-    "problem_clarity", "evidence_quality", "action_feasibility", "validation_design"
-]
+RubricDimensionKey = str
 
 
 class RubricDimensionInput(StrictModel):
-    dimension_key: RubricDimensionKey
+    dimension_key: RubricDimensionKey = Field(
+        min_length=3, max_length=60, pattern=r"^[a-z][a-z0-9_]+$"
+    )
     title: str = Field(min_length=2, max_length=80)
     purpose: str = Field(min_length=5, max_length=500)
     evidence_expected: str = Field(min_length=5, max_length=500)
@@ -240,15 +241,9 @@ class RubricVersionInput(StrictModel):
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> "RubricVersionInput":
-        expected = {
-            "problem_clarity",
-            "evidence_quality",
-            "action_feasibility",
-            "validation_design",
-        }
         actual = {dimension.dimension_key for dimension in self.dimensions}
-        if actual != expected or len(actual) != len(self.dimensions):
-            raise ValueError("Rubric V1 must contain each approved dimension exactly once")
+        if len(actual) != len(self.dimensions):
+            raise ValueError("Rubric dimensions must be unique")
         return self
 
 
@@ -307,6 +302,7 @@ class InviteOut(StrictModel):
     status: str
     expires_at: datetime
     revision: int
+    journey_version_id: UUID | None = None
 
 
 class CreateInviteOut(InviteOut):
@@ -496,6 +492,29 @@ class CurrentActionOut(StrictModel):
     revision: int
     responsible_party: str
     feedback_expectation: str
+    journey: "JourneyProgressOut | None" = None
+
+
+class JourneyProgressNodeOut(StrictModel):
+    stable_key: str
+    position: int
+    stage_kind: Literal["DAY_0", "TREASURE", "ASSESSMENT"]
+    completion_policy: Literal["LEARNER_EVIDENCE", "REVIEW_REQUIRED"]
+    title: str
+    short_description: str
+    status: Literal["COMPLETED", "CURRENT", "LOCKED"]
+    assignment_id: UUID
+
+
+class JourneyProgressOut(StrictModel):
+    journey_version_id: UUID
+    stable_key: str
+    version: int
+    title: str
+    completed_stages: int
+    total_stages: Literal[8]
+    current_stage_key: str | None
+    nodes: list[JourneyProgressNodeOut]
 
 
 class CurrentActionResponse(StrictModel):
@@ -526,6 +545,16 @@ class AssignmentOut(StrictModel):
     draft: "SubmissionDraftOut | None"
     available_attachments: list["AttachmentOut"]
     latest_revision_feedback: str | None
+    journey_stage: "AssignmentJourneyStageOut | None" = None
+
+
+class AssignmentJourneyStageOut(StrictModel):
+    stable_key: str
+    position: int
+    stage_kind: Literal["DAY_0", "TREASURE", "ASSESSMENT"]
+    completion_policy: Literal["LEARNER_EVIDENCE", "REVIEW_REQUIRED"]
+    title: str
+    short_description: str
 
 
 class AssignmentResponse(StrictModel):
@@ -596,6 +625,50 @@ class TaskDefinitionListOut(StrictModel):
 
 class TaskDefinitionListResponse(StrictModel):
     data: TaskDefinitionListOut
+    request_id: str
+
+
+class PublishFormalJourneyCommand(StrictModel):
+    reviewed_by: UUID
+    expected_absent: Literal[True] = True
+    review_acknowledged: Literal[True]
+
+
+class FormalJourneyStageOut(StrictModel):
+    id: UUID
+    stable_key: str
+    position: int
+    stage_kind: Literal["DAY_0", "TREASURE", "ASSESSMENT"]
+    completion_policy: Literal["LEARNER_EVIDENCE", "REVIEW_REQUIRED"]
+    task_version_id: UUID
+    title: str
+    short_description: str
+
+
+class FormalJourneyVersionOut(StrictModel):
+    id: UUID
+    stable_key: str
+    version: int
+    title: str
+    purpose: str
+    change_summary: str
+    content_review_note: str
+    published_at: datetime
+    stages: list[FormalJourneyStageOut]
+    idempotency_replay: bool = False
+
+
+class FormalJourneyVersionResponse(StrictModel):
+    data: FormalJourneyVersionOut
+    request_id: str
+
+
+class FormalJourneyVersionListOut(StrictModel):
+    items: list[FormalJourneyVersionOut]
+
+
+class FormalJourneyVersionListResponse(StrictModel):
+    data: FormalJourneyVersionListOut
     request_id: str
 
 
@@ -976,6 +1049,11 @@ class ResultEvaluationOut(StrictModel):
     created_at: datetime
 
 
+class JourneyResultEvaluationOut(ResultEvaluationOut):
+    stage_key: str
+    stage_title: str
+
+
 class HandoffOut(StrictModel):
     id: UUID
     status: Literal["READY"]
@@ -1011,6 +1089,7 @@ class ResultOut(StrictModel):
     status: str
     summary: str
     evaluation: ResultEvaluationOut
+    journey_evaluations: list[JourneyResultEvaluationOut]
     handoff: HandoffOut
     notification: NotificationDeliveryOut
     ai_summary: AiSummaryOut

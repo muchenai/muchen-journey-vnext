@@ -10,6 +10,10 @@ class AssignmentActionState:
     status: AssignmentStatus
     revision: int
     position: int
+    stage_key: str | None = None
+    stage_title: str | None = None
+    stage_kind: str | None = None
+    completion_policy: str | None = None
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,9 @@ class CurrentAction:
     title: str
     reason: str
     allowed_commands: tuple[str, ...]
+    stage_key: str | None = None
+    stage_kind: str | None = None
+    completion_policy: str | None = None
 
 
 def assignment_action(
@@ -79,6 +86,7 @@ def resolve_current_action(
     fallback_revision: int,
     enrollment_status: EnrollmentStatus | None,
     assignments: tuple[AssignmentActionState, ...],
+    journey_version_bound: bool = False,
 ) -> CurrentAction:
     if enrollment_status is None:
         return CurrentAction(
@@ -113,6 +121,39 @@ def resolve_current_action(
 
     active = tuple(item for item in assignments if item.status != AssignmentStatus.CANCELLED)
     if enrollment_status == EnrollmentStatus.ACTIVE:
+        if journey_version_bound:
+            ordered = sorted(active, key=lambda item: (item.position, str(item.id)))
+            selected = next(
+                (
+                    item
+                    for item in ordered
+                    if item.status != AssignmentStatus.COMPLETED
+                ),
+                None,
+            )
+            if selected is not None:
+                action_type, fallback_stage, title, reason, commands = assignment_action(
+                    selected.status
+                )
+                if selected.completion_policy == "LEARNER_EVIDENCE":
+                    if selected.status == AssignmentStatus.AVAILABLE:
+                        title = "进入这一站"
+                        reason = "先看清这一站，再留下你自己的认知证据。"
+                    elif selected.status == AssignmentStatus.IN_PROGRESS:
+                        title = "继续这一站"
+                        reason = "完成记录后，这一站会直接点亮并开放下一站。"
+                return CurrentAction(
+                    action_type,
+                    selected.stage_title or fallback_stage,
+                    selected.id,
+                    selected.revision,
+                    title,
+                    reason,
+                    commands,
+                    selected.stage_key,
+                    selected.stage_kind,
+                    selected.completion_policy,
+                )
         priorities = (
             (AssignmentStatus.NEEDS_REVISION,),
             (AssignmentStatus.AVAILABLE, AssignmentStatus.IN_PROGRESS),
@@ -134,6 +175,9 @@ def resolve_current_action(
                     title,
                     reason,
                     commands,
+                    selected.stage_key,
+                    selected.stage_kind,
+                    selected.completion_policy,
                 )
 
     completed = sorted(
@@ -151,6 +195,9 @@ def resolve_current_action(
             title,
             reason,
             commands,
+            selected.stage_key,
+            selected.stage_kind,
+            selected.completion_policy,
         )
     return CurrentAction(
         "RESOLVE_ENROLLMENT",

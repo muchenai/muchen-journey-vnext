@@ -253,27 +253,72 @@ def task_versions() -> list[dict[str, Any]]:
             .order_by(TaskDefinition.stable_key, TaskVersion.version)
         ).all()
         for stable_key, version in rows:
-            content = {
-                "title": version.title,
-                "instructions": version.instructions,
-                "completion_criteria": version.completion_criteria,
-                "rubric": version.rubric,
-                "allowed_attachment_types": version.allowed_attachment_types,
-                "max_attachment_size_bytes": version.max_attachment_size_bytes,
-            }
             items.append(
                 {
                     "stable_key": stable_key,
                     "version": version.version,
                     "task_version_id": str(version.id),
-                    "content_sha256": hashlib.sha256(
-                        json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
-                    ).hexdigest(),
+                    "publication_status": "PUBLISHED_DB",
+                    "content_sha256": content_sha256(task_version_content(version)),
                 }
             )
+    published_keys = {item["stable_key"] for item in items}
+    items.extend(
+        item for item in formal_catalog_versions() if item["stable_key"] not in published_keys
+    )
     if not items:
         raise CandidateError("candidate database contains no TaskVersion")
-    return items
+    return sorted(items, key=lambda item: (item["stable_key"], item["version"]))
+
+
+def task_version_content(version: Any) -> dict[str, Any]:
+    return {
+        "title": version.title,
+        "purpose": version.purpose,
+        "learner_outcome": version.learner_outcome,
+        "instructions": version.instructions,
+        "completion_criteria": version.completion_criteria,
+        "required_deliverables": version.required_deliverables,
+        "content_source_notes": version.content_source_notes,
+        "change_summary": version.change_summary,
+        "reviewer_calibration_note": version.reviewer_calibration_note,
+        "allowed_attachment_types": version.allowed_attachment_types,
+        "max_attachment_size_bytes": version.max_attachment_size_bytes,
+        "reference_materials": version.reference_materials,
+        "estimated_duration_minutes": version.estimated_duration_minutes,
+        "rubric": version.rubric,
+        "rubric_version": version.rubric_version,
+        "reviewer_role": version.reviewer_role,
+        "feedback_sla_business_days": version.feedback_sla_business_days,
+        "sensitivity": version.sensitivity,
+        "audience": version.audience,
+    }
+
+
+def content_sha256(content: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def formal_catalog_versions() -> list[dict[str, Any]]:
+    try:
+        from journey_api.formal_journey_catalog import (
+            FORMAL_STAGE_CATALOG,
+            task_version_values,
+        )
+    except ImportError as error:
+        raise CandidateError("formal catalog must be available in the API container") from error
+    return [
+        {
+            "stable_key": item.stable_key,
+            "version": 1,
+            "task_version_id": None,
+            "publication_status": "RUNTIME_OPERATOR_PUBLISH_REQUIRED",
+            "content_sha256": content_sha256(task_version_values(item)),
+        }
+        for item in FORMAL_STAGE_CATALOG
+    ]
 
 
 def mapping(values: Iterable[str]) -> dict[str, str]:

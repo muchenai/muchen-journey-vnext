@@ -19,6 +19,29 @@ export type CurrentAction = {
   revision: number;
   responsible_party: string;
   feedback_expectation: string;
+  journey: JourneyProgress | null;
+};
+
+export type JourneyProgressNode = {
+  stable_key: string;
+  position: number;
+  stage_kind: "DAY_0" | "TREASURE" | "ASSESSMENT";
+  completion_policy: "LEARNER_EVIDENCE" | "REVIEW_REQUIRED";
+  title: string;
+  short_description: string;
+  status: "COMPLETED" | "CURRENT" | "LOCKED";
+  assignment_id: string;
+};
+
+export type JourneyProgress = {
+  journey_version_id: string;
+  stable_key: string;
+  version: number;
+  title: string;
+  completed_stages: number;
+  total_stages: 8;
+  current_stage_key: string | null;
+  nodes: JourneyProgressNode[];
 };
 
 export type Assignment = {
@@ -51,6 +74,10 @@ export type Assignment = {
   draft: SubmissionDraft | null;
   available_attachments: Attachment[];
   latest_revision_feedback: string | null;
+  journey_stage: Omit<
+    JourneyProgressNode,
+    "status" | "assignment_id"
+  > | null;
 };
 
 export type Attachment = {
@@ -174,6 +201,21 @@ export type Result = {
     }>;
     created_at: string;
   };
+  journey_evaluations: Array<{
+    id: string;
+    reviewer_id: string;
+    decision: "PASS";
+    overall_feedback: string;
+    rubric_feedback: Array<{
+      dimension_key: string;
+      title: string;
+      rating: string;
+      feedback: string | null;
+    }>;
+    created_at: string;
+    stage_key: string;
+    stage_title: string;
+  }>;
   handoff: {
     id: string;
     status: "READY";
@@ -265,6 +307,28 @@ export type OpsInvite = {
   status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "REVOKED";
   expires_at: string;
   revision: number;
+  journey_version_id: string | null;
+};
+
+export type OpsFormalJourney = {
+  id: string;
+  stable_key: string;
+  version: number;
+  title: string;
+  purpose: string;
+  change_summary: string;
+  content_review_note: string;
+  published_at: string;
+  stages: Array<{
+    id: string;
+    stable_key: string;
+    position: number;
+    stage_kind: "DAY_0" | "TREASURE" | "ASSESSMENT";
+    completion_policy: "LEARNER_EVIDENCE" | "REVIEW_REQUIRED";
+    task_version_id: string;
+    title: string;
+    short_description: string;
+  }>;
 };
 
 export type OpsAuditEntry = {
