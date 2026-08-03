@@ -511,7 +511,7 @@ export async function createLearnerInvite(
 ): Promise<InviteActionState> {
   try {
     const reviewerId = requiredUuid(data, "reviewer_id");
-    const taskVersionId = requiredUuid(data, "task_version_id");
+    const journeyVersionId = requiredUuid(data, "journey_version_id");
     const purpose = data.get("purpose");
     if (typeof purpose !== "string" || purpose.trim().length < 3 || purpose.length > 200) {
       return { error: "邀请用途需为 3–200 个字符。" };
@@ -527,7 +527,7 @@ export async function createLearnerInvite(
           expires_in_hours: 24,
           role: "LEARNER",
           reviewer_id: reviewerId,
-          task_version_id: taskVersionId,
+          journey_version_id: journeyVersionId,
           target_user_id: null,
         }),
       },

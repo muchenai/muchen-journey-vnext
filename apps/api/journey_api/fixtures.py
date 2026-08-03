@@ -12,6 +12,11 @@ OPERATOR_ID = uuid.UUID("10000000-0000-4000-8000-000000000009")
 OPERATOR_ROLE_ID = uuid.UUID("10000000-0000-4000-8000-00000000000a")
 TASK_DEFINITION_ID = uuid.UUID("10000000-0000-4000-8000-00000000000b")
 TASK_VERSION_V2_ID = uuid.UUID("10000000-0000-4000-8000-00000000000c")
+JOURNEY_DEFINITION_ID = uuid.UUID("10000000-0000-4000-8000-00000000000d")
+JOURNEY_VERSION_ID = uuid.UUID("10000000-0000-4000-8000-00000000000e")
+JOURNEY_STAGE_VERSION_ID = uuid.UUID("10000000-0000-4000-8000-00000000000f")
+JOURNEY_VERSION_V2_ID = uuid.UUID("10000000-0000-4000-8000-000000000010")
+JOURNEY_STAGE_VERSION_V2_ID = uuid.UUID("10000000-0000-4000-8000-000000000011")
 
 # This is the public, synthetic-data contract for the one canonical fixture
 # builder. It intentionally records schema coverage and stable references, but
@@ -29,6 +34,11 @@ FIXTURE_MANIFEST = {
         "task_definition": str(TASK_DEFINITION_ID),
         "task_version_v1": str(TASK_VERSION_ID),
         "task_version_v2": str(TASK_VERSION_V2_ID),
+        "journey_definition": str(JOURNEY_DEFINITION_ID),
+        "journey_version": str(JOURNEY_VERSION_ID),
+        "journey_stage_version": str(JOURNEY_STAGE_VERSION_ID),
+        "journey_version_v2": str(JOURNEY_VERSION_V2_ID),
+        "journey_stage_version_v2": str(JOURNEY_STAGE_VERSION_V2_ID),
         "enrollment": str(ENROLLMENT_ID),
         "assignment": str(ASSIGNMENT_ID),
     },
@@ -51,6 +61,28 @@ FIXTURE_MANIFEST = {
             "version",
             "content_contract",
             "publish_evidence",
+        ],
+        "journey_definitions": [
+            "id",
+            "organization_id",
+            "stable_key",
+            "kind",
+            "status",
+            "revision",
+        ],
+        "journey_versions": [
+            "id",
+            "organization_id",
+            "journey_definition_id",
+            "version",
+            "title",
+        ],
+        "journey_stage_versions": [
+            "id",
+            "journey_version_id",
+            "stable_key",
+            "position",
+            "task_version_id",
         ],
         "enrollments": ["id", "organization_id", "learner_id", "status"],
         "assignments": [

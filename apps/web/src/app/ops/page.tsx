@@ -11,6 +11,7 @@ import {
   OpsEnrollment,
   OpsIdentityAccess,
   OpsInvite,
+  OpsJourneyDefinition,
   OpsNotificationDelivery,
   OpsNotificationEndpoint,
   OpsTaskDefinition,
@@ -38,6 +39,7 @@ export default async function OpsPage({
   const [
     query,
     tasks,
+    journeys,
     enrollments,
     audit,
     runtime,
@@ -48,6 +50,7 @@ export default async function OpsPage({
   ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
+    identityPageRequest<{ items: OpsJourneyDefinition[] }>("/api/v1/ops/journey-definitions", "OPERATOR"),
     identityPageRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
     identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
     identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
@@ -89,7 +92,7 @@ export default async function OpsPage({
         <InviteManagementPanel
           invites={invites.items}
           identityAccess={identityAccess.items}
-          tasks={tasks.items}
+          journeys={journeys.items}
         />
       </section>
 

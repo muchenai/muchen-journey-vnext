@@ -9,6 +9,7 @@ from sqlalchemy.exc import DBAPIError
 from journey_api.auth import Actor
 from journey_api.db import SessionLocal
 from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_VERSION_V2_ID
+from journey_api.journey_service import ensure_single_stage_alpha_journey
 from journey_api.main import app
 from journey_api.models import (
     Assignment,
@@ -408,12 +409,24 @@ def create_other_org_review() -> uuid.UUID:
             )
         )
         session.flush()
+        task = session.get(TaskVersion, task_id)
+        assert task is not None
+        journey_version, journey_stage = ensure_single_stage_alpha_journey(
+            session,
+            organization_id=organization_id,
+            stable_key="ALPHA-ISOLATION",
+            title="隔离组织 Alpha 验证旅程",
+            task=task,
+            owner_id=reviewer_id,
+            reviewer_id=reviewer_id,
+        )
         session.add(
             Enrollment(
                 id=enrollment_id,
                 organization_id=organization_id,
                 learner_id=learner_id,
                 reviewer_id=reviewer_id,
+                journey_version_id=journey_version.id,
                 status=EnrollmentStatus.ACTIVE,
                 revision=1,
             )
@@ -424,6 +437,8 @@ def create_other_org_review() -> uuid.UUID:
                 id=assignment_id,
                 organization_id=organization_id,
                 enrollment_id=enrollment_id,
+                journey_version_id=journey_version.id,
+                journey_stage_version_id=journey_stage.id,
                 task_definition_id=definition_id,
                 task_version_id=task_id,
                 position=1,

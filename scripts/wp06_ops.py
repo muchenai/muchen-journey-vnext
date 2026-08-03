@@ -36,7 +36,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0014_wp12_data_lifecycle"
+EXPECTED_MIGRATION_HEAD = "0015_wp19_journey_composition"
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",

@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
+from journey_api.journey_service import ensure_single_stage_alpha_journey
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -408,6 +409,15 @@ def apply_package(package_dir: Path) -> dict[str, object]:
                     status = "QUARANTINED"
                     reason_code = "OBJECT_SCOPE_CONFLICT"
                 else:
+                    journey_version, journey_stage = ensure_single_stage_alpha_journey(
+                        session,
+                        organization_id=manifest.target_organization_id,
+                        stable_key=f"OFFLINE-{str(task.id).replace('-', '')[:16].upper()}",
+                        title="Offline fixture Alpha journey",
+                        task=task,
+                        owner_id=manifest.operator_id,
+                        reviewer_id=item.reviewer_id,
+                    )
                     learner_id = uuid.uuid4()
                     enrollment_id = uuid.uuid4()
                     target_id = enrollment_id
@@ -435,6 +445,7 @@ def apply_package(package_dir: Path) -> dict[str, object]:
                             organization_id=manifest.target_organization_id,
                             learner_id=learner_id,
                             reviewer_id=item.reviewer_id,
+                            journey_version_id=journey_version.id,
                             status=EnrollmentStatus.ACTIVE,
                             revision=1,
                         )
@@ -445,6 +456,8 @@ def apply_package(package_dir: Path) -> dict[str, object]:
                             id=uuid.uuid4(),
                             organization_id=manifest.target_organization_id,
                             enrollment_id=enrollment_id,
+                            journey_version_id=journey_version.id,
+                            journey_stage_version_id=journey_stage.id,
                             task_definition_id=task.task_definition_id,
                             task_version_id=task.id,
                             position=1,

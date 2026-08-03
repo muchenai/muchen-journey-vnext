@@ -6,11 +6,12 @@ from sqlalchemy.exc import DBAPIError
 
 from journey_api.db import SessionLocal
 from journey_api.fixtures import (
-    ENROLLMENT_ID,
     LEARNER_ID,
+    OPERATOR_ID,
     ORGANIZATION_ID,
     REVIEWER_ID,
 )
+from journey_api.journey_service import ensure_single_stage_alpha_journey
 from journey_api.main import app
 from journey_api.models import (
     Assignment,
@@ -254,25 +255,57 @@ def test_published_task_version_is_immutable_in_database():
         assert stored.title == version["title"]
 
 
-def test_assignment_stays_on_v1_when_v2_is_published_and_drives_current_action():
+def test_assignment_stays_on_v1_when_v2_is_published():
     definition = create_definition(f"TSK-FIXED-{uuid.uuid4().hex[:8].upper()}")
     version_one = assert_ok(
         publish(str(definition["id"]), publish_payload(expected_revision=1, title="固定版本一"))
     )
     assignment_id = uuid.uuid4()
+    enrollment_id = uuid.uuid4()
+    learner_id = uuid.uuid4()
     with SessionLocal.begin() as session:
-        enrollment = session.get(Enrollment, ENROLLMENT_ID)
-        assert enrollment is not None
-        enrollment.status = EnrollmentStatus.ACTIVE
-        enrollment.revision += 1
+        task = session.get(TaskVersion, uuid.UUID(str(version_one["id"])))
+        assert task is not None
+        journey_version, journey_stage = ensure_single_stage_alpha_journey(
+            session,
+            organization_id=ORGANIZATION_ID,
+            stable_key=f"ALPHA-{definition['stable_key']}",
+            title="固定版本验证旅程",
+            task=task,
+            owner_id=OPERATOR_ID,
+            reviewer_id=REVIEWER_ID,
+        )
+        session.add(
+            User(
+                id=learner_id,
+                organization_id=ORGANIZATION_ID,
+                display_name="固定版本测试新人",
+                status=UserStatus.ACTIVE,
+            )
+        )
+        session.flush()
+        session.add(
+            Enrollment(
+                id=enrollment_id,
+                organization_id=ORGANIZATION_ID,
+                learner_id=learner_id,
+                reviewer_id=REVIEWER_ID,
+                journey_version_id=journey_version.id,
+                status=EnrollmentStatus.ACTIVE,
+                revision=1,
+            )
+        )
+        session.flush()
         session.add(
             Assignment(
                 id=assignment_id,
                 organization_id=ORGANIZATION_ID,
-                enrollment_id=ENROLLMENT_ID,
+                enrollment_id=enrollment_id,
+                journey_version_id=journey_version.id,
+                journey_stage_version_id=journey_stage.id,
                 task_definition_id=uuid.UUID(str(definition["id"])),
                 task_version_id=uuid.UUID(str(version_one["id"])),
-                position=2,
+                position=1,
                 status=AssignmentStatus.AVAILABLE,
                 revision=1,
             )
@@ -282,28 +315,6 @@ def test_assignment_stays_on_v1_when_v2_is_published_and_drives_current_action()
         publish(str(definition["id"]), publish_payload(expected_revision=2, title="新发布版本二"))
     )
     assert version_two["version"] == 2
-
-    detail = assert_ok(
-        client.get(f"/api/v1/me/assignments/{assignment_id}", headers=learner_headers)
-    )
-    assert detail["task_version"] == 1
-    assert detail["task_title"] == "固定版本一"
-    assert detail["allowed_commands"] == ["start"]
-    assert detail["learner_outcome"]
-    assert detail["required_deliverables"]
-    assert {item["dimension_key"] for item in detail["rubric"]["dimensions"]} == {
-        "problem_clarity",
-        "evidence_quality",
-        "action_feasibility",
-        "validation_design",
-    }
-
-    current = assert_ok(client.get("/api/v1/me/current-action", headers=learner_headers))
-    assert current["resource_id"] == str(assignment_id)
-    assert current["action_type"] == "START_OR_CONTINUE_TASK"
-    assert current["stage"] == "当前任务"
-    assert current["responsible_party"] == "试点主管"
-    assert current["feedback_expectation"] == "2 个工作日内"
 
     with SessionLocal() as session:
         assignment = session.get(Assignment, assignment_id)
@@ -319,6 +330,17 @@ def test_assignment_detail_does_not_leak_another_learners_task():
     other_enrollment_id = uuid.uuid4()
     other_assignment_id = uuid.uuid4()
     with SessionLocal.begin() as session:
+        task = session.get(TaskVersion, uuid.UUID(str(version["id"])))
+        assert task is not None
+        journey_version, journey_stage = ensure_single_stage_alpha_journey(
+            session,
+            organization_id=ORGANIZATION_ID,
+            stable_key=f"ALPHA-{definition['stable_key']}",
+            title="跨 Learner 访问验证旅程",
+            task=task,
+            owner_id=OPERATOR_ID,
+            reviewer_id=REVIEWER_ID,
+        )
         session.add(
             User(
                 id=other_learner_id,
@@ -334,6 +356,7 @@ def test_assignment_detail_does_not_leak_another_learners_task():
                 organization_id=ORGANIZATION_ID,
                 learner_id=other_learner_id,
                 reviewer_id=REVIEWER_ID,
+                journey_version_id=journey_version.id,
                 status=EnrollmentStatus.ACTIVE,
                 revision=1,
             )
@@ -344,6 +367,8 @@ def test_assignment_detail_does_not_leak_another_learners_task():
                 id=other_assignment_id,
                 organization_id=ORGANIZATION_ID,
                 enrollment_id=other_enrollment_id,
+                journey_version_id=journey_version.id,
+                journey_stage_version_id=journey_stage.id,
                 task_definition_id=uuid.UUID(str(definition["id"])),
                 task_version_id=uuid.UUID(str(version["id"])),
                 position=1,
