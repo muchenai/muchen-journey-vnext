@@ -31,15 +31,13 @@ export default async function RootLayout({
             Muchen Journey
           </Link>
           <nav aria-label="主要导航">
-            <Link href="/app">新人当前行动</Link>
-            <Link href="/auth/feishu?return_to=%2Freview">主管评审</Link>
-            <Link href="/auth/feishu?return_to=%2Fops">运营</Link>
+            <Link href="/app">我的行动</Link>
           </nav>
         </header>
         <main id="main-content" className="page-shell">
           {children}
         </main>
-        <footer className="site-footer">Muchen Journey vNext · Alpha</footer>
+        <footer className="site-footer">Muchen Journey · 让下一步更清晰</footer>
       </body>
     </html>
   );

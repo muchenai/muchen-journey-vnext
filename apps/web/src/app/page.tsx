@@ -22,24 +22,15 @@ export default async function Home({
     ? query.return_to
     : null;
   return (
-    <section className="hero">
-      <p className="eyebrow">探索营 · P0</p>
-      <h1>只看一个当前行动，完成一次真实闭环。</h1>
+    <section className="hero product-home">
+      <p className="eyebrow">从行动开始</p>
+      <h1>把一个真实问题，变成清晰的下一步。</h1>
       <p className="lede">
-        新人提交真实成果，主管评审固定版本，系统保留事实并给出唯一下一步。
+        围绕你正在面对的问题，完成一次行动、获得具体反馈，然后继续前进。
       </p>
       <div className="action-row">
-        <Link className="button primary" href="/join">
-          使用邀请加入
-        </Link>
-        <Link className="button secondary" href="/app">
-          已加入，进入当前行动
-        </Link>
-        <Link className="button secondary" href="/auth/feishu?return_to=%2Freview">
-          飞书登录进入主管评审
-        </Link>
-        <Link className="button secondary" href="/auth/feishu?return_to=%2Fops">
-          飞书登录进入运营
+        <Link className="button primary" href="/app">
+          继续我的行动
         </Link>
       </div>
       {authError ? (
@@ -52,10 +43,28 @@ export default async function Home({
           ) : null}
         </div>
       ) : null}
-      <aside className="notice" aria-label="环境说明">
-        Alpha 试点仅限受邀参与者。新人使用邀请加入；主管和运营使用飞书登录。
-        如无法进入，请联系试点运营。
-      </aside>
+      <section className="journey-intro" aria-labelledby="journey-intro-title">
+        <h2 id="journey-intro-title">一次只走好一步</h2>
+        <ol className="journey-steps">
+          <li>
+            <strong>看清当前任务</strong>
+            <span>知道现在要解决什么，以及完成的标准。</span>
+          </li>
+          <li>
+            <strong>提交真实成果</strong>
+            <span>用自己的工作内容回应问题，而不是完成形式。</span>
+          </li>
+          <li>
+            <strong>带着反馈继续</strong>
+            <span>获得具体建议，明确下一步行动。</span>
+          </li>
+        </ol>
+      </section>
+      <p className="role-entry">
+        首次加入请打开运营同学发送的专属邀请链接。主管可从
+        <Link href="/auth/feishu?return_to=%2Freview">评审入口</Link>
+        登录。
+      </p>
     </section>
   );
 }
