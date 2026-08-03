@@ -68,6 +68,12 @@ h1 { max-width: 16ch; margin-bottom: 20px; font-size: clamp(36px, 7vw, 64px); li
 h2 { font-size: 24px; line-height: 1.25; }
 .lede { max-width: 620px; color: var(--text-secondary); font-size: 20px; }
 .action-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 32px 0; }
+.journey-intro { margin-top: 64px; }
+.journey-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; list-style: none; }
+.journey-steps li { display: grid; gap: 6px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: 12px; }
+.journey-steps span, .role-entry { color: var(--text-secondary); }
+.role-entry { margin-top: 28px; }
+.role-entry a { margin: 0 4px; color: var(--action-primary); font-weight: 700; }
 
 .button {
   display: inline-flex;
@@ -220,6 +226,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   nav { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
   .page-shell { padding-top: 48px; }
   .action-row .button { width: 100%; }
+  .journey-steps { grid-template-columns: 1fr; }
   .section-heading-row { align-items: flex-start; flex-direction: column; gap: 8px; }
   .decision-grid { grid-template-columns: 1fr; }
   .fixed-references dl div { grid-template-columns: 1fr; gap: 0; }
