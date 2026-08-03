@@ -4,6 +4,11 @@ from journey_api.db import SessionLocal
 from journey_api.fixtures import (
     ASSIGNMENT_ID,
     ENROLLMENT_ID,
+    JOURNEY_DEFINITION_ID,
+    JOURNEY_STAGE_VERSION_ID,
+    JOURNEY_STAGE_VERSION_V2_ID,
+    JOURNEY_VERSION_ID,
+    JOURNEY_VERSION_V2_ID,
     LEARNER_ID,
     LEARNER_ROLE_ID,
     ORGANIZATION_ID,
@@ -20,6 +25,13 @@ from journey_api.models import (
     AssignmentStatus,
     Enrollment,
     EnrollmentStatus,
+    JourneyCompletionPolicy,
+    JourneyDefinition,
+    JourneyDefinitionStatus,
+    JourneyKind,
+    JourneyStageKind,
+    JourneyStageVersion,
+    JourneyVersion,
     Organization,
     Role,
     RoleAssignment,
@@ -218,6 +230,75 @@ def seed() -> None:
             )
             if task_definition.revision < 2:
                 task_definition.revision = 2
+        if session.get(JourneyDefinition, JOURNEY_DEFINITION_ID) is None:
+            session.add(
+                JourneyDefinition(
+                    id=JOURNEY_DEFINITION_ID,
+                    organization_id=ORGANIZATION_ID,
+                    stable_key="ALPHA-TSK-001",
+                    kind=JourneyKind.ALPHA_VALIDATION,
+                    status=JourneyDefinitionStatus.PUBLISHED,
+                    revision=2,
+                    created_by=OPERATOR_ID,
+                )
+            )
+            session.flush()
+        if session.get(JourneyVersion, JOURNEY_VERSION_ID) is None:
+            session.add(
+                JourneyVersion(
+                    id=JOURNEY_VERSION_ID,
+                    organization_id=ORGANIZATION_ID,
+                    journey_definition_id=JOURNEY_DEFINITION_ID,
+                    version=1,
+                    title="TSK-001 Alpha 验证旅程",
+                    change_summary="将已批准的 TSK-001 walking skeleton 固定为单阶段 Alpha Journey。",
+                    published_by=OPERATOR_ID,
+                    reviewed_by=REVIEWER_ID,
+                )
+            )
+            session.flush()
+        if session.get(JourneyStageVersion, JOURNEY_STAGE_VERSION_ID) is None:
+            session.add(
+                JourneyStageVersion(
+                    id=JOURNEY_STAGE_VERSION_ID,
+                    organization_id=ORGANIZATION_ID,
+                    journey_version_id=JOURNEY_VERSION_ID,
+                    stable_key="ALPHA-TSK-001",
+                    position=1,
+                    stage_kind=JourneyStageKind.ASSESSMENT,
+                    completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED,
+                    task_definition_id=task_definition.id,
+                    task_version_id=TASK_VERSION_ID,
+                )
+            )
+        if session.get(JourneyVersion, JOURNEY_VERSION_V2_ID) is None:
+            session.add(
+                JourneyVersion(
+                    id=JOURNEY_VERSION_V2_ID,
+                    organization_id=ORGANIZATION_ID,
+                    journey_definition_id=JOURNEY_DEFINITION_ID,
+                    version=2,
+                    title="TSK-001 Alpha 附件验证旅程",
+                    change_summary="固定 TSK-001 V2 附件合同的单阶段 Alpha Journey。",
+                    published_by=OPERATOR_ID,
+                    reviewed_by=REVIEWER_ID,
+                )
+            )
+            session.flush()
+        if session.get(JourneyStageVersion, JOURNEY_STAGE_VERSION_V2_ID) is None:
+            session.add(
+                JourneyStageVersion(
+                    id=JOURNEY_STAGE_VERSION_V2_ID,
+                    organization_id=ORGANIZATION_ID,
+                    journey_version_id=JOURNEY_VERSION_V2_ID,
+                    stable_key="ALPHA-TSK-001-ATTACHMENTS",
+                    position=1,
+                    stage_kind=JourneyStageKind.ASSESSMENT,
+                    completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED,
+                    task_definition_id=task_definition.id,
+                    task_version_id=TASK_VERSION_V2_ID,
+                )
+            )
         if session.get(Enrollment, ENROLLMENT_ID) is None:
             session.add(
                 Enrollment(
@@ -225,6 +306,7 @@ def seed() -> None:
                     organization_id=ORGANIZATION_ID,
                     learner_id=LEARNER_ID,
                     reviewer_id=REVIEWER_ID,
+                    journey_version_id=JOURNEY_VERSION_ID,
                     status=EnrollmentStatus.ACTIVE,
                     revision=1,
                 )
@@ -236,6 +318,8 @@ def seed() -> None:
                     id=ASSIGNMENT_ID,
                     organization_id=ORGANIZATION_ID,
                     enrollment_id=ENROLLMENT_ID,
+                    journey_version_id=JOURNEY_VERSION_ID,
+                    journey_stage_version_id=JOURNEY_STAGE_VERSION_ID,
                     task_definition_id=task_definition.id,
                     task_version_id=TASK_VERSION_ID,
                     position=1,

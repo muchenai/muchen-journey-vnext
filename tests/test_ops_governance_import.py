@@ -14,6 +14,8 @@ from journey_api import offline_import
 from journey_api.config import Settings, get_settings
 from journey_api.db import SessionLocal
 from journey_api.fixtures import (
+    JOURNEY_STAGE_VERSION_ID,
+    JOURNEY_VERSION_ID,
     OPERATOR_ID,
     ORGANIZATION_ID,
     REVIEWER_ID,
@@ -21,6 +23,7 @@ from journey_api.fixtures import (
     TASK_VERSION_ID,
 )
 from journey_api.main import app
+from journey_api.journey_service import ensure_single_stage_alpha_journey
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -36,6 +39,9 @@ from journey_api.models import (
     RoleAssignment,
     Submission,
     SubmissionVersion,
+    TaskDefinition,
+    TaskDefinitionStatus,
+    TaskVersion,
     User,
     UserStatus,
 )
@@ -91,6 +97,7 @@ def create_enrollment(
                 organization_id=ORGANIZATION_ID,
                 learner_id=learner_id,
                 reviewer_id=REVIEWER_ID,
+                journey_version_id=JOURNEY_VERSION_ID,
                 status=EnrollmentStatus.ACTIVE,
                 revision=1,
             )
@@ -101,6 +108,8 @@ def create_enrollment(
                 id=assignment_id,
                 organization_id=ORGANIZATION_ID,
                 enrollment_id=enrollment_id,
+                journey_version_id=JOURNEY_VERSION_ID,
+                journey_stage_version_id=JOURNEY_STAGE_VERSION_ID,
                 task_definition_id=TASK_DEFINITION_ID,
                 task_version_id=TASK_VERSION_ID,
                 position=1,
@@ -276,6 +285,8 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
     other_reviewer_id = uuid.uuid4()
     other_enrollment_id = uuid.uuid4()
     with SessionLocal.begin() as session:
+        source = session.get(TaskVersion, TASK_VERSION_ID)
+        assert source is not None
         session.add(Organization(id=other_org_id, name="WP-06 isolated organization"))
         session.add_all(
             [
@@ -294,12 +305,61 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
             ]
         )
         session.flush()
+        other_definition = TaskDefinition(
+            id=uuid.uuid4(),
+            organization_id=other_org_id,
+            stable_key="TSK-ISOLATED",
+            status=TaskDefinitionStatus.PUBLISHED,
+            revision=1,
+            created_by=other_reviewer_id,
+        )
+        session.add(other_definition)
+        session.flush()
+        other_task = TaskVersion(
+            id=uuid.uuid4(),
+            organization_id=other_org_id,
+            task_definition_id=other_definition.id,
+            version=1,
+            title=source.title,
+            purpose=source.purpose,
+            learner_outcome=source.learner_outcome,
+            instructions=source.instructions,
+            completion_criteria=source.completion_criteria,
+            required_deliverables=source.required_deliverables,
+            content_source_notes=source.content_source_notes,
+            change_summary=source.change_summary,
+            reviewer_calibration_note=source.reviewer_calibration_note,
+            allowed_attachment_types=source.allowed_attachment_types,
+            max_attachment_size_bytes=source.max_attachment_size_bytes,
+            reference_materials=source.reference_materials,
+            estimated_duration_minutes=source.estimated_duration_minutes,
+            rubric=source.rubric,
+            rubric_version=source.rubric_version,
+            reviewer_role=source.reviewer_role,
+            feedback_sla_business_days=source.feedback_sla_business_days,
+            sensitivity=source.sensitivity,
+            audience=source.audience,
+            published_by=other_reviewer_id,
+            reviewed_by=other_reviewer_id,
+        )
+        session.add(other_task)
+        session.flush()
+        journey_version, _ = ensure_single_stage_alpha_journey(
+            session,
+            organization_id=other_org_id,
+            stable_key="ALPHA-ISOLATED",
+            title="Isolated Alpha journey",
+            task=other_task,
+            owner_id=other_reviewer_id,
+            reviewer_id=other_reviewer_id,
+        )
         session.add(
             Enrollment(
                 id=other_enrollment_id,
                 organization_id=other_org_id,
                 learner_id=other_learner_id,
                 reviewer_id=other_reviewer_id,
+                journey_version_id=journey_version.id,
                 status=EnrollmentStatus.ACTIVE,
                 revision=1,
             )
@@ -311,7 +371,7 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
     )
     assert hidden.status_code == 404
     runtime = assert_ok(client.get("/api/v1/ops/runtime-status", headers=operator_headers))
-    assert runtime["migration_revision"] == "0014_wp12_data_lifecycle"
+    assert runtime["migration_revision"] == "0015_wp19_journey_composition"
     assert runtime["config_schema_version"] == 3
     assert runtime["external_observability_confirmed"] is False
     assert runtime["observability_mode"] == "STRUCTURED_STDOUT"

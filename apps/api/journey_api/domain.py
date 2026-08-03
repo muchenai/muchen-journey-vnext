@@ -27,6 +27,13 @@ def assignment_action(
     status: AssignmentStatus,
 ) -> tuple[str, str, str, str, tuple[str, ...]]:
     actions = {
+        AssignmentStatus.LOCKED: (
+            "RESOLVE_ENROLLMENT",
+            "阶段待解锁",
+            "完成前一阶段后继续",
+            "这个阶段仍被固定旅程顺序锁定。",
+            (),
+        ),
         AssignmentStatus.AVAILABLE: (
             "START_OR_CONTINUE_TASK",
             "当前任务",
@@ -111,35 +118,40 @@ def resolve_current_action(
             (),
         )
 
-    active = tuple(item for item in assignments if item.status != AssignmentStatus.CANCELLED)
-    if enrollment_status == EnrollmentStatus.ACTIVE:
-        priorities = (
-            (AssignmentStatus.NEEDS_REVISION,),
-            (AssignmentStatus.AVAILABLE, AssignmentStatus.IN_PROGRESS),
-            (AssignmentStatus.SUBMITTED, AssignmentStatus.IN_REVIEW),
+    active = tuple(
+        sorted(
+            (item for item in assignments if item.status != AssignmentStatus.CANCELLED),
+            key=lambda item: (item.position, str(item.id)),
         )
-        for statuses in priorities:
-            matching = sorted(
-                (item for item in active if item.status in statuses),
-                key=lambda item: (item.position, str(item.id)),
-            )
-            if matching:
-                selected = matching[0]
-                action_type, stage, title, reason, commands = assignment_action(selected.status)
+    )
+    if enrollment_status == EnrollmentStatus.ACTIVE:
+        pending = tuple(
+            item for item in active if item.status != AssignmentStatus.COMPLETED
+        )
+        if pending:
+            selected = pending[0]
+            if selected.status == AssignmentStatus.LOCKED:
                 return CurrentAction(
-                    action_type,
-                    stage,
+                    "RESOLVE_ENROLLMENT",
+                    "阶段待解锁",
                     selected.id,
                     selected.revision,
-                    title,
-                    reason,
-                    commands,
+                    "联系运营确认旅程顺序",
+                    "当前阶段仍被前置条件锁定，系统不会允许跳关。",
+                    (),
                 )
+            action_type, stage, title, reason, commands = assignment_action(selected.status)
+            return CurrentAction(
+                action_type,
+                stage,
+                selected.id,
+                selected.revision,
+                title,
+                reason,
+                commands,
+            )
 
-    completed = sorted(
-        (item for item in active if item.status == AssignmentStatus.COMPLETED),
-        key=lambda item: (item.position, str(item.id)),
-    )
+    completed = [item for item in active if item.status == AssignmentStatus.COMPLETED]
     if completed:
         selected = completed[-1]
         action_type, stage, title, reason, commands = assignment_action(selected.status)

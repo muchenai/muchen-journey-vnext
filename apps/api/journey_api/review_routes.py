@@ -23,6 +23,9 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     Evaluation,
+    JourneyDefinition,
+    JourneyKind,
+    JourneyVersion,
     OutboxEvent,
     OutboxStatus,
     Review,
@@ -537,16 +540,57 @@ def finalize_review(
         context.assignment.status = AssignmentStatus.COMPLETED
         if context.enrollment.status != EnrollmentStatus.ACTIVE:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
-        context.enrollment.status = EnrollmentStatus.COMPLETED
-        context.enrollment.revision += 1
-        create_pass_outcome_bundle(
-            session,
-            enrollment=context.enrollment,
-            assignment=context.assignment,
-            evaluation=evaluation,
-            reviewer_id=actor.id,
-            request_id=request.state.request_id,
+        next_assignment = session.scalar(
+            select(Assignment)
+            .where(
+                Assignment.organization_id == context.assignment.organization_id,
+                Assignment.enrollment_id == context.assignment.enrollment_id,
+                Assignment.journey_version_id == context.assignment.journey_version_id,
+                Assignment.position > context.assignment.position,
+                Assignment.status != AssignmentStatus.CANCELLED,
+            )
+            .order_by(Assignment.position, Assignment.id)
+            .with_for_update()
         )
+        if next_assignment is not None:
+            if next_assignment.status != AssignmentStatus.LOCKED:
+                raise ApiError(
+                    409,
+                    "INVALID_STATE_TRANSITION",
+                    "下一阶段状态与固定旅程顺序不一致。",
+                )
+            next_assignment.status = AssignmentStatus.AVAILABLE
+            next_assignment.revision += 1
+            add_event(session, "assignment.unlocked.v1", "assignment", next_assignment.id)
+        else:
+            journey_kind = session.scalar(
+                select(JourneyDefinition.kind)
+                .join(
+                    JourneyVersion,
+                    JourneyVersion.journey_definition_id == JourneyDefinition.id,
+                )
+                .where(
+                    JourneyVersion.id == context.enrollment.journey_version_id,
+                    JourneyVersion.organization_id == context.enrollment.organization_id,
+                    JourneyDefinition.organization_id == context.enrollment.organization_id,
+                )
+            )
+            if journey_kind == JourneyKind.FORMAL_EXPLORATION:
+                raise ApiError(
+                    409,
+                    "INVALID_STATE_TRANSITION",
+                    "正式旅程综合 Outcome 必须等待 WP-21 的多评测证据合同。",
+                )
+            context.enrollment.status = EnrollmentStatus.COMPLETED
+            context.enrollment.revision += 1
+            create_pass_outcome_bundle(
+                session,
+                enrollment=context.enrollment,
+                assignment=context.assignment,
+                evaluation=evaluation,
+                reviewer_id=actor.id,
+                request_id=request.state.request_id,
+            )
         assignment_event = "assignment.completed.v1"
     else:
         context.assignment.status = AssignmentStatus.NEEDS_REVISION

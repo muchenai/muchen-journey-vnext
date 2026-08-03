@@ -687,6 +687,7 @@ def cancel_enrollment(
     ).all()
     for assignment in assignments:
         if assignment.status in {
+            AssignmentStatus.LOCKED,
             AssignmentStatus.AVAILABLE,
             AssignmentStatus.IN_PROGRESS,
             AssignmentStatus.SUBMITTED,

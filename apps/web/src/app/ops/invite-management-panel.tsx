@@ -7,7 +7,7 @@ import {
   InviteActionState,
   revokeLearnerInvite,
 } from "@/app/actions";
-import { OpsIdentityAccess, OpsInvite, OpsTaskDefinition } from "@/lib/server/api";
+import { OpsIdentityAccess, OpsInvite, OpsJourneyDefinition } from "@/lib/server/api";
 
 const INITIAL_STATE: InviteActionState = {};
 
@@ -27,16 +27,18 @@ const STATUS_LABELS: Record<OpsInvite["status"], string> = {
 
 function CreateInviteForm({
   reviewers,
-  tasks,
+  journeys,
 }: {
   reviewers: OpsIdentityAccess[];
-  tasks: OpsTaskDefinition[];
+  journeys: OpsJourneyDefinition[];
 }) {
   const [state, action, pending] = useActionState(createLearnerInvite, INITIAL_STATE);
   const [copied, setCopied] = useState(false);
-  const taskVersions = tasks
-    .filter((task) => task.status === "PUBLISHED")
-    .flatMap((task) => task.versions.map((version) => ({ ...version, stableKey: task.stable_key })));
+  const journeyVersions = journeys
+    .filter((journey) => journey.status === "PUBLISHED" && journey.kind === "ALPHA_VALIDATION")
+    .flatMap((journey) =>
+      journey.versions.map((version) => ({ ...version, stableKey: journey.stable_key })),
+    );
 
   async function copyLink() {
     if (!state.joinPath) return;
@@ -61,12 +63,12 @@ function CreateInviteForm({
     );
   }
 
-  if (reviewers.length === 0 || taskVersions.length === 0) {
+  if (reviewers.length === 0 || journeyVersions.length === 0) {
     return (
       <p className="inline-error" role="alert">
         {reviewers.length === 0
           ? "当前没有已绑定飞书身份的 Reviewer；请先在本页“飞书身份访问”完成绑定。"
-          : "当前没有已发布的任务版本；不能创建无法进入真实闭环的邀请。"}
+          : "当前没有可激活的 Alpha 旅程版本；不能创建无法进入真实闭环的邀请。"}
       </p>
     );
   }
@@ -85,12 +87,12 @@ function CreateInviteForm({
         </select>
       </label>
       <label>
-        首个任务
-        <select name="task_version_id" required defaultValue="">
-          <option value="" disabled>选择已发布任务版本</option>
-          {taskVersions.map((version) => (
+        固定旅程版本
+        <select name="journey_version_id" required defaultValue="">
+          <option value="" disabled>选择已发布 Alpha 旅程</option>
+          {journeyVersions.map((version) => (
             <option key={version.id} value={version.id}>
-              {version.stableKey} · V{version.version} · {version.title}
+              {version.stableKey} · V{version.version} · {version.title} · {version.stages.length} 阶段
             </option>
           ))}
         </select>
@@ -122,11 +124,11 @@ function CreateInviteForm({
 export function InviteManagementPanel({
   invites,
   identityAccess,
-  tasks,
+  journeys,
 }: {
   invites: OpsInvite[];
   identityAccess: OpsIdentityAccess[];
-  tasks: OpsTaskDefinition[];
+  journeys: OpsJourneyDefinition[];
 }) {
   const reviewers = identityAccess.filter(
     (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
@@ -134,7 +136,7 @@ export function InviteManagementPanel({
 
   return (
     <>
-      <CreateInviteForm reviewers={reviewers} tasks={tasks} />
+      <CreateInviteForm reviewers={reviewers} journeys={journeys} />
       <h3>最近邀请</h3>
       {invites.length === 0 ? <p>尚未创建新人邀请。</p> : null}
       <ul className="ops-list invite-list">

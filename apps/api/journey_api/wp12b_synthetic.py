@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
 from journey_api.identity import credential_hash
+from journey_api.journey_service import ensure_single_stage_alpha_journey
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -303,6 +304,18 @@ def prepare(
                 )
             )
             session.flush()
+            task_version = session.get(TaskVersion, version_id)
+            if task_version is None:
+                raise SyntheticError("synthetic TaskVersion was not created")
+            journey_version, journey_stage = ensure_single_stage_alpha_journey(
+                session,
+                organization_id=organization_id,
+                stable_key="WP12B-SYNTHETIC",
+                title="WP-12B synthetic validation journey",
+                task=task_version,
+                owner_id=operator_id,
+                reviewer_id=reviewer_rows[0][0],
+            )
 
             learner_payloads: list[dict[str, Any]] = []
             for learner_index in range(learners_per_organization):
@@ -333,6 +346,7 @@ def prepare(
                         organization_id=organization_id,
                         learner_id=learner_id,
                         reviewer_id=reviewer_id,
+                        journey_version_id=journey_version.id,
                         status=EnrollmentStatus.ACTIVE,
                         revision=1,
                     )
@@ -343,6 +357,8 @@ def prepare(
                         id=assignment_id,
                         organization_id=organization_id,
                         enrollment_id=enrollment_id,
+                        journey_version_id=journey_version.id,
+                        journey_stage_version_id=journey_stage.id,
                         task_definition_id=definition_id,
                         task_version_id=version_id,
                         position=1,

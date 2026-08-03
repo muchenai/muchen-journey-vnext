@@ -104,8 +104,15 @@ class CreateInviteCommand(StrictModel):
     expires_in_hours: int = Field(ge=1, le=168)
     role: Literal["LEARNER"] = "LEARNER"
     reviewer_id: UUID
-    task_version_id: UUID
+    journey_version_id: UUID | None = None
+    task_version_id: UUID | None = None
     target_user_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_version_target(self) -> "CreateInviteCommand":
+        if (self.journey_version_id is None) == (self.task_version_id is None):
+            raise ValueError("Exactly one journey_version_id or legacy task_version_id is required")
+        return self
 
 
 class CreateLearnerReentryCommand(RevisionCommand):
@@ -210,6 +217,54 @@ class CreateTaskDefinitionCommand(StrictModel):
         return value.strip().upper()
 
 
+class CreateJourneyDefinitionCommand(StrictModel):
+    stable_key: str = Field(min_length=3, max_length=80, pattern=r"^[A-Z][A-Z0-9_-]+$")
+    kind: Literal["ALPHA_VALIDATION", "FORMAL_EXPLORATION"]
+
+    @field_validator("stable_key")
+    @classmethod
+    def normalize_stable_key(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class JourneyStageVersionInput(StrictModel):
+    stable_key: str = Field(min_length=3, max_length=80, pattern=r"^[A-Z][A-Z0-9_-]+$")
+    stage_kind: Literal["ORIENTATION", "TREASURE", "ASSESSMENT"]
+    completion_policy: Literal["LEARNER_EVIDENCE", "REVIEW_REQUIRED"]
+    task_version_id: UUID
+
+    @field_validator("stable_key")
+    @classmethod
+    def normalize_stable_key(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @model_validator(mode="after")
+    def validate_kind_policy(self) -> "JourneyStageVersionInput":
+        expected = (
+            "REVIEW_REQUIRED" if self.stage_kind == "ASSESSMENT" else "LEARNER_EVIDENCE"
+        )
+        if self.completion_policy != expected:
+            raise ValueError("Stage kind and completion policy do not match")
+        return self
+
+
+class PublishJourneyVersionCommand(RevisionCommand):
+    title: str = Field(min_length=3, max_length=180)
+    change_summary: str = Field(min_length=10, max_length=1_000)
+    reviewed_by: UUID
+    stages: list[JourneyStageVersionInput] = Field(min_length=1, max_length=9)
+
+    @model_validator(mode="after")
+    def validate_stages(self) -> "PublishJourneyVersionCommand":
+        stable_keys = [stage.stable_key for stage in self.stages]
+        task_versions = [stage.task_version_id for stage in self.stages]
+        if len(set(stable_keys)) != len(stable_keys):
+            raise ValueError("Journey stage stable keys must be unique")
+        if len(set(task_versions)) != len(task_versions):
+            raise ValueError("A TaskVersion can appear only once in a JourneyVersion")
+        return self
+
+
 RubricDimensionKey = Literal[
     "problem_clarity", "evidence_quality", "action_feasibility", "validation_design"
 ]
@@ -304,6 +359,7 @@ class InviteOut(StrictModel):
     id: UUID
     purpose: str
     role: Literal["LEARNER"]
+    journey_version_id: UUID
     status: str
     expires_at: datetime
     revision: int
@@ -496,6 +552,18 @@ class CurrentActionOut(StrictModel):
     revision: int
     responsible_party: str
     feedback_expectation: str
+    journey: "JourneyProgressOut | None"
+
+
+class JourneyProgressOut(StrictModel):
+    stable_key: str
+    version: int
+    title: str
+    current_stage_key: str | None
+    current_stage_kind: str | None
+    current_position: int | None
+    completed_stages: int
+    total_stages: int
 
 
 class CurrentActionResponse(StrictModel):
@@ -596,6 +664,49 @@ class TaskDefinitionListOut(StrictModel):
 
 class TaskDefinitionListResponse(StrictModel):
     data: TaskDefinitionListOut
+    request_id: str
+
+
+class JourneyStageVersionOut(StrictModel):
+    id: UUID
+    stable_key: str
+    position: int
+    stage_kind: str
+    completion_policy: str
+    task_definition_id: UUID
+    task_version_id: UUID
+
+
+class JourneyVersionSummaryOut(StrictModel):
+    id: UUID
+    version: int
+    title: str
+    published_at: datetime
+    stages: list[JourneyStageVersionOut]
+
+
+class JourneyDefinitionOut(StrictModel):
+    id: UUID
+    stable_key: str
+    kind: str
+    status: str
+    revision: int
+    content_owner_id: UUID
+    versions: list[JourneyVersionSummaryOut]
+    idempotency_replay: bool = False
+
+
+class JourneyDefinitionResponse(StrictModel):
+    data: JourneyDefinitionOut
+    request_id: str
+
+
+class JourneyDefinitionListOut(StrictModel):
+    items: list[JourneyDefinitionOut]
+
+
+class JourneyDefinitionListResponse(StrictModel):
+    data: JourneyDefinitionListOut
     request_id: str
 
 

@@ -34,6 +34,12 @@ from journey_api.models import (
     IdentitySession,
     Invite,
     InviteStatus,
+    JourneyCompletionPolicy,
+    JourneyDefinition,
+    JourneyDefinitionStatus,
+    JourneyKind,
+    JourneyStageVersion,
+    JourneyVersion,
     JoinContext,
     JoinContextStatus,
     OutboxEvent,
@@ -143,13 +149,15 @@ def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrol
     if len(active) != 1:
         return []
     enrollment = active[0]
-    if enrollment.reviewer_id != invite.reviewer_id:
+    if (
+        enrollment.reviewer_id != invite.reviewer_id
+        or enrollment.journey_version_id != invite.journey_version_id
+    ):
         return []
     assignment = session.scalar(
         select(Assignment.id).where(
             Assignment.organization_id == invite.organization_id,
             Assignment.enrollment_id == enrollment.id,
-            Assignment.task_version_id == invite.task_version_id,
             Assignment.status != AssignmentStatus.CANCELLED,
         )
     )
@@ -196,18 +204,69 @@ def create_invite(
             RoleAssignment.role == Role.REVIEWER,
         )
     )
-    task = session.scalar(
-        select(TaskVersion)
-        .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
+    journey_query = (
+        select(JourneyVersion, JourneyDefinition)
+        .join(
+            JourneyDefinition,
+            JourneyDefinition.id == JourneyVersion.journey_definition_id,
+        )
         .where(
-            TaskVersion.id == command.task_version_id,
-            TaskVersion.organization_id == actor.organization_id,
-            TaskDefinition.organization_id == actor.organization_id,
-            TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+            JourneyVersion.organization_id == actor.organization_id,
+            JourneyDefinition.organization_id == actor.organization_id,
+            JourneyDefinition.status == JourneyDefinitionStatus.PUBLISHED,
         )
     )
-    if reviewer is None or task is None:
-        raise ApiError(422, "VALIDATION_FAILED", "邀请的主管或任务版本无效。")
+    if command.journey_version_id is not None:
+        journey_row = session.execute(
+            journey_query.where(JourneyVersion.id == command.journey_version_id)
+        ).first()
+    else:
+        legacy_candidates = session.execute(
+            journey_query
+            .join(
+                JourneyStageVersion,
+                JourneyStageVersion.journey_version_id == JourneyVersion.id,
+            )
+            .where(
+                JourneyStageVersion.task_version_id == command.task_version_id,
+                JourneyStageVersion.organization_id == actor.organization_id,
+                JourneyDefinition.kind == JourneyKind.ALPHA_VALIDATION,
+            )
+        ).all()
+        if len(legacy_candidates) == 1:
+            journey_row = legacy_candidates[0]
+        else:
+            canonical = [
+                row
+                for row in legacy_candidates
+                if row[1].stable_key in {"ALPHA-LEGACY", "ALPHA-TSK-001"}
+            ]
+            journey_row = canonical[0] if len(canonical) == 1 else None
+    if reviewer is None or journey_row is None:
+        raise ApiError(422, "VALIDATION_FAILED", "邀请的主管或旅程版本无效。")
+    journey_version, journey_definition = journey_row
+    stages = session.scalars(
+        select(JourneyStageVersion)
+        .where(
+            JourneyStageVersion.journey_version_id == journey_version.id,
+            JourneyStageVersion.organization_id == actor.organization_id,
+        )
+        .order_by(JourneyStageVersion.position)
+    ).all()
+    if not stages:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "旅程版本没有可执行阶段。")
+    if journey_definition.kind == JourneyKind.FORMAL_EXPLORATION:
+        raise ApiError(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "正式探索营仍等待 WP-20/21 内容与结果合同，当前不能签发邀请。",
+        )
+    if any(stage.completion_policy != JourneyCompletionPolicy.REVIEW_REQUIRED for stage in stages):
+        raise ApiError(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "包含 Learner Evidence 的旅程必须等待 WP-20 完成策略后才能激活。",
+        )
     if command.target_user_id is not None:
         target = session.scalar(
             select(User).where(
@@ -226,6 +285,7 @@ def create_invite(
         purpose=command.purpose.strip(),
         role=Role.LEARNER,
         reviewer_id=command.reviewer_id,
+        journey_version_id=journey_version.id,
         task_version_id=command.task_version_id,
         target_user_id=command.target_user_id,
         status=InviteStatus.ACTIVE,
@@ -238,6 +298,7 @@ def create_invite(
         "id": str(invite.id),
         "purpose": invite.purpose,
         "role": invite.role.value,
+        "journey_version_id": str(invite.journey_version_id),
         "status": invite.status.value,
         "expires_at": invite.expires_at.isoformat(),
         "revision": invite.revision,
@@ -287,6 +348,7 @@ def list_invites(
                     id=invite.id,
                     purpose=invite.purpose,
                     role="LEARNER",
+                    journey_version_id=invite.journey_version_id,
                     status=visible_invite_status(invite),
                     expires_at=invite.expires_at,
                     revision=invite.revision,
@@ -373,7 +435,7 @@ def create_learner_reentry(
             Invite.organization_id == actor.organization_id,
             Invite.target_user_id == learner.id,
             Invite.reviewer_id == enrollment.reviewer_id,
-            Invite.task_version_id == assignment.task_version_id,
+            Invite.journey_version_id == enrollment.journey_version_id,
             Invite.status == InviteStatus.ACTIVE,
             Invite.expires_at > now,
         )
@@ -389,6 +451,7 @@ def create_learner_reentry(
         purpose=purpose,
         role=Role.LEARNER,
         reviewer_id=enrollment.reviewer_id,
+        journey_version_id=enrollment.journey_version_id,
         task_version_id=assignment.task_version_id,
         target_user_id=learner.id,
         status=InviteStatus.ACTIVE,
@@ -401,6 +464,7 @@ def create_learner_reentry(
         "id": str(invite.id),
         "purpose": invite.purpose,
         "role": invite.role.value,
+        "journey_version_id": str(invite.journey_version_id),
         "status": invite.status.value,
         "expires_at": invite.expires_at.isoformat(),
         "revision": invite.revision,
@@ -601,6 +665,7 @@ def exchange_invite(
             organization_id=invite.organization_id,
             learner_id=user.id,
             reviewer_id=invite.reviewer_id,
+            journey_version_id=invite.journey_version_id,
             status=EnrollmentStatus.PENDING_IDENTITY,
             revision=1,
         )
@@ -744,39 +809,54 @@ def confirm_identity(
         )
         enrollment.status = EnrollmentStatus.ACTIVE
         enrollment.revision += 1
-        task_version = session.scalar(
-            select(TaskVersion)
+        journey_stages = session.execute(
+            select(JourneyStageVersion, TaskVersion, TaskDefinition)
+            .join(TaskVersion, TaskVersion.id == JourneyStageVersion.task_version_id)
             .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
             .where(
-                TaskVersion.id == invite.task_version_id,
+                JourneyStageVersion.journey_version_id == invite.journey_version_id,
+                JourneyStageVersion.organization_id == invite.organization_id,
                 TaskVersion.organization_id == invite.organization_id,
                 TaskDefinition.organization_id == invite.organization_id,
                 TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
             )
-        )
-        if task_version is None:
-            raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的任务版本已不可用于新 Assignment。")
-        assignment = Assignment(
-            id=uuid.uuid4(),
-            organization_id=invite.organization_id,
-            enrollment_id=enrollment.id,
-            task_definition_id=task_version.task_definition_id,
-            task_version_id=invite.task_version_id,
-            position=1,
-            status=AssignmentStatus.AVAILABLE,
-            revision=1,
-        )
-        session.add(assignment)
+            .order_by(JourneyStageVersion.position)
+        ).all()
+        if not journey_stages:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的旅程版本已不可用于新 Assignment。")
+        for stage, task_version, _ in journey_stages:
+            session.add(
+                Assignment(
+                    id=uuid.uuid4(),
+                    organization_id=invite.organization_id,
+                    enrollment_id=enrollment.id,
+                    journey_version_id=invite.journey_version_id,
+                    journey_stage_version_id=stage.id,
+                    task_definition_id=task_version.task_definition_id,
+                    task_version_id=task_version.id,
+                    position=stage.position,
+                    status=(
+                        AssignmentStatus.AVAILABLE
+                        if stage.position == 1
+                        else AssignmentStatus.LOCKED
+                    ),
+                    revision=1,
+                )
+            )
     else:
         assignment = session.scalar(
             select(Assignment).where(
                 Assignment.organization_id == invite.organization_id,
                 Assignment.enrollment_id == enrollment.id,
-                Assignment.task_version_id == invite.task_version_id,
                 Assignment.status != AssignmentStatus.CANCELLED,
             )
+            .order_by(Assignment.position)
         )
-        if assignment is None or enrollment.reviewer_id != invite.reviewer_id:
+        if (
+            assignment is None
+            or enrollment.reviewer_id != invite.reviewer_id
+            or enrollment.journey_version_id != invite.journey_version_id
+        ):
             raise ApiError(409, "INVALID_STATE_TRANSITION", "重新进入链接与当前行动不再匹配。")
     invite.status = InviteStatus.CONSUMED
     invite.consumed_by = user.id

@@ -633,6 +633,18 @@
             "title": "Expires In Hours",
             "type": "integer"
           },
+          "journey_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Version Id"
+          },
           "purpose": {
             "maxLength": 200,
             "minLength": 3,
@@ -663,16 +675,22 @@
             "title": "Target User Id"
           },
           "task_version_id": {
-            "format": "uuid",
-            "title": "Task Version Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Version Id"
           }
         },
         "required": [
           "purpose",
           "expires_in_hours",
-          "reviewer_id",
-          "task_version_id"
+          "reviewer_id"
         ],
         "title": "CreateInviteCommand",
         "type": "object"
@@ -699,6 +717,11 @@
             "title": "Invite Token",
             "type": "string"
           },
+          "journey_version_id": {
+            "format": "uuid",
+            "title": "Journey Version Id",
+            "type": "string"
+          },
           "purpose": {
             "title": "Purpose",
             "type": "string"
@@ -721,6 +744,7 @@
           "id",
           "purpose",
           "role",
+          "journey_version_id",
           "status",
           "expires_at",
           "revision",
@@ -745,6 +769,32 @@
           "request_id"
         ],
         "title": "CreateInviteResponse",
+        "type": "object"
+      },
+      "CreateJourneyDefinitionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "ALPHA_VALIDATION",
+              "FORMAL_EXPLORATION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "stable_key": {
+            "maxLength": 80,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_-]+$",
+            "title": "Stable Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stable_key",
+          "kind"
+        ],
+        "title": "CreateJourneyDefinitionCommand",
         "type": "object"
       },
       "CreateLearnerReentryCommand": {
@@ -811,6 +861,16 @@
             "title": "Feedback Expectation",
             "type": "string"
           },
+          "journey": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyProgressOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason": {
             "title": "Reason",
             "type": "string"
@@ -846,7 +906,8 @@
           "allowed_commands",
           "revision",
           "responsible_party",
-          "feedback_expectation"
+          "feedback_expectation",
+          "journey"
         ],
         "title": "CurrentActionOut",
         "type": "object"
@@ -1808,6 +1869,11 @@
             "title": "Id",
             "type": "string"
           },
+          "journey_version_id": {
+            "format": "uuid",
+            "title": "Journey Version Id",
+            "type": "string"
+          },
           "purpose": {
             "title": "Purpose",
             "type": "string"
@@ -1830,6 +1896,7 @@
           "id",
           "purpose",
           "role",
+          "journey_version_id",
           "status",
           "expires_at",
           "revision"
@@ -1924,6 +1991,311 @@
           "request_id"
         ],
         "title": "JoinExchangeResponse",
+        "type": "object"
+      },
+      "JourneyDefinitionListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JourneyDefinitionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "JourneyDefinitionListOut",
+        "type": "object"
+      },
+      "JourneyDefinitionListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/JourneyDefinitionListOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "JourneyDefinitionListResponse",
+        "type": "object"
+      },
+      "JourneyDefinitionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "content_owner_id": {
+            "format": "uuid",
+            "title": "Content Owner Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_replay": {
+            "default": false,
+            "title": "Idempotency Replay",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "stable_key": {
+            "title": "Stable Key",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/JourneyVersionSummaryOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "stable_key",
+          "kind",
+          "status",
+          "revision",
+          "content_owner_id",
+          "versions"
+        ],
+        "title": "JourneyDefinitionOut",
+        "type": "object"
+      },
+      "JourneyDefinitionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/JourneyDefinitionOut"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "JourneyDefinitionResponse",
+        "type": "object"
+      },
+      "JourneyProgressOut": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_stages": {
+            "title": "Completed Stages",
+            "type": "integer"
+          },
+          "current_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Position"
+          },
+          "current_stage_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Stage Key"
+          },
+          "current_stage_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Stage Kind"
+          },
+          "stable_key": {
+            "title": "Stable Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total_stages": {
+            "title": "Total Stages",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stable_key",
+          "version",
+          "title",
+          "current_stage_key",
+          "current_stage_kind",
+          "current_position",
+          "completed_stages",
+          "total_stages"
+        ],
+        "title": "JourneyProgressOut",
+        "type": "object"
+      },
+      "JourneyStageVersionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "completion_policy": {
+            "enum": [
+              "LEARNER_EVIDENCE",
+              "REVIEW_REQUIRED"
+            ],
+            "title": "Completion Policy",
+            "type": "string"
+          },
+          "stable_key": {
+            "maxLength": 80,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_-]+$",
+            "title": "Stable Key",
+            "type": "string"
+          },
+          "stage_kind": {
+            "enum": [
+              "ORIENTATION",
+              "TREASURE",
+              "ASSESSMENT"
+            ],
+            "title": "Stage Kind",
+            "type": "string"
+          },
+          "task_version_id": {
+            "format": "uuid",
+            "title": "Task Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stable_key",
+          "stage_kind",
+          "completion_policy",
+          "task_version_id"
+        ],
+        "title": "JourneyStageVersionInput",
+        "type": "object"
+      },
+      "JourneyStageVersionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "completion_policy": {
+            "title": "Completion Policy",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "stable_key": {
+            "title": "Stable Key",
+            "type": "string"
+          },
+          "stage_kind": {
+            "title": "Stage Kind",
+            "type": "string"
+          },
+          "task_definition_id": {
+            "format": "uuid",
+            "title": "Task Definition Id",
+            "type": "string"
+          },
+          "task_version_id": {
+            "format": "uuid",
+            "title": "Task Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stable_key",
+          "position",
+          "stage_kind",
+          "completion_policy",
+          "task_definition_id",
+          "task_version_id"
+        ],
+        "title": "JourneyStageVersionOut",
+        "type": "object"
+      },
+      "JourneyVersionSummaryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/JourneyStageVersionOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "title",
+          "published_at",
+          "stages"
+        ],
+        "title": "JourneyVersionSummaryOut",
         "type": "object"
       },
       "NotificationDeliveryOut": {
@@ -2578,6 +2950,51 @@
           "request_id"
         ],
         "title": "PresignedAttachmentResponse",
+        "type": "object"
+      },
+      "PublishJourneyVersionCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "change_summary": {
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Change Summary",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reviewed_by": {
+            "format": "uuid",
+            "title": "Reviewed By",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/JourneyStageVersionInput"
+            },
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "Stages",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 180,
+            "minLength": 3,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "title",
+          "change_summary",
+          "reviewed_by",
+          "stages"
+        ],
+        "title": "PublishJourneyVersionCommand",
         "type": "object"
       },
       "PublishTaskVersionCommand": {
@@ -6971,6 +7388,190 @@
           }
         },
         "summary": "Revoke Invite"
+      }
+    },
+    "/api/v1/ops/journey-definitions": {
+      "get": {
+        "operationId": "list_journey_definitions_api_v1_ops_journey_definitions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyDefinitionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Journey Definitions"
+      },
+      "post": {
+        "operationId": "create_journey_definition_api_v1_ops_journey_definitions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJourneyDefinitionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Journey Definition"
+      }
+    },
+    "/api/v1/ops/journey-definitions/{journey_definition_id}/publish": {
+      "post": {
+        "operationId": "publish_journey_version_api_v1_ops_journey_definitions__journey_definition_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journey_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Journey Definition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fixture-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishJourneyVersionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Journey Version"
       }
     },
     "/api/v1/ops/notification-deliveries": {

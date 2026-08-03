@@ -19,6 +19,16 @@ export type CurrentAction = {
   revision: number;
   responsible_party: string;
   feedback_expectation: string;
+  journey: {
+    stable_key: string;
+    version: number;
+    title: string;
+    current_stage_key: string | null;
+    current_stage_kind: string | null;
+    current_position: number | null;
+    completed_stages: number;
+    total_stages: number;
+  } | null;
 };
 
 export type Assignment = {
@@ -227,6 +237,30 @@ export type OpsTaskDefinition = {
   versions: Array<{ id: string; version: number; title: string; published_at: string }>;
 };
 
+export type OpsJourneyDefinition = {
+  id: string;
+  stable_key: string;
+  kind: "ALPHA_VALIDATION" | "FORMAL_EXPLORATION";
+  status: string;
+  revision: number;
+  content_owner_id: string;
+  versions: Array<{
+    id: string;
+    version: number;
+    title: string;
+    published_at: string;
+    stages: Array<{
+      id: string;
+      stable_key: string;
+      position: number;
+      stage_kind: string;
+      completion_policy: string;
+      task_definition_id: string;
+      task_version_id: string;
+    }>;
+  }>;
+};
+
 export type OpsEnrollment = {
   id: string;
   learner_id: string;
@@ -262,6 +296,7 @@ export type OpsInvite = {
   id: string;
   purpose: string;
   role: "LEARNER";
+  journey_version_id: string;
   status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "REVOKED";
   expires_at: string;
   revision: number;

@@ -61,7 +61,7 @@ def test_current_action_handles_enrollment_boundaries(
     assert action.allowed_commands == commands
 
 
-def test_current_action_uses_business_priority_then_assignment_order():
+def test_current_action_never_skips_an_earlier_unfinished_stage():
     waiting = state(AssignmentStatus.SUBMITTED, position=1)
     available = state(AssignmentStatus.AVAILABLE, position=2)
     revision = state(AssignmentStatus.NEEDS_REVISION, position=3)
@@ -71,8 +71,8 @@ def test_current_action_uses_business_priority_then_assignment_order():
         enrollment_status=EnrollmentStatus.ACTIVE,
         assignments=(waiting, available, revision),
     )
-    assert action.action_type == "REVISE_SUBMISSION"
-    assert action.resource_id == revision.id
+    assert action.action_type == "WAIT_FOR_REVIEW"
+    assert action.resource_id == waiting.id
 
 
 def test_current_action_moves_to_next_available_task_after_completion():

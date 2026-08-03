@@ -19,6 +19,11 @@ export default async function LearnerHome() {
     <section className="content-narrow">
       <p className="eyebrow">你的当前行动</p>
       <article className="status-card">
+        {action.journey ? (
+          <p className="section-label">
+            {action.journey.title} · {action.journey.completed_stages}/{action.journey.total_stages}
+          </p>
+        ) : null}
         <span className="badge">{action.stage}</span>
         <h1>{action.title}</h1>
         <p>{action.reason}</p>
