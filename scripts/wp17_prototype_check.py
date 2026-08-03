@@ -60,7 +60,7 @@ def main() -> None:
     require("从问题出发。" not in html, "superseded first-screen proposition returned")
     require("revise: ['done', 'done', 'current', '']" in html, "revision must remain visually incomplete")
     require("/review" not in html and "/ops" not in html, "professional tools must not be included in the Learner prototype")
-    require("PROTOTYPE_READY_FOR_REVIEW" in doc, "document must not claim implementation or deployment")
+    require("PROTOTYPE_APPROVED_FOR_HUMAN_TEST" in doc, "approved prototype must remain bounded to human testing")
     require("/review" in doc and "/ops" in doc, "document must preserve professional-tool exclusions")
     require("不得一次性重写全部路由" in doc, "single-WIP implementation boundary is missing")
 
