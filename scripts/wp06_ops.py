@@ -289,13 +289,22 @@ def migration_check() -> Path:
     try:
         compose("exec", "-T", "db-test", "createdb", "-U", TEST_DATABASE_USER, database)
         created = True
+        # Seed through the current ORM only after the database reaches the
+        # current schema.  Running today's model against a historical revision
+        # breaks as soon as a later migration adds a mapped column.  The
+        # downgrade below converts the fixture into the exact 0009 shape before
+        # the forward-compatibility facts are captured.
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
-            "api", "alembic", "upgrade", "0009_notification_scope",
+            "api", "alembic", "upgrade", "head",
         )
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "python", "-m", "journey_api.seed",
+        )
+        compose(
+            "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
+            "api", "alembic", "downgrade", "0009_notification_scope",
         )
         before = legacy_database_facts("db-test", database)
         compose(
@@ -330,6 +339,7 @@ def migration_check() -> Path:
                     "upgrade_0009_to_head": "PASS",
                     "downgrade_head_to_0009": "PASS",
                     "reupgrade_to_head": "PASS",
+                    "legacy_fixture_prepared_by_current_seed_then_downgrade": True,
                     "business_facts_preserved": True,
                     "facts": reupgraded,
             },

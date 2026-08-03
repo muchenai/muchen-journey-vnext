@@ -112,3 +112,48 @@ def test_http_request_rejects_invalid_local_api_port(monkeypatch):
 
     with pytest.raises(OpsError, match="valid TCP port"):
         ops.http_request("/health/ready")
+
+
+def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
+    monkeypatch, tmp_path
+):
+    calls: list[tuple[str, ...]] = []
+    legacy_facts = {"counts": {"enrollments": 1}, "task_version_fingerprint": "fixed"}
+    current_facts = {
+        "migration_revision": ops.EXPECTED_MIGRATION_HEAD,
+        "counts": {"enrollments": 1},
+        "task_version_fingerprint": "fixed",
+        "invalid_constraints": 0,
+        "critical_invariant_violations": 0,
+    }
+
+    monkeypatch.setattr(ops, "ensure_local_services", lambda: None)
+    monkeypatch.setattr(ops, "psql", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(ops, "compose", lambda *args: calls.append(args))
+    monkeypatch.setattr(ops, "legacy_database_facts", lambda *_args: legacy_facts)
+    monkeypatch.setattr(ops, "database_facts", lambda *_args: current_facts)
+    monkeypatch.setattr(ops, "make_run_directory", lambda: tmp_path)
+    monkeypatch.setattr(
+        ops,
+        "write_private_json",
+        lambda path, value: path.write_text(json.dumps(value)),
+    )
+
+    report_path = ops.migration_check()
+    report = json.loads(report_path.read_text())
+    api_steps = [
+        call[6:]
+        for call in calls
+        if len(call) > 6 and call[5] == "api"
+    ]
+
+    assert api_steps == [
+        ("alembic", "upgrade", "head"),
+        ("python", "-m", "journey_api.seed"),
+        ("alembic", "downgrade", "0009_notification_scope"),
+        ("alembic", "upgrade", "head"),
+        ("alembic", "downgrade", "0009_notification_scope"),
+        ("alembic", "upgrade", "head"),
+    ]
+    assert report["legacy_fixture_prepared_by_current_seed_then_downgrade"] is True
+    assert report["business_facts_preserved"] is True
