@@ -11,6 +11,27 @@ from scripts import wp08_runtime_inventory as inventory
 CANDIDATE = "2" * 40
 API = "3" * 40
 WORKER = "4" * 40
+IMAGE_ID = "a" * 64
+IMAGE_DIGEST = "b" * 64
+
+
+def safe_container_metadata(service: str) -> dict[str, object]:
+    return {
+        "compose_config_files": ["compose.yaml"],
+        "compose_project": inventory.COMPOSE_PROJECT,
+        "compose_release_directory": f"{CANDIDATE}-12345",
+        "compose_service": service,
+        "container_name": inventory.CONTAINERS[service],
+        "image_id": f"sha256:{IMAGE_ID}",
+        "image_reference_digest": f"sha256:{IMAGE_DIGEST}",
+        "networks": [
+            {
+                "aliases": [inventory.CONTAINERS[service], service],
+                "name": "journey-next-staging_default",
+            }
+        ],
+        "running": True,
+    }
 
 
 def test_inventory_outputs_only_safe_revision_and_health_fields(
@@ -19,7 +40,21 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
     marker = tmp_path / "DEPLOYED_CANDIDATE"
     marker.write_text(CANDIDATE)
     monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", marker)
-    monkeypatch.setattr(inventory, "_inspect_running_container", lambda _name: None)
+    monkeypatch.setattr(
+        inventory,
+        "_inspect_running_container",
+        lambda _name, service: safe_container_metadata(service),
+    )
+    monkeypatch.setattr(
+        inventory,
+        "_project_service_counts",
+        lambda: {service: 1 for service in inventory.CONTAINERS},
+    )
+    monkeypatch.setattr(
+        inventory,
+        "_caddy_upstreams",
+        lambda: {"production": "production-web:3000", "staging": "web:3000"},
+    )
 
     def container_json(container: str, _code: str):
         if container == inventory.CONTAINERS["api"]:
@@ -46,6 +81,19 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
         "api_health_status": "ok",
         "api_release": API,
         "config_schema_version": 3,
+        "container_runtime": {
+            service: safe_container_metadata(service)
+            for service in inventory.CONTAINERS
+        },
+        "compose_project": inventory.COMPOSE_PROJECT,
+        "compose_service_counts": {
+            service: 1 for service in inventory.CONTAINERS
+        },
+        "compose_singleton_services": True,
+        "caddy_upstreams": {
+            "production": "production-web:3000",
+            "staging": "web:3000",
+        },
         "deployed_candidate": CANDIDATE,
         "heartbeat_release": API,
         "migration_revision": "0013_wp11_notify_observability",
@@ -64,7 +112,21 @@ def test_inventory_rejects_missing_or_malformed_revision_evidence(
     marker = tmp_path / "DEPLOYED_CANDIDATE"
     marker.write_text(CANDIDATE)
     monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", marker)
-    monkeypatch.setattr(inventory, "_inspect_running_container", lambda _name: None)
+    monkeypatch.setattr(
+        inventory,
+        "_inspect_running_container",
+        lambda _name, service: safe_container_metadata(service),
+    )
+    monkeypatch.setattr(
+        inventory,
+        "_project_service_counts",
+        lambda: {service: 1 for service in inventory.CONTAINERS},
+    )
+    monkeypatch.setattr(
+        inventory,
+        "_caddy_upstreams",
+        lambda: {"production": "production-web:3000", "staging": "web:3000"},
+    )
     monkeypatch.setattr(
         inventory,
         "_container_json",
@@ -93,3 +155,158 @@ def test_inventory_requires_authorized_deployed_candidate(monkeypatch, tmp_path:
 
     with pytest.raises(inventory.InventoryError, match="authorized candidate"):
         inventory.collect(CANDIDATE)
+
+
+def test_container_metadata_is_whitelisted_and_redacts_runtime_secrets(monkeypatch):
+    name = inventory.CONTAINERS["web"]
+    raw = json.dumps(
+        [
+            {
+                "Name": f"/{name}",
+                "State": {"Running": True},
+                "Image": f"sha256:{IMAGE_ID}",
+                "Config": {
+                    "Image": (
+                        "ghcr.io/muchenai2024-creator/"
+                        "muchen-journey-vnext-web@sha256:"
+                        f"{IMAGE_DIGEST}"
+                    ),
+                    "Env": ["SESSION_SECRET=never-output-this"],
+                    "Labels": {
+                        "com.docker.compose.project": inventory.COMPOSE_PROJECT,
+                        "com.docker.compose.service": "web",
+                        "com.docker.compose.project.working_dir": (
+                            f"/srv/journey-next-staging/releases/{CANDIDATE}-12345"
+                        ),
+                        "com.docker.compose.project.config_files": (
+                            f"/srv/journey-next-staging/releases/{CANDIDATE}-12345/compose.yaml"
+                        ),
+                    },
+                },
+                "Mounts": [{"Source": "/secret/path"}],
+                "NetworkSettings": {
+                    "IPAddress": "10.88.10.242",
+                    "Networks": {
+                        "journey-next-staging_default": {
+                            "Aliases": [name, "web"],
+                            "IPAddress": "172.20.0.4",
+                        }
+                    },
+                },
+            }
+        ]
+    )
+    monkeypatch.setattr(inventory, "_run", lambda *_args: raw)
+
+    result = inventory._inspect_running_container(name, "web")
+
+    assert result == safe_container_metadata("web")
+    encoded = json.dumps(result)
+    assert "never-output-this" not in encoded
+    assert "/secret/path" not in encoded
+    assert "10.88.10.242" not in encoded
+    assert "172.20.0.4" not in encoded
+
+
+def test_project_service_counts_detects_duplicate_web_without_outputting_ids(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        inventory,
+        "_run",
+        lambda *_args: "\n".join(
+            [
+                inventory.CONTAINERS["api"],
+                inventory.CONTAINERS["worker"],
+                inventory.CONTAINERS["web"],
+                "journey-next-staging-web-2",
+                inventory.CONTAINERS["edge"],
+            ]
+        ),
+    )
+
+    assert inventory._project_service_counts() == {
+        "api": 1,
+        "worker": 1,
+        "web": 2,
+        "edge": 1,
+    }
+
+
+def test_container_metadata_rejects_unreviewed_network_alias(monkeypatch):
+    name = inventory.CONTAINERS["web"]
+    raw = json.dumps(
+        [
+            {
+                "Name": f"/{name}",
+                "State": {"Running": True},
+                "Image": f"sha256:{IMAGE_ID}",
+                "Config": {
+                    "Image": (
+                        "ghcr.io/muchenai2024-creator/"
+                        "muchen-journey-vnext-web@sha256:"
+                        f"{IMAGE_DIGEST}"
+                    ),
+                    "Labels": {
+                        "com.docker.compose.project": inventory.COMPOSE_PROJECT,
+                        "com.docker.compose.service": "web",
+                        "com.docker.compose.project.working_dir": (
+                            f"/srv/journey-next-staging/releases/{CANDIDATE}-12345"
+                        ),
+                        "com.docker.compose.project.config_files": (
+                            f"/srv/journey-next-staging/releases/{CANDIDATE}-12345/compose.yaml"
+                        ),
+                    },
+                },
+                "NetworkSettings": {
+                    "Networks": {
+                        "journey-next-staging_default": {
+                            "Aliases": [name, "web", "unreviewed-backend"]
+                        }
+                    }
+                },
+            }
+        ]
+    )
+    monkeypatch.setattr(inventory, "_run", lambda *_args: raw)
+
+    with pytest.raises(inventory.InventoryError, match="outside the whitelist"):
+        inventory._inspect_running_container(name, "web")
+
+
+def test_caddy_inventory_outputs_only_safe_upstreams(monkeypatch):
+    monkeypatch.setattr(
+        inventory,
+        "_run",
+        lambda *_args: """
+{$STAGING_HOST} {
+  reverse_proxy web:3000
+}
+{$PRODUCTION_HOST} {
+  reverse_proxy production-web:3000
+}
+""",
+    )
+
+    assert inventory._caddy_upstreams() == {
+        "production": "production-web:3000",
+        "staging": "web:3000",
+    }
+
+
+def test_caddy_inventory_does_not_cross_host_blocks(monkeypatch):
+    monkeypatch.setattr(
+        inventory,
+        "_run",
+        lambda *_args: """
+{$STAGING_HOST} {
+  encode gzip
+}
+{$PRODUCTION_HOST} {
+  reverse_proxy production-web:3000
+}
+""",
+    )
+
+    with pytest.raises(inventory.InventoryError, match="incomplete"):
+        inventory._caddy_upstreams()
