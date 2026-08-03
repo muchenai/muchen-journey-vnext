@@ -237,6 +237,7 @@ def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
             "CANDIDATE_COMMIT": CANDIDATE,
             "BASELINE_CANDIDATE": WEB_ONLY_BASELINE,
             "STAGING_HOST": STAGING_HOST,
+            "PRODUCTION_HOST": PRODUCTION_HOST,
             **selected_images,
         },
     )
