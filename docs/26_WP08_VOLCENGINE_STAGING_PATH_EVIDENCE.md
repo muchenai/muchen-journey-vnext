@@ -294,3 +294,10 @@
 - staging Caddyfile 仅把 upstream 从通用 `web:3000` 改为 inventory 已验证的唯一 `journey-next-staging-web-1:3000`；production upstream `production-web:3000`、TLS、域名、安全头和日志策略保持不变。官方 Caddy 合同说明当前 `admin off` 不支持管理 API reload，因此首次应用必须重建一次 Edge，不能把未受支持的“热加载”当作零中断证据。
 - 新 `phase=repair-edge-route` 固定候选、确认词、旧 production release 与 Edge digest，先验证两个 Web 的直接 readiness 和共享 alias prestate，再用现行 Caddy binary validate。唯一变更命令为 `docker compose ... up -d --no-deps --force-recreate --pull never edge`；禁止 image pull、Web/API/Worker、migration、grant、seed、Terraform、DNS、云资源、消息和 WP-12B。
 - 公开验收要求 12 轮连续新连接均得到 staging 候选、production 既有 release、两个根页面 200 与 staging 两个受保护路由 401，避免单次探针再次掩盖 Docker DNS 轮询。应用或验收失败时，root-only 备份原位恢复并只重建 Edge；成功后删除临时状态。临时 SSH 仍由 `always()` 无条件关闭。本合同本身不构成 mutation dispatch 授权，production 继续 `NO_GO`。
+
+## 2026-08-03 Edge-only 修复应用与公开 staging 验收
+
+- Owner 精确授权候选 `ef0a512cf357001cfd8cb6803f65cc17ae697325` 基于主线 `36e80e6a6d783dba0417c88612794b0c1e105db0` 在现有 staging 执行一次 `phase=repair-edge-route`。唯一 run [`30826160950`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30826160950) 成功，未重试。
+- run 在修复前证明 staging Web=`ef0a512…`、production Web=`8e56e759…`、共享 alias 冲突、Edge 固定摘要、Compose project/release 和旧 Caddyfile；随后用现行 Caddy binary 校验新配置，仅以 `--no-deps --force-recreate --pull never edge` 重建 Edge。
+- workflow 内 12 轮连续新连接和主任务独立 12 轮复验均证明 staging readiness=`ef0a512…`、production readiness=`8e56e759…`、两个根页面 200、staging 匿名 `/ops` 与 `/review` 401。回退步骤未触发，成功状态已清理，SSH 关闭步骤输出 `WP08_SSH_INGRESS=CLOSED`。
+- 本证据只关闭公开 staging Edge 路由债务；正式 Journey V1 的 Operator/Reviewer 发布事实仍待生成，内容真人理解、独立 Reviewer 校准、WP-23 完整旅程与 production GO 均不因此转绿。
