@@ -57,6 +57,15 @@ def main() -> None:
     require('class="route-point feedback"' not in html, "route points must not reuse result-card feedback styles")
     require("接下来约 60 分钟" not in html and "你只需关注" not in html, "redundant explanatory copy returned")
     require("这里，<br>没有标准答案。" in html, "approved first-screen proposition is missing")
+    require(
+        '<span class="worldview">It\'s a long game.</span>' in html,
+        "approved secondary worldview line is missing",
+    )
+    require(
+        "<h1>It's a long game." not in html
+        and '<h1 id="entry-title">It\'s a long game.' not in html,
+        "secondary worldview line replaced the primary proposition",
+    )
     require("从问题出发。" not in html, "superseded first-screen proposition returned")
     require("revise: ['done', 'done', 'current', '']" in html, "revision must remain visually incomplete")
     require("/review" not in html and "/ops" not in html, "professional tools must not be included in the Learner prototype")

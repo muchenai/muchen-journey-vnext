@@ -82,6 +82,8 @@
     .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 34px; }
     .brand { display: flex; align-items: center; gap: 13px; font-weight: 800; letter-spacing: -.02em; }
     .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; color: white; background: linear-gradient(145deg, var(--blue), #4e85ec); box-shadow: 0 10px 28px rgba(49, 95, 214, .25); }
+    .journey-meta { display: grid; gap: 2px; text-align: right; }
+    .worldview { color: var(--blue-deep); font-size: 11px; font-weight: 800; letter-spacing: .16em; opacity: .72; text-transform: uppercase; }
     .journey-id { color: var(--muted); font-size: 14px; }
 
     .stage-track { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 42px; }
@@ -197,6 +199,7 @@
       .prototype-label span { display: none; }
       .shell { width: min(100% - 24px, 1180px); padding-top: 22px; }
       .brand-row { align-items: flex-start; flex-direction: column; margin-bottom: 25px; }
+      .journey-meta { text-align: left; }
       .stage-track { gap: 3px; margin-bottom: 28px; }
       .stage { font-size: 11px; }
       .stage-dot { width: 30px; height: 30px; }
@@ -231,7 +234,10 @@
   <main class="shell">
     <div class="brand-row">
       <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>Muchen Journey</span></div>
-      <div class="journey-id">探索营 · 第一段 · 行动任务 01</div>
+      <div class="journey-meta">
+        <span class="worldview">It's a long game.</span>
+        <span class="journey-id">探索营 · 第一段 · 行动任务 01</span>
+      </div>
     </div>
 
     <div class="stage-track" aria-label="旅程阶段">
