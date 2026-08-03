@@ -14,7 +14,7 @@ WP07_PYTHON_IMAGE := python:3.14.6-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa0087
 WP08_LOCAL_DB_PORT ?= 35432
 WP08_LOCAL_API_PORT ?= 38000
 
-.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke
+.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp17-prototype-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke
 
 bootstrap:
 	docker compose build api worker
@@ -117,9 +117,12 @@ wp15-alpha-cutover-check:
 wp16-web-only-check:
 	python3 scripts/wp16_web_only.py
 
+wp17-prototype-check:
+	python3 scripts/wp17_prototype_check.py
+
 ci-fast:
 	$(MAKE) web-install
-	$(MAKE) traceability-check legacy-reference-scan wp08-web-only-check wp08-workflow-check wp11-staging-audit-check wp12-hardening-check wp12b-contract-check wp13-15-plan-check wp15-alpha-cutover-check wp16-web-only-check secret-scan dependency-audit
+	$(MAKE) traceability-check legacy-reference-scan wp08-web-only-check wp08-workflow-check wp11-staging-audit-check wp12-hardening-check wp12b-contract-check wp13-15-plan-check wp15-alpha-cutover-check wp16-web-only-check wp17-prototype-check secret-scan dependency-audit
 	$(MAKE) api-test openapi-check wp12-data-lifecycle-check web-static
 
 ci-main:
