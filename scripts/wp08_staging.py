@@ -25,6 +25,7 @@ INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
 RUNTIME_INVENTORY_SCRIPT = ROOT / "scripts" / "wp08_runtime_inventory.py"
 FAILED_RELEASE_CLEANUP_SCRIPT = ROOT / "scripts" / "wp08_failed_release_cleanup.py"
+EDGE_ROUTE_REPAIR_SCRIPT = ROOT / "scripts" / "wp08_edge_route_repair.py"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
 STAGING_CADDYFILE = ROOT / "deploy" / "staging" / "Caddyfile"
 WEB_READINESS_ROUTE = (
@@ -148,6 +149,7 @@ def validate_files() -> None:
         "scripts/wp08_security_group.py",
         "scripts/wp08_runtime_inventory.py",
         "scripts/wp08_failed_release_cleanup.py",
+        "scripts/wp08_edge_route_repair.py",
         "scripts/wp08_web_only.py",
         "config/wp08_web_only.json",
         ".github/workflows/wp08-edge-mirror.yml",
@@ -162,9 +164,13 @@ def validate_files() -> None:
     cleanup_mode = stat.S_IMODE(FAILED_RELEASE_CLEANUP_SCRIPT.stat().st_mode)
     if cleanup_mode != 0o755:
         raise StagingError("scripts/wp08_failed_release_cleanup.py must be mode 0755")
+    repair_mode = stat.S_IMODE(EDGE_ROUTE_REPAIR_SCRIPT.stat().st_mode)
+    if repair_mode != 0o755:
+        raise StagingError("scripts/wp08_edge_route_repair.py must be mode 0755")
     validate_deploy_script()
     validate_runtime_inventory_script()
     validate_failed_release_cleanup_script()
+    validate_edge_route_repair_script()
     validate_staging_compose()
 
 
@@ -240,6 +246,49 @@ def validate_failed_release_cleanup_script(
         raise StagingError("failed release cleanup exceeds its exact deletion boundary")
 
 
+def validate_edge_route_repair_script(
+    path: Path = EDGE_ROUTE_REPAIR_SCRIPT,
+) -> None:
+    source = path.read_text()
+    required = (
+        'CANDIDATE = "ef0a512cf357001cfd8cb6803f65cc17ae697325"',
+        'PRODUCTION_RELEASE = "8e56e759152efcbf17f4373f2132e02a8762af81"',
+        'EDGE_CONTAINER = "journey-next-staging-edge-1"',
+        'STAGING_WEB_CONTAINER = "journey-next-staging-web-1"',
+        'PRODUCTION_WEB_CONTAINER = "journey-next-production-web-1"',
+        'STATE_ROOT = Path("/run")',
+        '"reverse_proxy journey-next-staging-web-1:3000"',
+        '"reverse_proxy production-web:3000"',
+        '"caddy",\n            "validate"',
+        '"--no-deps"',
+        '"--force-recreate"',
+        '"--pull"',
+        '"never"',
+        'backup = state / "Caddyfile.before"',
+        '_write_in_place(current_path, current)',
+        'def rollback_repair(',
+        'shutil.rmtree(state)',
+        'WP08_EDGE_ROUTE_REPAIR=PASS',
+    )
+    if any(marker not in source for marker in required):
+        raise StagingError("Edge route repair script is incomplete")
+    forbidden = (
+        "docker pull",
+        "docker compose down",
+        "docker stop",
+        "docker restart",
+        "docker network",
+        "terraform ",
+        "alembic ",
+        "journey_api.seed",
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+    )
+    if any(marker in source for marker in forbidden):
+        raise StagingError("Edge route repair exceeds its Edge-only boundary")
+
+
 def validate_edge_mirror_workflow(path: Path = EDGE_MIRROR_WORKFLOW) -> None:
     workflow = path.read_text()
     required = (
@@ -267,8 +316,16 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
         raise StagingError("staging Web healthcheck must use the readiness route")
     if "http://localhost:3000/ops" in compose:
         raise StagingError("staging Web healthcheck must not use an authenticated route")
-    if "log_skip /auth/feishu*" not in STAGING_CADDYFILE.read_text():
+    caddy = STAGING_CADDYFILE.read_text()
+    if "log_skip /auth/feishu*" not in caddy:
         raise StagingError("staging edge must suppress OAuth callback query logs")
+    lines = {line.strip() for line in caddy.splitlines()}
+    if "reverse_proxy journey-next-staging-web-1:3000" not in lines:
+        raise StagingError("staging edge must use its unique Web network alias")
+    if "reverse_proxy web:3000" in lines:
+        raise StagingError("staging edge must not use the ambiguous shared Web alias")
+    if "reverse_proxy production-web:3000" not in lines:
+        raise StagingError("production edge upstream must remain unchanged")
 
     readiness = WEB_READINESS_ROUTE.read_text()
     if 'status: "ready"' not in readiness or '"Cache-Control": "no-store"' not in readiness:
@@ -568,7 +625,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -605,6 +662,16 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
         "INSPECT_RUNTIME_EF0A512_STAGING",
         "scripts/wp08_runtime_inventory.py",
+        "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
+        "scripts/wp08_edge_route_repair.py",
+        "id: edge_repair_apply",
+        "Verify deterministic staging and preserved production routes",
+        "Roll back Edge route after failed verification",
+        "steps.edge_repair_apply.outcome == 'success'",
+        "steps.edge_repair_apply.outcome == 'failure'",
+        "Remove successful Edge repair state",
+        "https://journey.muchenai.com/health/ready",
+        "8e56e759152efcbf17f4373f2132e02a8762af81",
         "if: inputs.phase == 'cleanup-failed-release'",
         "scripts/wp08_failed_release_cleanup.py",
         "'30808632624'",
@@ -624,6 +691,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if workflow.count("if: inputs.phase == 'inspect-runtime'") != 1:
         raise StagingError("staging workflow runtime inventory step count must be exactly 1")
+    if workflow.count("if: inputs.phase == 'repair-edge-route'") != 2:
+        raise StagingError("staging workflow Edge repair success path must have exactly 2 steps")
     if workflow.count("if: inputs.phase == 'cleanup-failed-release'") != 1:
         raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
@@ -695,6 +764,24 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     ):
         if forbidden in inventory_step:
             raise StagingError("runtime inventory must remain read-only")
+    edge_step_start = workflow.find("- name: Apply reviewed Edge route repair")
+    edge_step_end = workflow.find("\n      - name:", edge_step_start + 1)
+    if edge_step_start < 0 or edge_step_end < 0:
+        raise StagingError("reviewed Edge route repair step is missing")
+    edge_step = workflow[edge_step_start:edge_step_end]
+    for forbidden in (
+        "terraform plan",
+        "terraform apply",
+        "terraform import",
+        "docker pull",
+        "deploy.sh",
+        "grant_runtime",
+        "alembic",
+        "wp12b",
+        "journey_api.seed",
+    ):
+        if forbidden in edge_step:
+            raise StagingError("Edge route repair exceeds its reviewed boundary")
     cleanup_step_start = workflow.find("- name: Remove exact failed pre-start release")
     cleanup_step_end = workflow.find("\n      - name:", cleanup_step_start + 1)
     if cleanup_step_start < 0 or cleanup_step_end < 0:
@@ -714,7 +801,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,exact-failed-release-cleanup"
+        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,edge-route-repair,exact-failed-release-cleanup"
         " retired=provision,bounded-web-only,runtime-repair"
     )
 

@@ -11,6 +11,7 @@ on:
           - audit
           - deploy
           - inspect-runtime
+          - repair-edge-route
           - cleanup-failed-release
       candidate:
         description: Exact approved 40-character candidate SHA
@@ -38,6 +39,7 @@ jobs:
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_EF0A512_TO_VOLCENGINE_STAGING') ||
       (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_EF0A512_STAGING') ||
+      (inputs.phase == 'repair-edge-route' && inputs.confirmation == 'REPAIR_EDGE_ROUTE_EF0A512_STAGING') ||
       (inputs.phase == 'cleanup-failed-release' && inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -190,7 +192,7 @@ jobs:
           terraform show -json "$plan_file" | python3 ../../scripts/wp08_plan_guard.py
           terraform apply -auto-approve "$plan_file"
       - name: Read frozen Alpha pilot infrastructure
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release'
         id: frozen_infrastructure
         working-directory: infra/staging
         run: |
@@ -214,7 +216,7 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
       - name: Open exact runner SSH ingress
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release'
         run: |
           python3 -m scripts.wp08_security_group open \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
@@ -234,6 +236,94 @@ jobs:
             "python3 - --candidate '${{ inputs.candidate }}'" \
             <scripts/wp08_runtime_inventory.py
           ssh-keygen -lf "$known_hosts"
+      - name: Apply reviewed Edge route repair
+        id: edge_repair_apply
+        if: inputs.phase == 'repair-edge-route'
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp08-edge-repair-key"
+          known_hosts="$RUNNER_TEMP/wp08-edge-repair-known-hosts"
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$key"
+          chmod 0600 "$key"
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts")
+          state="/run/wp08-edge-route-repair-$GITHUB_RUN_ID"
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "test ! -e '$state' && install -d -m 0700 '$state'"
+          tar -czf - scripts/wp08_edge_route_repair.py deploy/staging/Caddyfile | \
+            ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$state'"
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 '$state/scripts/wp08_edge_route_repair.py' apply \
+              --candidate '${{ inputs.candidate }}' \
+              --run-id '$GITHUB_RUN_ID' \
+              --new-caddyfile '$state/deploy/staging/Caddyfile'"
+          ssh-keygen -lf "$known_hosts"
+      - name: Verify deterministic staging and preserved production routes
+        if: inputs.phase == 'repair-edge-route'
+        run: |
+          verify_readiness() {
+            local url=$1
+            local release=$2
+            curl --fail --silent --show-error --http1.1 --no-keepalive "$url" | \
+              jq -e --arg release "$release" \
+                '.status == "ready" and .release == $release' >/dev/null
+          }
+          verify_denied() {
+            local url=$1
+            test "$(curl --silent --show-error --http1.1 --no-keepalive \
+              --output /dev/null --write-out '%{http_code}' "$url")" = "401"
+          }
+          curl --fail --silent --show-error --http1.1 --no-keepalive \
+            --retry 15 --retry-delay 2 --retry-all-errors \
+            https://staging-vnext.muchenai.com/ >/dev/null
+          curl --fail --silent --show-error --http1.1 --no-keepalive \
+            --retry 15 --retry-delay 2 --retry-all-errors \
+            https://journey.muchenai.com/ >/dev/null
+          for attempt in $(seq 1 12); do
+            verify_readiness \
+              https://staging-vnext.muchenai.com/health/ready \
+              "${{ inputs.candidate }}"
+            verify_readiness \
+              https://journey.muchenai.com/health/ready \
+              8e56e759152efcbf17f4373f2132e02a8762af81
+            curl --fail --silent --show-error --http1.1 --no-keepalive \
+              https://staging-vnext.muchenai.com/ >/dev/null
+            curl --fail --silent --show-error --http1.1 --no-keepalive \
+              https://journey.muchenai.com/ >/dev/null
+            verify_denied https://staging-vnext.muchenai.com/ops
+            verify_denied https://staging-vnext.muchenai.com/review
+            sleep 2
+          done
+      - name: Roll back Edge route after failed verification
+        if: >-
+          failure() && inputs.phase == 'repair-edge-route' &&
+          (steps.edge_repair_apply.outcome == 'success' ||
+          steps.edge_repair_apply.outcome == 'failure')
+        env:
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp08-edge-repair-key"
+          known_hosts="$RUNNER_TEMP/wp08-edge-repair-known-hosts"
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts")
+          state="/run/wp08-edge-route-repair-$GITHUB_RUN_ID"
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 '$state/scripts/wp08_edge_route_repair.py' rollback \
+              --candidate '${{ inputs.candidate }}' --run-id '$GITHUB_RUN_ID'"
+          curl --fail --silent --show-error --retry 6 --retry-delay 2 \
+            https://journey.muchenai.com/ >/dev/null
+      - name: Remove successful Edge repair state
+        if: success() && inputs.phase == 'repair-edge-route'
+        env:
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp08-edge-repair-key"
+          known_hosts="$RUNNER_TEMP/wp08-edge-repair-known-hosts"
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts")
+          state="/run/wp08-edge-route-repair-$GITHUB_RUN_ID"
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 '$state/scripts/wp08_edge_route_repair.py' finalize \
+              --candidate '${{ inputs.candidate }}' --run-id '$GITHUB_RUN_ID'"
       - name: Remove exact failed pre-start release
         if: inputs.phase == 'cleanup-failed-release'
         env:
@@ -305,7 +395,7 @@ jobs:
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
       - name: Close SSH ingress
-        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
