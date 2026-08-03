@@ -416,7 +416,7 @@ jobs:
           set -euo pipefail
           public_ip='${{ steps.frozen.outputs.public_ip }}'
           opts=(-i "$RUNNER_TEMP/wp15-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp15-known-hosts")
-          ssh "${opts[@]}" root@"$public_ip" 'set -e; test -L /srv/journey-next-staging/current; if test -L /srv/journey-next-production/current; then cat /srv/journey-next-production/DEPLOYED_CANDIDATE; docker ps --format "{{.Names}} {{.Status}}" | grep -E "journey-next-(staging|production)"; else echo WP15_PRODUCTION_RUNTIME=NOT_DEPLOYED; fi'
+          ssh "${opts[@]}" root@"$public_ip" 'set -e; test -L /srv/journey-next-staging/current; if test -L /srv/journey-next-production/current; then cat /srv/journey-next-production/DEPLOYED_CANDIDATE; docker ps --format "{{.Names}} {{.Status}}" | grep -E "journey-next-(staging|production)"; docker logs --since 30m journey-next-staging-edge-1 2>&1 | grep -E "\"logger\":\"tls\\.|obtaining certificate|certificate obtained|challenge failed|authorization failed" | sed -E "s/\"email\":\"[^\"]+\"/\"email\":\"[redacted]\"/g" | tail -n 100 || true; else echo WP15_PRODUCTION_RUNTIME=NOT_DEPLOYED; fi'
       - name: Preflight result
         if: inputs.phase == 'preflight'
         run: |
