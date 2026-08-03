@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     default: "Muchen Journey",
     template: "%s · Muchen Journey",
   },
-  description: "一个清晰连接当前任务、主管反馈与下一步的成长闭环。",
+  description: "一段没有标准答案、但每一步都留下真实证据的探索旅程。",
 };
 
 export default async function RootLayout({
@@ -31,13 +31,13 @@ export default async function RootLayout({
             Muchen Journey
           </Link>
           <nav aria-label="主要导航">
-            <Link href="/app">我的行动</Link>
+            <Link href="/app">我的旅程</Link>
           </nav>
         </header>
         <main id="main-content" className="page-shell">
           {children}
         </main>
-        <footer className="site-footer">Muchen Journey · 让下一步更清晰</footer>
+        <footer className="site-footer">Muchen Journey <span>It&apos;s a long game.</span></footer>
       </body>
     </html>
   );

@@ -19,6 +19,8 @@ from journey_api.models import (
     Evaluation,
     ExternalNotificationReceipt,
     Handoff,
+    JourneyOutcomeEvidence,
+    JourneyStageVersion,
     NotificationAttempt,
     NotificationChannel,
     NotificationDelivery,
@@ -35,6 +37,7 @@ from journey_api.models import (
 from journey_api.schemas import (
     AiSummaryOut,
     HandoffOut,
+    JourneyResultEvaluationOut,
     NotificationDeliveryOut,
     ResultEvaluationOut,
     ResultOut,
@@ -110,13 +113,25 @@ def notification_out(
     )
 
 
-def rubric_feedback(evaluation: Evaluation) -> list[ResultRubricFeedbackOut]:
+def rubric_feedback(
+    evaluation: Evaluation, task: TaskVersion | None = None
+) -> list[ResultRubricFeedbackOut]:
+    configured_titles = {
+        str(item.get("dimension_key")): str(item.get("title"))
+        for item in (task.rubric.get("dimensions", []) if task is not None else [])
+        if isinstance(item, dict) and item.get("dimension_key") and item.get("title")
+    }
     structured = evaluation.structured_feedback
     if evaluation.feedback_structure_version == 1 and isinstance(structured, list):
         return [
             ResultRubricFeedbackOut(
                 dimension_key=str(item["dimension_key"]),
-                title=RUBRIC_TITLES.get(str(item["dimension_key"]), str(item["dimension_key"])),
+                title=configured_titles.get(
+                    str(item["dimension_key"]),
+                    RUBRIC_TITLES.get(
+                        str(item["dimension_key"]), str(item["dimension_key"])
+                    ),
+                ),
                 rating=str(item["rating"]),
                 feedback=str(item["feedback"]),
             )
@@ -129,7 +144,7 @@ def rubric_feedback(evaluation: Evaluation) -> list[ResultRubricFeedbackOut]:
     return [
         ResultRubricFeedbackOut(
             dimension_key=key,
-            title=RUBRIC_TITLES.get(key, key),
+            title=configured_titles.get(key, RUBRIC_TITLES.get(key, key)),
             rating=rating,
             feedback=None,
         )
@@ -195,6 +210,25 @@ def result(
     outcome, handoff, evaluation, owner, delivery, receipt = row
     if evaluation.decision != Decision.PASS:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少有效的通过结论。")
+    formal_rows = session.execute(
+        select(JourneyStageVersion, Evaluation, TaskVersion)
+        .join(
+            JourneyOutcomeEvidence,
+            JourneyOutcomeEvidence.journey_stage_version_id
+            == JourneyStageVersion.id,
+        )
+        .join(Evaluation, Evaluation.id == JourneyOutcomeEvidence.evaluation_id)
+        .join(Assignment, Assignment.id == Evaluation.assignment_id)
+        .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .where(
+            JourneyOutcomeEvidence.outcome_id == outcome.id,
+            JourneyOutcomeEvidence.organization_id == actor.organization_id,
+            JourneyStageVersion.organization_id == actor.organization_id,
+            Evaluation.organization_id == actor.organization_id,
+            Evaluation.decision == Decision.PASS,
+        )
+        .order_by(JourneyStageVersion.position)
+    ).all()
     return envelope(
         request,
         ResultOut(
@@ -210,6 +244,19 @@ def result(
                 rubric_feedback=rubric_feedback(evaluation),
                 created_at=evaluation.created_at,
             ),
+            journey_evaluations=[
+                JourneyResultEvaluationOut(
+                    id=journey_evaluation.id,
+                    reviewer_id=journey_evaluation.reviewer_id,
+                    decision="PASS",
+                    overall_feedback=journey_evaluation.feedback,
+                    rubric_feedback=rubric_feedback(journey_evaluation, task),
+                    created_at=journey_evaluation.created_at,
+                    stage_key=stage.stable_key,
+                    stage_title=stage.title,
+                )
+                for stage, journey_evaluation, task in formal_rows
+            ],
             handoff=HandoffOut(
                 id=handoff.id,
                 status=handoff.status.value,

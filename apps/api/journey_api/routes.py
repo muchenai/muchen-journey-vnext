@@ -10,12 +10,22 @@ from journey_api.db import get_db
 from journey_api.domain import AssignmentActionState, assignment_action, resolve_current_action
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.journey_service import (
+    journey_stages,
+    lock_active_learner_assignment,
+    publish_catalog_journey,
+)
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
     AuditEntry,
     Enrollment,
     EnrollmentStatus,
+    JourneyCompletionPolicy,
+    JourneyDefinition,
+    JourneyDefinitionStatus,
+    JourneyStageVersion,
+    JourneyVersion,
     OutboxEvent,
     OutboxStatus,
     Role,
@@ -27,6 +37,7 @@ from journey_api.models import (
     UserStatus,
 )
 from journey_api.schemas import (
+    AssignmentJourneyStageOut,
     AssignmentOut,
     AssignmentResponse,
     CommandOut,
@@ -35,6 +46,14 @@ from journey_api.schemas import (
     CurrentActionOut,
     CurrentActionResponse,
     HealthOut,
+    FormalJourneyStageOut,
+    FormalJourneyVersionListOut,
+    FormalJourneyVersionListResponse,
+    FormalJourneyVersionOut,
+    FormalJourneyVersionResponse,
+    JourneyProgressNodeOut,
+    JourneyProgressOut,
+    PublishFormalJourneyCommand,
     RevisionCommand,
     PublishTaskVersionCommand,
     TaskDefinitionListOut,
@@ -55,19 +74,9 @@ def envelope(request: Request, data: object) -> dict[str, object]:
 
 
 def lock_learner_assignment(session: Session, actor: Actor, assignment_id: uuid.UUID) -> Assignment:
-    assignment = session.scalar(
-        select(Assignment)
-        .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
-        .where(
-            Assignment.id == assignment_id,
-            Assignment.organization_id == actor.organization_id,
-            Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
-        )
-        .with_for_update()
+    assignment, _enrollment = lock_active_learner_assignment(
+        session, actor, assignment_id
     )
-    if assignment is None:
-        raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
     return assignment
 
 
@@ -176,6 +185,44 @@ def task_version_out(
         published_by=version.published_by,
         reviewed_by=version.reviewed_by,
         published_at=version.published_at,
+        idempotency_replay=replay,
+    )
+
+
+def formal_journey_out(
+    session: Session, version: JourneyVersion, *, replay: bool = False
+) -> FormalJourneyVersionOut:
+    definition = session.scalar(
+        select(JourneyDefinition).where(
+            JourneyDefinition.id == version.journey_definition_id,
+            JourneyDefinition.organization_id == version.organization_id,
+        )
+    )
+    if definition is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "旅程版本缺少稳定定义。")
+    stages = journey_stages(session, version.id, version.organization_id)
+    return FormalJourneyVersionOut(
+        id=version.id,
+        stable_key=definition.stable_key,
+        version=version.version,
+        title=version.title,
+        purpose=version.purpose,
+        change_summary=version.change_summary,
+        content_review_note=version.content_review_note,
+        published_at=version.published_at,
+        stages=[
+            FormalJourneyStageOut(
+                id=stage.id,
+                stable_key=stage.stable_key,
+                position=stage.position,
+                stage_kind=stage.stage_kind.value,
+                completion_policy=stage.completion_policy.value,
+                task_version_id=stage.task_version_id,
+                title=stage.title,
+                short_description=stage.short_description,
+            )
+            for stage in stages
+        ],
         idempotency_replay=replay,
     )
 
@@ -416,6 +463,111 @@ def publish_task_version(
     return envelope(request, task_version_out(version, definition.stable_key))
 
 
+@api.get(
+    "/ops/formal-journeys",
+    response_model=FormalJourneyVersionListResponse,
+)
+def list_formal_journeys(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    versions = session.scalars(
+        select(JourneyVersion)
+        .join(
+            JourneyDefinition,
+            JourneyDefinition.id == JourneyVersion.journey_definition_id,
+        )
+        .where(
+            JourneyVersion.organization_id == actor.organization_id,
+            JourneyDefinition.organization_id == actor.organization_id,
+            JourneyDefinition.status == JourneyDefinitionStatus.PUBLISHED,
+        )
+        .order_by(JourneyVersion.published_at.desc())
+    ).all()
+    return envelope(
+        request,
+        FormalJourneyVersionListOut(
+            items=[formal_journey_out(session, version) for version in versions]
+        ),
+    )
+
+
+@api.post(
+    "/ops/formal-journeys/publish",
+    response_model=FormalJourneyVersionResponse,
+)
+def publish_formal_journey(
+    command: PublishFormalJourneyCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = command.model_dump(mode="json")
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="formal_journey.publish",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        version = session.get(JourneyVersion, uuid.UUID(str(replay["id"])))
+        if version is None or version.organization_id != actor.organization_id:
+            raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的旅程版本已不可用。")
+        return envelope(request, formal_journey_out(session, version, replay=True))
+
+    reviewer = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == command.reviewed_by,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+    )
+    if reviewer is None:
+        raise ApiError(422, "VALIDATION_FAILED", "内容复核人必须是同组织的有效 Reviewer。")
+    version = publish_catalog_journey(
+        session,
+        operator_id=actor.id,
+        reviewer_id=reviewer.id,
+        organization_id=actor.organization_id,
+    )
+    result = {"id": str(version.id)}
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="formal_journey.publish",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_event(session, "formal_journey.published.v1", "journey_version", version.id)
+    add_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="formal_journey.published",
+        resource_type="journey_version",
+        resource_id=version.id,
+        details={
+            "reviewed_by": str(reviewer.id),
+            "review_acknowledged": command.review_acknowledged,
+            "stage_count": 8,
+            "audience": "CONTROLLED_BETA",
+        },
+    )
+    session.commit()
+    return envelope(request, formal_journey_out(session, version))
+
+
 @api.get("/me/current-action", response_model=CurrentActionResponse)
 def current_action(
     request: Request,
@@ -439,13 +591,19 @@ def current_action(
             Enrollment.revision.desc(),
         )
     )
-    assignment_rows: list[tuple[Assignment, TaskVersion]] = []
+    assignment_rows: list[
+        tuple[Assignment, TaskVersion, JourneyStageVersion | None]
+    ] = []
     reviewer: User | None = None
     if enrollment is not None:
         assignment_rows = list(
             session.execute(
-                select(Assignment, TaskVersion)
+                select(Assignment, TaskVersion, JourneyStageVersion)
                 .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+                .outerjoin(
+                    JourneyStageVersion,
+                    JourneyStageVersion.id == Assignment.journey_stage_version_id,
+                )
                 .where(
                     Assignment.enrollment_id == enrollment.id,
                     Assignment.organization_id == actor.organization_id,
@@ -470,14 +628,97 @@ def current_action(
                 status=assignment.status,
                 revision=assignment.revision,
                 position=assignment.position,
+                stage_key=stage.stable_key if stage is not None else None,
+                stage_title=stage.title if stage is not None else None,
+                stage_kind=stage.stage_kind if stage is not None else None,
+                completion_policy=(
+                    stage.completion_policy.value if stage is not None else None
+                ),
             )
-            for assignment, _ in assignment_rows
+            for assignment, _, stage in assignment_rows
         ),
+        journey_version_bound=enrollment.journey_version_id is not None
+        if enrollment is not None
+        else False,
     )
     selected_task = next(
-        (task for assignment, task in assignment_rows if assignment.id == action.resource_id),
+        (
+            task
+            for assignment, task, _stage in assignment_rows
+            if assignment.id == action.resource_id
+        ),
         None,
     )
+    selected_stage = next(
+        (
+            stage
+            for assignment, _task, stage in assignment_rows
+            if assignment.id == action.resource_id
+        ),
+        None,
+    )
+    journey_progress: JourneyProgressOut | None = None
+    if enrollment is not None and enrollment.journey_version_id is not None:
+        journey_version = session.scalar(
+            select(JourneyVersion).where(
+                JourneyVersion.id == enrollment.journey_version_id,
+                JourneyVersion.organization_id == actor.organization_id,
+            )
+        )
+        journey_definition = (
+            session.scalar(
+                select(JourneyDefinition).where(
+                    JourneyDefinition.id == journey_version.journey_definition_id,
+                    JourneyDefinition.organization_id == actor.organization_id,
+                )
+            )
+            if journey_version is not None
+            else None
+        )
+        if journey_version is None or journey_definition is None:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "当前旅程版本不可用。")
+        completed_stages = sum(
+            assignment.status == AssignmentStatus.COMPLETED
+            for assignment, _task, stage in assignment_rows
+            if stage is not None
+        )
+        current_stage_key = next(
+            (
+                stage.stable_key
+                for assignment, _task, stage in assignment_rows
+                if stage is not None and assignment.id == action.resource_id
+            ),
+            None,
+        )
+        journey_progress = JourneyProgressOut(
+            journey_version_id=journey_version.id,
+            stable_key=journey_definition.stable_key,
+            version=journey_version.version,
+            title=journey_version.title,
+            completed_stages=completed_stages,
+            total_stages=8,
+            current_stage_key=current_stage_key,
+            nodes=[
+                JourneyProgressNodeOut(
+                    stable_key=stage.stable_key,
+                    position=stage.position,
+                    stage_kind=stage.stage_kind.value,
+                    completion_policy=stage.completion_policy.value,
+                    title=stage.title,
+                    short_description=stage.short_description,
+                    status=(
+                        "COMPLETED"
+                        if assignment.status == AssignmentStatus.COMPLETED
+                        else "CURRENT"
+                        if assignment.id == action.resource_id
+                        else "LOCKED"
+                    ),
+                    assignment_id=assignment.id,
+                )
+                for assignment, _task, stage in assignment_rows
+                if stage is not None
+            ],
+        )
     data = CurrentActionOut(
         action_type=action.action_type,
         stage=action.stage,
@@ -486,12 +727,25 @@ def current_action(
         reason=action.reason,
         allowed_commands=list(action.allowed_commands),
         revision=action.revision,
-        responsible_party=reviewer.display_name if reviewer is not None else "运营支持",
+        responsible_party=(
+            "由你完成证据"
+            if selected_stage is not None
+            and selected_stage.completion_policy
+            == JourneyCompletionPolicy.LEARNER_EVIDENCE
+            else reviewer.display_name
+            if reviewer is not None
+            else "运营支持"
+        ),
         feedback_expectation=(
-            f"{selected_task.feedback_sla_business_days} 个工作日内"
+            "提交后进入下一站"
+            if selected_stage is not None
+            and selected_stage.completion_policy
+            == JourneyCompletionPolicy.LEARNER_EVIDENCE
+            else f"{selected_task.feedback_sla_business_days} 个工作日内"
             if selected_task is not None
             else "按当前加入状态处理"
         ),
+        journey=journey_progress,
     )
     return envelope(request, data)
 
@@ -505,10 +759,14 @@ def assignment_detail(
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
     row = session.execute(
-        select(Assignment, TaskVersion, TaskDefinition)
+        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion)
         .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
+        .outerjoin(
+            JourneyStageVersion,
+            JourneyStageVersion.id == Assignment.journey_stage_version_id,
+        )
         .where(
             Assignment.id == assignment_id,
             Assignment.organization_id == actor.organization_id,
@@ -520,7 +778,7 @@ def assignment_detail(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
-    assignment, task, definition = row
+    assignment, task, definition, journey_stage = row
     commands = () if assignment.status == AssignmentStatus.CANCELLED else assignment_action(assignment.status)[4]
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
@@ -552,6 +810,18 @@ def assignment_detail(
         draft=draft,
         available_attachments=available_attachments,
         latest_revision_feedback=latest_feedback,
+        journey_stage=(
+            AssignmentJourneyStageOut(
+                stable_key=journey_stage.stable_key,
+                position=journey_stage.position,
+                stage_kind=journey_stage.stage_kind.value,
+                completion_policy=journey_stage.completion_policy.value,
+                title=journey_stage.title,
+                short_description=journey_stage.short_description,
+            )
+            if journey_stage is not None
+            else None
+        ),
     )
     return envelope(request, data)
 

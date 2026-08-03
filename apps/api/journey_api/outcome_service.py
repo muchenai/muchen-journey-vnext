@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
@@ -16,9 +17,13 @@ from journey_api.models import (
     NotificationDelivery,
     NotificationStatus,
     Outcome,
+    JourneyOutcomeEvidence,
     OutboxEvent,
     OutboxStatus,
 )
+
+if TYPE_CHECKING:
+    from journey_api.journey_service import FormalEvaluationEvidence
 
 
 def add_scoped_outbox_event(
@@ -65,10 +70,12 @@ def create_pass_outcome_bundle(
     evaluation: Evaluation,
     reviewer_id: uuid.UUID,
     request_id: str,
+    formal_evidence: list[FormalEvaluationEvidence] | None = None,
 ) -> tuple[Outcome, Handoff, NotificationDelivery]:
     """Create the result, one next step, and its notification request atomically."""
 
     now = datetime.now(UTC)
+    is_formal_journey = bool(formal_evidence)
     outcome = Outcome(
         id=uuid.uuid4(),
         organization_id=enrollment.organization_id,
@@ -77,7 +84,11 @@ def create_pass_outcome_bundle(
         enrollment_id=enrollment.id,
         source_evaluation_id=evaluation.id,
         status="HANDOFF_READY",
-        summary="任务已通过并形成最终人工评价，探索营交接已准备。",
+        summary=(
+            "四个宝藏与三项能力评测已完成，三份独立人工评价构成最终结果。"
+            if is_formal_journey
+            else "任务已通过并形成最终人工评价，探索营交接已准备。"
+        ),
         created_at=now,
     )
     handoff = Handoff(
@@ -88,10 +99,14 @@ def create_pass_outcome_bundle(
         source_evaluation_id=evaluation.id,
         owner_user_id=reviewer_id,
         status=HandoffStatus.READY,
-        title="探索营交接已准备",
+        title="探索营完成，交接已准备" if is_formal_journey else "探索营交接已准备",
         next_step_code="CONFIRM_HANDOFF",
         next_step_title="与交接责任人确认下一步",
-        instructions="查看主管的结构化反馈，并与交接责任人确认后续安排。",
+        instructions=(
+            "查看三项能力评测反馈，并与交接责任人确认后续安排。"
+            if is_formal_journey
+            else "查看主管的结构化反馈，并与交接责任人确认后续安排。"
+        ),
         created_at=now,
     )
     # The fixed-scope composite FKs intentionally have no ORM relationships, so
@@ -100,6 +115,19 @@ def create_pass_outcome_bundle(
     # immediate constraint checks and removes one database round trip.
     session.add(outcome)
     session.flush()
+    if formal_evidence:
+        session.add_all(
+            [
+                JourneyOutcomeEvidence(
+                    outcome_id=outcome.id,
+                    evaluation_id=item.evaluation.id,
+                    journey_stage_version_id=item.stage.id,
+                    organization_id=enrollment.organization_id,
+                    enrollment_id=enrollment.id,
+                )
+                for item in formal_evidence
+            ]
+        )
     session.add(handoff)
 
     add_scoped_outbox_event(

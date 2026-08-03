@@ -11,6 +11,11 @@ from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import canonical_hash, find_replay, store_result
+from journey_api.journey_service import (
+    create_formal_assignments,
+    journey_stages,
+    validate_published_structure,
+)
 from journey_api.identity import (
     CSRF_COOKIE,
     JOIN_COOKIE,
@@ -34,6 +39,9 @@ from journey_api.models import (
     IdentitySession,
     Invite,
     InviteStatus,
+    JourneyDefinition,
+    JourneyDefinitionStatus,
+    JourneyVersion,
     JoinContext,
     JoinContextStatus,
     OutboxEvent,
@@ -196,17 +204,44 @@ def create_invite(
             RoleAssignment.role == Role.REVIEWER,
         )
     )
+    journey_version: JourneyVersion | None = None
+    if command.journey_version_id is not None:
+        journey_version = session.scalar(
+            select(JourneyVersion)
+            .join(
+                JourneyDefinition,
+                JourneyDefinition.id == JourneyVersion.journey_definition_id,
+            )
+            .where(
+                JourneyVersion.id == command.journey_version_id,
+                JourneyVersion.organization_id == actor.organization_id,
+                JourneyDefinition.organization_id == actor.organization_id,
+                JourneyDefinition.status == JourneyDefinitionStatus.PUBLISHED,
+            )
+        )
+        stages = (
+            journey_stages(session, journey_version.id, actor.organization_id)
+            if journey_version is not None
+            else []
+        )
+        if journey_version is not None:
+            validate_published_structure(stages)
+        resolved_task_version_id = stages[0].task_version_id if stages else None
+    else:
+        resolved_task_version_id = command.task_version_id
     task = session.scalar(
         select(TaskVersion)
         .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
         .where(
-            TaskVersion.id == command.task_version_id,
+            TaskVersion.id == resolved_task_version_id,
             TaskVersion.organization_id == actor.organization_id,
             TaskDefinition.organization_id == actor.organization_id,
             TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
         )
     )
-    if reviewer is None or task is None:
+    if reviewer is None or task is None or (
+        command.journey_version_id is not None and journey_version is None
+    ):
         raise ApiError(422, "VALIDATION_FAILED", "邀请的主管或任务版本无效。")
     if command.target_user_id is not None:
         target = session.scalar(
@@ -226,7 +261,8 @@ def create_invite(
         purpose=command.purpose.strip(),
         role=Role.LEARNER,
         reviewer_id=command.reviewer_id,
-        task_version_id=command.task_version_id,
+        task_version_id=task.id,
+        journey_version_id=journey_version.id if journey_version is not None else None,
         target_user_id=command.target_user_id,
         status=InviteStatus.ACTIVE,
         expires_at=now + timedelta(hours=command.expires_in_hours),
@@ -241,6 +277,9 @@ def create_invite(
         "status": invite.status.value,
         "expires_at": invite.expires_at.isoformat(),
         "revision": invite.revision,
+        "journey_version_id": (
+            str(invite.journey_version_id) if invite.journey_version_id is not None else None
+        ),
     }
     store_result(
         session,
@@ -260,7 +299,10 @@ def create_invite(
         resource_type="invite",
         resource_id=invite.id,
         result="SUCCESS",
-        details={"role": invite.role.value},
+        details={
+            "role": invite.role.value,
+            "target_type": "JOURNEY" if invite.journey_version_id else "TASK",
+        },
     )
     session.commit()
     return envelope(request, CreateInviteOut(**result, invite_token=invite_token))
@@ -290,6 +332,7 @@ def list_invites(
                     status=visible_invite_status(invite),
                     expires_at=invite.expires_at,
                     revision=invite.revision,
+                    journey_version_id=invite.journey_version_id,
                 )
                 for invite in invites
             ]
@@ -390,6 +433,7 @@ def create_learner_reentry(
         role=Role.LEARNER,
         reviewer_id=enrollment.reviewer_id,
         task_version_id=assignment.task_version_id,
+        journey_version_id=enrollment.journey_version_id,
         target_user_id=learner.id,
         status=InviteStatus.ACTIVE,
         expires_at=now + timedelta(minutes=command.expires_in_minutes),
@@ -404,6 +448,9 @@ def create_learner_reentry(
         "status": invite.status.value,
         "expires_at": invite.expires_at.isoformat(),
         "revision": invite.revision,
+        "journey_version_id": (
+            str(invite.journey_version_id) if invite.journey_version_id is not None else None
+        ),
     }
     store_result(
         session,
@@ -601,6 +648,7 @@ def exchange_invite(
             organization_id=invite.organization_id,
             learner_id=user.id,
             reviewer_id=invite.reviewer_id,
+            journey_version_id=invite.journey_version_id,
             status=EnrollmentStatus.PENDING_IDENTITY,
             revision=1,
         )
@@ -744,29 +792,33 @@ def confirm_identity(
         )
         enrollment.status = EnrollmentStatus.ACTIVE
         enrollment.revision += 1
-        task_version = session.scalar(
-            select(TaskVersion)
-            .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
-            .where(
-                TaskVersion.id == invite.task_version_id,
-                TaskVersion.organization_id == invite.organization_id,
-                TaskDefinition.organization_id == invite.organization_id,
-                TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+        if invite.journey_version_id is not None:
+            assignments = create_formal_assignments(session, enrollment=enrollment)
+            assignment = assignments[0]
+        else:
+            task_version = session.scalar(
+                select(TaskVersion)
+                .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
+                .where(
+                    TaskVersion.id == invite.task_version_id,
+                    TaskVersion.organization_id == invite.organization_id,
+                    TaskDefinition.organization_id == invite.organization_id,
+                    TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+                )
             )
-        )
-        if task_version is None:
-            raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的任务版本已不可用于新 Assignment。")
-        assignment = Assignment(
-            id=uuid.uuid4(),
-            organization_id=invite.organization_id,
-            enrollment_id=enrollment.id,
-            task_definition_id=task_version.task_definition_id,
-            task_version_id=invite.task_version_id,
-            position=1,
-            status=AssignmentStatus.AVAILABLE,
-            revision=1,
-        )
-        session.add(assignment)
+            if task_version is None:
+                raise ApiError(409, "INVALID_STATE_TRANSITION", "邀请引用的任务版本已不可用于新 Assignment。")
+            assignment = Assignment(
+                id=uuid.uuid4(),
+                organization_id=invite.organization_id,
+                enrollment_id=enrollment.id,
+                task_definition_id=task_version.task_definition_id,
+                task_version_id=invite.task_version_id,
+                position=1,
+                status=AssignmentStatus.AVAILABLE,
+                revision=1,
+            )
+            session.add(assignment)
     else:
         assignment = session.scalar(
             select(Assignment).where(

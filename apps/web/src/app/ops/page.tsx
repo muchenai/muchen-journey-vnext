@@ -9,6 +9,7 @@ import {
   identityPageRequest,
   OpsAuditEntry,
   OpsEnrollment,
+  OpsFormalJourney,
   OpsIdentityAccess,
   OpsInvite,
   OpsNotificationDelivery,
@@ -45,6 +46,7 @@ export default async function OpsPage({
     invites,
     notificationEndpoints,
     notificationDeliveries,
+    formalJourneys,
   ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
@@ -59,6 +61,10 @@ export default async function OpsPage({
     ),
     identityPageRequest<{ items: OpsNotificationDelivery[] }>(
       "/api/v1/ops/notification-deliveries?status=DEAD",
+      "OPERATOR",
+    ),
+    identityPageRequest<{ items: OpsFormalJourney[] }>(
+      "/api/v1/ops/formal-journeys",
       "OPERATOR",
     ),
   ]);
@@ -90,6 +96,7 @@ export default async function OpsPage({
           invites={invites.items}
           identityAccess={identityAccess.items}
           tasks={tasks.items}
+          journeys={formalJourneys.items}
         />
       </section>
 

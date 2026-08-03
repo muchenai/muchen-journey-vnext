@@ -45,9 +45,10 @@ export default async function ResultPage() {
   return (
     <article className="result-page">
       <header className="panel result-hero">
-        <p className="eyebrow">探索营最终结果</p>
-        <p className="result-kicker"><span aria-hidden="true">✓</span> 最终人工评价：通过</p>
-        <h1>已通过，交接已准备</h1>
+        <div className="completion-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <p className="journey-whisper">The journey continues.</p>
+        <p className="result-kicker"><span aria-hidden="true">✓</span> 已完成</p>
+        <h1>这段旅程，走完了。</h1>
         <p className="lede">{result.summary}</p>
         <p className="status-meta">
           结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
@@ -55,25 +56,55 @@ export default async function ResultPage() {
       </header>
 
       <section className="panel result-section" aria-labelledby="feedback-title">
-        <p className="section-label">01 · 最终评价</p>
-        <h2 id="feedback-title">主管反馈</h2>
-        <p className="feedback-summary">{result.evaluation.overall_feedback}</p>
-        <ul className="result-rubric">
-          {result.evaluation.rubric_feedback.map((item) => (
-            <li key={item.dimension_key}>
-              <div className="result-rubric-heading">
-                <h3>{item.title}</h3>
-                <span className="material-status complete">
-                  {ratingLabels[item.rating] ?? item.rating}
-                </span>
-              </div>
-              <p>{item.feedback ?? "该历史评价未记录维度级反馈；页面不会补写旧事实。"}</p>
-            </li>
-          ))}
-        </ul>
+        <p className="section-label">01 · 三项能力证据</p>
+        <h2 id="feedback-title">你留下的判断</h2>
+        {result.journey_evaluations.length > 0 ? (
+          <div className="ability-results">
+            {result.journey_evaluations.map((evaluation, index) => (
+              <article key={evaluation.id}>
+                <span>0{index + 1}</span>
+                <h3>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</h3>
+                <p>{evaluation.overall_feedback}</p>
+                <details>
+                  <summary>展开评审证据</summary>
+                  <ul className="result-rubric">
+                    {evaluation.rubric_feedback.map((item) => (
+                      <li key={item.dimension_key}>
+                        <div className="result-rubric-heading">
+                          <h3>{item.title}</h3>
+                          <span className="material-status complete">
+                            {ratingLabels[item.rating] ?? item.rating}
+                          </span>
+                        </div>
+                        <p>{item.feedback ?? "该维度没有补充文字反馈。"}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <>
+            <p className="feedback-summary">{result.evaluation.overall_feedback}</p>
+            <ul className="result-rubric">
+              {result.evaluation.rubric_feedback.map((item) => (
+                <li key={item.dimension_key}>
+                  <div className="result-rubric-heading">
+                    <h3>{item.title}</h3>
+                    <span className="material-status complete">
+                      {ratingLabels[item.rating] ?? item.rating}
+                    </span>
+                  </div>
+                  <p>{item.feedback ?? "该历史评价未记录维度级反馈。"}</p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         <aside className="ai-note" aria-label="AI 摘要状态">
-          <strong>AI 摘要未启用</strong>
-          <span>{result.ai_summary.message}</span>
+          <strong>人工评价原文</strong>
+          <span>页面不使用 AI 改写 Reviewer 结论。</span>
         </aside>
       </section>
 

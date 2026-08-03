@@ -32,5 +32,5 @@ test("reentry confirmation does not collect a new display name or claim new busi
   assert.match(join, /summary\?\.flow === "REENTRY"/);
   assert.match(join, /只恢复原有 Learner 会话/);
   assert.match(join, /不会创建新人、Enrollment、Assignment 或新提交/);
-  assert.match(join, /确认并重新进入/);
+  assert.match(join, /继续旅程/);
 });

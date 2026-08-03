@@ -23,10 +23,18 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
   assert.match(actions, /"\/api\/v1\/ops\/invites"/);
   assert.match(actions, /reviewer_id: reviewerId/);
   assert.match(actions, /task_version_id: taskVersionId/);
+  assert.match(actions, /journey_version_id: journeyVersionId/);
   assert.match(actions, /target_user_id: null/);
   assert.match(actions, /`\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
   assert.match(panel, /new URL\(state\.joinPath, window\.location\.origin\)\.href/);
   assert.doesNotMatch(actions, /\/join\?token=/);
+});
+
+test("formal journey publication requires an explicit offline review attestation", () => {
+  assert.match(panel, /已完成线下复核的 Reviewer/);
+  assert.match(panel, /name="review_acknowledged" type="checkbox" required/);
+  assert.match(actions, /data\.get\("review_acknowledged"\) === "on"/);
+  assert.match(actions, /review_acknowledged: reviewAcknowledged/);
 });
 
 test("active invites can be revoked without persisted token display", () => {

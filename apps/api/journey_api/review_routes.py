@@ -12,6 +12,10 @@ from journey_api.auth import Actor, get_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.journey_service import (
+    formal_evaluation_evidence,
+    formal_journey_is_complete,
+)
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -537,17 +541,36 @@ def finalize_review(
         context.assignment.status = AssignmentStatus.COMPLETED
         if context.enrollment.status != EnrollmentStatus.ACTIVE:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
-        context.enrollment.status = EnrollmentStatus.COMPLETED
-        context.enrollment.revision += 1
-        create_pass_outcome_bundle(
-            session,
-            enrollment=context.enrollment,
-            assignment=context.assignment,
-            evaluation=evaluation,
-            reviewer_id=actor.id,
-            request_id=request.state.request_id,
-        )
-        assignment_event = "assignment.completed.v1"
+        if context.enrollment.journey_version_id is None:
+            context.enrollment.status = EnrollmentStatus.COMPLETED
+            context.enrollment.revision += 1
+            create_pass_outcome_bundle(
+                session,
+                enrollment=context.enrollment,
+                assignment=context.assignment,
+                evaluation=evaluation,
+                reviewer_id=actor.id,
+                request_id=request.state.request_id,
+            )
+            assignment_event = "assignment.completed.v1"
+        else:
+            session.flush()
+            if formal_journey_is_complete(session, context.enrollment):
+                evidence = formal_evaluation_evidence(session, context.enrollment)
+                context.enrollment.status = EnrollmentStatus.COMPLETED
+                context.enrollment.revision += 1
+                create_pass_outcome_bundle(
+                    session,
+                    enrollment=context.enrollment,
+                    assignment=context.assignment,
+                    evaluation=evaluation,
+                    reviewer_id=actor.id,
+                    request_id=request.state.request_id,
+                    formal_evidence=evidence,
+                )
+                assignment_event = "formal_journey.completed.v1"
+            else:
+                assignment_event = "journey_stage.completed.v1"
     else:
         context.assignment.status = AssignmentStatus.NEEDS_REVISION
         assignment_event = "assignment.revision_requested.v1"

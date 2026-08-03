@@ -42,9 +42,14 @@ export default async function JoinPage({
   const isReentry = summary?.flow === "REENTRY";
 
   return (
-    <section className="content-narrow">
-      <p className="eyebrow">{isReentry ? "安全重新进入" : "受邀加入"}</p>
-      <h1>{isReentry ? "确认重新进入，继续原有当前行动。" : "确认身份，进入唯一当前行动。"}</h1>
+    <section className="learner-join">
+      <div className="join-symbol" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <p className="journey-whisper">{isReentry ? "Welcome back." : "Your journey starts here."}</p>
+      <h1>{isReentry ? "回到你离开的地方。" : "这张通行证，只属于你。"}</h1>
       {errorMessage ? (
         <div className="notice" role="alert">
           <strong>{errorMessage}</strong>
@@ -52,12 +57,12 @@ export default async function JoinPage({
         </div>
       ) : null}
       {summary ? (
-        <article className="panel">
-          <h2>本次邀请用途</h2>
-          <p>{summary.purpose}</p>
-          <p className="status-meta">
-            身份确认窗口截至 {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-          </p>
+        <article className="join-pass">
+          <span className="join-pass-label">Muchen Journey · 邀请</span>
+          <h2>{summary.purpose}</h2>
+          <time dateTime={summary.expires_at}>
+            {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
+          </time>
           <form action={confirmIdentity}>
             {!isReentry ? (
               <>
@@ -65,14 +70,16 @@ export default async function JoinPage({
                 <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
               </>
             ) : (
-              <p className="notice">本次只恢复原有 Learner 会话，不会创建新人、Enrollment、Assignment 或新提交。</p>
+              <p className="status-meta">
+                只恢复原有 Learner 会话与进度，不会创建新人、Enrollment、Assignment 或新提交。
+              </p>
             )}
             <label className="consent-row">
               <input type="checkbox" name="accepted_purpose" value="yes" required />
-              我已确认本次邀请用途并同意继续
+              我确认这是我的邀请
             </label>
             <button className="button primary" type="submit">
-              {isReentry ? "确认并重新进入" : "确认身份并进入"}
+              {isReentry ? "继续旅程" : "开启旅程"}
             </button>
           </form>
         </article>

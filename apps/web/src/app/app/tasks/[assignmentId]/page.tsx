@@ -32,49 +32,61 @@ export default async function TaskPage({
   const initialAttachmentIds = assignment.draft?.attachment_ids ?? [];
 
   return (
-    <article className="panel content-narrow">
-      <p className="eyebrow">
-        {assignment.stable_task_key} · Version {assignment.task_version}
-      </p>
-      <h1>{assignment.task_title}</h1>
-      <p className="lede">{assignment.task_purpose}</p>
-      <p className="status-meta">
-        预计 {assignment.estimated_duration_minutes} 分钟 · 反馈目标 {assignment.feedback_sla_business_days} 个工作日
-      </p>
-      <h2>完成后你将能够</h2>
-      <p>{assignment.learner_outcome}</p>
-      <h2>任务步骤</h2>
-      <ol className="checklist">
+    <article className="learner-task-page">
+      <header className="task-hero-card">
+        <div className="task-identity">
+          <span aria-hidden="true">
+            {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "◇" : "●"}
+          </span>
+          <p>
+            {assignment.journey_stage?.title ?? assignment.stable_task_key}
+            <small>V{assignment.task_version}</small>
+          </p>
+        </div>
+        <h1>{assignment.task_title}</h1>
+        <p>{assignment.journey_stage?.short_description ?? assignment.task_purpose}</p>
+        <div className="task-time" aria-label={`预计 ${assignment.estimated_duration_minutes} 分钟`}>
+          <i aria-hidden="true" /> {assignment.estimated_duration_minutes} min
+        </div>
+      </header>
+
+      <section className="task-moves" aria-labelledby="task-moves-title">
+        <p className="section-label">这一站</p>
+        <h2 id="task-moves-title">沿着动作前进</h2>
+        <ol>
         {assignment.instructions.map((item) => (
           <li key={item}>{item}</li>
         ))}
-      </ol>
-      <h2>完成标准</h2>
-      <ul className="checklist">
-        {assignment.completion_criteria.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
+        </ol>
+      </section>
 
-      <h2>需要交付</h2>
-      <ul className="checklist">
-        {assignment.required_deliverables.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-
-      {assignment.reference_materials.length > 0 ? (
-        <>
-          <h2>参考材料</h2>
+      <details className="task-contract">
+        <summary>完成边界</summary>
+        <p>{assignment.learner_outcome}</p>
+        <div className="task-contract-columns">
+          <div>
+            <h3>完成标准</h3>
+            <ul className="checklist">
+              {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h3>交付内容</h3>
+            <ul className="checklist">
+              {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        </div>
+        {assignment.reference_materials.length > 0 ? (
           <ul className="checklist">
-            {assignment.reference_materials.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
+            {assignment.reference_materials.map((item) => <li key={item}>{item}</li>)}
           </ul>
-        </>
-      ) : null}
+        ) : null}
+      </details>
 
-      <h2>工作区</h2>
+      <section className="task-workspace" aria-labelledby="task-workspace-title">
+      <p className="section-label">你的回应</p>
+      <h2 id="task-workspace-title">留下判断与证据</h2>
 
       {query.draft === "saved" ? (
         <p className="success-text" role="status">草稿已保存，刷新后仍可恢复。</p>
@@ -98,7 +110,7 @@ export default async function TaskPage({
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
-          <button className="button primary" type="submit">开始任务</button>
+          <button className="button primary" type="submit">开始这一站</button>
         </form>
       ) : null}
 
@@ -144,13 +156,17 @@ export default async function TaskPage({
             attachments={assignment.available_attachments}
             submissionIdempotencyKey={randomUUID()}
             draftIdempotencyKey={randomUUID()}
+            requiresReview={
+              assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
+            }
           />
         </>
       ) : null}
 
       {assignment.allowed_commands.length === 0 ? (
-        <p className="notice">当前版本已锁定，不再提供写入动作。请返回当前行动查看最新状态。</p>
+        <p className="notice">这一站暂时没有可执行动作。</p>
       ) : null}
+      </section>
 
       {assignment.submission ? (
         <section className="submission-history" aria-labelledby="submission-history-title">
@@ -181,7 +197,7 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      <details>
+      {assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
         <summary>评审会看什么</summary>
         <ul className="checklist">
           {assignment.rubric.dimensions.map((dimension) => (
@@ -190,7 +206,7 @@ export default async function TaskPage({
             </li>
           ))}
         </ul>
-      </details>
+      </details> : null}
     </article>
   );
 }

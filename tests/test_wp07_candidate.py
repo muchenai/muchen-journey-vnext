@@ -16,8 +16,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0014_wp12_data_lifecycle",
-        "revision_count": 14,
+        "head": "0015_wp19_formal_journey",
+        "revision_count": 15,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -87,16 +87,41 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0014_wp12_data_lifecycle",
-        "revision_count": 14,
+        "head": "0015_wp19_formal_journey",
+        "revision_count": 15,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0014_wp12_data_lifecycle"
+    assert migration()["head"] == "0015_wp19_formal_journey"
     assert config_schema() == 3
+
+
+def test_formal_catalog_is_bound_into_candidate_content_evidence():
+    items = candidate.formal_catalog_versions()
+    assert len(items) == 8
+    assert {item["stable_key"] for item in items} == {
+        "DAY-0",
+        "TRE-001-COMPANY-VALUES",
+        "TRE-002-AI-DATA-BASICS",
+        "TRE-003-PROJECT-AWARENESS",
+        "TRE-004-DELIVERY-FIT",
+        "ASM-001-RULE-BREAKDOWN",
+        "ASM-002-MODEL-JUDGEMENT",
+        "ASM-003-BOUNDARY-ESCALATION",
+    }
+    assert all(item["task_version_id"] is None for item in items)
+    assert all(
+        item["publication_status"] == "RUNTIME_OPERATOR_PUBLISH_REQUIRED"
+        for item in items
+    )
+    assert all(
+        len(item["content_sha256"]) == 64
+        and set(item["content_sha256"]) <= set("0123456789abcdef")
+        for item in items
+    )
 
 
 def test_verify_accepts_bound_task_artifact_and_not_run_status(candidate_manifest):

@@ -37,14 +37,14 @@ export function InviteTokenExchangeForm() {
   }, [token]);
 
   if (!token) {
-    return <p className="notice">请从运营发送的完整邀请链接进入；链接无效时请联系运营重新邀请。</p>;
+    return <p className="notice">请使用完整邀请链接进入。</p>;
   }
 
   return (
     <form action={exchangeInvite}>
       <input type="hidden" name="token" value={token} />
-      <p className="notice">邀请凭证已从地址栏移除。验证后会显示本次邀请用途。</p>
-      <button className="button primary" type="submit">验证邀请并继续</button>
+      <p className="status-meta">通行证已安全读取。</p>
+      <button className="button primary" type="submit">打开通行证</button>
     </form>
   );
 }
