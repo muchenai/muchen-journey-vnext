@@ -268,3 +268,10 @@
 - 用户随后精确授权一次 `phase=repair-runtime`。唯一 run [`30616573615`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30616573615) 成功，未重试：Web=`222096db506e95db887a8705b22ca4a439d0545d`，API/Worker/heartbeat=`02863d0b670ee9b00b9def3e75bc6699827f555a`，migration=`0014_wp12_data_lifecycle`；
 - workflow 内部组件合同、公开 readiness、root=200、匿名 `/ops`/`/review`=401 与 SSH 撤销全部通过；Terraform、DNS、云资源、seed、消息发送和 WP-12B 未执行；
 - 本记录只恢复 WP-13 技术入口。原 UAT 失败、WP-12B 1 秒性能失败、真人签署缺失、WP-14 真实 14 天与 WP-15 production 门禁继续保持，production 仍为 `NO_GO`。
+
+## 2026-08-03 WP-19～WP-22 候选绑定
+
+- 精确候选 `ef0a512cf357001cfd8cb6803f65cc17ae697325` 的 Mainline Candidate Gate [`30806515651`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30806515651) 已通过完整 CI、候选打包、SBOM、三镜像 GHCR push 和远端 digest 复验；artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`；
+- staging 合同固定 API `sha256:045bc1eb…3281`、Web `sha256:ba24dc10…99b6`、Worker `sha256:1a767577…efc5`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_EF0A512_TO_VOLCENGINE_STAGING`；
+- 候选 migration head 为 `0015_wp19_formal_journey`。10 个 TaskVersion 中 8 个正式旅程任务保持 `RUNTIME_OPERATOR_PUBLISH_REQUIRED`；部署只建立可运行能力，不替 Operator 发布业务内容；
+- Owner 已授权绑定 PR 合入且 required check 通过后，在冻结 staging 基础设施执行一次部署；失败不重试。Terraform plan/apply、DNS、云资源、消息发送、业务接收人和 WP-12B 均不在范围，production 继续 `NO_GO`。

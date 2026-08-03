@@ -33,10 +33,10 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == '8f77ceec570e2ec5e9c52861fcdc27748d7bb44a' &&
+      inputs.candidate == 'ef0a512cf357001cfd8cb6803f65cc17ae697325' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8F77CEE_TO_VOLCENGINE_STAGING') ||
-      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_8F77CEE_STAGING'))
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_EF0A512_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_EF0A512_STAGING'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -84,10 +84,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-8f77ceec570e2ec5e9c52861fcdc27748d7bb44a
+          name: wp07-candidate-ef0a512cf357001cfd8cb6803f65cc17ae697325
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 30709982868
+          run-id: 30806515651
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
