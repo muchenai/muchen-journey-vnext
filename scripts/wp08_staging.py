@@ -24,6 +24,7 @@ INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
 RUNTIME_INVENTORY_SCRIPT = ROOT / "scripts" / "wp08_runtime_inventory.py"
+FAILED_RELEASE_CLEANUP_SCRIPT = ROOT / "scripts" / "wp08_failed_release_cleanup.py"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
 STAGING_CADDYFILE = ROOT / "deploy" / "staging" / "Caddyfile"
 WEB_READINESS_ROUTE = (
@@ -146,6 +147,7 @@ def validate_files() -> None:
         "scripts/wp08_rds_network_audit.py",
         "scripts/wp08_security_group.py",
         "scripts/wp08_runtime_inventory.py",
+        "scripts/wp08_failed_release_cleanup.py",
         "scripts/wp08_web_only.py",
         "config/wp08_web_only.json",
         ".github/workflows/wp08-edge-mirror.yml",
@@ -157,8 +159,12 @@ def validate_files() -> None:
     mode = stat.S_IMODE((ROOT / "deploy/staging/deploy.sh").stat().st_mode)
     if mode != 0o755:
         raise StagingError("deploy/staging/deploy.sh must be mode 0755")
+    cleanup_mode = stat.S_IMODE(FAILED_RELEASE_CLEANUP_SCRIPT.stat().st_mode)
+    if cleanup_mode != 0o755:
+        raise StagingError("scripts/wp08_failed_release_cleanup.py must be mode 0755")
     validate_deploy_script()
     validate_runtime_inventory_script()
+    validate_failed_release_cleanup_script()
     validate_staging_compose()
 
 
@@ -187,6 +193,37 @@ def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> 
     )
     if any(marker in source for marker in forbidden):
         raise StagingError("runtime inventory script exceeds its read-only boundary")
+
+
+def validate_failed_release_cleanup_script(
+    path: Path = FAILED_RELEASE_CLEANUP_SCRIPT,
+) -> None:
+    source = path.read_text()
+    required = (
+        'CANDIDATE = "ef0a512cf357001cfd8cb6803f65cc17ae697325"',
+        'FAILED_RUN_ID = "30808632624"',
+        'RELEASE_ROOT = Path("/srv/journey-next-staging")',
+        'root / "releases" / f"{candidate}-{run_id}"',
+        'current.resolve(strict=True) == target',
+        'previous = root / "PREVIOUS_RELEASE"',
+        'deployed = root / "DEPLOYED_CANDIDATE"',
+        'read_env_value(deployment_env, "CANDIDATE_COMMIT")',
+        'com.docker.compose.project.working_dir',
+        '["shred", "-u", "--", str(path)]',
+        "shutil.rmtree(target)",
+        "WP08_FAILED_RELEASE_CLEANUP=PASS",
+    )
+    if any(marker not in source for marker in required):
+        raise StagingError("failed release cleanup script is incomplete")
+    forbidden = (
+        "terraform ",
+        "alembic ",
+        "docker compose up",
+        "docker pull",
+        "journey_api.seed",
+    )
+    if any(marker in source for marker in forbidden):
+        raise StagingError("failed release cleanup exceeds its exact deletion boundary")
 
 
 def validate_edge_mirror_workflow(path: Path = EDGE_MIRROR_WORKFLOW) -> None:
@@ -507,7 +544,9 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             )
     required = (
         "- audit\n          - deploy\n          - inspect-runtime",
+        "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
+        "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
         "id: terraform_init",
         "if: inputs.phase == 'audit'",
         "python3 -m scripts.wp08_rds_network_audit",
@@ -515,7 +554,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -552,6 +591,9 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
         "INSPECT_RUNTIME_EF0A512_STAGING",
         "scripts/wp08_runtime_inventory.py",
+        "if: inputs.phase == 'cleanup-failed-release'",
+        "scripts/wp08_failed_release_cleanup.py",
+        "'30808632624'",
         'if [[ "${{ inputs.phase }}" == "deploy-web" || "${{ inputs.phase }}" == "repair-runtime" ]]; then',
         "python3 scripts/wp08_web_only.py check",
         '--mode "$mode"',
@@ -568,6 +610,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if workflow.count("if: inputs.phase == 'inspect-runtime'") != 1:
         raise StagingError("staging workflow runtime inventory step count must be exactly 1")
+    if workflow.count("if: inputs.phase == 'cleanup-failed-release'") != 1:
+        raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
         or workflow.count('git show "$candidate:') != 12
@@ -637,9 +681,26 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     ):
         if forbidden in inventory_step:
             raise StagingError("runtime inventory must remain read-only")
+    cleanup_step_start = workflow.find("- name: Remove exact failed pre-start release")
+    cleanup_step_end = workflow.find("\n      - name:", cleanup_step_start + 1)
+    if cleanup_step_start < 0 or cleanup_step_end < 0:
+        raise StagingError("exact failed-release cleanup step is missing")
+    cleanup_step = workflow[cleanup_step_start:cleanup_step_end]
+    for forbidden in (
+        "terraform plan",
+        "terraform apply",
+        "terraform import",
+        "docker pull",
+        "deploy.sh",
+        "grant_runtime",
+        "alembic",
+        "wp12b",
+    ):
+        if forbidden in cleanup_step:
+            raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,frozen-alpha-deploy,runtime-inventory"
+        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,exact-failed-release-cleanup"
         " retired=provision,bounded-web-only,runtime-repair"
     )
 

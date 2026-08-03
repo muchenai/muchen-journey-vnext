@@ -275,3 +275,10 @@
 - staging 合同固定 API `sha256:045bc1eb…3281`、Web `sha256:ba24dc10…99b6`、Worker `sha256:1a767577…efc5`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_EF0A512_TO_VOLCENGINE_STAGING`；
 - 候选 migration head 为 `0015_wp19_formal_journey`。10 个 TaskVersion 中 8 个正式旅程任务保持 `RUNTIME_OPERATOR_PUBLISH_REQUIRED`；部署只建立可运行能力，不替 Operator 发布业务内容；
 - Owner 已授权绑定 PR 合入且 required check 通过后，在冻结 staging 基础设施执行一次部署；失败不重试。Terraform plan/apply、DNS、云资源、消息发送、业务接收人和 WP-12B 均不在范围，production 继续 `NO_GO`。
+
+## 2026-08-03 ef0a512 部署 pre-start 失败与精确清理合同
+
+- 绑定 PR #138 已合入主线 `80c3e7e9050b8c69c411e42a99ac6d6e7c07b1b3`。用户授权的唯一 deploy run [`30808632624`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30808632624) 没有重试；候选、artifact、冻结 state 和临时 runner `/32` 均通过，随后 `deploy.sh` 在第一组环境合同检查以 `WP08_DEPLOY_ERROR: unexpected production host` fail closed；
+- 根因是 `scripts/wp08_prepare_deploy.py` 已把 `PRODUCTION_HOST=journey.muchenai.com` 写入 edge 环境，却漏写到 `deploy.sh` 实际 source 的 `.deployment.env`。失败发生在 `docker compose pull`、migration、runtime grant、seed、容器替换和 `current` symlink 更新之前；外部 staging 继续运行旧 Web-only release，匿名 `/ops` 与 `/review` 仍为 401，临时 SSH 已输出 `WP08_SSH_INGRESS=CLOSED`；
+- 失败仅留下 root-only 目录 `/srv/journey-next-staging/releases/ef0a512cf357001cfd8cb6803f65cc17ae697325-30808632624`。修复 PR 增加 `.deployment.env` 的生产 host、单元回归测试和一次性 `cleanup-failed-release`。清理脚本精确绑定候选/run，并在删除前拒绝 `current`、回退标记、部署标记、Docker working directory、符号链接、硬链接或 bundle 内容漂移；release-local 环境文件先安全擦除；
+- 清理不是部署，不读取业务表正文、不修改数据库、DNS、Terraform、云资源、消息、接收人或 WP-12B。清理通过后 staging 仍应保持旧 release；新的 deploy 必须由用户基于合入后的完整主线 SHA 单独授权，production 继续 `NO_GO`。

@@ -11,6 +11,7 @@ on:
           - audit
           - deploy
           - inspect-runtime
+          - cleanup-failed-release
       candidate:
         description: Exact approved 40-character candidate SHA
         required: true
@@ -36,7 +37,8 @@ jobs:
       inputs.candidate == 'ef0a512cf357001cfd8cb6803f65cc17ae697325' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_EF0A512_TO_VOLCENGINE_STAGING') ||
-      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_EF0A512_STAGING'))
+      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_EF0A512_STAGING') ||
+      (inputs.phase == 'cleanup-failed-release' && inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -188,7 +190,7 @@ jobs:
           terraform show -json "$plan_file" | python3 ../../scripts/wp08_plan_guard.py
           terraform apply -auto-approve "$plan_file"
       - name: Read frozen Alpha pilot infrastructure
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'
         id: frozen_infrastructure
         working-directory: infra/staging
         run: |
@@ -212,7 +214,7 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
       - name: Open exact runner SSH ingress
-        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime'
+        if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release'
         run: |
           python3 -m scripts.wp08_security_group open \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \
@@ -231,6 +233,21 @@ jobs:
           ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
             "python3 - --candidate '${{ inputs.candidate }}'" \
             <scripts/wp08_runtime_inventory.py
+          ssh-keygen -lf "$known_hosts"
+      - name: Remove exact failed pre-start release
+        if: inputs.phase == 'cleanup-failed-release'
+        env:
+          WP08_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
+        run: |
+          key="$RUNNER_TEMP/wp08-cleanup-key"
+          known_hosts="$RUNNER_TEMP/wp08-cleanup-known-hosts"
+          printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$key"
+          chmod 0600 "$key"
+          ssh_opts=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts")
+          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" \
+            "python3 - '${{ inputs.candidate }}' '30808632624'" \
+            <scripts/wp08_failed_release_cleanup.py
           ssh-keygen -lf "$known_hosts"
       - name: Prepare private deploy bundle
         if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'
@@ -288,7 +305,7 @@ jobs:
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
       - name: Close SSH ingress
-        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime') && steps.frozen_infrastructure.outputs.security_group_id != ''
+        if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |
           python3 -m scripts.wp08_security_group close \
             --security-group-id "${{ steps.frozen_infrastructure.outputs.security_group_id }}" \

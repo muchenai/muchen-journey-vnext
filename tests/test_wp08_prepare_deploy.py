@@ -83,6 +83,7 @@ def test_prepare_writes_private_independent_environment_files(
     assert "Migration-Password" not in (output / "secrets/api.env").read_text()
     deployment = (output / ".deployment.env").read_text()
     assert f"CANDIDATE_COMMIT={prepare.CANDIDATE}" in deployment
+    assert f"PRODUCTION_HOST={prepare.PRODUCTION_HOST}" in deployment
     for image in prepare.IMAGES.values():
         assert image in deployment
 

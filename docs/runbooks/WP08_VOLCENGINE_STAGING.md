@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`WP19_22_CANDIDATE_BOUND_PENDING_DEPLOY / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。候选 `ef0a512…` 只允许在 2026-08-03 当轮授权下执行一次 staging 部署；绑定本身不代表已部署。Terraform、DNS、云资源、消息、业务接收人和 WP-12B 均不在本次范围；production 继续 `NO_GO`。
+状态：`WP19_22_DEPLOY_FAILED_PRESTART_FIX_AND_CLEANUP_IN_REVIEW / NEW_DEPLOY_AUTH_REQUIRED / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本，不授权 production。Provision 已收敛并冻结。候选 `ef0a512…` 的 2026-08-03 唯一部署授权已由 run `30808632624` 消费并在应用启动前失败，禁止自动重试。当前只允许通过 PR 补齐部署包 `PRODUCTION_HOST` 合同，并以一次性 `cleanup-failed-release` 精确删除该 run 遗留、未被 `current`/容器/回退标记引用的 root-only release 目录；新的部署必须在合入、门禁与清理复验后另行授权。Terraform、DNS、云资源、消息、业务接收人和 WP-12B 均不在本次范围；production 继续 `NO_GO`。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -21,7 +21,7 @@
 - Web 邀请入口修复候选：`222096db506e95db887a8705b22ca4a439d0545d`；Mainline Candidate Gate `30550010916` 已完成完整 CI、候选工件、三镜像 GHCR push 与 digest 验证。full deploy run `30556851235` 超时取消后形成 Web 新、API/Worker 旧的混合状态，未被接受为部署成功。`config/wp08_web_only.json` 现建立有界 Web-only 合同：只允许候选单提交中的 Web/指定证据路径；API、Worker、migration 与 OpenAPI 必须和基线 `02863d0…` 完全兼容；运行时必须先证明 API/Worker=`02863d0…`、migration=`0014_wp12_data_lifecycle`、config schema=3、Worker 非 stale，否则在 Web 写入前停止；
 - 历史 Web-only/runtime-repair dispatch 已随受控 Alpha 候选绑定退役；`config/wp08_web_only.json` 仅保留为不可变历史合同并明确 `RETIRED`。PR Fast Gate 继续验证其原候选、父提交、路径和兼容性事实，但 `.github/workflows/staging.yml` 的 job guard 不再允许 `provision`、`deploy-web` 或 `repair-runtime`；
 - 历史受控 Alpha 候选：`8f77ceec570e2ec5e9c52861fcdc27748d7bb44a`；唯一 deploy run `30729705773` 已成功消费，不得再次部署；
-- WP-19～WP-22 最小纵向切片候选：`ef0a512cf357001cfd8cb6803f65cc17ae697325`；Mainline Candidate Gate `30806515651` 已完成 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。migration head 为 `0015_wp19_formal_journey`；候选清单包含 10 个 TaskVersion，其中 8 个正式旅程任务保持 `RUNTIME_OPERATOR_PUBLISH_REQUIRED`，部署不会替 Operator 发布业务内容。本合同只允许在 2026-08-03 当轮精确授权下执行一次冻结基础设施 `phase=deploy`，失败不重试、不重跑 WP-12B、不发送消息、不配置业务接收人；
+- WP-19～WP-22 最小纵向切片候选：`ef0a512cf357001cfd8cb6803f65cc17ae697325`；Mainline Candidate Gate `30806515651` 已完成 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。migration head 为 `0015_wp19_formal_journey`；候选清单包含 10 个 TaskVersion，其中 8 个正式旅程任务保持 `RUNTIME_OPERATOR_PUBLISH_REQUIRED`，部署不会替 Operator 发布业务内容。唯一 deploy run `30808632624` 已在 `.deployment.env` 缺少 `PRODUCTION_HOST` 时 pre-start fail closed：没有 pull、migration、grant、seed、容器替换或 `current` 切换，SSH 已关闭。该部署授权已消费；修复与失败目录清理不构成新部署授权；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -90,7 +90,7 @@ make wp08-staging-apply-check
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. 历史确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`、`DEPLOY_172C9F6_TO_VOLCENGINE_STAGING`、`DEPLOY_9E1CDB2_TO_VOLCENGINE_STAGING`、`DEPLOY_674E51D_TO_VOLCENGINE_STAGING`、`DEPLOY_02863D0_TO_VOLCENGINE_STAGING`、`DEPLOY_222096D_TO_VOLCENGINE_STAGING` 与 `DEPLOY_8F77CEE_TO_VOLCENGINE_STAGING` 均不得复用。新候选只接受 `DEPLOY_EF0A512_TO_VOLCENGINE_STAGING`；该文本不构成 dispatch 授权。只有合同 PR 合入、required check 通过且当轮一次性授权有效时才可执行 `phase=deploy`。任何前置状态漂移必须零业务写入停止，不得退化为 provision、Web-only、runtime-repair 或修改期望基线。
+3. 历史确认词 `DEPLOY_2AB2658_TO_VOLCENGINE_STAGING`、`DEPLOY_172C9F6_TO_VOLCENGINE_STAGING`、`DEPLOY_9E1CDB2_TO_VOLCENGINE_STAGING`、`DEPLOY_674E51D_TO_VOLCENGINE_STAGING`、`DEPLOY_02863D0_TO_VOLCENGINE_STAGING`、`DEPLOY_222096D_TO_VOLCENGINE_STAGING` 与 `DEPLOY_8F77CEE_TO_VOLCENGINE_STAGING` 均不得复用。候选 `ef0a512…` 的旧部署授权已经消费；workflow 中的 `DEPLOY_EF0A512_TO_VOLCENGINE_STAGING` 只是候选绑定，不构成再次 dispatch 授权。新的 `phase=deploy` 必须在修复 PR 合入、required check 与一次性清理通过后另行取得授权。任何前置状态漂移必须零业务写入停止，不得退化为 provision、Web-only、runtime-repair 或修改期望基线。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
@@ -111,3 +111,4 @@ Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state 
 - CloudControl 长耗时 state refresh 若仅以精确 `InvalidTimestamp: The Signature of the request is expired` 失败，workflow 只允许重新签名并重跑一次只读 `terraform plan`；`apply` 不自动重试，其他错误继续 fail closed。
 - 预算预测或实际成本超过 ¥800、候选/digest 不一致、CA/域名/ACL 不合格、旧资源引用出现：立即 `STOPPED / NO DEPLOY`。
 - 首次部署无 previous release；失败时停止新容器，保留 RDS/TOS 供诊断。删除付费资源属于单独破坏性操作，需用户再次明确授权并先保留必要证据。
+- run `30808632624` 的 pre-start 失败目录仅可由 `phase=cleanup-failed-release` 处理，确认词固定为 `CLEANUP_FAILED_RELEASE_EF0A512_30808632624`。脚本必须同时证明候选/run 精确匹配、目录不是符号链接、`current`/`PREVIOUS_RELEASE`/`DEPLOYED_CANDIDATE` 均未引用、没有任何 Docker 容器以该目录为 Compose working directory，且目录内容与审查过的 bundle 完全一致；随后先安全擦除 release-local 环境文件，再删除该精确目录。该 phase 不运行 Compose、migration、seed、Terraform、DNS、消息或业务写入，并始终关闭临时 SSH。
