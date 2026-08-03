@@ -48,7 +48,7 @@
 
 ### 3.1 2026-08-03 执行记录
 
-- 备份与隔离恢复：run `30760806984`；密文/HMAC/PII-free facts 私有归档：run `30761088830`；
+- 备份与隔离恢复核心证明：run `30760806984`（TOS 归档失败使 workflow=`failure`）；同一密文/HMAC/PII-free facts 私有归档：run `30761088830`（`success`）；
 - DNS：`journey.muchenai.com A 115.191.28.113`；staging 记录未改变；
 - TLS/维护：run `30779397520`，证书 CN=`journey.muchenai.com`、issuer=`Let's Encrypt YE1`，维护页 HTTPS=503；
 - 正式放流：run `30779441351`，HTTPS root=200，readiness release=`8f77ceec570e2ec5e9c52861fcdc27748d7bb44a`，匿名 `/ops`/`/review`=401，OAuth 正式回调与 staging 回归通过；
