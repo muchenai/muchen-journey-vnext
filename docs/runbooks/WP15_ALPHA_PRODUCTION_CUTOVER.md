@@ -1,6 +1,6 @@
 # WP-15｜`journey.muchenai.com` 受控 Alpha 切换手册
 
-状态：`APPROVED_EXECUTION_PATH / NOT_FULL_PRODUCTION_GO`
+状态：`CONTROLLED_ALPHA_LIVE / NOT_FULL_PRODUCTION_GO`
 
 本手册是受保护主线中唯一允许操作 `journey.muchenai.com` 受控 Alpha 运行面的入口。它不把尚未完成的 WP-13 全量签署、WP-14 真实 14 天、WP-11 外部告警/真实通知、WP-12B 原 1 秒性能失败或独立灾备故障域改写为通过。
 
@@ -45,6 +45,14 @@
 13. 在飞书开放平台新增并发布正式回调，保留原 staging 回调；不扩大应用权限和可用人员范围。
 14. 在阿里云 DNS 把 `journey` 的 A 记录从私有证据中的旧站值改为当前 vNext ECS 公网地址，TTL 保持 600。只改这一条记录。
 15. TLS 签发后验证：正式根页 200、`/health/ready` 精确候选、匿名 `/ops` 和 `/review` 为 401、飞书 OAuth 回跳仍为正式域名；同时确认 staging 根页/readiness 继续可用。
+
+### 3.1 2026-08-03 执行记录
+
+- 备份与隔离恢复：run `30760806984`；密文/HMAC/PII-free facts 私有归档：run `30761088830`；
+- DNS：`journey.muchenai.com A 115.191.28.113`；staging 记录未改变；
+- TLS/维护：run `30779397520`，证书 CN=`journey.muchenai.com`、issuer=`Let's Encrypt YE1`，维护页 HTTPS=503；
+- 正式放流：run `30779441351`，HTTPS root=200，readiness release=`8f77ceec570e2ec5e9c52861fcdc27748d7bb44a`，匿名 `/ops`/`/review`=401，OAuth 正式回调与 staging 回归通过；
+- 回退合同已通过 maintenance→live 的真实路由演练；未执行旧站 DNS 回退，未删除 staging 或 production 数据。
 
 ## 4. 一键止血与旧站回退
 

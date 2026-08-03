@@ -109,6 +109,8 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 
 这一方案只提供逻辑隔离，不提供独立故障域。它必须先完成源库只读备份、空白 production 库隔离恢复、加密异机保存和恢复事实一致性证明；正式域名只能在 TLS、OAuth 回调、allowed host 和 canonical URL 同时正确后切换。发生安全或数据完整性问题时先一键维护，不用旧备份覆盖新事实；旧站 DNS 只恢复入口，不恢复旧站为事实源。完整 production GO 仍需后续 WP-13/14/15 证据，不因域名变更自动获得。
 
+2026-08-03 执行结果：备份/隔离恢复 run `30760806984` 与私有加密归档 run `30761088830` 通过；正式回调保存后，`journey` A 记录切至北京 vNext ECS。首次 TLS 握手因边缘容器早于 DNS 切换启动而未触发新证书申请；只读诊断 PR #127 合入后，maintenance run `30779397520` 只重建 edge 并成功签发 `journey.muchenai.com` 证书，维护页返回 503。live run `30779441351` 随后恢复 production Web；公开根页与 readiness 为 200/精确候选，匿名 `/ops`、`/review` 均为 401，OAuth `redirect_uri` 为正式回调，staging 继续 200。该事实把 DEC-023 记为 `CONTROLLED_ALPHA_LIVE`，不改变完整 release gate 的 `NO_GO`。
+
 ## 4. 风险台账
 
 | ID | 风险 | 概率/影响 | 早期信号 | 预防/缓解 | Owner |
