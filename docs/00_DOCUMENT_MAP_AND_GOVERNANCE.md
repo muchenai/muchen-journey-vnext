@@ -1,8 +1,8 @@
 # 00｜文档地图与治理规则
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.7
-日期：2026-07-30
+版本：V0.8
+日期：2026-08-03
 适用阶段：立项至 G0 开工门禁  
 权威性：本目录是 vNext 开发前唯一文档事实源；旧版 DOCX、旧仓库 README、会议纪要和聊天记录均不是 vNext 实施权威。
 
@@ -48,6 +48,7 @@
 | 30 | [WP-12 候选硬化与灾备构建证据](30_WP12_CANDIDATE_HARDENING_DR_EVIDENCE.md) | RC 的安全、性能、保留删除、异机恢复和回滚门禁实际关闭到什么程度？ | 第一批代码级安全硬化已验证；DEC-019 仅延期独立灾备故障域选型，基础恢复、威胁模型、性能、保留删除和回滚仍未关闭，WP-12 为 `IN_PROGRESS`，production 为 `NO_GO` |
 | 31 | [WP-13～WP-15 真人、时间与生产门禁执行包](31_WP13_WP15_EXECUTION_GATE_KIT.md) | 如何确保真人 UAT、14 天试点和生产批准不被自动化假证据替代？ | 候选 `8f77ceec…` 已完成一条真人修订闭环并以 `journey.muchenai.com` 开放单组织受控 Alpha；完整 WP-13/14/15 仍未通过，不伪造完整 production GO |
 | 32 | [WP-12B 多租户容量与隔离门禁证据](32_WP12B_MULTI_TENANT_LOAD_AND_ISOLATION_EVIDENCE.md) | 十几个真实组织上线前如何证明多租户并发容量、隔离和事实唯一性？ | run `30525165474` 的隔离/正确性/退役 PASS、原 1 秒性能 FAIL 均已固化；DEC-020 仅允许同一候选按 ≤1.2 秒进入 WP-13，不记 `WP12B_CLOSED` |
+| 33 | [WP-17 Learner Experience 高保真原型合同](33_WP17_LEARNER_EXPERIENCE_PROTOTYPE.md) | 如何让 Learner 在首次进入、任务执行和结果反馈中形成清晰而克制的旅程感？ | 三种高保真原型先完成视觉/可用性评审；仅允许重构 Learner 路由，`/review` 与 `/ops` 保持专业工具界面，不等同实现、部署或 UAT |
 | RB-15 | [受控 Alpha 正式域名切换手册](runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md) | 如何在不丢失 staging 和新业务事实的前提下备份恢复、切换正式域名并一键止血？ | 受保护主线唯一入口；锁定候选、空库恢复、加密异机备份、双 host、OAuth/TLS、维护页与旧站入口回退边界 |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 
