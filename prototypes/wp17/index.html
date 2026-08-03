@@ -123,7 +123,7 @@
     .route-point::after { content: ""; position: absolute; inset: -8px; border: 1px solid rgba(255,255,255,.34); border-radius: 50%; opacity: 0; transform: scale(.75); transition: opacity .16s ease, transform .16s ease; }
     .route-point:hover::after, .route-point:focus-visible::after, .route-point[aria-expanded="true"]::after { opacity: 1; transform: none; }
     .route-point.start { left: 1px; bottom: 7px; }
-    .route-point.feedback { left: calc(50% - 12px); top: 56px; background: #fff; }
+    .route-point.route-feedback { left: calc(50% - 12px); top: 56px; background: #fff; }
     .route-point.finish { right: -1px; top: 8px; background: var(--gold); }
     .route-tooltip { position: absolute; bottom: calc(100% + 13px); left: 50%; width: max-content; max-width: 165px; padding: 8px 10px; border-radius: 10px; color: var(--ink); background: #fff; box-shadow: 0 10px 30px rgba(5,30,44,.24); font-size: 12px; font-weight: 750; line-height: 1.45; opacity: 0; pointer-events: none; transform: translate(-50%, 6px); transition: opacity .16s ease, transform .16s ease; }
     .route-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top-color: #fff; }
@@ -262,7 +262,7 @@
             <div class="route-line">
               <svg viewBox="0 0 320 150" fill="none" aria-hidden="true"><path d="M12 120C58 30 108 146 156 70C204 -5 248 74 306 25" stroke="rgba(255,255,255,.75)" stroke-width="3" stroke-linecap="round"/></svg>
               <button class="route-point start" type="button" aria-label="启程" aria-describedby="route-tip-start" aria-expanded="false"><span class="route-tooltip" id="route-tip-start" role="tooltip">确认身份，进入任务</span></button>
-              <button class="route-point feedback" type="button" aria-label="主管反馈" aria-describedby="route-tip-feedback" aria-expanded="false"><span class="route-tooltip" id="route-tip-feedback" role="tooltip">提交后，主管开始评审</span></button>
+              <button class="route-point route-feedback" type="button" aria-label="主管反馈" aria-describedby="route-tip-feedback" aria-expanded="false"><span class="route-tooltip" id="route-tip-feedback" role="tooltip">提交后，主管开始评审</span></button>
               <button class="route-point finish" type="button" aria-label="完成旅程" aria-describedby="route-tip-finish" aria-expanded="false"><span class="route-tooltip" id="route-tip-finish" role="tooltip">通过后，里程碑点亮</span></button>
             </div>
           </div>

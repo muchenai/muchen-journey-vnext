@@ -54,6 +54,7 @@ def main() -> None:
     require("旅程" in html and "当前任务" in html and "里程碑" in html and "反馈" in html and "完成" in html, "narrative stages are incomplete")
     require(parser.paragraphs <= 8, "prototype relies on too many explanatory paragraphs")
     require(parser.route_points == 3, "the route must expose exactly three progressive-disclosure points")
+    require('class="route-point feedback"' not in html, "route points must not reuse result-card feedback styles")
     require("接下来约 60 分钟" not in html and "你只需关注" not in html, "redundant explanatory copy returned")
     require("revise: ['done', 'done', 'current', '']" in html, "revision must remain visually incomplete")
     require("/review" not in html and "/ops" not in html, "professional tools must not be included in the Learner prototype")
