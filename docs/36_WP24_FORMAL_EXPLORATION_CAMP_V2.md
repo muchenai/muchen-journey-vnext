@@ -101,7 +101,7 @@ WP-24 不重做 vNext 基座，也不修改 Journey V1、既有 Enrollment、Sub
 
 ## 7. 当前证据与下一步
 
-已完成：领域模型、migration、V2 catalog、API、Learner/Reviewer/Operator Web 路径；空库 `0001→0016` 迁移与 290 项 API 回归通过；Web lint、typecheck、13 项合同测试和 production build 通过；OpenAPI、isolation、traceability、secret scan 通过；隔离 production-mode 浏览器已验证 390/1280 视口中的“学习输入先于作答”。Python 在线依赖审计因 PyPI TLS EOF 未取得结果，不记为通过。768 视口、完整键盘顺序和真人内容校准仍属于发布前人工门禁，不以构建结果代替。
+已完成：领域模型、migration、V2 catalog、API、Learner/Reviewer/Operator Web 路径；空库 `0001→0016` 迁移与 290 项 API 回归通过；Web lint、typecheck、13 项合同测试和 production build 通过；OpenAPI、isolation、traceability、secret scan 通过；隔离 production-mode 浏览器已验证 390/1280 视口中的“学习输入先于作答”。本地 Python 依赖审计重试遇到 PyPI TLS EOF，但 PR Fast Gate 的完整 `make ci-fast`（run `30902143844`，含依赖审计）已通过。768 视口、完整键盘顺序和真人内容校准仍属于发布前人工门禁，不以构建结果代替。
 
 未授权且未执行：V2 业务发布、Learner 邀请、staging/production 部署、消息发送、既有事实迁移。合并代码后仍必须由内容 Reviewer 在 `/ops` 明确复核并发布 Journey V2；随后用新的受控邀请做小范围真人完整旅程验证。
 
