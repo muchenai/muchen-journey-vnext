@@ -1,6 +1,6 @@
 # 39｜WP-26～WP-30 本地构建记录与待授权账本
 
-状态：`AS_BUILT_LOCAL_MACHINE_GATES_PASS / HUMAN_GATES_NOT_RUN / EXTERNAL_AUTHORIZATIONS_DEFERRED / PRODUCTION_NO_GO`
+状态：`MAINLINE_MERGED / OWNER_AUTHORIZATION_RECEIVED / STAGING_CANDIDATE_BINDING / HUMAN_GATES_NOT_RUN / PRODUCTION_NO_GO`
 
 版本：V0.2
 
@@ -65,7 +65,9 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 
 ## 5. 六小时后待授权事项（严格按顺序）
 
-1. 审阅并合入本地 PR；合入本身不部署。
+2026-08-05 Owner 已明确同意本节全部待授权事项。该授权允许按以下顺序推进，但不把尚未发生的真人材料、独立复核、UAT、六方签署、正式域名 readback 或观察窗口写成通过；任何前置门禁失败即停止，production 在 `P0_RC_SIGNED` 前继续 `NO_GO`。
+
+1. 审阅并合入本地 PR；合入本身不部署。`DONE`：PR #148 已通过 Fast Gate 并合入主线 `a2312b269b1806cd3d5ce7d26fbc693466399035`。
 2. 在 staging 创建/绑定真实 Content Editor；不读取通讯录，不扩大其他身份。
 3. 由 Content Editor 导入并提交批准材料，由独立 Reviewer 线下复核，Operator 精确发布八个 TaskVersion。
 4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。
