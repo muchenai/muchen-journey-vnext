@@ -301,3 +301,8 @@
 - run 在修复前证明 staging Web=`ef0a512…`、production Web=`8e56e759…`、共享 alias 冲突、Edge 固定摘要、Compose project/release 和旧 Caddyfile；随后用现行 Caddy binary 校验新配置，仅以 `--no-deps --force-recreate --pull never edge` 重建 Edge。
 - workflow 内 12 轮连续新连接和主任务独立 12 轮复验均证明 staging readiness=`ef0a512…`、production readiness=`8e56e759…`、两个根页面 200、staging 匿名 `/ops` 与 `/review` 401。回退步骤未触发，成功状态已清理，SSH 关闭步骤输出 `WP08_SSH_INGRESS=CLOSED`。
 - 本证据只关闭公开 staging Edge 路由债务；正式 Journey V1 的 Operator/Reviewer 发布事实仍待生成，内容真人理解、独立 Reviewer 校准、WP-23 完整旅程与 production GO 均不因此转绿。
+
+## 2026-08-04 正式 Journey V1 发布的 Owner 陈述
+
+- Owner 报告当前 staging Operator 已选择完成线下复核的独立 Reviewer，确认发布后正文不可原地修改，并发布一次受控内测 Journey V1；未同时创建邀请或发送消息。
+- 这是合格的真人 Operator 操作陈述，不是应用或数据库机器读回。发布事实暂记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`；下一步只允许以一条绑定正式 JourneyVersion 的受控邀请关闭最小读回，不因此改写真人内容门禁、WP-23 或 production `NO_GO`。

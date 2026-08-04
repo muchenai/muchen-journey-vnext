@@ -2,7 +2,7 @@
 
 状态：`AS_BUILT`
 
-实现结论：`ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_PENDING`
+实现结论：`ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`
 
 版本：V0.1
 
@@ -93,11 +93,13 @@ Docker 首次重建期间曾在 build isolation 拉取 Python setuptools 时遇�
 
 “先完成切片、再发布”的前四个工程步骤已完成：PR 已合入受保护主线，mainline 已生成绑定 migration `0015` 和 8 个正式阶段摘要的候选 `ef0a512…`，该候选已在单次精确授权下部署到现有 staging，并经内部 runtime inventory 与公开 Edge 连续路由验收。
 
+候选发布后，Owner 于 2026-08-04 报告：当前 Operator 已在 staging 选择完成线下复核的独立 Reviewer，确认正文不可原地修改，并发布受控内测 Journey V1。该证据只是真人 Operator 陈述，不伪造数据库机器读回或独立 Reviewer 校准 PASS。
+
 剩余顺序固定为：
 
-1. Operator 显式选择已完成线下复核的独立 Reviewer，发布正式 Journey V1；
-2. 发布成功后再生成一条受控内测邀请，验证 Learner 固定到该 JourneyVersion 且首个 Current Action 为 Day 0；
+1. 在 Operator 页生成一条绑定已发布 JourneyVersion 的受控内测邀请，以邀请成功作为发布事实的最小机器读回；
+2. 由 Learner 使用该邀请加入，验证 Enrollment 固定到该 JourneyVersion 且首个 Current Action 为 Day 0；
 3. 小范围学员、NPC、直培班班主任和人才发展主管使用真实路径；这些反馈属于 WP-23，不反写已发布 V1，只能形成 V2 决策；
 4. 未经新的精确授权，不把此候选切到 `journey.muchenai.com`。
 
-WP-19～WP-22 的“最小纵向切片”已可在工程和 staging 运行层记为 `ENGINEERING_SLICE_VERIFIED / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED`。在 Operator 生成不可变 Journey V1 前，产品发布仍为 `RUNTIME_CONTENT_PUBLICATION_PENDING`。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 均为 `NOT_RUN`，所以完整 WP-20、WP-21、WP-22 退出签署与 WP-23 仍未关闭。
+WP-19～WP-22 的“最小纵向切片”已可在工程和 staging 运行层记为 `ENGINEERING_SLICE_VERIFIED / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED`。正式 Journey V1 当前记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`，只有受控正式 Journey 邀请成功后才能升级为机器已验证。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 均为 `NOT_RUN`，所以完整 WP-20、WP-21、WP-22 退出签署与 WP-23 仍未关闭。
