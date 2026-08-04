@@ -684,6 +684,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "https://staging-vnext.muchenai.com/health/ready",
         "https://staging-vnext.muchenai.com/ops",
         "https://staging-vnext.muchenai.com/review",
+        "https://staging-vnext.muchenai.com/content",
         "'%{http_code}'",
         '= "401"',
         "expired_reviewer=explicit-relogin",
