@@ -12,6 +12,8 @@ fail() {
 [[ "${WP16_WEB_IMAGE:-}" =~ ^ghcr\.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:[0-9a-f]{64}$ ]] || fail "Web image is not immutable"
 [[ "${WP16_PUBLIC_URL:-}" == "https://staging-vnext.muchenai.com" || "${WP16_PUBLIC_URL:-}" == "https://journey.muchenai.com" ]] || fail "public URL is invalid"
 [[ "${WP16_MARKER:-}" == /srv/journey-next-staging/DEPLOYED_WEB_CANDIDATE || "${WP16_MARKER:-}" == /srv/journey-next-production/DEPLOYED_WEB_CANDIDATE ]] || fail "marker path is invalid"
+expected_home_marker="${WP16_EXPECTED_HOME_MARKER:-把一个真实问题，变成清晰的下一步。}"
+[[ "$expected_home_marker" == "把一个真实问题，变成清晰的下一步。" || "$expected_home_marker" == "这里，没有标准答案。" ]] || fail "home marker is invalid"
 
 for path in compose.yaml .deployment.env secrets/api.env secrets/worker.env secrets/web.env; do
   [[ -f "$path" && ! -L "$path" ]] || fail "$path must be a regular file"
@@ -109,7 +111,7 @@ import sys
 assert json.loads(sys.argv[2]) == {"status": "ready", "release": sys.argv[1]}
 PY
 root_html=$(curl -fsS --max-time 15 "$WP16_PUBLIC_URL/")
-grep -Fq '把一个真实问题，变成清晰的下一步。' <<<"$root_html"
+grep -Fq "$expected_home_marker" <<<"$root_html"
 [[ "$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$WP16_PUBLIC_URL/ops")" == "401" ]] || fail "anonymous ops access is not denied"
 [[ "$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$WP16_PUBLIC_URL/review")" == "401" ]] || fail "anonymous review access is not denied"
 

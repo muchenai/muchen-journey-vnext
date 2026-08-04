@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "status": "READY_FOR_DEPLOY_AUTHORIZATION",
+  "candidate_sha": "12bc627d4310cdba9eba4c67050dc875994ceb31",
+  "baseline_runtime_sha": "ef0a512cf357001cfd8cb6803f65cc17ae697325",
+  "candidate_gate_run_id": 30872461375,
+  "web_image": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:21e22f681935f617f4ee29f43cc131d471425357e159c0d1a3ac3631a45cf43c",
+  "target": "staging",
+  "public_url": "https://staging-vnext.muchenai.com",
+  "migration_revision": "0015_wp19_formal_journey",
+  "purpose": "Expose the real formal Journey publication API error without changing API, Worker, database, infrastructure, or business facts."
+}
