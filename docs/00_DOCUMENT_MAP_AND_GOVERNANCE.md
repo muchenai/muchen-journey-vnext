@@ -1,8 +1,8 @@
 # 00｜文档地图与治理规则
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.11
-日期：2026-08-04
+版本：V0.14
+日期：2026-08-05
 适用阶段：立项至 G0 开工门禁  
 权威性：本目录是 vNext 开发前唯一文档事实源；旧版 DOCX、旧仓库 README、会议纪要和聊天记录均不是 vNext 实施权威。
 
@@ -52,6 +52,9 @@
 | 34 | [WP-18 正式产品真相恢复与 vNext 重接合同](34_WP18_FORMAL_PRODUCT_TRUTH_RECOVERY.md) | 旧正式探索营与单任务 Alpha 为什么不一致，四宝藏＋三评测如何接回 vNext？ | `DEC-024` 锁定 Day 0＋四宝藏＋三能力评测＋结果；TSK-001 保留为 Alpha 验证任务；后续只在现有 vNext 基座上补多阶段 Journey 编排，不复用旧运行时 |
 | 35 | [WP-19～WP-22 正式探索营最小纵向切片证据](35_WP19_WP22_FORMAL_JOURNEY_VERTICAL_SLICE_EVIDENCE.md) | 多阶段 Journey、四宝藏、三评测和正式 Learner 页面是否已在同一条真实路径上接通？ | 代码、migration、API、Web、staging、Journey V1 发布与绑定邀请读回已形成 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`；内容真人有效性、Reviewer 校准、WP-23 和 production GO 仍独立 |
 | 36 | [WP-24 Formal Exploration Camp V2](36_WP24_FORMAL_EXPLORATION_CAMP_V2.md) | 如何把最小技术切片重建为完整一天学习、三项真实评测和人工准入产品？ | V1/既有事实不可变；V2 内容、评分和人工准入本地实现并通过门禁后方可由 Reviewer/Operator 发布；不自动部署或迁移 |
+| 37 | [WP-25～WP-30 探索营 P0 真人体验与受控上线工作包](37_WP25_WP30_LEARNING_PRODUCTIZATION_WORK_PACKAGES.md) | 如何把真实内容、完整体验、单宝藏纵向切片和每包真人验证接成可受控上线的探索营？ | `DEC-026` 已批准并启动 WP-25 内容/原型/真人验证；产品代码、WP-26 及全部外部动作仍未授权 |
+| 38 | [WP-25 P0 Experience & Content Freeze 执行包](38_WP25_P0_EXPERIENCE_CONTENT_FREEZE.md) | WP-25 已核对哪些正式内容、页面状态和真人验收，哪些材料仍需负责人提供？ | 原型三视口/路线/完整点击路径机器通过；当前 `PROTOTYPE_MACHINE_VERIFIED / HUMAN_GATES_NOT_RUN / CONTENT_INPUT_REQUIRED`，不得以原型或工程草稿冒充已批准内容 |
+| 39 | [WP-26～WP-30 本地构建记录与待授权账本](39_WP26_WP30_AUTONOMOUS_BUILD_RECORD.md) | 夜间自主开发完成了哪些机器合同，哪些真人/外部动作仍必须另行授权？ | WP-26～30 本地机器能力已实现；真人内容/UAT、V3 发布、部署、正式域名和 cohort 仍 `NOT_RUN`/`NO_GO`，按顺序授权 |
 | RB-15 | [受控 Alpha 正式域名切换手册](runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md) | 如何在不丢失 staging 和新业务事实的前提下备份恢复、切换正式域名并一键止血？ | 受保护主线唯一入口；锁定候选、空库恢复、加密异机备份、双 host、OAuth/TLS、维护页与旧站入口回退边界 |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 

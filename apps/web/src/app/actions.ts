@@ -13,9 +13,11 @@ import {
   CSRF_COOKIE,
   JOIN_COOKIE,
   SESSION_COOKIE,
+  TaskContentInput,
 } from "@/lib/server/api";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 
 function requiredUuid(data: FormData, key: string): string {
   const value = data.get(key);
@@ -35,6 +37,105 @@ function requiredRevision(data: FormData): number {
 
 function commandHeaders(): HeadersInit {
   return { "Idempotency-Key": randomUUID() };
+}
+
+function requiredText(data: FormData, key: string, min: number, max: number): string {
+  const value = data.get(key);
+  if (typeof value !== "string" || value.trim().length < min || value.length > max) {
+    throw new Error(`${key} 内容不符合长度要求。`);
+  }
+  return value.trim();
+}
+
+function textLines(data: FormData, key: string, maxItems: number): string[] {
+  const value = requiredText(data, key, 1, 6_000);
+  const lines = value.split("\n").map((item) => item.trim()).filter(Boolean);
+  if (lines.length < 1 || lines.length > maxItems || new Set(lines).size !== lines.length) {
+    throw new Error(`${key} 必须是 1–${maxItems} 行不重复内容。`);
+  }
+  return lines;
+}
+
+function boundedInteger(data: FormData, key: string, min: number, max: number): number {
+  const value = Number(data.get(key));
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${key} 数值无效。`);
+  }
+  return value;
+}
+
+function taskContentFromForm(data: FormData): TaskContentInput {
+  const materialKey = requiredText(data, "material_key", 3, 80);
+  if (!MATERIAL_KEY_PATTERN.test(materialKey)) throw new Error("材料稳定编号无效。");
+  const optionalUrlValue = data.get("link_url");
+  const optionalUrl = typeof optionalUrlValue === "string" ? optionalUrlValue.trim() : "";
+  if (optionalUrl && !/^https:\/\/[^\s]+$/.test(optionalUrl)) {
+    throw new Error("外部材料必须使用 HTTPS 链接。");
+  }
+  const learningMaterials: TaskContentInput["learning_materials"] = [
+    {
+      key: materialKey,
+      title: requiredText(data, "material_title", 2, 160),
+      kind: "TEXT" as const,
+      source_label: requiredText(data, "material_source", 2, 160),
+      body: requiredText(data, "material_body", 20, 20_000),
+      url: null,
+      estimated_duration_minutes: boundedInteger(data, "material_duration", 1, 120),
+      required: true,
+    },
+  ];
+  if (optionalUrl) {
+    const linkKey = requiredText(data, "link_key", 3, 80);
+    if (!MATERIAL_KEY_PATTERN.test(linkKey) || linkKey === materialKey) {
+      throw new Error("外部材料稳定编号无效或重复。");
+    }
+    learningMaterials.push({
+      key: linkKey,
+      title: requiredText(data, "link_title", 2, 160),
+      kind: "HTTPS_LINK",
+      source_label: requiredText(data, "link_source", 2, 160),
+      body: null,
+      url: optionalUrl,
+      estimated_duration_minutes: boundedInteger(data, "link_duration", 1, 120),
+      required: true,
+    });
+  }
+  return {
+    title: requiredText(data, "title", 3, 180),
+    purpose: requiredText(data, "purpose", 10, 2_000),
+    learner_outcome: requiredText(data, "learner_outcome", 10, 2_000),
+    instructions: textLines(data, "instructions", 12),
+    completion_criteria: textLines(data, "completion_criteria", 12),
+    required_deliverables: textLines(data, "required_deliverables", 12),
+    content_source_notes: textLines(data, "content_source_notes", 20),
+    change_summary: requiredText(data, "change_summary", 10, 1_000),
+    reviewer_calibration_note: requiredText(data, "reviewer_calibration_note", 10, 1_000),
+    allowed_attachment_types: [],
+    max_attachment_size_bytes: 0,
+    reference_materials: [],
+    learning_materials: learningMaterials,
+    estimated_duration_minutes: boundedInteger(data, "estimated_duration_minutes", 1, 480),
+    rubric: {
+      version: 1,
+      dimensions: [{
+        dimension_key: "evidence_traceability",
+        title: requiredText(data, "rubric_title", 2, 80),
+        purpose: requiredText(data, "rubric_purpose", 5, 500),
+        evidence_expected: requiredText(data, "rubric_evidence", 5, 500),
+        levels: {
+          MEETS: requiredText(data, "rubric_meets", 1, 500),
+          NEEDS_WORK: requiredText(data, "rubric_needs_work", 1, 500),
+        },
+        required: true,
+        feedback_prompt: requiredText(data, "rubric_feedback_prompt", 5, 500),
+        blocking_rule: "REQUIRE_FEEDBACK",
+      }],
+    },
+    reviewer_role: "REVIEWER",
+    feedback_sla_business_days: boundedInteger(data, "feedback_sla_business_days", 1, 10),
+    sensitivity: "INTERNAL",
+    audience: "LEARNER",
+  };
 }
 
 function requiredIdempotencyKey(data: FormData, key: string): string {
@@ -192,6 +293,31 @@ export async function startAssignment(data: FormData) {
   });
   revalidatePath("/app");
   redirect(`/app/tasks/${assignmentId}`);
+}
+
+export async function completeLearningMaterial(data: FormData) {
+  const assignmentId = requiredUuid(data, "assignment_id");
+  const materialKey = data.get("material_key");
+  const taskVersion = Number(data.get("task_version"));
+  const idempotencyKey = requiredIdempotencyKey(data, "idempotency_key");
+  if (typeof materialKey !== "string" || !MATERIAL_KEY_PATTERN.test(materialKey)) {
+    throw new Error("学习材料标识无效。请刷新页面后重试。");
+  }
+  if (!Number.isSafeInteger(taskVersion) || taskVersion < 1) {
+    throw new Error("学习材料版本无效。请刷新页面后重试。");
+  }
+  await apiRequest(
+    `/api/v1/me/assignments/${assignmentId}/materials/${encodeURIComponent(materialKey)}/complete`,
+    "LEARNER",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ task_version: taskVersion }),
+    },
+  );
+  revalidatePath(`/app/tasks/${assignmentId}`);
+  revalidatePath("/app");
+  redirect(`/app/tasks/${assignmentId}?material=completed`);
 }
 
 export async function submitAssignment(
@@ -611,6 +737,27 @@ export async function revokeLearnerInvite(data: FormData) {
   redirect("/ops?updated=invite-revoked#learner-invites");
 }
 
+export async function updateInvitationControl(data: FormData) {
+  const target = data.get("target_state");
+  if (target !== "FROZEN" && target !== "OPEN") {
+    throw new Error("邀请控制目标状态无效。");
+  }
+  await apiRequest(
+    `/api/v1/ops/invitation-control/${target === "FROZEN" ? "freeze" : "resume"}`,
+    "OPERATOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        expected_revision: requiredRevision(data),
+        reason: requiredReason(data),
+      }),
+    },
+  );
+  revalidatePath("/ops");
+  redirect(`/ops?updated=invites-${target === "FROZEN" ? "frozen" : "resumed"}#learner-invites`);
+}
+
 type AdmissionScores = {
   attendance_discipline: number;
   muchener_understanding: number;
@@ -806,6 +953,117 @@ export async function redriveNotificationDelivery(data: FormData) {
   redirect("/ops?updated=notification-redrive");
 }
 
+export async function createContentDraft(data: FormData) {
+  const taskDefinitionId = requiredUuid(data, "task_definition_id");
+  const result = await apiRequest<{ id: string }>(
+    `/api/v1/content/task-definitions/${taskDefinitionId}/drafts`,
+    "CONTENT_EDITOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ content: taskContentFromForm(data) }),
+    },
+  );
+  revalidatePath("/content");
+  redirect(`/content/drafts/${result.id}?updated=created`);
+}
+
+export async function updateContentDraft(data: FormData) {
+  const draftId = requiredUuid(data, "draft_id");
+  await apiRequest(`/api/v1/content/drafts/${draftId}`, "CONTENT_EDITOR", {
+    method: "PUT",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      content: taskContentFromForm(data),
+    }),
+  });
+  revalidatePath("/content");
+  revalidatePath(`/content/drafts/${draftId}`);
+  redirect(`/content/drafts/${draftId}?updated=saved`);
+}
+
+export async function submitContentDraft(data: FormData) {
+  const draftId = requiredUuid(data, "draft_id");
+  await apiRequest(`/api/v1/content/drafts/${draftId}/submit`, "CONTENT_EDITOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      review_note: requiredText(data, "review_note", 10, 1_000),
+    }),
+  });
+  revalidatePath("/content");
+  revalidatePath(`/content/drafts/${draftId}`);
+  redirect(`/content/drafts/${draftId}?updated=submitted`);
+}
+
+export async function publishContentDraft(data: FormData) {
+  const draftId = requiredUuid(data, "draft_id");
+  const reviewerId = requiredUuid(data, "reviewer_id");
+  const definitionRevision = Number(data.get("definition_revision"));
+  if (!Number.isSafeInteger(definitionRevision) || definitionRevision < 1) {
+    throw new Error("任务定义版本无效，请刷新页面重试。");
+  }
+  if (data.get("review_acknowledged") !== "on") {
+    throw new Error("发布前必须确认复核已完成。近似确认不能替代真实复核。");
+  }
+  await apiRequest(`/api/v1/ops/content-drafts/${draftId}/publish`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      expected_definition_revision: definitionRevision,
+      reviewed_by: reviewerId,
+      review_acknowledged: true,
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=content-draft-published#content-drafts");
+}
+
+export async function createContentEditor(data: FormData) {
+  const displayName = requiredText(data, "display_name", 1, 120);
+  await apiRequest("/api/v1/ops/content-editors", "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({ display_name: displayName, expected_absent: true }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=content-editor-created#identity-access");
+}
+
+export async function assembleFormalJourneyV3(data: FormData) {
+  const reviewerId = requiredUuid(data, "reviewer_id");
+  const expectedCurrentVersion = Number(data.get("expected_current_version"));
+  const taskVersionIds = data.getAll("task_version_id");
+  if (
+    !Number.isSafeInteger(expectedCurrentVersion)
+    || expectedCurrentVersion < 1
+    || taskVersionIds.length !== 8
+    || taskVersionIds.some((value) => typeof value !== "string" || !UUID_PATTERN.test(value))
+    || new Set(taskVersionIds).size !== 8
+  ) {
+    throw new Error("Journey V3 固定版本清单无效，请刷新后重试。");
+  }
+  if (data.get("review_acknowledged") !== "on") {
+    throw new Error("必须确认八站内容和顺序已经完成线下复核。");
+  }
+  await apiRequest("/api/v1/ops/formal-journeys/assemble-v3", "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      reviewed_by: reviewerId,
+      expected_current_version: expectedCurrentVersion,
+      task_version_ids: taskVersionIds,
+      content_review_note: requiredText(data, "content_review_note", 20, 1_000),
+      review_acknowledged: true,
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=journey-v3-assembled#journey-v3");
+}
+
 export type IdentityLinkActionState = {
   error?: string;
   requestId?: string;
@@ -819,7 +1077,7 @@ export async function createIdentityLink(
 ): Promise<IdentityLinkActionState> {
   const targetUserId = requiredUuid(data, "target_user_id");
   const role = data.get("role");
-  if (role !== "REVIEWER" && role !== "OPERATOR") {
+  if (role !== "REVIEWER" && role !== "OPERATOR" && role !== "CONTENT_EDITOR") {
     return { error: "身份角色无效。请刷新页面后重试。" };
   }
   try {

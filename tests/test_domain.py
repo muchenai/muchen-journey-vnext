@@ -38,6 +38,27 @@ def test_current_action_is_server_authoritative(status, action_type, commands):
     assert action.allowed_commands == commands
 
 
+def test_waiting_action_distinguishes_queued_from_active_human_review():
+    queued = resolve_current_action(
+        fallback_resource_id=FALLBACK_ID,
+        fallback_revision=1,
+        enrollment_status=EnrollmentStatus.ACTIVE,
+        assignments=(state(AssignmentStatus.SUBMITTED),),
+    )
+    active = resolve_current_action(
+        fallback_resource_id=FALLBACK_ID,
+        fallback_revision=1,
+        enrollment_status=EnrollmentStatus.ACTIVE,
+        assignments=(state(AssignmentStatus.IN_REVIEW),),
+    )
+
+    assert queued.title == "等待主管开始评审"
+    assert queued.reason == "提交已经保存，主管将在两个工作日内反馈。"
+    assert active.title == "主管正在评审"
+    assert active.reason == "主管已经开始处理这份固定版本。"
+    assert queued.allowed_commands == active.allowed_commands == ()
+
+
 @pytest.mark.parametrize(
     ("enrollment_status", "action_type", "commands"),
     [

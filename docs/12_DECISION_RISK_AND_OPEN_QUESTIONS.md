@@ -1,8 +1,8 @@
 # 12｜决策、风险与开放问题台账
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.7
-日期：2026-08-03
+版本：V0.9
+日期：2026-08-04
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
 
@@ -46,6 +46,7 @@
 | DEC-023 | 受控 Alpha 正式域名切换 | 候选 `8f77ceec…` 已完成一条真实“提交→要求修订→安全重新进入→再次提交→通过”闭环。允许以 `journey.muchenai.com` 作为单一组织私密名单的正式 Alpha 入口：production Compose/DB/application secrets 与 staging 逻辑隔离，现阶段共享北京 ECS/RDS/Caddy 故障域；先完成加密异机备份和空库隔离恢复，再配置 TLS/OAuth/canonical URL；维护页为一键止血，旧站 DNS 仅作入口级回退，禁止回写或覆盖 vNext 新事实；staging 永久保留。该决定不把 WP-13 全量签署、WP-14、WP-11 延期项、WP-12B 原 FAIL 或完整 production release gate 记为通过 | `APPROVED` | 授权本手册三项最小切换动作；仍限单组织 Alpha，30 日后重开故障域 | Liu Mowen（Product + Data + Security + Tech + Ops + Release Owner） |
 | DEC-024 | 正式探索营产品真相恢复 | 当前 TSK-001 是验证 vNext 闭环的 Alpha 切片，不代表正式探索营全部产品。正式目标固定为 Day 0、四个认知宝藏、三个能力评测和完整结果；旧前端所谓“第五个宝藏”是能力准入容器，不是独立宝藏。后续只在 vNext Identity/Enrollment/Task/Submission/Review/Outcome 基座上增加版本化 Journey 编排，不复用旧代码、路由、状态、数据库或运行时 | `APPROVED` | WP-18 产品合同生效；当前 Alpha 历史不变；WP-19 实现前需 schema/API/迁移评审 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
 | DEC-025 | 正式探索营 V2 内容、评分与准入 | 以完整正式方案而非最小技术切片为内容事实源：10:00–19:00 先完成 Day 0 与四个学习宝藏，再完成规则拆解、模型回答判断和通用数据构建三项真实题面；边界识别与提报是横向能力，不是第三项独立评测。固定 100 分只形成 A/B/C/D 建议，最终下一阶段准入必须由授权 Operator 基于证据人工决定；覆盖建议必须记录理由，系统不得自动淘汰或录用。V1 与既有事实不可变，V2 以新版本发布 | `APPROVED` | 授权 WP-24 本地实现和 PR；不授权业务发布、邀请、部署或现有 Enrollment 迁移 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
+| DEC-026 | 探索营 P0 真人体验优先与受控上线 | 不再按视觉/数据/后台/页面的技术层顺序建设；先冻结真实材料和完整可点击体验，每个工作包均以真人可感知结果退出，只在单宝藏闭环通过后扩展四宝藏和三评测。路线节点共享坐标、Learner 页面执行文字预算；最小权限 Content Editor 导入结构化文本/HTTPS 链接，经 Operator 发布不可变 Journey V3；WP-10 附件保持关闭。P0 上线仅指 `journey.muchenai.com` 单组织私密 cohort，不等同完整 production GO | `APPROVED` | 2026-08-04 只开放 WP-25 内容/原型/真人验证；产品代码、外部写入、WP-26 及以后仍未授权 | Liu Mowen（Product + Content + Design + Security + Tech + QA Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -147,6 +148,12 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-022 | 受控 Alpha 正式域名被误解为完整 production GO | 中/高 | 对外扩大名单、关闭 staging、把延期门禁写成 PASS，或共享 ECS/RDS 故障被当作独立灾备 | DEC-023；入口标记受控 Alpha；逻辑隔离、异机加密备份、维护模式、私密名单和 30 日故障域复审 | Product/Data/Security/Ops/Release |
 | RSK-023 | 最小技术切片被误当成正式产品 | 高/高 | 继续只为 TSK-001 做视觉包装；路线点与正式阶段无对应；无法解释四宝藏和三评测去了哪里 | DEC-024；34 号合同；TSK-001 重定位；WP-19～23 单一 WIP | Product/Content/Design/Tech |
 | RSK-024 | 量化评分被误当成自动淘汰或录用 | 高/高 | 达到阈值即自动准入；低分自动关闭身份；人工看不到证据或无法覆盖建议 | DEC-025；preview 与最终决定分离；覆盖理由；决定不可变；不得触发消息/身份/人事动作 | Product/Content/QA/Security/Tech |
+| RSK-025 | 视觉叙事继续被独立坐标和重复文案破坏 | 高/中 | 路线点漂浮、同一动作在标题/说明/按钮/页脚重复、用户需口头解释入口 | WP-25 完整原型和真人定向先行；WP-26 起共享 SVG 坐标、文字预算、三视口与逐包真人验收 | Product/Design/Frontend/QA |
+| RSK-026 | 为导入材料授予过宽运营权限 | 中/高 | 内容负责人可创建邀请、查看他组织、修改身份或直接发布 | DEC-026；最小 Content Editor capability；私密名册；Operator 最终发布；权限负测 | Product/Security/Tech |
+| RSK-027 | 点击或停留时间被伪装成学习效果 | 高/高 | 自动滚动即完成、计时到点即解锁、material completion 直接 PASS/准入 | WP-26/27；显式完成事实只证明确认材料；小任务和 Reviewer 负责理解证据 | Product/Content/QA/Tech |
+| RSK-028 | 内容导入绕过附件与外部内容安全 | 中/高 | 上传 PDF/视频、服务端抓取任意 URL、复制未授权材料或记录外部身份 | WP-10 保持关闭；仅清洗文本和 HTTPS 链接；不抓取/嵌入；来源与版权复核 | Content/Security/Tech/Privacy |
+| RSK-029 | 工作包再次按技术层完成而不是用户结果完成 | 高/高 | 数据/组件/后台分别 PASS，但没有真人完成当包价值；问题集中到最后 UAT | DEC-026；WP-25 内容/原型先行；WP-26 单宝藏纵向切片；每包真人门禁；代码不得领先真人证据一个包以上 | Product/Tech/Design/QA |
+| RSK-030 | 无止境内测推迟真实上线 | 高/中 | 每轮加入新偏好和增强项、重复全量回归、没有最后 UAT 和上线判定 | WP-29 是最后完整上线前 UAT；只让 P0 blocker 阻断；修复后重验受影响路径；增强项进入真实使用 backlog | Product/QA/Release |
 
 ## 5. 原开放问题的关闭结论
 

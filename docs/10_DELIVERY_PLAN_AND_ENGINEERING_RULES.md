@@ -101,6 +101,21 @@
 
 WP-23 首位真人暴露“系统已开始但 Learner 尚未获得学习输入就被要求写作”的内容级阻断。WP-24 以单一 WIP 在现有基座上新增完整一天内容、三项真实题面、固定 100 分评分证据和人工准入决定；Journey V1 与全部既有事实保持不可变。实现、验证、合并、内容复核、V2 业务发布和部署是五个独立动作；本工作包不因代码合并自动发布或部署。详细合同与证据见 36。
 
+### 探索营 P0 真人体验与受控上线列车｜WP-25～WP-30
+
+Journey V2 在 staging 发布后暴露路线节点错位、重复文案和宝藏缺少主管材料导入/学习后小任务三个系统性缺口。V0.1 又把真人证明推迟到最后一个工作包，仍是技术层优先。后续改为“真实内容/完整原型先行、每包真人验收、一个宝藏纵向切片后再扩展”，不逐页打补丁，也不建立通用 LMS/CMS；详细草案见 37：
+
+| 工作包 | 唯一目标 | 明确非范围 | 退出条件 |
+| --- | --- | --- | --- |
+| WP-25 P0 Experience & Content Freeze | 真实内容和完整可点击旅程先由目标 Learner 验证 | 产品代码、API、数据、部署 | `AT-WP25-001..005`；`P0_EXPERIENCE_CONTENT_APPROVED` |
+| WP-26 One Treasure Real Slice | 一个真实宝藏完成内容生产、学习、小任务、修订与恢复闭环 | 其他宝藏、通用 CMS、正式上线 | `AT-WP26-001..005`；`ONE_TREASURE_REAL_LOOP_PASS` |
+| WP-27 Four Treasures Learning Journey | Day 0＋四宝藏形成可恢复且无空白输入框的学习旅程 | 三评测、人工准入、通知 | `AT-WP27-001..005`；`FOUR_TREASURES_HUMAN_VERIFIED` |
+| WP-28 Assessments, Feedback & Admission | 三评测、真人反馈、修订和人工准入接成完整结果 | 自动招聘决定、消息、AI | `AT-WP28-001..005`；`ASSESSMENT_ADMISSION_LOOP_PASS` |
+| WP-29 P0 Release Candidate UAT | 固定候选完成最后一轮整日真人 UAT，P0 blocker 为 0 | 新功能、增强项、自动化代替真人 | `AT-WP29-001..005`；`P0_RC_SIGNED` |
+| WP-30 Controlled P0 Launch | Journey V3 向正式域名单组织私密 cohort 开放并观察 | 企业级 GA、多组织扩张、基础设施重建 | `AT-WP30-001..006`；`P0_LIVE_CONTROLLED`，后续可达 `P0_VALIDATED` |
+
+当前列车状态为 `APPROVED_FOR_WP25 / WP26_NOT_AUTHORIZED`。2026-08-04，Owner 已启动 WP-25 内容冻结、完整原型和真人验证；该批准不授权产品代码。WP-26 及以后的开发、staging/production 部署、V3 业务发布、邀请、身份分配和消息仍需独立授权。
+
 WP-19 未关闭前不得并行启动 WP-20～23；正式内容不能通过修改当前 TSK-001 在途版本进入系统。
 
 工作包按端到端价值拆分，不允许同时建立多个“空模块框架”再等待集成。

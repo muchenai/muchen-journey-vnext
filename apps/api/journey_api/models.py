@@ -34,6 +34,7 @@ class Role(str, enum.Enum):
     LEARNER = "LEARNER"
     REVIEWER = "REVIEWER"
     OPERATOR = "OPERATOR"
+    CONTENT_EDITOR = "CONTENT_EDITOR"
 
 
 class EnrollmentStatus(str, enum.Enum):
@@ -78,6 +79,12 @@ class TaskDefinitionStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
     WITHDRAWN = "WITHDRAWN"
+
+
+class ContentDraftStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    PUBLISHED = "PUBLISHED"
 
 
 class JourneyDefinitionStatus(str, enum.Enum):
@@ -251,6 +258,23 @@ class Invite(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class InvitationControl(Base):
+    __tablename__ = "invitation_controls"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), primary_key=True
+    )
+    new_invites_enabled: Mapped[bool] = mapped_column(default=True)
+    revision: Mapped[int] = mapped_column(default=1)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class JoinContext(Base):
     __tablename__ = "join_contexts"
 
@@ -377,6 +401,46 @@ class TaskDefinition(Base):
     )
 
 
+class ContentDraft(Base):
+    __tablename__ = "content_drafts"
+    __table_args__ = (
+        CheckConstraint("revision >= 1", name="ck_content_drafts_positive_revision"),
+        UniqueConstraint(
+            "published_task_version_id",
+            name="uq_content_drafts_published_task_version",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    task_definition_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_definitions.id"), index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[ContentDraftStatus] = mapped_column(
+        Enum(ContentDraftStatus, native_enum=False), index=True
+    )
+    revision: Mapped[int] = mapped_column(default=1)
+    content: Mapped[dict[str, Any]] = mapped_column(JSON)
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    published_task_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task_versions.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class TaskVersion(Base):
     __tablename__ = "task_versions"
     __table_args__ = (
@@ -424,6 +488,7 @@ class TaskVersion(Base):
     allowed_attachment_types: Mapped[list[str]] = mapped_column(JSON)
     max_attachment_size_bytes: Mapped[int] = mapped_column(default=0)
     reference_materials: Mapped[list[str]] = mapped_column(JSON)
+    learning_materials: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     learning_experience: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     estimated_duration_minutes: Mapped[int]
     rubric: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -435,6 +500,47 @@ class TaskVersion(Base):
     published_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     reviewed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LearningMaterialCompletion(Base):
+    __tablename__ = "learning_material_completions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["assignment_id", "organization_id"],
+            ["assignments.id", "assignments.organization_id"],
+            name="fk_material_completions_assignment_scope",
+        ),
+        ForeignKeyConstraint(
+            ["task_version_id", "organization_id"],
+            ["task_versions.id", "task_versions.organization_id"],
+            name="fk_material_completions_task_version_scope",
+        ),
+        ForeignKeyConstraint(
+            ["enrollment_id", "organization_id", "learner_id"],
+            ["enrollments.id", "enrollments.organization_id", "enrollments.learner_id"],
+            name="fk_material_completions_enrollment_owner_scope",
+        ),
+        UniqueConstraint(
+            "assignment_id",
+            "material_key",
+            name="uq_material_completions_assignment_key",
+        ),
+        CheckConstraint(
+            "material_key ~ '^[a-z0-9][a-z0-9_-]{2,79}$'",
+            name="ck_material_completions_key",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    task_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    learner_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    material_key: Mapped[str] = mapped_column(String(80))
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class JourneyDefinition(Base):

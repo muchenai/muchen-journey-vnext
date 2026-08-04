@@ -7,7 +7,7 @@ import { CSRF_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
 export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
-export type Role = "LEARNER" | "REVIEWER" | "OPERATOR";
+export type Role = "LEARNER" | "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR";
 
 export type CurrentAction = {
   action_type: string;
@@ -83,6 +83,7 @@ export type Assignment = {
   allowed_attachment_types: string[];
   max_attachment_size_bytes: number;
   reference_materials: string[];
+  learning_materials: LearningMaterial[];
   learning_experience: LearningExperience | Record<string, never>;
   estimated_duration_minutes: number;
   feedback_sla_business_days: number;
@@ -105,6 +106,18 @@ export type Assignment = {
     JourneyProgressNode,
     "status" | "assignment_id"
   > | null;
+};
+
+export type LearningMaterial = {
+  key: string;
+  title: string;
+  kind: "TEXT" | "HTTPS_LINK";
+  source_label: string;
+  body: string | null;
+  url: string | null;
+  estimated_duration_minutes: number;
+  required: boolean;
+  completed_at: string | null;
 };
 
 export type Attachment = {
@@ -219,6 +232,31 @@ export type Result = {
   status: string;
   decision: "PASS";
   summary: string;
+  learning_completion: {
+    status: "COMPLETED";
+    completed_stages: number;
+    total_stages: number;
+  };
+  reviewer_conclusion: {
+    status: "FINALIZED";
+    decision: "PASS";
+    reviewer_id: string;
+    overall_feedback: string;
+    concluded_at: string;
+  };
+  system_recommendation: {
+    status: "PENDING_OPERATOR_INPUT" | "RECORDED";
+    advisory_only: true;
+    recommendation_tier: "A" | "B" | "C" | "D" | null;
+    recommended_decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
+  };
+  operator_admission: {
+    status: "PENDING" | "DECIDED";
+    decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
+    decision_reason: string | null;
+    total_score: number | null;
+    decided_at: string | null;
+  };
   evaluation: {
     id: string;
     reviewer_id: string;
@@ -300,6 +338,67 @@ export type OpsTaskDefinition = {
   versions: Array<{ id: string; version: number; title: string; published_at: string }>;
 };
 
+export type LearningMaterialInput = {
+  key: string;
+  title: string;
+  kind: "TEXT" | "HTTPS_LINK";
+  source_label: string;
+  body: string | null;
+  url: string | null;
+  estimated_duration_minutes: number;
+  required: boolean;
+};
+
+export type TaskContentInput = {
+  title: string;
+  purpose: string;
+  learner_outcome: string;
+  instructions: string[];
+  completion_criteria: string[];
+  required_deliverables: string[];
+  content_source_notes: string[];
+  change_summary: string;
+  reviewer_calibration_note: string;
+  allowed_attachment_types: string[];
+  max_attachment_size_bytes: number;
+  reference_materials: string[];
+  learning_materials: LearningMaterialInput[];
+  estimated_duration_minutes: number;
+  rubric: {
+    version: 1;
+    dimensions: Array<{
+      dimension_key: string;
+      title: string;
+      purpose: string;
+      evidence_expected: string;
+      levels: { MEETS: string; NEEDS_WORK: string };
+      required: true;
+      feedback_prompt: string;
+      blocking_rule: "REQUIRE_FEEDBACK";
+      max_points?: number | null;
+      meets_threshold?: number | null;
+      score_category?: string | null;
+    }>;
+  };
+  reviewer_role: "REVIEWER";
+  feedback_sla_business_days: number;
+  sensitivity: "INTERNAL";
+  audience: "LEARNER";
+};
+
+export type ContentDraft = {
+  id: string;
+  task_definition_id: string;
+  stable_key: string;
+  owner_id: string;
+  status: "DRAFT" | "SUBMITTED" | "PUBLISHED";
+  revision: number;
+  content: TaskContentInput;
+  submitted_at: string | null;
+  published_at: string | null;
+  published_task_version_id: string | null;
+};
+
 export type OpsEnrollment = {
   id: string;
   learner_id: string;
@@ -321,7 +420,7 @@ export type OpsEnrollment = {
 export type OpsIdentityAccess = {
   user_id: string;
   display_name: string;
-  role: "REVIEWER" | "OPERATOR";
+  role: "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR";
   identity_id: string | null;
   identity_status: "UNLINKED" | "LINKED" | "REVOKED";
   identity_revision: number | null;
@@ -344,6 +443,14 @@ export type OpsInvite = {
   expires_at: string;
   revision: number;
   journey_version_id: string | null;
+};
+
+export type OpsInvitationControl = {
+  state: "OPEN" | "FROZEN";
+  new_invites_enabled: boolean;
+  revision: number;
+  reason: string | null;
+  updated_at: string | null;
 };
 
 export type OpsFormalJourney = {
@@ -497,13 +604,17 @@ export async function apiRequest<T>(
 
 export async function identityPageRequest<T>(
   path: string,
-  role: "REVIEWER" | "OPERATOR",
+  role: "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR",
 ): Promise<T> {
   try {
     return await apiRequest<T>(path, role);
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 401) {
-      const returnTo = role === "REVIEWER" ? "/review" : "/ops";
+      const returnTo = role === "REVIEWER"
+        ? "/review"
+        : role === "CONTENT_EDITOR"
+          ? "/content"
+          : "/ops";
       const query = new URLSearchParams({
         auth_error: "SESSION_EXPIRED",
         return_to: returnTo,

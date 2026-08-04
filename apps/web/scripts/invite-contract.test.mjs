@@ -47,3 +47,13 @@ test("active invites can be revoked without persisted token display", () => {
   assert.match(panel, /invite\.status === "ACTIVE"/);
   assert.doesNotMatch(panel, /invite_token/);
 });
+
+test("operator can freeze future invites without deleting accepted facts", () => {
+  assert.match(page, /\/api\/v1\/ops\/invitation-control/);
+  assert.match(panel, /新邀请总开关/);
+  assert.match(panel, /停止创建新邀请/);
+  assert.match(panel, /不撤销已接受邀请，也不删除任何业务事实/);
+  assert.match(actions, /export async function updateInvitationControl/);
+  assert.match(actions, /invitation-control\/\$\{target === "FROZEN" \? "freeze" : "resume"\}/);
+  assert.match(actions, /expected_revision: requiredRevision\(data\)/);
+});

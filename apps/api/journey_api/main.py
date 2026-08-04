@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from journey_api.config import get_settings
+from journey_api.content_routes import router as content_router
 from journey_api.errors import ApiError
 from journey_api.identity_routes import router as identity_router
 from journey_api.outcome_routes import router as outcome_router
@@ -111,3 +112,4 @@ app.include_router(review_router)
 app.include_router(outcome_router)
 app.include_router(ops_router)
 app.include_router(oauth_router)
+app.include_router(content_router)

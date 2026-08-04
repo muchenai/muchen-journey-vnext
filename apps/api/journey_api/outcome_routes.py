@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
@@ -14,12 +14,14 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.models import (
     Assignment,
+    AssignmentStatus,
     Decision,
     Enrollment,
     Evaluation,
     ExternalNotificationReceipt,
     Handoff,
     JourneyOutcomeEvidence,
+    JourneyAdmissionDecision,
     JourneyStageVersion,
     NotificationAttempt,
     NotificationChannel,
@@ -40,9 +42,13 @@ from journey_api.schemas import (
     JourneyResultEvaluationOut,
     NotificationDeliveryOut,
     ResultEvaluationOut,
+    ResultLearningCompletionOut,
+    ResultOperatorAdmissionOut,
     ResultOut,
+    ResultReviewerConclusionOut,
     ResultResponse,
     ResultRubricFeedbackOut,
+    ResultSystemRecommendationOut,
     TimelineItemOut,
     TimelineOut,
     TimelineResponse,
@@ -167,6 +173,7 @@ def result(
             User,
             NotificationDelivery,
             ExternalNotificationReceipt,
+            JourneyAdmissionDecision,
         )
         .join(Enrollment, Enrollment.id == Outcome.enrollment_id)
         .join(
@@ -197,6 +204,12 @@ def result(
             ExternalNotificationReceipt,
             ExternalNotificationReceipt.delivery_id == NotificationDelivery.id,
         )
+        .outerjoin(
+            JourneyAdmissionDecision,
+            (JourneyAdmissionDecision.outcome_id == Outcome.id)
+            & (JourneyAdmissionDecision.organization_id == Outcome.organization_id)
+            & (JourneyAdmissionDecision.enrollment_id == Outcome.enrollment_id),
+        )
         .where(
             Outcome.organization_id == actor.organization_id,
             Outcome.learner_id == actor.id,
@@ -207,7 +220,7 @@ def result(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "当前还没有最终结果。")
-    outcome, handoff, evaluation, owner, delivery, receipt = row
+    outcome, handoff, evaluation, owner, delivery, receipt, admission = row
     if evaluation.decision != Decision.PASS:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少有效的通过结论。")
     formal_rows = session.execute(
@@ -229,6 +242,36 @@ def result(
         )
         .order_by(JourneyStageVersion.position)
     ).all()
+    completed_stages, total_stages = session.execute(
+        select(
+            func.sum(
+                case((Assignment.status == AssignmentStatus.COMPLETED, 1), else_=0)
+            ),
+            func.count(Assignment.id),
+        ).where(
+            Assignment.organization_id == actor.organization_id,
+            Assignment.enrollment_id == outcome.enrollment_id,
+            Assignment.journey_stage_version_id.is_not(None),
+        )
+    ).one()
+    completed_count = int(completed_stages or 0)
+    total_count = int(total_stages or 0)
+    if total_count == 0:
+        # Historical single-task Alpha outcomes predate JourneyStageVersion.
+        # Preserve their result contract without pretending they completed V3.
+        completed_count = 1
+        total_count = 1
+    elif completed_count != total_count:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少完整旅程证据。")
+    recommended_decision = None
+    if admission is not None:
+        recommended_decision = (
+            "ADMIT"
+            if admission.recommendation_tier in {"A", "B"}
+            else "DEFER"
+            if admission.recommendation_tier == "C"
+            else "NOT_ADMIT"
+        )
     return envelope(
         request,
         ResultOut(
@@ -236,6 +279,31 @@ def result(
             decision="PASS",
             status=outcome.status,
             summary=outcome.summary,
+            learning_completion=ResultLearningCompletionOut(
+                completed_stages=completed_count,
+                total_stages=total_count,
+            ),
+            reviewer_conclusion=ResultReviewerConclusionOut(
+                reviewer_id=evaluation.reviewer_id,
+                overall_feedback=evaluation.feedback,
+                concluded_at=evaluation.created_at,
+            ),
+            system_recommendation=ResultSystemRecommendationOut(
+                status="RECORDED" if admission is not None else "PENDING_OPERATOR_INPUT",
+                recommendation_tier=(
+                    admission.recommendation_tier if admission is not None else None
+                ),
+                recommended_decision=recommended_decision,
+            ),
+            operator_admission=ResultOperatorAdmissionOut(
+                status="DECIDED" if admission is not None else "PENDING",
+                decision=admission.decision.value if admission is not None else None,
+                decision_reason=(
+                    admission.decision_reason if admission is not None else None
+                ),
+                total_score=admission.total_score if admission is not None else None,
+                decided_at=admission.created_at if admission is not None else None,
+            ),
             evaluation=ResultEvaluationOut(
                 id=evaluation.id,
                 reviewer_id=evaluation.reviewer_id,

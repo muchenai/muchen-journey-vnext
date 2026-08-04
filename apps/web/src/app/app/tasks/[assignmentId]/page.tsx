@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  completeLearningMaterial,
   deleteSubmissionAttachment,
   startAssignment,
 } from "@/app/actions";
@@ -15,7 +16,7 @@ export default async function TaskPage({
   searchParams,
 }: {
   params: Promise<{ assignmentId: string }>;
-  searchParams: Promise<{ draft?: string; attachment?: string }>;
+  searchParams: Promise<{ draft?: string; attachment?: string; material?: string }>;
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
@@ -33,6 +34,8 @@ export default async function TaskPage({
   const experience = "learning_blocks" in assignment.learning_experience
     ? assignment.learning_experience
     : null;
+  const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
+  const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
 
   return (
     <article className="learner-task-page">
@@ -53,7 +56,59 @@ export default async function TaskPage({
         </div>
       </header>
 
-      {experience ? (
+      {assignment.learning_materials.length > 0 ? (
+        <section className="learning-materials" aria-labelledby="learning-materials-title">
+          <div className="learning-materials-heading">
+            <div>
+              <p className="section-label">先完成输入</p>
+              <h2 id="learning-materials-title">学习材料</h2>
+            </div>
+            <strong>
+              {requiredMaterials.filter((material) => material.completed_at).length}
+              /{requiredMaterials.length}
+            </strong>
+          </div>
+          {query.material === "completed" ? (
+            <p className="success-text" role="status">完成事实已保存，可在重新登录后恢复。</p>
+          ) : null}
+          <ol className="learning-material-list">
+            {assignment.learning_materials.map((material, index) => (
+              <li className={material.completed_at ? "is-complete" : ""} key={material.key}>
+                <div className="learning-material-order" aria-hidden="true">
+                  {material.completed_at ? "✓" : String(index + 1).padStart(2, "0")}
+                </div>
+                <article>
+                  <p>
+                    {material.source_label} · {material.estimated_duration_minutes} min
+                    {material.required ? " · 必读" : " · 选读"}
+                  </p>
+                  <h3>{material.title}</h3>
+                  {material.kind === "TEXT" ? <div>{material.body}</div> : (
+                    <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
+                      打开 {new URL(material.url ?? "https://invalid.example").hostname}
+                    </a>
+                  )}
+                  {material.completed_at ? (
+                    <span className="material-complete-label">已完成</span>
+                  ) : (
+                    <form action={completeLearningMaterial}>
+                      <input type="hidden" name="assignment_id" value={assignment.id} />
+                      <input type="hidden" name="task_version" value={assignment.task_version} />
+                      <input type="hidden" name="material_key" value={material.key} />
+                      <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                      <button className="button primary compact" type="submit">
+                        完成本材料
+                      </button>
+                    </form>
+                  )}
+                </article>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {experience && assignment.learning_materials.length === 0 ? (
         <section className="learning-experience" aria-labelledby="learning-experience-title">
           <div className="learning-schedule">
             <span>{experience.schedule.start}</span>
@@ -143,7 +198,13 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      {canStart ? (
+      {!materialsReady ? (
+        <p className="task-locked-message" role="status">
+          完成全部必读材料后，小任务会在这里解锁。
+        </p>
+      ) : null}
+
+      {canStart && materialsReady ? (
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
@@ -151,7 +212,7 @@ export default async function TaskPage({
         </form>
       ) : null}
 
-      {submitCommand ? (
+      {submitCommand && materialsReady ? (
         <>
           {assignment.allowed_attachment_types.length > 0 ? (
             <section className="attachment-workspace" aria-labelledby="attachment-title">

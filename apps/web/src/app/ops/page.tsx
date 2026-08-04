@@ -2,16 +2,19 @@ import {
   assignEnrollmentReviewer,
   cancelEnrollment,
   configureNotificationEndpoint,
+  createContentEditor,
   redriveNotificationDelivery,
   revokeNotificationEndpoint,
 } from "@/app/actions";
 import {
   identityPageRequest,
+  ContentDraft,
   OpsAuditEntry,
   OpsEnrollment,
   OpsFormalJourney,
   OpsIdentityAccess,
   OpsInvite,
+  OpsInvitationControl,
   OpsNotificationDelivery,
   OpsNotificationEndpoint,
   OpsTaskDefinition,
@@ -21,6 +24,8 @@ import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
 import { FormalAdmissionPanel } from "@/app/ops/formal-admission-panel";
+import { ContentDraftPublicationPanel } from "@/app/ops/content-draft-publication-panel";
+import { JourneyV3AssemblyPanel } from "@/app/ops/journey-v3-assembly-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +50,11 @@ export default async function OpsPage({
     runtime,
     identityAccess,
     invites,
+    invitationControl,
     notificationEndpoints,
     notificationDeliveries,
     formalJourneys,
+    contentDrafts,
   ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
@@ -56,6 +63,7 @@ export default async function OpsPage({
     identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
     identityPageRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
     identityPageRequest<{ items: OpsInvite[] }>("/api/v1/ops/invites", "OPERATOR"),
+    identityPageRequest<OpsInvitationControl>("/api/v1/ops/invitation-control", "OPERATOR"),
     identityPageRequest<{ items: OpsNotificationEndpoint[] }>(
       "/api/v1/ops/notification-endpoints",
       "OPERATOR",
@@ -66,6 +74,10 @@ export default async function OpsPage({
     ),
     identityPageRequest<{ items: OpsFormalJourney[] }>(
       "/api/v1/ops/formal-journeys",
+      "OPERATOR",
+    ),
+    identityPageRequest<{ items: ContentDraft[] }>(
+      "/api/v1/ops/content-drafts",
       "OPERATOR",
     ),
   ]);
@@ -95,6 +107,7 @@ export default async function OpsPage({
         </p>
         <InviteManagementPanel
           invites={invites.items}
+          invitationControl={invitationControl}
           identityAccess={identityAccess.items}
           tasks={tasks.items}
           journeys={formalJourneys.items}
@@ -136,6 +149,30 @@ export default async function OpsPage({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel ops-section" id="content-drafts" aria-labelledby="content-draft-heading">
+        <p className="section-label">CONTENT DRAFT / EXACT SNAPSHOT</p>
+        <h2 id="content-draft-heading">待发布内容</h2>
+        <ContentDraftPublicationPanel
+          drafts={contentDrafts.items}
+          definitions={tasks.items}
+          reviewers={identityAccess.items.filter(
+            (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
+          )}
+        />
+      </section>
+
+      <section className="panel ops-section" id="journey-v3" aria-labelledby="journey-v3-heading">
+        <p className="section-label">DAY 0 / 4 TREASURES / 3 ASSESSMENTS</p>
+        <h2 id="journey-v3-heading">固定 Journey V3</h2>
+        <JourneyV3AssemblyPanel
+          tasks={tasks.items}
+          journeys={formalJourneys.items}
+          reviewers={identityAccess.items.filter(
+            (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
+          )}
+        />
       </section>
 
       <section className="panel ops-section" id="admission-decisions" aria-labelledby="enrollment-heading">
@@ -285,12 +322,21 @@ export default async function OpsPage({
         </ul>
       </section>
 
-      <section className="panel ops-section" aria-labelledby="identity-heading">
+      <section className="panel ops-section" id="identity-access" aria-labelledby="identity-heading">
         <p className="section-label">REAL IDENTITY / MINIMUM ACCESS</p>
         <h2 id="identity-heading">飞书身份访问</h2>
         <p>
-          仅管理 Reviewer 与 Operator 的真实身份入口。绑定链接仅显示一次；撤销身份会立即使其现有会话失效。
+          仅管理 Reviewer、Content Editor 与 Operator 的真实身份入口。绑定链接仅显示一次；撤销身份会立即使其现有会话失效。
         </p>
+        {identityAccess.items.some((item) => item.role === "CONTENT_EDITOR") ? null : (
+          <form action={createContentEditor} className="ops-command-form">
+            <label>
+              指定 Content Editor 显示名
+              <input name="display_name" required minLength={1} maxLength={120} autoComplete="off" />
+            </label>
+            <button className="button secondary compact" type="submit">创建最小内容身份</button>
+          </form>
+        )}
         <IdentityAccessPanel items={identityAccess.items} />
       </section>
 
