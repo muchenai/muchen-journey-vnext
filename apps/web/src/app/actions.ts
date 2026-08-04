@@ -559,18 +559,27 @@ export async function createLearnerInvite(
   }
 }
 
-export async function publishFormalJourney(data: FormData) {
-  const reviewedBy = requiredUuid(data, "reviewed_by");
-  const reviewAcknowledged = data.get("review_acknowledged") === "on";
-  await apiRequest("/api/v1/ops/formal-journeys/publish", "OPERATOR", {
-    method: "POST",
-    headers: commandHeaders(),
-    body: JSON.stringify({
-      reviewed_by: reviewedBy,
-      expected_absent: true,
-      review_acknowledged: reviewAcknowledged,
-    }),
-  });
+export type PublishFormalJourneyActionState = SubmissionActionState;
+
+export async function publishFormalJourney(
+  _previousState: PublishFormalJourneyActionState,
+  data: FormData,
+): Promise<PublishFormalJourneyActionState> {
+  try {
+    const reviewedBy = requiredUuid(data, "reviewed_by");
+    const reviewAcknowledged = data.get("review_acknowledged") === "on";
+    await apiRequest("/api/v1/ops/formal-journeys/publish", "OPERATOR", {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        reviewed_by: reviewedBy,
+        expected_absent: true,
+        review_acknowledged: reviewAcknowledged,
+      }),
+    });
+  } catch (error) {
+    return submissionError(error);
+  }
   revalidatePath("/ops");
   redirect("/ops?updated=formal-journey-published#learner-invites");
 }

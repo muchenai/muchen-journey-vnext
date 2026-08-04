@@ -33,8 +33,12 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
 test("formal journey publication requires an explicit offline review attestation", () => {
   assert.match(panel, /已完成线下复核的 Reviewer/);
   assert.match(panel, /name="review_acknowledged" type="checkbox" required/);
+  assert.match(panel, /useActionState\(\s*publishFormalJourney/);
+  assert.match(panel, /state\.requestId \? <code>request ID:/);
   assert.match(actions, /data\.get\("review_acknowledged"\) === "on"/);
   assert.match(actions, /review_acknowledged: reviewAcknowledged/);
+  assert.match(actions, /export type PublishFormalJourneyActionState = SubmissionActionState/);
+  assert.match(actions, /export async function publishFormalJourney\([\s\S]*?return submissionError\(error\)/);
 });
 
 test("active invites can be revoked without persisted token display", () => {
