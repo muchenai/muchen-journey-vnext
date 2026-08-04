@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-29",
+  "state": "HUMAN_UAT_NOT_RUN",
+  "journey_release_label": "JOURNEY_V3",
+  "schedule": "10:00-19:00",
+  "minimum_roster": {
+    "content_editors": 1,
+    "operators": 1,
+    "learners": 3,
+    "reviewers": 2,
+    "qa_recorders": 1
+  },
+  "required_acceptance": [
+    "AT-WP29-001",
+    "AT-WP29-002",
+    "AT-WP29-003",
+    "AT-WP29-004",
+    "AT-WP29-005"
+  ],
+  "browser_checks": [
+    "VIEWPORT_390",
+    "VIEWPORT_768",
+    "VIEWPORT_1280",
+    "KEYBOARD_ONLY",
+    "TOUCH",
+    "TEXT_ZOOM_200",
+    "REDUCED_MOTION",
+    "CONSOLE_CLEAN",
+    "NO_OVERFLOW"
+  ],
+  "required_signatures": [
+    "PRODUCT_OWNER",
+    "OPERATOR",
+    "CONTENT_EDITOR",
+    "QA_RECORDER",
+    "REVIEWER_1",
+    "REVIEWER_2"
+  ],
+  "allowed_issue_classes": [
+    "P0_BLOCKER",
+    "POST_LAUNCH_BACKLOG"
+  ],
+  "production_gate": "NO_GO"
+}

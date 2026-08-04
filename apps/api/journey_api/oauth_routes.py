@@ -68,11 +68,19 @@ def envelope(request: Request, data: object) -> dict[str, object]:
 
 
 def safe_entry(role: Role) -> str:
-    return {Role.REVIEWER: "/review", Role.OPERATOR: "/ops"}[role]
+    return {
+        Role.REVIEWER: "/review",
+        Role.OPERATOR: "/ops",
+        Role.CONTENT_EDITOR: "/content",
+    }[role]
 
 
 def requested_role(return_to: str) -> Role:
-    return {"/review": Role.REVIEWER, "/ops": Role.OPERATOR}[return_to]
+    return {
+        "/review": Role.REVIEWER,
+        "/ops": Role.OPERATOR,
+        "/content": Role.CONTENT_EDITOR,
+    }[return_to]
 
 
 def link_start_path(token: str, role: Role) -> str:
@@ -110,7 +118,9 @@ def list_identity_access(
             User.organization_id == actor.organization_id,
             User.status == UserStatus.ACTIVE,
             RoleAssignment.organization_id == actor.organization_id,
-            RoleAssignment.role.in_([Role.REVIEWER, Role.OPERATOR]),
+            RoleAssignment.role.in_(
+                [Role.REVIEWER, Role.OPERATOR, Role.CONTENT_EDITOR]
+            ),
         )
         .order_by(User.display_name, User.id, RoleAssignment.role)
         .limit(100)

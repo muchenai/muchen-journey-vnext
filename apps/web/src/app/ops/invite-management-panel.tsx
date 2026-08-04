@@ -8,11 +8,13 @@ import {
   publishFormalJourney,
   PublishFormalJourneyActionState,
   revokeLearnerInvite,
+  updateInvitationControl,
 } from "@/app/actions";
 import {
   OpsFormalJourney,
   OpsIdentityAccess,
   OpsInvite,
+  OpsInvitationControl,
   OpsTaskDefinition,
 } from "@/lib/server/api";
 
@@ -37,10 +39,12 @@ function CreateInviteForm({
   reviewers,
   tasks,
   journeys,
+  invitationsEnabled,
 }: {
   reviewers: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
   journeys: OpsFormalJourney[];
+  invitationsEnabled: boolean;
 }) {
   const [state, action, pending] = useActionState(createLearnerInvite, INITIAL_STATE);
   const [copied, setCopied] = useState(false);
@@ -68,6 +72,14 @@ function CreateInviteForm({
         </button>
         <p className="status-meta">需要邀请下一人时刷新运营页，再生成一条独立链接。</p>
       </div>
+    );
+  }
+
+  if (!invitationsEnabled) {
+    return (
+      <p className="inline-error" role="status">
+        新邀请已冻结；既有 Enrollment、提交、评审和重新进入路径继续保留。
+      </p>
     );
   }
 
@@ -197,11 +209,13 @@ function PublishFormalJourneyForm({
 
 export function InviteManagementPanel({
   invites,
+  invitationControl,
   identityAccess,
   tasks,
   journeys,
 }: {
   invites: OpsInvite[];
+  invitationControl: OpsInvitationControl;
   identityAccess: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
   journeys: OpsFormalJourney[];
@@ -216,13 +230,45 @@ export function InviteManagementPanel({
 
   return (
     <>
+      <section className="admission-form" aria-labelledby="invite-control-title">
+        <div className="ops-enrollment-heading">
+          <div>
+            <h3 id="invite-control-title">新邀请总开关</h3>
+            <span>当前：{invitationControl.state === "OPEN" ? "开放" : "已冻结"} · revision {invitationControl.revision}</span>
+          </div>
+          <span className={`material-status ${invitationControl.new_invites_enabled ? "complete" : "incomplete"}`}>
+            {invitationControl.new_invites_enabled ? "OPEN" : "FROZEN"}
+          </span>
+        </div>
+        <p>停止条件出现时只冻结新邀请，不撤销已接受邀请，也不删除任何业务事实。</p>
+        <form action={updateInvitationControl} className="ops-command-form">
+          <input type="hidden" name="revision" value={invitationControl.revision} />
+          <input
+            type="hidden"
+            name="target_state"
+            value={invitationControl.new_invites_enabled ? "FROZEN" : "OPEN"}
+          />
+          <label>
+            {invitationControl.new_invites_enabled ? "冻结理由" : "恢复理由"}
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <button className="button secondary compact" type="submit">
+            {invitationControl.new_invites_enabled ? "停止创建新邀请" : "恢复创建新邀请"}
+          </button>
+        </form>
+      </section>
       {!v2Published && reviewers.length > 0 ? (
         <PublishFormalJourneyForm
           reviewers={reviewers}
           expectedCurrentVersion={latestJourney?.version ?? 0}
         />
       ) : null}
-      <CreateInviteForm reviewers={reviewers} tasks={tasks} journeys={journeys} />
+      <CreateInviteForm
+        reviewers={reviewers}
+        tasks={tasks}
+        journeys={journeys}
+        invitationsEnabled={invitationControl.new_invites_enabled}
+      />
       <h3>最近邀请</h3>
       {invites.length === 0 ? <p>尚未创建新人邀请。</p> : null}
       <ul className="ops-list invite-list">

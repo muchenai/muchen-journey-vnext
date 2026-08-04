@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-30",
+  "state": "AWAITING_SIGNED_RC_AND_AUTHORIZATION",
+  "production_host": "journey.muchenai.com",
+  "staging_host": "staging-vnext.muchenai.com",
+  "organization_count": 1,
+  "cohort_learner_minimum": 5,
+  "cohort_learner_maximum": 10,
+  "required_controls": [
+    "PRIVATE_COHORT",
+    "PUBLIC_REGISTRATION_DISABLED",
+    "STOP_NEW_INVITES",
+    "PREVIOUS_RELEASE_ROLLBACK",
+    "MAINTENANCE_PAGE",
+    "STAGING_RETAINED",
+    "PII_FREE_DAILY_METRICS"
+  ],
+  "stop_conditions": [
+    "BUSINESS_FACT_LOSS",
+    "CROSS_ORGANIZATION_ACCESS",
+    "SUSTAINED_LOGIN_FAILURE",
+    "CORE_LOOP_INTERRUPTION",
+    "P0_EVENT"
+  ],
+  "required_acceptance": [
+    "AT-WP30-001",
+    "AT-WP30-002",
+    "AT-WP30-003",
+    "AT-WP30-004",
+    "AT-WP30-005",
+    "AT-WP30-006"
+  ],
+  "production_gate": "NO_GO"
+}

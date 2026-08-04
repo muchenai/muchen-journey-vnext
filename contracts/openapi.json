@@ -336,6 +336,71 @@
         }
       }
     },
+    "/api/v1/ops/formal-journeys/assemble-v3": {
+      "post": {
+        "summary": "Assemble Formal Journey V3",
+        "operationId": "assemble_formal_journey_v3_api_v1_ops_formal_journeys_assemble_v3_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssembleFormalJourneyV3Command"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormalJourneyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ops/enrollments/{enrollment_id}/formal-admission/preview": {
       "post": {
         "summary": "Preview Formal Admission",
@@ -562,6 +627,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssignmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/assignments/{assignment_id}/materials/{material_key}/complete": {
+      "post": {
+        "summary": "Complete Learning Material",
+        "operationId": "complete_learning_material_api_v1_me_assignments__assignment_id__materials__material_key__complete_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "material_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Material Key"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteLearningMaterialCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningMaterialCompletionResponse"
                 }
               }
             }
@@ -1291,6 +1440,182 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InviteListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/invitation-control": {
+      "get": {
+        "summary": "Get Invitation Control",
+        "operationId": "get_invitation_control_api_v1_ops_invitation_control_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationControlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/invitation-control/freeze": {
+      "post": {
+        "summary": "Freeze New Invitations",
+        "operationId": "freeze_new_invitations_api_v1_ops_invitation_control_freeze_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvitationControlCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationControlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/invitation-control/resume": {
+      "post": {
+        "summary": "Resume New Invitations",
+        "operationId": "resume_new_invitations_api_v1_ops_invitation_control_resume_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvitationControlCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationControlResponse"
                 }
               }
             }
@@ -3345,6 +3670,563 @@
           }
         }
       }
+    },
+    "/api/v1/content/task-definitions": {
+      "get": {
+        "summary": "List Editable Task Definitions",
+        "operationId": "list_editable_task_definitions_api_v1_content_task_definitions_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDefinitionListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/content/drafts": {
+      "get": {
+        "summary": "List Owned Drafts",
+        "operationId": "list_owned_drafts_api_v1_content_drafts_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/content/drafts/{draft_id}": {
+      "get": {
+        "summary": "Get Owned Draft",
+        "operationId": "get_owned_draft_api_v1_content_drafts__draft_id__get",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Content Draft",
+        "operationId": "update_content_draft_api_v1_content_drafts__draft_id__put",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentDraftCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/content/task-definitions/{task_definition_id}/drafts": {
+      "post": {
+        "summary": "Create Content Draft",
+        "operationId": "create_content_draft_api_v1_content_task_definitions__task_definition_id__drafts_post",
+        "parameters": [
+          {
+            "name": "task_definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Definition Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentDraftCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/content/drafts/{draft_id}/submit": {
+      "post": {
+        "summary": "Submit Content Draft",
+        "operationId": "submit_content_draft_api_v1_content_drafts__draft_id__submit_post",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitContentDraftCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/content-drafts": {
+      "get": {
+        "summary": "List Submitted Content Drafts",
+        "operationId": "list_submitted_content_drafts_api_v1_ops_content_drafts_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDraftListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/content-editors": {
+      "post": {
+        "summary": "Create Content Editor",
+        "operationId": "create_content_editor_api_v1_ops_content_editors_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentEditorCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentEditorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/content-drafts/{draft_id}/publish": {
+      "post": {
+        "summary": "Publish Content Draft",
+        "operationId": "publish_content_draft_api_v1_ops_content_drafts__draft_id__publish_post",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishContentDraftCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3368,6 +4250,51 @@
           "message"
         ],
         "title": "AiSummaryOut"
+      },
+      "AssembleFormalJourneyV3Command": {
+        "properties": {
+          "reviewed_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewed By"
+          },
+          "expected_current_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Current Version"
+          },
+          "task_version_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 8,
+            "title": "Task Version Ids"
+          },
+          "content_review_note": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 20,
+            "title": "Content Review Note"
+          },
+          "review_acknowledged": {
+            "type": "boolean",
+            "const": true,
+            "title": "Review Acknowledged"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reviewed_by",
+          "expected_current_version",
+          "task_version_ids",
+          "content_review_note",
+          "review_acknowledged"
+        ],
+        "title": "AssembleFormalJourneyV3Command"
       },
       "AssignEnrollmentReviewerCommand": {
         "properties": {
@@ -3526,6 +4453,13 @@
             "type": "array",
             "title": "Reference Materials"
           },
+          "learning_materials": {
+            "items": {
+              "$ref": "#/components/schemas/LearningMaterialOut"
+            },
+            "type": "array",
+            "title": "Learning Materials"
+          },
           "learning_experience": {
             "additionalProperties": true,
             "type": "object",
@@ -3611,6 +4545,7 @@
           "allowed_attachment_types",
           "max_attachment_size_bytes",
           "reference_materials",
+          "learning_materials",
           "learning_experience",
           "estimated_duration_minutes",
           "feedback_sla_business_days",
@@ -3946,6 +4881,21 @@
         ],
         "title": "CompleteAttachmentCommand"
       },
+      "CompleteLearningMaterialCommand": {
+        "properties": {
+          "task_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Task Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_version"
+        ],
+        "title": "CompleteLearningMaterialCommand"
+      },
       "ConfigureNotificationEndpointCommand": {
         "properties": {
           "expected_revision": {
@@ -3973,6 +4923,244 @@
           "reason"
         ],
         "title": "ConfigureNotificationEndpointCommand"
+      },
+      "ContentDraftListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentDraftOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ContentDraftListOut"
+      },
+      "ContentDraftListResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentDraftListOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ContentDraftListResponse"
+      },
+      "ContentDraftOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "task_definition_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Definition Id"
+          },
+          "stable_key": {
+            "type": "string",
+            "title": "Stable Key"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "PUBLISHED"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "content": {
+            "$ref": "#/components/schemas/TaskContentInput"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "published_task_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Task Version Id"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "task_definition_id",
+          "stable_key",
+          "owner_id",
+          "status",
+          "revision",
+          "content",
+          "submitted_at",
+          "published_at",
+          "published_task_version_id"
+        ],
+        "title": "ContentDraftOut"
+      },
+      "ContentDraftResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentDraftOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ContentDraftResponse"
+      },
+      "ContentEditorOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "const": "CONTENT_EDITOR",
+            "title": "Role",
+            "default": "CONTENT_EDITOR"
+          },
+          "status": {
+            "type": "string",
+            "const": "ACTIVE",
+            "title": "Status",
+            "default": "ACTIVE"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "display_name"
+        ],
+        "title": "ContentEditorOut"
+      },
+      "ContentEditorResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentEditorOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ContentEditorResponse"
+      },
+      "CreateContentDraftCommand": {
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/TaskContentInput"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "CreateContentDraftCommand"
+      },
+      "CreateContentEditorCommand": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "expected_absent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Expected Absent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name",
+          "expected_absent"
+        ],
+        "title": "CreateContentEditorCommand"
       },
       "CreateDataRightsRequestCommand": {
         "properties": {
@@ -4078,7 +5266,8 @@
             "type": "string",
             "enum": [
               "REVIEWER",
-              "OPERATOR"
+              "OPERATOR",
+              "CONTENT_EDITOR"
             ],
             "title": "Role"
           },
@@ -5454,7 +6643,8 @@
             "type": "string",
             "enum": [
               "REVIEWER",
-              "OPERATOR"
+              "OPERATOR",
+              "CONTENT_EDITOR"
             ],
             "title": "Role"
           },
@@ -5704,7 +6894,8 @@
             "type": "string",
             "enum": [
               "REVIEWER",
-              "OPERATOR"
+              "OPERATOR",
+              "CONTENT_EDITOR"
             ],
             "title": "Role"
           },
@@ -5766,6 +6957,83 @@
           "request_id"
         ],
         "title": "IdentityLinkResponse"
+      },
+      "InvitationControlOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "FROZEN"
+            ],
+            "title": "State"
+          },
+          "new_invites_enabled": {
+            "type": "boolean",
+            "title": "New Invites Enabled"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "new_invites_enabled",
+          "revision",
+          "reason",
+          "updated_at"
+        ],
+        "title": "InvitationControlOut"
+      },
+      "InvitationControlResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InvitationControlOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "InvitationControlResponse"
       },
       "InviteListOut": {
         "properties": {
@@ -6125,6 +7393,216 @@
           "stage_title"
         ],
         "title": "JourneyResultEvaluationOut"
+      },
+      "LearningMaterialCompletionOut": {
+        "properties": {
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "task_version": {
+            "type": "integer",
+            "title": "Task Version"
+          },
+          "material_key": {
+            "type": "string",
+            "title": "Material Key"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completed At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "task_version",
+          "material_key",
+          "completed_at"
+        ],
+        "title": "LearningMaterialCompletionOut"
+      },
+      "LearningMaterialCompletionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LearningMaterialCompletionOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "LearningMaterialCompletionResponse"
+      },
+      "LearningMaterialInput": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 3,
+            "pattern": "^[a-z0-9][a-z0-9_-]+$",
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "HTTPS_LINK"
+            ],
+            "title": "Kind"
+          },
+          "source_label": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 2,
+            "title": "Source Label"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000,
+                "minLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 12,
+                "pattern": "^https://[^\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "estimated_duration_minutes": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Estimated Duration Minutes"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "kind",
+          "source_label",
+          "estimated_duration_minutes"
+        ],
+        "title": "LearningMaterialInput"
+      },
+      "LearningMaterialOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "HTTPS_LINK"
+            ],
+            "title": "Kind"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "estimated_duration_minutes": {
+            "type": "integer",
+            "title": "Estimated Duration Minutes"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "kind",
+          "source_label",
+          "estimated_duration_minutes",
+          "required"
+        ],
+        "title": "LearningMaterialOut"
       },
       "NotificationDeliveryOut": {
         "properties": {
@@ -6513,7 +7991,8 @@
             "type": "string",
             "enum": [
               "/review",
-              "/ops"
+              "/ops",
+              "/content"
             ],
             "title": "Safe Entry"
           },
@@ -6560,7 +8039,8 @@
             "type": "string",
             "enum": [
               "/review",
-              "/ops"
+              "/ops",
+              "/content"
             ],
             "title": "Return To"
           },
@@ -6793,6 +8273,39 @@
         ],
         "title": "PreviewFormalAdmissionCommand"
       },
+      "PublishContentDraftCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "expected_definition_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Definition Revision"
+          },
+          "reviewed_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewed By"
+          },
+          "review_acknowledged": {
+            "type": "boolean",
+            "const": true,
+            "title": "Review Acknowledged"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "expected_definition_revision",
+          "reviewed_by",
+          "review_acknowledged"
+        ],
+        "title": "PublishContentDraftCommand"
+      },
       "PublishFormalJourneyCommand": {
         "properties": {
           "reviewed_by": {
@@ -6840,11 +8353,6 @@
       },
       "PublishTaskVersionCommand": {
         "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Expected Revision"
-          },
           "title": {
             "type": "string",
             "maxLength": 180,
@@ -6940,6 +8448,14 @@
             "maxItems": 20,
             "title": "Reference Materials"
           },
+          "learning_materials": {
+            "items": {
+              "$ref": "#/components/schemas/LearningMaterialInput"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Learning Materials"
+          },
           "estimated_duration_minutes": {
             "type": "integer",
             "maximum": 480.0,
@@ -6973,6 +8489,11 @@
             "title": "Audience",
             "default": "LEARNER"
           },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
           "reviewed_by": {
             "type": "string",
             "format": "uuid",
@@ -6982,7 +8503,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "expected_revision",
           "title",
           "purpose",
           "learner_outcome",
@@ -6995,6 +8515,7 @@
           "estimated_duration_minutes",
           "rubric",
           "feedback_sla_business_days",
+          "expected_revision",
           "reviewed_by"
         ],
         "title": "PublishTaskVersionCommand"
@@ -7099,6 +8620,106 @@
         ],
         "title": "ResultEvaluationOut"
       },
+      "ResultLearningCompletionOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "COMPLETED",
+            "title": "Status",
+            "default": "COMPLETED"
+          },
+          "completed_stages": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Completed Stages"
+          },
+          "total_stages": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Total Stages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "completed_stages",
+          "total_stages"
+        ],
+        "title": "ResultLearningCompletionOut"
+      },
+      "ResultOperatorAdmissionOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "DECIDED"
+            ],
+            "title": "Status"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ADMIT",
+                  "DEFER",
+                  "NOT_ADMIT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "total_score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Score"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "decision",
+          "decision_reason",
+          "decided_at"
+        ],
+        "title": "ResultOperatorAdmissionOut"
+      },
       "ResultOut": {
         "properties": {
           "outcome_id": {
@@ -7118,6 +8739,18 @@
           "summary": {
             "type": "string",
             "title": "Summary"
+          },
+          "learning_completion": {
+            "$ref": "#/components/schemas/ResultLearningCompletionOut"
+          },
+          "reviewer_conclusion": {
+            "$ref": "#/components/schemas/ResultReviewerConclusionOut"
+          },
+          "system_recommendation": {
+            "$ref": "#/components/schemas/ResultSystemRecommendationOut"
+          },
+          "operator_admission": {
+            "$ref": "#/components/schemas/ResultOperatorAdmissionOut"
           },
           "evaluation": {
             "$ref": "#/components/schemas/ResultEvaluationOut"
@@ -7151,6 +8784,10 @@
           "decision",
           "status",
           "summary",
+          "learning_completion",
+          "reviewer_conclusion",
+          "system_recommendation",
+          "operator_admission",
           "evaluation",
           "journey_evaluations",
           "handoff",
@@ -7177,6 +8814,44 @@
           "request_id"
         ],
         "title": "ResultResponse"
+      },
+      "ResultReviewerConclusionOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "FINALIZED",
+            "title": "Status",
+            "default": "FINALIZED"
+          },
+          "decision": {
+            "type": "string",
+            "const": "PASS",
+            "title": "Decision",
+            "default": "PASS"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Id"
+          },
+          "overall_feedback": {
+            "type": "string",
+            "title": "Overall Feedback"
+          },
+          "concluded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Concluded At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "overall_feedback",
+          "concluded_at"
+        ],
+        "title": "ResultReviewerConclusionOut"
       },
       "ResultRubricFeedbackOut": {
         "properties": {
@@ -7213,6 +8888,65 @@
           "feedback"
         ],
         "title": "ResultRubricFeedbackOut"
+      },
+      "ResultSystemRecommendationOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_OPERATOR_INPUT",
+              "RECORDED"
+            ],
+            "title": "Status"
+          },
+          "advisory_only": {
+            "type": "boolean",
+            "const": true,
+            "title": "Advisory Only",
+            "default": true
+          },
+          "recommendation_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Tier"
+          },
+          "recommended_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ADMIT",
+                  "DEFER",
+                  "NOT_ADMIT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Decision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "recommendation_tier",
+          "recommended_decision"
+        ],
+        "title": "ResultSystemRecommendationOut"
       },
       "ReviewAttachmentOut": {
         "properties": {
@@ -8678,6 +10412,185 @@
         ],
         "title": "SubmissionVersionOut"
       },
+      "SubmitContentDraftCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "review_note": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Review Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "review_note"
+        ],
+        "title": "SubmitContentDraftCommand"
+      },
+      "TaskContentInput": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Purpose"
+          },
+          "learner_outcome": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Learner Outcome"
+          },
+          "instructions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Instructions"
+          },
+          "completion_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Completion Criteria"
+          },
+          "required_deliverables": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Required Deliverables"
+          },
+          "content_source_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Content Source Notes"
+          },
+          "change_summary": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Change Summary"
+          },
+          "reviewer_calibration_note": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Reviewer Calibration Note"
+          },
+          "allowed_attachment_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "text/plain",
+                "application/pdf",
+                "image/png",
+                "image/jpeg"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Allowed Attachment Types"
+          },
+          "max_attachment_size_bytes": {
+            "type": "integer",
+            "maximum": 5242880.0,
+            "minimum": 0.0,
+            "title": "Max Attachment Size Bytes",
+            "default": 0
+          },
+          "reference_materials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Reference Materials"
+          },
+          "learning_materials": {
+            "items": {
+              "$ref": "#/components/schemas/LearningMaterialInput"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Learning Materials"
+          },
+          "estimated_duration_minutes": {
+            "type": "integer",
+            "maximum": 480.0,
+            "minimum": 1.0,
+            "title": "Estimated Duration Minutes"
+          },
+          "rubric": {
+            "$ref": "#/components/schemas/RubricVersionInput"
+          },
+          "reviewer_role": {
+            "type": "string",
+            "const": "REVIEWER",
+            "title": "Reviewer Role",
+            "default": "REVIEWER"
+          },
+          "feedback_sla_business_days": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Feedback Sla Business Days"
+          },
+          "sensitivity": {
+            "type": "string",
+            "const": "INTERNAL",
+            "title": "Sensitivity",
+            "default": "INTERNAL"
+          },
+          "audience": {
+            "type": "string",
+            "const": "LEARNER",
+            "title": "Audience",
+            "default": "LEARNER"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "purpose",
+          "learner_outcome",
+          "instructions",
+          "completion_criteria",
+          "required_deliverables",
+          "content_source_notes",
+          "change_summary",
+          "reviewer_calibration_note",
+          "estimated_duration_minutes",
+          "rubric",
+          "feedback_sla_business_days"
+        ],
+        "title": "TaskContentInput"
+      },
       "TaskDefinitionListOut": {
         "properties": {
           "items": {
@@ -8866,6 +10779,13 @@
             "type": "array",
             "title": "Reference Materials"
           },
+          "learning_materials": {
+            "items": {
+              "$ref": "#/components/schemas/LearningMaterialInput"
+            },
+            "type": "array",
+            "title": "Learning Materials"
+          },
           "learning_experience": {
             "additionalProperties": true,
             "type": "object",
@@ -8940,6 +10860,7 @@
           "allowed_attachment_types",
           "max_attachment_size_bytes",
           "reference_materials",
+          "learning_materials",
           "learning_experience",
           "estimated_duration_minutes",
           "rubric",
@@ -9111,6 +11032,47 @@
           "request_id"
         ],
         "title": "TimelineResponse"
+      },
+      "UpdateContentDraftCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "content": {
+            "$ref": "#/components/schemas/TaskContentInput"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "content"
+        ],
+        "title": "UpdateContentDraftCommand"
+      },
+      "UpdateInvitationControlCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "UpdateInvitationControlCommand"
       },
       "ValidationError": {
         "properties": {

@@ -43,6 +43,18 @@ class FormalEvaluationEvidence:
     evaluation: Evaluation
 
 
+FORMAL_V3_STAGE_KEYS = (
+    "DAY-0",
+    "TRE-001-COMPANY-VALUES",
+    "TRE-002-AI-DATA-BASICS",
+    "TRE-003-PROJECT-AWARENESS",
+    "TRE-004-DELIVERY-FIT",
+    "ASM-001-RULE-BREAKDOWN",
+    "ASM-002-MODEL-JUDGEMENT",
+    "ASM-003-DATA-CONSTRUCTION",
+)
+
+
 def published_formal_journey(
     session: Session, organization_id: uuid.UUID
 ) -> JourneyVersion | None:
@@ -228,6 +240,132 @@ def publish_catalog_journey(
         stage_rows.append(stage)
     session.flush()
     session.add_all(stage_rows)
+    session.flush()
+    validate_published_structure(journey_stages(session, version.id, organization_id))
+    return version
+
+
+def publish_composed_v3_journey(
+    session: Session,
+    *,
+    operator_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    expected_current_version: int,
+    task_version_ids: list[uuid.UUID],
+    content_review_note: str,
+) -> JourneyVersion:
+    """Publish a V3 composition from eight already immutable, approved task versions."""
+
+    definition = session.scalar(
+        select(JourneyDefinition)
+        .where(
+            JourneyDefinition.organization_id == organization_id,
+            JourneyDefinition.stable_key == FORMAL_JOURNEY_KEY,
+            JourneyDefinition.status == JourneyDefinitionStatus.PUBLISHED,
+        )
+        .with_for_update()
+    )
+    if definition is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "请先保留既有正式旅程定义。")
+    current_version = session.scalar(
+        select(func.max(JourneyVersion.version)).where(
+            JourneyVersion.journey_definition_id == definition.id,
+            JourneyVersion.organization_id == organization_id,
+        )
+    ) or 0
+    if current_version != expected_current_version:
+        raise ApiError(
+            409,
+            "VERSION_CONFLICT",
+            "正式探索营当前版本已变化，请刷新后重试。",
+            details={"current_version": current_version},
+        )
+    if len(task_version_ids) != 8 or len(set(task_version_ids)) != 8:
+        raise ApiError(422, "VALIDATION_FAILED", "Journey V3 必须绑定八个唯一版本。")
+
+    task_rows: list[tuple[TaskVersion, TaskDefinition]] = []
+    for expected_key, task_version_id in zip(
+        FORMAL_V3_STAGE_KEYS, task_version_ids, strict=True
+    ):
+        row = session.execute(
+            select(TaskVersion, TaskDefinition)
+            .join(TaskDefinition, TaskDefinition.id == TaskVersion.task_definition_id)
+            .where(
+                TaskVersion.id == task_version_id,
+                TaskVersion.organization_id == organization_id,
+                TaskDefinition.organization_id == organization_id,
+                TaskDefinition.status == TaskDefinitionStatus.PUBLISHED,
+            )
+        ).first()
+        if row is None:
+            raise ApiError(422, "VALIDATION_FAILED", "Journey V3 包含不可用的任务版本。")
+        task, task_definition = row
+        if task_definition.stable_key != expected_key:
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                f"Journey V3 阶段顺序错误：需要 {expected_key}。",
+            )
+        required_materials = [
+            item
+            for item in task.learning_materials
+            if isinstance(item, dict) and item.get("required") is True
+        ]
+        if not required_materials:
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                f"{expected_key} 缺少已固定的 required material。",
+            )
+        task_rows.append((task, task_definition))
+
+    version = JourneyVersion(
+        id=uuid.uuid4(),
+        organization_id=organization_id,
+        journey_definition_id=definition.id,
+        version=current_version + 1,
+        title=f"{FORMAL_JOURNEY_TITLE} · V3",
+        purpose=FORMAL_JOURNEY_PURPOSE,
+        change_summary=(
+            "WP-27/28：组合经 Content Editor 提交、Reviewer 复核并由 Operator "
+            "发布的 Day 0、四宝藏与三项评测固定版本。"
+        ),
+        content_review_note=content_review_note,
+        published_by=operator_id,
+        reviewed_by=reviewer_id,
+    )
+    session.add(version)
+    session.flush()
+    stages: list[JourneyStageVersion] = []
+    for position, (task, definition_row) in enumerate(task_rows):
+        stage_kind = (
+            JourneyStageKind.DAY_0
+            if position == 0
+            else JourneyStageKind.TREASURE
+            if position < 5
+            else JourneyStageKind.ASSESSMENT
+        )
+        completion_policy = (
+            JourneyCompletionPolicy.REVIEW_REQUIRED
+            if stage_kind == JourneyStageKind.ASSESSMENT
+            else JourneyCompletionPolicy.LEARNER_EVIDENCE
+        )
+        stages.append(
+            JourneyStageVersion(
+                id=uuid.uuid4(),
+                organization_id=organization_id,
+                journey_version_id=version.id,
+                stable_key=definition_row.stable_key,
+                position=position,
+                stage_kind=stage_kind,
+                completion_policy=completion_policy,
+                task_version_id=task.id,
+                title=task.title,
+                short_description=task.learner_outcome[:240],
+            )
+        )
+    session.add_all(stages)
     session.flush()
     validate_published_structure(journey_stages(session, version.id, organization_id))
     return version

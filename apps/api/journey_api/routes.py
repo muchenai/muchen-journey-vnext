@@ -10,11 +10,17 @@ from journey_api.db import get_db
 from journey_api.domain import AssignmentActionState, assignment_action, resolve_current_action
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.learning_materials import (
+    completed_materials,
+    ensure_required_materials_completed,
+    material_by_key,
+)
 from journey_api.journey_service import (
     formal_admission_scorecard,
     journey_stages,
     lock_active_learner_assignment,
     publish_catalog_journey,
+    publish_composed_v3_journey,
 )
 from journey_api.models import (
     Assignment,
@@ -28,6 +34,7 @@ from journey_api.models import (
     JourneyDefinitionStatus,
     JourneyStageVersion,
     JourneyVersion,
+    LearningMaterialCompletion,
     FormalAdmissionDecisionType,
     OutboxEvent,
     OutboxStatus,
@@ -43,6 +50,8 @@ from journey_api.schemas import (
     AssignmentJourneyStageOut,
     AssignmentOut,
     AssignmentResponse,
+    AssembleFormalJourneyV3Command,
+    CompleteLearningMaterialCommand,
     CommandOut,
     CommandResponse,
     CreateFormalAdmissionDecisionCommand,
@@ -61,6 +70,9 @@ from journey_api.schemas import (
     FormalAdmissionPreviewResponse,
     JourneyProgressNodeOut,
     JourneyProgressOut,
+    LearningMaterialCompletionOut,
+    LearningMaterialCompletionResponse,
+    LearningMaterialOut,
     PublishFormalJourneyCommand,
     PreviewFormalAdmissionCommand,
     RevisionCommand,
@@ -184,6 +196,7 @@ def task_version_out(
         allowed_attachment_types=version.allowed_attachment_types,
         max_attachment_size_bytes=version.max_attachment_size_bytes,
         reference_materials=version.reference_materials,
+        learning_materials=version.learning_materials,
         learning_experience=version.learning_experience,
         estimated_duration_minutes=version.estimated_duration_minutes,
         rubric=version.rubric,
@@ -445,6 +458,10 @@ def publish_task_version(
         allowed_attachment_types=command.allowed_attachment_types,
         max_attachment_size_bytes=command.max_attachment_size_bytes,
         reference_materials=command.reference_materials,
+        learning_materials=[
+            material.model_dump(mode="json") for material in command.learning_materials
+        ],
+        learning_experience={},
         estimated_duration_minutes=command.estimated_duration_minutes,
         rubric=command.rubric.model_dump(mode="json"),
         rubric_version=command.rubric.version,
@@ -596,6 +613,84 @@ def publish_formal_journey(
             "audience": "FORMAL_CAMP_V2",
             "catalog_version": command.catalog_version,
             "previous_version": command.expected_current_version,
+        },
+    )
+    session.commit()
+    return envelope(request, formal_journey_out(session, version))
+
+
+@api.post(
+    "/ops/formal-journeys/assemble-v3",
+    response_model=FormalJourneyVersionResponse,
+)
+def assemble_formal_journey_v3(
+    command: AssembleFormalJourneyV3Command,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = command.model_dump(mode="json")
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="formal_journey.assemble_v3",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        version = session.get(JourneyVersion, uuid.UUID(str(replay["id"])))
+        if version is None or version.organization_id != actor.organization_id:
+            raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的旅程版本已不可用。")
+        return envelope(request, formal_journey_out(session, version, replay=True))
+    reviewer = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == command.reviewed_by,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+    )
+    if reviewer is None:
+        raise ApiError(422, "VALIDATION_FAILED", "内容复核人必须是同组织的有效 Reviewer。")
+    version = publish_composed_v3_journey(
+        session,
+        operator_id=actor.id,
+        reviewer_id=reviewer.id,
+        organization_id=actor.organization_id,
+        expected_current_version=command.expected_current_version,
+        task_version_ids=command.task_version_ids,
+        content_review_note=command.content_review_note,
+    )
+    result = {"id": str(version.id)}
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="formal_journey.assemble_v3",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_event(session, "formal_journey.published.v3", "journey_version", version.id)
+    add_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="formal_journey.v3_published",
+        resource_type="journey_version",
+        resource_id=version.id,
+        details={
+            "reviewed_by": str(reviewer.id),
+            "review_acknowledged": True,
+            "stage_count": 8,
+            "audience": "FORMAL_CAMP_V3",
+            "previous_version": command.expected_current_version,
+            "task_version_ids": [str(item) for item in command.task_version_ids],
         },
     )
     session.commit()
@@ -966,6 +1061,7 @@ def assignment_detail(
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
     )
+    material_completions = completed_materials(session, assignment)
     data = AssignmentOut(
         id=assignment.id,
         status=assignment.status.value,
@@ -986,6 +1082,18 @@ def assignment_detail(
             task.max_attachment_size_bytes if get_settings().attachments_enabled else 0
         ),
         reference_materials=task.reference_materials,
+        learning_materials=[
+            LearningMaterialOut(
+                **material,
+                completed_at=(
+                    material_completions[str(material["key"])].completed_at
+                    if str(material.get("key")) in material_completions
+                    else None
+                ),
+            )
+            for material in task.learning_materials
+            if isinstance(material, dict) and material.get("key")
+        ],
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
         feedback_sla_business_days=task.feedback_sla_business_days,
@@ -1008,6 +1116,133 @@ def assignment_detail(
         ),
     )
     return envelope(request, data)
+
+
+@api.post(
+    "/me/assignments/{assignment_id}/materials/{material_key}/complete",
+    response_model=LearningMaterialCompletionResponse,
+)
+def complete_learning_material(
+    assignment_id: uuid.UUID,
+    material_key: str,
+    command: CompleteLearningMaterialCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.LEARNER)
+    payload = {
+        **command.model_dump(mode="json"),
+        "assignment_id": str(assignment_id),
+        "material_key": material_key,
+    }
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="learning_material.complete",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(
+            request,
+            LearningMaterialCompletionOut(
+                **{**replay, "idempotency_replay": True}
+            ),
+        )
+    assignment, enrollment = lock_active_learner_assignment(
+        session, actor, assignment_id
+    )
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="learning_material.complete",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(
+            request,
+            LearningMaterialCompletionOut(
+                **{**replay, "idempotency_replay": True}
+            ),
+        )
+    task = session.get(TaskVersion, assignment.task_version_id)
+    if task is None or task.organization_id != actor.organization_id:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
+    if task.version != command.task_version:
+        raise ApiError(409, "VERSION_CONFLICT", "学习材料版本已变化，请刷新后重试。")
+    material_by_key(task, material_key)
+    existing = session.scalar(
+        select(LearningMaterialCompletion).where(
+            LearningMaterialCompletion.organization_id == actor.organization_id,
+            LearningMaterialCompletion.assignment_id == assignment.id,
+            LearningMaterialCompletion.task_version_id == task.id,
+            LearningMaterialCompletion.material_key == material_key,
+        )
+    )
+    if existing is not None:
+        result = LearningMaterialCompletionOut(
+            assignment_id=assignment.id,
+            task_version=task.version,
+            material_key=existing.material_key,
+            completed_at=existing.completed_at,
+        )
+    else:
+        if assignment.status not in {
+            AssignmentStatus.AVAILABLE,
+            AssignmentStatus.IN_PROGRESS,
+            AssignmentStatus.NEEDS_REVISION,
+        }:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能记录材料完成。")
+        completion = LearningMaterialCompletion(
+            id=uuid.uuid4(),
+            organization_id=actor.organization_id,
+            enrollment_id=enrollment.id,
+            assignment_id=assignment.id,
+            task_version_id=task.id,
+            learner_id=actor.id,
+            material_key=material_key,
+        )
+        session.add(completion)
+        session.flush()
+        result = LearningMaterialCompletionOut(
+            assignment_id=assignment.id,
+            task_version=task.version,
+            material_key=completion.material_key,
+            completed_at=completion.completed_at,
+        )
+        add_event(
+            session,
+            "learning_material.completed.v1",
+            "learning_material_completion",
+            completion.id,
+        )
+        add_audit(
+            session,
+            request=request,
+            actor=actor,
+            action="learning_material.completed",
+            resource_type="learning_material_completion",
+            resource_id=completion.id,
+            details={
+                "assignment_id": str(assignment.id),
+                "task_version_id": str(task.id),
+                "material_key": material_key,
+            },
+        )
+    serialized = result.model_dump(mode="json")
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="learning_material.complete",
+        key=idempotency_key,
+        payload=payload,
+        response=serialized,
+    )
+    session.commit()
+    return envelope(request, result)
 
 
 @api.post("/me/assignments/{assignment_id}/start", response_model=CommandResponse)
@@ -1035,6 +1270,7 @@ def start_assignment(
     ensure_revision(assignment.revision, command.expected_revision)
     if assignment.status != AssignmentStatus.AVAILABLE:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能执行开始操作。")
+    ensure_required_materials_completed(session, assignment)
     assignment.status = AssignmentStatus.IN_PROGRESS
     assignment.revision += 1
     result = {"resource_id": str(assignment.id), "status": assignment.status.value, "revision": assignment.revision}

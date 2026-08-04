@@ -36,7 +36,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0016_wp24_formal_camp_v2"
+EXPECTED_MIGRATION_HEAD = "0019_wp30_invitation_control"
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",

@@ -13,6 +13,10 @@ class RevisionCommand(StrictModel):
     expected_revision: int = Field(ge=1)
 
 
+class CompleteLearningMaterialCommand(StrictModel):
+    task_version: int = Field(ge=1)
+
+
 class SubmissionCommand(RevisionCommand):
     body: str = Field(min_length=40, max_length=8_000)
     attachment_ids: list[UUID] = Field(default_factory=list, max_length=5)
@@ -122,6 +126,16 @@ class CreateLearnerReentryCommand(RevisionCommand):
 
 class RevokeInviteCommand(RevisionCommand):
     reason: str = Field(min_length=10, max_length=500)
+
+
+class UpdateInvitationControlCommand(RevisionCommand):
+    expected_revision: int = Field(ge=0)
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_invitation_control_reason(cls, value: str) -> str:
+        return value.strip()
 
 
 class AssignEnrollmentReviewerCommand(RevisionCommand):
@@ -262,7 +276,35 @@ class RubricVersionInput(StrictModel):
         return self
 
 
-class PublishTaskVersionCommand(RevisionCommand):
+class LearningMaterialInput(StrictModel):
+    key: str = Field(
+        min_length=3,
+        max_length=80,
+        pattern=r"^[a-z0-9][a-z0-9_-]+$",
+    )
+    title: str = Field(min_length=2, max_length=160)
+    kind: Literal["TEXT", "HTTPS_LINK"]
+    source_label: str = Field(min_length=2, max_length=160)
+    body: str | None = Field(default=None, min_length=20, max_length=20_000)
+    url: str | None = Field(
+        default=None,
+        min_length=12,
+        max_length=2_000,
+        pattern=r"^https://[^\s]+$",
+    )
+    estimated_duration_minutes: int = Field(ge=1, le=120)
+    required: bool = True
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> "LearningMaterialInput":
+        if self.kind == "TEXT" and (self.body is None or self.url is not None):
+            raise ValueError("TEXT material requires body and forbids url")
+        if self.kind == "HTTPS_LINK" and (self.url is None or self.body is not None):
+            raise ValueError("HTTPS_LINK material requires url and forbids body")
+        return self
+
+
+class TaskContentInput(StrictModel):
     title: str = Field(min_length=3, max_length=180)
     purpose: str = Field(min_length=10, max_length=2_000)
     learner_outcome: str = Field(min_length=10, max_length=2_000)
@@ -277,20 +319,24 @@ class PublishTaskVersionCommand(RevisionCommand):
     )
     max_attachment_size_bytes: int = Field(default=0, ge=0, le=5_242_880)
     reference_materials: list[str] = Field(default_factory=list, max_length=20)
+    learning_materials: list[LearningMaterialInput] = Field(
+        default_factory=list, max_length=12
+    )
     estimated_duration_minutes: int = Field(ge=1, le=480)
     rubric: RubricVersionInput
     reviewer_role: Literal["REVIEWER"] = "REVIEWER"
     feedback_sla_business_days: int = Field(ge=1, le=10)
     sensitivity: Literal["INTERNAL"] = "INTERNAL"
     audience: Literal["LEARNER"] = "LEARNER"
-    reviewed_by: UUID
-
     @model_validator(mode="after")
-    def validate_attachment_policy(self) -> "PublishTaskVersionCommand":
+    def validate_attachment_policy(self) -> "TaskContentInput":
         if len(set(self.allowed_attachment_types)) != len(self.allowed_attachment_types):
             raise ValueError("Attachment content types must be unique")
         if bool(self.allowed_attachment_types) != bool(self.max_attachment_size_bytes):
             raise ValueError("Attachment types and size limit must be configured together")
+        material_keys = [material.key for material in self.learning_materials]
+        if len(material_keys) != len(set(material_keys)):
+            raise ValueError("Learning material keys must be unique")
         return self
 
     @field_validator(
@@ -308,6 +354,69 @@ class PublishTaskVersionCommand(RevisionCommand):
         if len(set(normalized)) != len(normalized):
             raise ValueError("Task list items must be unique")
         return normalized
+
+
+class PublishTaskVersionCommand(TaskContentInput):
+    expected_revision: int = Field(ge=1)
+    reviewed_by: UUID
+
+
+class CreateContentDraftCommand(StrictModel):
+    content: TaskContentInput
+
+
+class CreateContentEditorCommand(StrictModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    expected_absent: Literal[True]
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_content_editor_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class UpdateContentDraftCommand(RevisionCommand):
+    content: TaskContentInput
+
+
+class SubmitContentDraftCommand(RevisionCommand):
+    review_note: str = Field(min_length=10, max_length=1_000)
+
+    @field_validator("review_note")
+    @classmethod
+    def normalize_review_note(cls, value: str) -> str:
+        return value.strip()
+
+
+class PublishContentDraftCommand(RevisionCommand):
+    expected_definition_revision: int = Field(ge=1)
+    reviewed_by: UUID
+    review_acknowledged: Literal[True]
+
+
+class LearningMaterialOut(StrictModel):
+    key: str
+    title: str
+    kind: Literal["TEXT", "HTTPS_LINK"]
+    source_label: str
+    body: str | None = None
+    url: str | None = None
+    estimated_duration_minutes: int
+    required: bool
+    completed_at: datetime | None = None
+
+
+class LearningMaterialCompletionOut(StrictModel):
+    assignment_id: UUID
+    task_version: int
+    material_key: str
+    completed_at: datetime
+    idempotency_replay: bool = False
+
+
+class LearningMaterialCompletionResponse(StrictModel):
+    data: LearningMaterialCompletionOut
+    request_id: str
 
 
 class InviteOut(StrictModel):
@@ -336,6 +445,20 @@ class InviteListOut(StrictModel):
 
 class InviteListResponse(StrictModel):
     data: InviteListOut
+    request_id: str
+
+
+class InvitationControlOut(StrictModel):
+    state: Literal["OPEN", "FROZEN"]
+    new_invites_enabled: bool
+    revision: int = Field(ge=0)
+    reason: str | None
+    updated_at: datetime | None
+    idempotency_replay: bool = False
+
+
+class InvitationControlResponse(StrictModel):
+    data: InvitationControlOut
     request_id: str
 
 
@@ -381,14 +504,14 @@ class IdentityConfirmResponse(StrictModel):
 
 class CreateIdentityLinkCommand(StrictModel):
     target_user_id: UUID
-    role: Literal["REVIEWER", "OPERATOR"]
+    role: Literal["REVIEWER", "OPERATOR", "CONTENT_EDITOR"]
     expires_in_minutes: int = Field(default=30, ge=5, le=60)
 
 
 class IdentityLinkOut(StrictModel):
     id: UUID
     target_user_id: UUID
-    role: Literal["REVIEWER", "OPERATOR"]
+    role: Literal["REVIEWER", "OPERATOR", "CONTENT_EDITOR"]
     status: str
     expires_at: datetime
     revision: int
@@ -405,7 +528,7 @@ class IdentityLinkResponse(StrictModel):
 class IdentityAccessOut(StrictModel):
     user_id: UUID
     display_name: str
-    role: Literal["REVIEWER", "OPERATOR"]
+    role: Literal["REVIEWER", "OPERATOR", "CONTENT_EDITOR"]
     identity_id: UUID | None
     identity_status: Literal["UNLINKED", "LINKED", "REVOKED"]
     identity_revision: int | None
@@ -442,7 +565,7 @@ class RevokeExternalIdentityCommand(RevisionCommand):
 
 
 class OAuthStartCommand(StrictModel):
-    return_to: Literal["/review", "/ops"]
+    return_to: Literal["/review", "/ops", "/content"]
     link_token: str | None = Field(default=None, min_length=32, max_length=256)
 
 
@@ -462,7 +585,7 @@ class OAuthCallbackCommand(StrictModel):
 
 
 class OAuthCallbackOut(StrictModel):
-    safe_entry: Literal["/review", "/ops"]
+    safe_entry: Literal["/review", "/ops", "/content"]
     expires_at: datetime
     csrf_token: str
 
@@ -553,6 +676,7 @@ class AssignmentOut(StrictModel):
     allowed_attachment_types: list[str]
     max_attachment_size_bytes: int
     reference_materials: list[str]
+    learning_materials: list[LearningMaterialOut]
     learning_experience: dict[str, object]
     estimated_duration_minutes: int
     feedback_sla_business_days: int
@@ -595,6 +719,7 @@ class TaskVersionOut(StrictModel):
     allowed_attachment_types: list[str]
     max_attachment_size_bytes: int
     reference_materials: list[str]
+    learning_materials: list[LearningMaterialInput]
     learning_experience: dict[str, object]
     estimated_duration_minutes: int
     rubric: dict[str, object]
@@ -611,6 +736,47 @@ class TaskVersionOut(StrictModel):
 
 class TaskVersionResponse(StrictModel):
     data: TaskVersionOut
+    request_id: str
+
+
+class ContentDraftOut(StrictModel):
+    id: UUID
+    task_definition_id: UUID
+    stable_key: str
+    owner_id: UUID
+    status: Literal["DRAFT", "SUBMITTED", "PUBLISHED"]
+    revision: int
+    content: TaskContentInput
+    submitted_at: datetime | None
+    published_at: datetime | None
+    published_task_version_id: UUID | None
+    idempotency_replay: bool = False
+
+
+class ContentDraftResponse(StrictModel):
+    data: ContentDraftOut
+    request_id: str
+
+
+class ContentEditorOut(StrictModel):
+    user_id: UUID
+    display_name: str
+    role: Literal["CONTENT_EDITOR"] = "CONTENT_EDITOR"
+    status: Literal["ACTIVE"] = "ACTIVE"
+    idempotency_replay: bool = False
+
+
+class ContentEditorResponse(StrictModel):
+    data: ContentEditorOut
+    request_id: str
+
+
+class ContentDraftListOut(StrictModel):
+    items: list[ContentDraftOut]
+
+
+class ContentDraftListResponse(StrictModel):
+    data: ContentDraftListOut
     request_id: str
 
 
@@ -651,6 +817,26 @@ class PublishFormalJourneyCommand(StrictModel):
     expected_current_version: int = Field(default=0, ge=0)
     expected_absent: Literal[True] | None = None
     review_acknowledged: Literal[True]
+
+
+class AssembleFormalJourneyV3Command(StrictModel):
+    reviewed_by: UUID
+    expected_current_version: int = Field(ge=1)
+    task_version_ids: list[UUID] = Field(min_length=8, max_length=8)
+    content_review_note: str = Field(min_length=20, max_length=1_000)
+    review_acknowledged: Literal[True]
+
+    @field_validator("task_version_ids")
+    @classmethod
+    def validate_unique_v3_stages(cls, values: list[UUID]) -> list[UUID]:
+        if len(set(values)) != 8:
+            raise ValueError("Journey V3 must bind eight unique TaskVersions")
+        return values
+
+    @field_validator("content_review_note")
+    @classmethod
+    def normalize_content_review_note(cls, value: str) -> str:
+        return value.strip()
 
 
 class FormalJourneyStageOut(StrictModel):
@@ -1171,11 +1357,44 @@ class AiSummaryOut(StrictModel):
     message: str
 
 
+class ResultLearningCompletionOut(StrictModel):
+    status: Literal["COMPLETED"] = "COMPLETED"
+    completed_stages: int = Field(ge=1)
+    total_stages: int = Field(ge=1)
+
+
+class ResultReviewerConclusionOut(StrictModel):
+    status: Literal["FINALIZED"] = "FINALIZED"
+    decision: Literal["PASS"] = "PASS"
+    reviewer_id: UUID
+    overall_feedback: str
+    concluded_at: datetime
+
+
+class ResultSystemRecommendationOut(StrictModel):
+    status: Literal["PENDING_OPERATOR_INPUT", "RECORDED"]
+    advisory_only: Literal[True] = True
+    recommendation_tier: Literal["A", "B", "C", "D"] | None
+    recommended_decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
+
+
+class ResultOperatorAdmissionOut(StrictModel):
+    status: Literal["PENDING", "DECIDED"]
+    decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
+    decision_reason: str | None
+    total_score: int | None = Field(default=None, ge=0, le=100)
+    decided_at: datetime | None
+
+
 class ResultOut(StrictModel):
     outcome_id: UUID
     decision: Literal["PASS"]
     status: str
     summary: str
+    learning_completion: ResultLearningCompletionOut
+    reviewer_conclusion: ResultReviewerConclusionOut
+    system_recommendation: ResultSystemRecommendationOut
+    operator_admission: ResultOperatorAdmissionOut
     evaluation: ResultEvaluationOut
     journey_evaluations: list[JourneyResultEvaluationOut]
     handoff: HandoffOut

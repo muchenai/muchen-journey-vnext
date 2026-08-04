@@ -8,6 +8,12 @@ const KIND_LABELS = {
   ASSESSMENT: "评测",
 } as const;
 
+const STATUS_LABELS = {
+  COMPLETED: "已完成",
+  CURRENT: "当前阶段",
+  LOCKED: "未开放",
+} as const;
+
 const ROUTE_LABELS: Record<string, string> = {
   "DAY-0": "启程",
   "TRE-001-COMPANY-VALUES": "公司价值",
@@ -16,8 +22,89 @@ const ROUTE_LABELS: Record<string, string> = {
   "TRE-004-DELIVERY-FIT": "交付边界",
   "ASM-001-RULE-BREAKDOWN": "规则拆解",
   "ASM-002-MODEL-JUDGEMENT": "模型判断",
-  "ASM-003-BOUNDARY-ESCALATION": "边界提报",
+  "ASM-003-DATA-CONSTRUCTION": "数据构造",
 };
+
+const ROUTE_POINTS = {
+  wide: [
+    [60, 235], [200, 175], [340, 220], [485, 145],
+    [630, 195], [785, 125], [940, 165], [1070, 95],
+  ],
+  narrow: [
+    [90, 70], [255, 170], [90, 270], [255, 370],
+    [90, 470], [255, 570], [90, 670], [255, 770],
+  ],
+} as const;
+
+type RoutePoint = readonly [number, number];
+
+function RouteMapSvg({
+  journey,
+  points,
+  variant,
+}: {
+  journey: JourneyProgress;
+  points: readonly RoutePoint[];
+  variant: "wide" | "narrow";
+}) {
+  const viewBox = variant === "wide" ? "0 0 1120 320" : "0 0 360 880";
+
+  return (
+    <svg
+      className={`journey-route-map journey-route-map-${variant}`}
+      viewBox={viewBox}
+      aria-hidden="true"
+    >
+      <polyline points={points.map((point) => point.join(",")).join(" ")} />
+      {points.slice(0, journey.nodes.length).map(([x, y], index) => {
+        const node = journey.nodes[index];
+        const hint = `${KIND_LABELS[node.stage_kind]} · ${node.short_description}`;
+        const stateClass = `route-node-visual-${node.status.toLowerCase()}`;
+        const isAssessment = node.stage_kind === "ASSESSMENT";
+        const isCurrent = node.status === "CURRENT";
+        const contents = (
+          <>
+            <title>{hint}</title>
+            {isAssessment ? (
+              <rect
+                className="route-node-orb"
+                x={isCurrent ? -17 : -10}
+                y={isCurrent ? -17 : -10}
+                width={isCurrent ? 34 : 20}
+                height={isCurrent ? 34 : 20}
+                rx={isCurrent ? 7 : 4}
+              />
+            ) : (
+              <circle className="route-node-orb" r={isCurrent ? 17 : 10} />
+            )}
+            <text className="route-node-label" textAnchor="middle" y={isCurrent ? 43 : 36}>
+              {ROUTE_LABELS[node.stable_key] ?? node.title}
+            </text>
+          </>
+        );
+
+        return node.status === "CURRENT" ? (
+          <g key={node.stable_key} transform={`translate(${x} ${y})`}>
+            <a
+              className={`route-node-visual route-node-link ${stateClass}`}
+              href={`/app/tasks/${node.assignment_id}`}
+            >
+              {contents}
+            </a>
+          </g>
+        ) : (
+          <g
+            className={`route-node-visual ${stateClass}`}
+            key={node.stable_key}
+            transform={`translate(${x} ${y})`}
+          >
+            {contents}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 export function JourneyMap({ journey }: { journey: JourneyProgress }) {
   return (
@@ -31,45 +118,22 @@ export function JourneyMap({ journey }: { journey: JourneyProgress }) {
           {journey.completed_stages}<span>/ {journey.total_stages}</span>
         </strong>
       </header>
-      <ol className="journey-route" aria-label="探索营阶段进度">
-        {journey.nodes.map((node) => {
-          const hint = `${KIND_LABELS[node.stage_kind]} · ${node.short_description}`;
-          const nodeBody = (
-            <>
-              <span className="route-node-orb" aria-hidden="true" />
-              <span className="route-node-label">
-                {ROUTE_LABELS[node.stable_key] ?? node.title}
-              </span>
-            </>
-          );
-          return (
-            <li
-              className={`route-node route-node-${node.status.toLowerCase()}`}
-              key={node.stable_key}
-            >
-              {node.status === "CURRENT" ? (
-                <Link
-                  className="route-node-control"
-                  href={`/app/tasks/${node.assignment_id}`}
-                  data-hint={hint}
-                  aria-label={`当前阶段：${node.title}。${node.short_description}`}
-                >
-                  {nodeBody}
-                </Link>
-              ) : (
-                <span
-                  className="route-node-control"
-                  data-hint={hint}
-                  tabIndex={0}
-                  aria-label={`${node.status === "COMPLETED" ? "已完成" : "未开放"}：${node.title}。${node.short_description}`}
-                >
-                  {nodeBody}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <div className="journey-route-canvas">
+        <RouteMapSvg journey={journey} points={ROUTE_POINTS.wide} variant="wide" />
+        <RouteMapSvg journey={journey} points={ROUTE_POINTS.narrow} variant="narrow" />
+        <ol className="journey-route-accessible" aria-label="探索营阶段进度">
+          {journey.nodes.map((node) => {
+            const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
+            return (
+              <li key={node.stable_key}>
+                {node.status === "CURRENT" ? (
+                  <Link href={`/app/tasks/${node.assignment_id}`}>{label}</Link>
+                ) : label}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
       <p className="journey-map-hint">触碰路标，看见这一站。</p>
     </section>
   );

@@ -2,7 +2,7 @@
 
 状态：`AS_BUILT`
 
-产品状态：`IMPLEMENTED_LOCALLY / CONTENT_REVIEW_REQUIRED / NOT_PUBLISHED / NOT_DEPLOYED`
+产品状态：`STAGING_DEPLOYED / V2_PUBLICATION_OWNER_REPORTED / HUMAN_UX_DEFECTS_OPEN / CONTROLLED_INVITE_PAUSED`
 
 日期：2026-08-04
 前置：`DEC-024`、REQ-BR-011..014、WP-19～WP-22 最小纵向切片
@@ -103,7 +103,9 @@ WP-24 不重做 vNext 基座，也不修改 Journey V1、既有 Enrollment、Sub
 
 已完成：领域模型、migration、V2 catalog、API、Learner/Reviewer/Operator Web 路径；空库 `0001→0016` 迁移与 290 项 API 回归通过；Web lint、typecheck、13 项合同测试和 production build 通过；OpenAPI、isolation、traceability、secret scan 通过；隔离 production-mode 浏览器已验证 390/1280 视口中的“学习输入先于作答”。本地 Python 依赖审计重试遇到 PyPI TLS EOF，但 PR Fast Gate 的完整 `make ci-fast`（run `30902143844`，含依赖审计）已通过。768 视口、完整键盘顺序和真人内容校准仍属于发布前人工门禁，不以构建结果代替。
 
-未授权且未执行：V2 业务发布、Learner 邀请、staging/production 部署、消息发送、既有事实迁移。合并代码后仍必须由内容 Reviewer 在 `/ops` 明确复核并发布 Journey V2；随后用新的受控邀请做小范围真人完整旅程验证。
+2026-08-04 运行事实：候选 `0589fc825e41dc0c536b3bf87ac284c9a50013fd` 由 run `30913941412` 在冻结 staging 完成 migration `0015→0016_wp24_formal_camp_v2`、API/Web/Worker 部署、外部 TLS/readiness、匿名 `/ops`/`/review` 拒绝和 SSH 关闭；production 候选保持不变。Owner 随后报告已在 `/ops` 发布 Formal Exploration Camp V2 / Journey V2。该业务发布目前是合格的 Owner 操作陈述，尚未以新绑定邀请完成本轮机器读回。
+
+发布后人工检查发现 `UAT-WP24-001` 路线节点错位、`UAT-WP24-002` 多页面重复文案，以及 `UAT-WP24-003` 宝藏缺少 Content Editor 导入材料与“学习后解锁小任务”的完整路径。受控邀请因此暂停；V2 保持不可变，后续提案见 37 号 WP-25～WP-30 工作包，不在 WP-24 原地修正文或既有事实。
 
 ## 8. 内容事实边界
 

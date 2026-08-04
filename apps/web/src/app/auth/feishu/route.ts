@@ -8,7 +8,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const SAFE_RETURNS = new Set(["/review", "/ops"]);
+const SAFE_RETURNS = new Set(["/review", "/ops", "/content"]);
 const LINK_TOKEN = /^[A-Za-z0-9_-]{32,256}$/;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

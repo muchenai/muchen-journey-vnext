@@ -255,6 +255,26 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
 
     result = ok(learner.get("/api/v1/me/result"))
     assert result["decision"] == "PASS"
+    assert result["learning_completion"] == {
+        "status": "COMPLETED",
+        "completed_stages": 8,
+        "total_stages": 8,
+    }
+    assert result["reviewer_conclusion"]["status"] == "FINALIZED"
+    assert result["reviewer_conclusion"]["decision"] == "PASS"
+    assert result["system_recommendation"] == {
+        "status": "PENDING_OPERATOR_INPUT",
+        "advisory_only": True,
+        "recommendation_tier": None,
+        "recommended_decision": None,
+    }
+    assert result["operator_admission"] == {
+        "status": "PENDING",
+        "decision": None,
+        "decision_reason": None,
+        "total_score": None,
+        "decided_at": None,
+    }
     assert len(result["journey_evaluations"]) == 3
     assert [item["stage_key"] for item in result["journey_evaluations"]] == [
         "ASM-001-RULE-BREAKDOWN",
@@ -342,3 +362,14 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert admission["total_score"] == 100
     assert admission["recommendation_tier"] == "A"
     assert admission["decision"] == "ADMIT"
+    decided_result = ok(learner.get("/api/v1/me/result"))
+    assert decided_result["system_recommendation"] == {
+        "status": "RECORDED",
+        "advisory_only": True,
+        "recommendation_tier": "A",
+        "recommended_decision": "ADMIT",
+    }
+    assert decided_result["operator_admission"]["status"] == "DECIDED"
+    assert decided_result["operator_admission"]["decision"] == "ADMIT"
+    assert decided_result["operator_admission"]["total_score"] == 100
+    assert "Operator 独立作出" in decided_result["operator_admission"]["decision_reason"]

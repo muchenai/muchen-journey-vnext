@@ -22,6 +22,7 @@ from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.learning_materials import ensure_required_materials_completed
 from journey_api.journey_service import assignment_stage, lock_active_learner_assignment
 from journey_api.models import (
     Assignment,
@@ -573,6 +574,7 @@ def save_submission_draft(
     task = session.get(TaskVersion, assignment.task_version_id)
     if task is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
+    ensure_required_materials_completed(session, assignment, task)
     lock_ready_attachments(
         session,
         actor=actor,

@@ -9,7 +9,7 @@ const AUTH_ERRORS: Record<string, string> = {
   LEARNER_SESSION_EXPIRED: "新人会话已失效。已提交的任务与评审事实仍然保留；请联系试点运营获取一次性重新进入链接。",
 };
 
-const IDENTITY_RETURN_PATHS = new Set(["/review", "/ops"]);
+const IDENTITY_RETURN_PATHS = new Set(["/review", "/ops", "/content"]);
 const ROUTE_PREVIEW = [
   ["启程", "带着一个问题出发"],
   ["价值", "看见你愿意成为谁"],

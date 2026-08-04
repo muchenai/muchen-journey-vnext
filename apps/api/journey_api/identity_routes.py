@@ -39,6 +39,7 @@ from journey_api.models import (
     IdentitySession,
     Invite,
     InviteStatus,
+    InvitationControl,
     JourneyDefinition,
     JourneyDefinitionStatus,
     JourneyVersion,
@@ -67,10 +68,13 @@ from journey_api.schemas import (
     InviteListOut,
     InviteListResponse,
     InviteOut,
+    InvitationControlOut,
+    InvitationControlResponse,
     JoinExchangeCommand,
     JoinExchangeOut,
     JoinExchangeResponse,
     RevokeInviteCommand,
+    UpdateInvitationControlCommand,
     SessionLogoutOut,
     SessionLogoutResponse,
     SessionOut,
@@ -111,6 +115,20 @@ def visible_invite_status(invite: Invite) -> str:
     if invite.status == InviteStatus.ACTIVE and invite.expires_at <= utc_now():
         return InviteStatus.EXPIRED.value
     return invite.status.value
+
+
+def invitation_control_out(
+    control: InvitationControl | None, *, replay: bool = False
+) -> InvitationControlOut:
+    enabled = control is None or control.new_invites_enabled
+    return InvitationControlOut(
+        state="OPEN" if enabled else "FROZEN",
+        new_invites_enabled=enabled,
+        revision=control.revision if control is not None else 0,
+        reason=control.reason if control is not None else None,
+        updated_at=control.updated_at if control is not None else None,
+        idempotency_replay=replay,
+    )
 
 
 def deny_exchange(
@@ -192,6 +210,18 @@ def create_invite(
     )
     if replay is not None:
         return envelope(request, CreateInviteOut(**replay, invite_token=invite_token))
+
+    invitation_control = session.scalar(
+        select(InvitationControl)
+        .where(InvitationControl.organization_id == actor.organization_id)
+        .with_for_update()
+    )
+    if invitation_control is not None and not invitation_control.new_invites_enabled:
+        raise ApiError(
+            409,
+            "INVITES_FROZEN",
+            "当前已停止创建新邀请；既有 Enrollment 与已接受事实不受影响。",
+        )
 
     reviewer = session.scalar(
         select(User)
@@ -337,6 +367,142 @@ def list_invites(
                 for invite in invites
             ]
         ),
+    )
+
+
+@router.get("/ops/invitation-control", response_model=InvitationControlResponse)
+def get_invitation_control(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    control = session.get(InvitationControl, actor.organization_id)
+    return envelope(request, invitation_control_out(control))
+
+
+def update_invitation_control(
+    *,
+    enabled: bool,
+    command_name: str,
+    event_type: str,
+    command: UpdateInvitationControlCommand,
+    request: Request,
+    idempotency_key: str,
+    actor: Actor,
+    session: Session,
+) -> dict[str, object]:
+    payload = command.model_dump(mode="json")
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command=command_name,
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        control = session.get(InvitationControl, actor.organization_id)
+        if control is None:
+            raise ApiError(409, "VERSION_CONFLICT", "邀请控制状态已变化，请刷新后重试。")
+        return envelope(request, invitation_control_out(control, replay=True))
+    control = session.scalar(
+        select(InvitationControl)
+        .where(InvitationControl.organization_id == actor.organization_id)
+        .with_for_update()
+    )
+    actual_revision = control.revision if control is not None else 0
+    ensure_revision(actual_revision, command.expected_revision)
+    if control is None:
+        if enabled:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "新邀请当前已经开放。")
+        control = InvitationControl(
+            organization_id=actor.organization_id,
+            new_invites_enabled=False,
+            revision=1,
+            reason=command.reason,
+            updated_by=actor.id,
+        )
+        session.add(control)
+    else:
+        if control.new_invites_enabled is enabled:
+            raise ApiError(
+                409,
+                "INVALID_STATE_TRANSITION",
+                "邀请控制已处于目标状态。",
+            )
+        control.new_invites_enabled = enabled
+        control.revision += 1
+        control.reason = command.reason
+        control.updated_by = actor.id
+    session.flush()
+    serialized = invitation_control_out(control).model_dump(mode="json")
+    store_result(
+        session,
+        actor_id=actor.id,
+        command=command_name,
+        key=idempotency_key,
+        payload=payload,
+        response=serialized,
+    )
+    add_event(session, event_type, "invitation_control", actor.organization_id)
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action=command_name,
+        resource_type="invitation_control",
+        resource_id=actor.organization_id,
+        result="SUCCESS",
+        details={
+            "new_invites_enabled": enabled,
+            "reason_characters": len(command.reason),
+        },
+    )
+    session.commit()
+    return envelope(request, invitation_control_out(control))
+
+
+@router.post("/ops/invitation-control/freeze", response_model=InvitationControlResponse)
+def freeze_new_invitations(
+    command: UpdateInvitationControlCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    return update_invitation_control(
+        enabled=False,
+        command_name="invitation_control.freeze",
+        event_type="invitation_control.frozen.v1",
+        command=command,
+        request=request,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        session=session,
+    )
+
+
+@router.post("/ops/invitation-control/resume", response_model=InvitationControlResponse)
+def resume_new_invitations(
+    command: UpdateInvitationControlCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    return update_invitation_control(
+        enabled=True,
+        command_name="invitation_control.resume",
+        event_type="invitation_control.resumed.v1",
+        command=command,
+        request=request,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        session=session,
     )
 
 
@@ -927,6 +1093,7 @@ def current_session(
         Role.LEARNER: "/app",
         Role.REVIEWER: "/review",
         Role.OPERATOR: "/ops/invites",
+        Role.CONTENT_EDITOR: "/content",
     }[actor.role]
     return envelope(
         request,

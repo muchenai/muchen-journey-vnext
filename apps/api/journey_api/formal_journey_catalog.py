@@ -62,6 +62,7 @@ def task_version_values(item: FormalStageCatalogItem) -> dict[str, Any]:
         "allowed_attachment_types": [],
         "max_attachment_size_bytes": 0,
         "reference_materials": [],
+        "learning_materials": [],
         "learning_experience": item.learning_experience,
         "estimated_duration_minutes": item.estimated_duration_minutes,
         "rubric": item.rubric,

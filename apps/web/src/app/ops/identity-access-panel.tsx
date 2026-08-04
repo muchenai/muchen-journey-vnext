@@ -65,7 +65,11 @@ function CreateLinkForm({ item }: { item: OpsIdentityAccess }) {
 }
 
 function IdentityAccessItem({ item }: { item: OpsIdentityAccess }) {
-  const roleName = item.role === "OPERATOR" ? "Operator" : "Reviewer";
+  const roleName = item.role === "OPERATOR"
+    ? "Operator"
+    : item.role === "CONTENT_EDITOR"
+      ? "Content Editor"
+      : "Reviewer";
   return (
     <li>
       <div className="ops-enrollment-heading">

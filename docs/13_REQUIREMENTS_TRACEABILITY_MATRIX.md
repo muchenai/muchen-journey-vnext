@@ -1,8 +1,8 @@
 # 13｜需求追溯矩阵
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.9
-日期：2026-08-03
+版本：V0.10
+日期：2026-08-05
 文档 Owner：Product Owner + QA Owner  
 规则：P0 任一行缺少设计、数据/API 或验收引用，不得进入开发；实现 PR 必须引用对应 ID。
 
@@ -25,6 +25,9 @@
 | REQ-BR-013 三个能力评测 | JRN-007/002；task/review/result | TaskVersion、Assignment、SubmissionVersion、Review、Evaluation | submit/start_review/finalize/history | Learner/Reviewer explicit scope + org；固定版本；人工结论 | AT-CONTENT-010；AT-DATA-003/005/009；AT-UAT-009；AT-WP24-002/003 | V2 固定规则拆解、模型判断、通用数据构建三项题面和数值 Rubric；独立 Reviewer 真人校准仍 `NOT_RUN`；见 36 |
 | REQ-BR-014 完整旅程结果 | JRN-007；`/app/result` | JourneyVersion、Assignment、Evaluation、JourneyOutcomeEvidence、Outcome/Handoff | result/timeline；outcome.created/handoff.ready | 完整性服务端强制；缺阶段拒绝；来源评价不可变 | AT-PRODUCT-001；AT-DATA-009；AT-UAT-009 | 只有 8 阶段完整且三评测 PASS 才生成 Outcome 的自动化切片 PASS；真人完整四加三结果 `NOT_RUN`；见 35 |
 | REQ-BR-015 建议评分与人工准入 | `/ops` enrollment admission | JourneyAdmissionDecision、Outcome、Evaluation | preview/create formal admission | Operator only + org；preview 无写入；覆盖理由；决定不可变 | AT-WP24-004/005/007 | 100 分聚合、建议分档、人工覆盖保护和不可变写入自动化 PASS；真人内容/准入复核 `NOT_RUN`；见 36 |
+| REQ-BR-016 版本化学习材料生产 | `/ops` 最小 content studio；Learner treasure | TaskVersion learning schema、ContentDraft、Content Editor scope、JourneyVersion | draft/save/preview/submit/publish；Learner fixed-version read | Content Editor 最小权限 + org + owner；Operator 精确发布；提交草稿/发布版本不可变；无附件/抓取 | AT-WP25-001/005；AT-WP26-001/005；AT-WP27-001/005 | migration `0017/0018`、Content Editor 草稿/预览/冻结/发布和组织/角色负测机器 PASS；真实材料与真人复核 `NOT_RUN`；见 37/39 |
+| REQ-BR-017 先学习后小任务 | `/app/tasks/{id}` | LearningMaterialCompletion、Assignment、TaskVersion、SubmissionVersion、Resolver | material complete；micro-task start/submit；current-action | Learner owner + org + fixed version；required keys；幂等/DB 不可变；未完成材料服务端拒绝 | AT-WP26-002..004；AT-WP27-001/003/004；AT-WP29-001/002 | migration `0017`、材料完成、开始/提交门禁、恢复与固定版本机器 PASS；真实单宝藏与整日 UAT `NOT_RUN`；见 37/39 |
+| REQ-BR-018 视觉优先与信息压缩 | `/`、`/join`、`/app`、task/result | 无新业务事实；共享 Learner visual projection | 只读路线/状态；hover/focus/touch disclosure | 路线/节点同坐标；文字预算；WCAG 2.2 AA | AT-WP25-002..005；AT-WP26-003/004；AT-WP27-002/004；AT-WP29-002/004 | WP-25 原型机器通过；产品 JourneyMap 已改为线路/节点共享坐标与渐进披露静态合同 PASS；三视口真人理解仍 `NOT_RUN`；见 38/39 |
 
 ## 2. Greenfield 隔离追溯
 
@@ -110,6 +113,7 @@
 | DEC-016 | 03 P0 范围、05 TaskVersion、07 配置 API、09 UAT、15 内容/Rubric |
 | DEC-024 | 03 正式产品范围、04 JRN-007/IA、05 Journey/状态、10 WP-18～23、12 风险、13 追溯、15 内容、33/34 体验与重接 |
 | DEC-025 | 03 V2 内容与人工准入、04 一天旅程、05 JourneyAdmissionDecision、09 WP-24 UAT、10 WP-24、12 风险、13 追溯、15 题面/Rubric、36 构建合同 |
+| DEC-026 | 03 P0 上线定义、04 Learner 完整体验、05 material completion、07 内容/学习命令、08 Content Editor 权限、09 逐包真人门禁与 WP-29 UAT、10 WP-25～30、12 风险、13 追溯、14 视觉预算、15 内容生产、37 工作包合同 |
 
 ## 7. PR 与发布使用规则
 
@@ -164,3 +168,4 @@ CI 后续应验证：
 | WP-18 正式产品真相恢复 | DEC-024；REQ-BR-011..014；AT-PRODUCT-001；AT-DATA-009；AT-CONTENT-009/010；AT-UX-010；AT-UAT-009 | 旧归档只读对照、四/五宝藏歧义关闭、四宝藏＋三评测稳定身份、TSK-001 重定位、vNext 重接与单一 WIP 合同；见 34 | 无运行代码、数据库、云资源、历史事实或部署变更；最终内容材料、schema/API/migration、真实完整旅程仍未执行 | `PRODUCT_TRUTH_RECOVERED / IMPLEMENTATION_NOT_STARTED / LIVE_ALPHA_UNCHANGED` |
 | WP-19～WP-22 最小纵向切片 | REQ-BR-011..014；AT-PRODUCT-001；AT-DATA-009；AT-CONTENT-009/010；AT-UX-010 | migration `0015`、Journey publish/immutable stage、8 阶段顺序、5 个 Learner evidence 阶段、3 个评测与修订、JourneyOutcomeEvidence、正式 Learner 路由、候选正式目录摘要；完整证据见 35 | 空库升级/降级/再升级 PASS；API `266 passed / 2 skipped`；Web lint/type/10 tests/build PASS；API/Worker `ef0a512…` 与 Web `12bc627…` 已在公开 staging 验证；Journey V1 和一条状态“待使用”的绑定邀请在刷新后完成服务端读回，链接正文未重复展示 | `MINIMAL_VERTICAL_SLICE_COMPLETE / ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_VERIFIED / MACHINE_READBACK_VERIFIED / HUMAN_GATES_NOT_RUN` |
 | WP-24 Formal Exploration Camp V2 | DEC-024；REQ-BR-011..014；AT-WP24-001..008 | migration `0016`、TaskVersion learning experience、V2 immutable catalog、三项 scored Rubric、admission preview/decision、Learner/Reviewer/Operator Web；见 36 | 空库 `0001→0016`、API 290 项、Web lint/type/13 tests/build、OpenAPI、isolation、traceability、secret scan、隔离浏览器 390/1280 与 PR Fast Gate `make ci-fast`（run `30902143844`）PASS；内容复核、768/键盘、真人完整旅程与物理环境仍待执行 | `IMPLEMENTED_LOCALLY / V1_FACTS_PRESERVED / CONTENT_REVIEW_REQUIRED / NOT_PUBLISHED / NOT_DEPLOYED` |
+| WP-25～WP-30 探索营 P0 真人体验与受控上线 | DEC-026；REQ-BR-016..018；AT-WP25-001..005、AT-WP26-001..005、AT-WP27-001..005、AT-WP28-001..005、AT-WP29-001..005、AT-WP30-001..006 | ContentDraft/Content Editor、LearningMaterialCompletion、V3 组合、五层结果、RC 验证、邀请冻结和受控上线 preflight；见 37/38/39 | WP-25 原型机器通过；WP-26～28 本地产品合同与 migration `0017..0019` 定向通过；WP-29/30 fail-closed 验证器及邀请冻结端到端通过。真实材料、逐包真人门禁、RC 签署、部署、V3 发布、正式域名和 cohort 均未运行 | `LOCAL_MACHINE_IMPLEMENTED / CONTENT_AND_HUMAN_GATES_OPEN / EXTERNAL_AUTHORIZATIONS_DEFERRED / PRODUCTION_NO_GO` |

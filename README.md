@@ -23,6 +23,8 @@
 - 候选 `8f77ceec…` 已通过 `journey.muchenai.com` 向单一组织私密名单开放受控 Alpha：独立 production Compose/应用 secret/逻辑数据库、TLS、正式飞书 OAuth 回调、canonical URL、加密备份与隔离恢复均已验证，staging 保持在线；维护页 503 与恢复 live 已实际演练。真实旧系统数据导入、真实飞书通知/外部告警、独立故障域、完整真人 UAT、WP-14 与完整发布签署仍未完成，因此这是 `CONTROLLED_ALPHA_LIVE`，不是完整 `RELEASE_GO`。
 - WP-17/18：Learner 视觉方向已关闭；正式产品真相已恢复为 Day 0＋四个认知宝藏＋三个能力评测＋完整结果。当前 TSK-001 保留为已验证 Alpha 任务，不再代表完整探索营；后续只在现有 vNext 基座上按 WP-19～23 单一 WIP 补足多阶段 Journey、正式内容与真人完整旅程。
 - WP-19～22 最小纵向切片：版本化 Journey、Day 0＋四宝藏 Learner evidence、三项独立能力评测/修订/通过、完整 Journey Outcome 与正式 Learner 页面已合入主线；API/Worker 基线 `ef0a512…`、Web `12bc627…`、migration `0015`、内部服务和公开 Edge 均已在 staging 验证。2026-08-04，Operator 发布 Journey V1 后生成一条绑定该固定旅程的受控邀请；刷新 `/ops` 后 Journey V1 与状态“待使用”的邀请均可从服务端读回，一次性链接正文不再展示。因此最小纵向切片记为 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`。内容真人理解、独立 Reviewer 校准、WP-23 完整旅程和 production GO 仍是独立门禁。
+- WP-24：完整一天学习、三项真实评测、100 分建议证据和人工准入已由候选 `0589fc8…` 部署至 staging，migration 为 `0016_wp24_formal_camp_v2`；Owner 已报告发布 Journey V2。发布后发现路线节点错位、重复文案和宝藏缺少主管材料导入/学习后小任务三个 P0 体验缺口，受控邀请暂停。
+- WP-25～WP-30 本地构建：WP-25 完整零写入原型机器通过；WP-26 已实现 Content Editor 草稿、固定学习材料与服务端完成门禁；WP-27 已实现八站 Journey V3 精确组合和共享路线坐标；WP-28 已分开学习完成、能力证据、Reviewer 结论、系统建议和 Operator 准入；WP-29/30 已增加不可伪造真人签署的 RC 验证、受控上线 preflight、PII-free 指标和组织级新邀请冻结。migration head 为 `0019_wp30_invitation_control`。真实材料、逐包真人门禁、Journey V3 发布、候选部署、RC 签署、正式域名和 cohort 均未执行，production 继续 `NO_GO`；见 39。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
 
