@@ -97,6 +97,10 @@
 
 2026-08-04，WP-19～WP-22 最小纵向切片已按同一条 migration/domain/API/Web/test/evidence 路径闭合。API/Worker 基线 `ef0a512…`、Web `12bc627…` 和 migration `0015` 已在 staging 验证；Operator 发布 Journey V1 后生成一条绑定固定旅程的受控邀请，刷新 `/ops` 后固定 Journey V1 与状态“待使用”的邀请均可由服务端读回，一次性链接正文不再展示。当前记为 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`，详见 35。该结论不跳过 WP-20 内容真人理解、WP-21 独立 Reviewer 校准、WP-22 真人体验、WP-23 完整旅程或 production 门禁。
 
+### WP-24 Formal Exploration Camp V2
+
+WP-23 首位真人暴露“系统已开始但 Learner 尚未获得学习输入就被要求写作”的内容级阻断。WP-24 以单一 WIP 在现有基座上新增完整一天内容、三项真实题面、固定 100 分评分证据和人工准入决定；Journey V1 与全部既有事实保持不可变。实现、验证、合并、内容复核、V2 业务发布和部署是五个独立动作；本工作包不因代码合并自动发布或部署。详细合同与证据见 36。
+
 WP-19 未关闭前不得并行启动 WP-20～23；正式内容不能通过修改当前 TSK-001 在途版本进入系统。
 
 工作包按端到端价值拆分，不允许同时建立多个“空模块框架”再等待集成。

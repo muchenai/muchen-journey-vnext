@@ -20,6 +20,7 @@ export function SubmissionComposer({
   attachments,
   submissionIdempotencyKey,
   draftIdempotencyKey,
+  responseSections,
   requiresReview,
 }: {
   assignmentId: string;
@@ -30,6 +31,7 @@ export function SubmissionComposer({
   attachments: Attachment[];
   submissionIdempotencyKey: string;
   draftIdempotencyKey: string;
+  responseSections: string[];
   requiresReview: boolean;
 }) {
   const [body, setBody] = useState(initialBody);
@@ -53,13 +55,22 @@ export function SubmissionComposer({
         value={submissionIdempotencyKey}
       />
       <input type="hidden" name="draft_idempotency_key" value={draftIdempotencyKey} />
-      <label htmlFor="submission-body">写下你的判断</label>
+      {responseSections.length > 0 ? (
+        <div className="response-map" aria-labelledby="response-map-title">
+          <strong id="response-map-title">输出结构</strong>
+          <ol>
+            {responseSections.map((section) => <li key={section}>{section}</li>)}
+          </ol>
+        </div>
+      ) : null}
+      <label htmlFor="submission-body">{requiresReview ? "你的作答" : "你的学习记录"}</label>
       <textarea
         id="submission-body"
         name="body"
         minLength={40}
         maxLength={8000}
         required
+        placeholder={responseSections.join("\n\n")}
         value={body}
         onChange={(event) => setBody(event.target.value)}
       />

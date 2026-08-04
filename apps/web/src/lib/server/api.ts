@@ -44,6 +44,29 @@ export type JourneyProgress = {
   nodes: JourneyProgressNode[];
 };
 
+export type LearningExperience = {
+  mode:
+    | "ORIENTATION"
+    | "LEARN_AND_REFLECT"
+    | "LEARN_AND_CHECK"
+    | "CASE_STUDY"
+    | "ROLE_PRACTICE"
+    | "ASSESSMENT";
+  version: number;
+  schedule: {
+    start: string;
+    end: string;
+    break_after?: string;
+  };
+  learning_blocks: Array<{
+    kind: string;
+    title: string;
+    body: string;
+  }>;
+  knowledge_checks: string[];
+  response_sections: string[];
+};
+
 export type Assignment = {
   id: string;
   status: string;
@@ -60,6 +83,7 @@ export type Assignment = {
   allowed_attachment_types: string[];
   max_attachment_size_bytes: number;
   reference_materials: string[];
+  learning_experience: LearningExperience | Record<string, never>;
   estimated_duration_minutes: number;
   feedback_sla_business_days: number;
   rubric: {
@@ -68,6 +92,9 @@ export type Assignment = {
       dimension_key: string;
       title: string;
       evidence_expected: string;
+      max_points?: number;
+      meets_threshold?: number;
+      score_category?: string;
     }>;
   };
   submission: Submission | null;
@@ -149,6 +176,9 @@ export type ReviewDetail = ReviewItem & {
       title: string;
       evidence_expected: string;
       required: boolean;
+      max_points?: number;
+      meets_threshold?: number;
+      score_category?: string;
     }>;
   };
   materials: {
@@ -174,6 +204,7 @@ export type ReviewDetail = ReviewItem & {
     rubric_evaluations: Array<{
       dimension_key: string;
       rating: "MEETS" | "NEEDS_WORK";
+      score: number | null;
       feedback: string | null;
     }>;
     feedback_structure_version: number;
@@ -277,8 +308,13 @@ export type OpsEnrollment = {
   reviewer_display_name: string;
   status: string;
   revision: number;
+  journey_version_id: string | null;
   assignment_statuses: string[];
   open_review_status: string | null;
+  admission_decision_id: string | null;
+  admission_total_score: number | null;
+  admission_tier: "A" | "B" | "C" | "D" | null;
+  admission_decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
   allowed_commands: string[];
 };
 

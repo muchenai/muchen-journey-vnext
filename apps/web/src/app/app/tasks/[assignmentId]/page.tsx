@@ -30,6 +30,9 @@ export default async function TaskPage({
   const initialBody = assignment.draft?.body
     ?? (submitCommand === "submit_revision" ? latestVersion?.body ?? "" : "");
   const initialAttachmentIds = assignment.draft?.attachment_ids ?? [];
+  const experience = "learning_blocks" in assignment.learning_experience
+    ? assignment.learning_experience
+    : null;
 
   return (
     <article className="learner-task-page">
@@ -50,15 +53,47 @@ export default async function TaskPage({
         </div>
       </header>
 
-      <section className="task-moves" aria-labelledby="task-moves-title">
-        <p className="section-label">这一站</p>
-        <h2 id="task-moves-title">沿着动作前进</h2>
-        <ol>
-        {assignment.instructions.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-        </ol>
-      </section>
+      {experience ? (
+        <section className="learning-experience" aria-labelledby="learning-experience-title">
+          <div className="learning-schedule">
+            <span>{experience.schedule.start}</span>
+            <i aria-hidden="true" />
+            <span>{experience.schedule.end}</span>
+            <strong>{experience.mode.replaceAll("_", " ")}</strong>
+          </div>
+          <p className="section-label">先探索，再输出</p>
+          <h2 id="learning-experience-title">本阶段输入</h2>
+          <div className="learning-block-grid">
+            {experience.learning_blocks.map((block, index) => (
+              <article className="learning-block" key={`${block.kind}-${block.title}`}>
+                <span className="learning-block-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <p>{block.kind.replaceAll("_", " ")}</p>
+                <h3>{block.title}</h3>
+                <div>{block.body}</div>
+              </article>
+            ))}
+          </div>
+          <div className="learning-checks">
+            <h3>停一下，确认你能回答</h3>
+            <ul className="checklist">
+              {experience.knowledge_checks.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+          {experience.schedule.break_after ? (
+            <p className="learning-break">完成后 · {experience.schedule.break_after}</p>
+          ) : null}
+        </section>
+      ) : (
+        <section className="task-moves" aria-labelledby="task-moves-title">
+          <p className="section-label">这一站</p>
+          <h2 id="task-moves-title">沿着动作前进</h2>
+          <ol>
+            {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
+          </ol>
+        </section>
+      )}
 
       <details className="task-contract">
         <summary>完成边界</summary>
@@ -85,8 +120,10 @@ export default async function TaskPage({
       </details>
 
       <section className="task-workspace" aria-labelledby="task-workspace-title">
-      <p className="section-label">你的回应</p>
-      <h2 id="task-workspace-title">留下判断与证据</h2>
+      <p className="section-label">完成本阶段</p>
+      <h2 id="task-workspace-title">
+        {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "提交你的作答" : "留下学习证据"}
+      </h2>
 
       {query.draft === "saved" ? (
         <p className="success-text" role="status">草稿已保存，刷新后仍可恢复。</p>
@@ -156,6 +193,7 @@ export default async function TaskPage({
             attachments={assignment.available_attachments}
             submissionIdempotencyKey={randomUUID()}
             draftIdempotencyKey={randomUUID()}
+            responseSections={experience?.response_sections ?? []}
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }

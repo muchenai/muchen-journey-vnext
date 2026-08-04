@@ -16,8 +16,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0015_wp19_formal_journey",
-        "revision_count": 15,
+        "head": "0016_wp24_formal_camp_v2",
+        "revision_count": 16,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -87,15 +87,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0015_wp19_formal_journey",
-        "revision_count": 15,
+        "head": "0016_wp24_formal_camp_v2",
+        "revision_count": 16,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0015_wp19_formal_journey"
+    assert migration()["head"] == "0016_wp24_formal_camp_v2"
     assert config_schema() == 3
 
 
@@ -110,8 +110,9 @@ def test_formal_catalog_is_bound_into_candidate_content_evidence():
         "TRE-004-DELIVERY-FIT",
         "ASM-001-RULE-BREAKDOWN",
         "ASM-002-MODEL-JUDGEMENT",
-        "ASM-003-BOUNDARY-ESCALATION",
+        "ASM-003-DATA-CONSTRUCTION",
     }
+    assert {item["version"] for item in items} == {2}
     assert all(item["task_version_id"] is None for item in items)
     assert all(
         item["publication_status"] == "RUNTIME_OPERATOR_PUBLISH_REQUIRED"

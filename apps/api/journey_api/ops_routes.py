@@ -25,6 +25,8 @@ from journey_api.models import (
     InviteStatus,
     JoinContext,
     JoinContextStatus,
+    JourneyAdmissionDecision,
+    JourneyStageVersion,
     ExternalNotificationReceipt,
     NotificationChannel,
     NotificationDelivery,
@@ -554,12 +556,30 @@ def list_enrollments(
             .order_by(Assignment.position)
         ).all()
         open_review = open_review_for_enrollment(session, enrollment, for_update=False)
+        admission = session.scalar(
+            select(JourneyAdmissionDecision).where(
+                JourneyAdmissionDecision.enrollment_id == enrollment.id,
+                JourneyAdmissionDecision.organization_id == actor.organization_id,
+            )
+        )
+        is_formal_v2 = bool(
+            enrollment.journey_version_id
+            and session.scalar(
+                select(JourneyStageVersion.id).where(
+                    JourneyStageVersion.journey_version_id == enrollment.journey_version_id,
+                    JourneyStageVersion.organization_id == actor.organization_id,
+                    JourneyStageVersion.stable_key == "ASM-003-DATA-CONSTRUCTION",
+                )
+            )
+        )
         allowed: list[str] = []
         if enrollment.status in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
         if enrollment.status == EnrollmentStatus.ACTIVE:
             allowed.append("create_learner_reentry")
+        if enrollment.status == EnrollmentStatus.COMPLETED and is_formal_v2 and admission is None:
+            allowed.append("create_formal_admission")
         items.append(
             EnrollmentOpsOut(
                 id=enrollment.id,
@@ -569,8 +589,13 @@ def list_enrollments(
                 reviewer_display_name=reviewer.display_name if reviewer else "已停用主管",
                 status=enrollment.status.value,
                 revision=enrollment.revision,
+                journey_version_id=enrollment.journey_version_id,
                 assignment_statuses=[item.status.value for item in assignments],
                 open_review_status=open_review.status.value if open_review else None,
+                admission_decision_id=admission.id if admission else None,
+                admission_total_score=admission.total_score if admission else None,
+                admission_tier=admission.recommendation_tier if admission else None,
+                admission_decision=admission.decision.value if admission else None,
                 allowed_commands=allowed,
             )
         )

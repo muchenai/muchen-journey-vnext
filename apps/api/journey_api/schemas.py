@@ -65,6 +65,7 @@ class RubricEvaluationCommand(StrictModel):
         min_length=3, max_length=60, pattern=r"^[a-z][a-z0-9_]+$"
     )
     rating: Literal["MEETS", "NEEDS_WORK"]
+    score: int | None = Field(default=None, ge=0, le=15)
     feedback: str = Field(min_length=5, max_length=500)
 
     @field_validator("feedback")
@@ -77,7 +78,7 @@ class FinalizeReviewCommand(RevisionCommand):
     overall_decision: Literal["APPROVE", "REQUEST_REVISION"]
     overall_feedback: str = Field(min_length=10, max_length=2_000)
     rubric_evaluations: list[RubricEvaluationCommand] = Field(
-        min_length=4, max_length=4
+        min_length=1, max_length=6
     )
 
     @field_validator("overall_feedback")
@@ -225,6 +226,14 @@ class RubricDimensionInput(StrictModel):
     required: Literal[True] = True
     feedback_prompt: str = Field(min_length=5, max_length=500)
     blocking_rule: Literal["REQUIRE_FEEDBACK"] = "REQUIRE_FEEDBACK"
+    max_points: int | None = Field(default=None, ge=1, le=15)
+    meets_threshold: int | None = Field(default=None, ge=1, le=15)
+    score_category: Literal[
+        "rule_decomposition",
+        "model_judgement",
+        "rationale_writing",
+        "data_construction",
+    ] | None = None
 
     @model_validator(mode="after")
     def validate_levels(self) -> "RubricDimensionInput":
@@ -232,12 +241,18 @@ class RubricDimensionInput(StrictModel):
             raise ValueError("Rubric levels must contain MEETS and NEEDS_WORK exactly")
         if any(not value.strip() for value in self.levels.values()):
             raise ValueError("Rubric level descriptions cannot be blank")
+        if bool(self.max_points) != bool(self.meets_threshold):
+            raise ValueError("Scored rubric dimensions need max points and threshold together")
+        if self.meets_threshold and self.max_points and self.meets_threshold > self.max_points:
+            raise ValueError("Rubric threshold cannot exceed max points")
+        if self.max_points is not None and self.score_category is None:
+            raise ValueError("Scored rubric dimensions need a score category")
         return self
 
 
 class RubricVersionInput(StrictModel):
     version: Literal[1] = 1
-    dimensions: list[RubricDimensionInput] = Field(min_length=4, max_length=4)
+    dimensions: list[RubricDimensionInput] = Field(min_length=1, max_length=6)
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> "RubricVersionInput":
@@ -538,6 +553,7 @@ class AssignmentOut(StrictModel):
     allowed_attachment_types: list[str]
     max_attachment_size_bytes: int
     reference_materials: list[str]
+    learning_experience: dict[str, object]
     estimated_duration_minutes: int
     feedback_sla_business_days: int
     rubric: dict[str, object]
@@ -579,6 +595,7 @@ class TaskVersionOut(StrictModel):
     allowed_attachment_types: list[str]
     max_attachment_size_bytes: int
     reference_materials: list[str]
+    learning_experience: dict[str, object]
     estimated_duration_minutes: int
     rubric: dict[str, object]
     rubric_version: int
@@ -630,7 +647,9 @@ class TaskDefinitionListResponse(StrictModel):
 
 class PublishFormalJourneyCommand(StrictModel):
     reviewed_by: UUID
-    expected_absent: Literal[True] = True
+    catalog_version: Literal[2] = 2
+    expected_current_version: int = Field(default=0, ge=0)
+    expected_absent: Literal[True] | None = None
     review_acknowledged: Literal[True]
 
 
@@ -692,8 +711,13 @@ class EnrollmentOpsOut(StrictModel):
     reviewer_display_name: str
     status: str
     revision: int
+    journey_version_id: UUID | None
     assignment_statuses: list[str]
     open_review_status: str | None
+    admission_decision_id: UUID | None
+    admission_total_score: int | None
+    admission_tier: Literal["A", "B", "C", "D"] | None
+    admission_decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
     allowed_commands: list[str]
 
 
@@ -985,7 +1009,71 @@ class ReviewMaterialOut(StrictModel):
 class RubricEvaluationOut(StrictModel):
     dimension_key: str
     rating: str
+    score: int | None = None
     feedback: str | None
+
+
+class FormalAdmissionScoreInput(StrictModel):
+    attendance_discipline: int = Field(ge=0, le=10)
+    muchener_understanding: int = Field(ge=0, le=10)
+    ai_data_fundamentals: int = Field(ge=0, le=10)
+    project_organization_fit: int = Field(ge=0, le=10)
+
+
+class PreviewFormalAdmissionCommand(StrictModel):
+    scores: FormalAdmissionScoreInput
+
+
+class FormalAdmissionPreviewOut(StrictModel):
+    enrollment_id: UUID
+    total_score: int
+    recommendation_tier: Literal["A", "B", "C", "D"]
+    recommended_decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"]
+    scorecard: dict[str, object]
+    source_evaluation_ids: list[UUID]
+    advisory_only: Literal[True] = True
+
+
+class FormalAdmissionPreviewResponse(StrictModel):
+    data: FormalAdmissionPreviewOut
+    request_id: str
+
+
+class CreateFormalAdmissionDecisionCommand(StrictModel):
+    expected_absent: Literal[True] = True
+    human_judgement_acknowledged: Literal[True]
+    scores: FormalAdmissionScoreInput
+    score_evidence: str = Field(min_length=20, max_length=2_000)
+    decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"]
+    decision_reason: str = Field(min_length=20, max_length=2_000)
+    override_reason: str | None = Field(default=None, min_length=20, max_length=2_000)
+
+    @field_validator("score_evidence", "decision_reason", "override_reason")
+    @classmethod
+    def normalize_admission_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class FormalAdmissionDecisionOut(StrictModel):
+    id: UUID
+    enrollment_id: UUID
+    journey_version_id: UUID
+    outcome_id: UUID
+    total_score: int
+    recommendation_tier: Literal["A", "B", "C", "D"]
+    scorecard: dict[str, object]
+    source_evaluation_ids: list[UUID]
+    decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"]
+    decision_reason: str
+    override_reason: str | None
+    decided_by: UUID
+    created_at: datetime
+    idempotency_replay: bool = False
+
+
+class FormalAdmissionDecisionResponse(StrictModel):
+    data: FormalAdmissionDecisionOut
+    request_id: str
 
 
 class EvaluationOut(StrictModel):

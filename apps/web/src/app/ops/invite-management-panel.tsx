@@ -148,8 +148,10 @@ function CreateInviteForm({
 
 function PublishFormalJourneyForm({
   reviewers,
+  expectedCurrentVersion,
 }: {
   reviewers: OpsIdentityAccess[];
+  expectedCurrentVersion: number;
 }) {
   const [state, action, pending] = useActionState(
     publishFormalJourney,
@@ -159,11 +161,12 @@ function PublishFormalJourneyForm({
   return (
     <form action={action} className="ops-command-form invite-create-form">
       <div>
-        <strong>正式探索营尚未发布</strong>
+        <strong>发布正式探索营 V2</strong>
         <p className="status-meta">
-          发布后固定为 Day 0、四个宝藏、三个能力评测；正文版本不可原地修改。
+          V2 包含完整一天学习输入、四个宝藏、三项真实评测及人工准入评分。V1 与现有 Enrollment 不迁移。
         </p>
       </div>
+      <input type="hidden" name="expected_current_version" value={expectedCurrentVersion} />
       <label>
         已完成线下复核的 Reviewer
         <select name="reviewed_by" required defaultValue="">
@@ -177,10 +180,10 @@ function PublishFormalJourneyForm({
       </label>
       <label className="checkbox-row">
         <input name="review_acknowledged" type="checkbox" required />
-        我确认该 Reviewer 已复核本次受控内测 V1；发布后正文不可原地修改
+        我确认该 Reviewer 已逐项复核 V2 学习内容、题面、Rubric 与准入边界；发布后正文不可原地修改
       </label>
       <button className="button secondary" type="submit" disabled={pending}>
-        {pending ? "正在发布…" : "发布受控内测 V1"}
+        {pending ? "正在发布…" : "发布正式探索营 V2"}
       </button>
       {state.error ? (
         <p className="inline-error" role="alert">
@@ -206,11 +209,18 @@ export function InviteManagementPanel({
   const reviewers = identityAccess.filter(
     (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
   );
+  const latestJourney = journeys[0];
+  const v2Published = latestJourney?.stages.some(
+    (stage) => stage.stable_key === "ASM-003-DATA-CONSTRUCTION",
+  ) ?? false;
 
   return (
     <>
-      {journeys.length === 0 && reviewers.length > 0 ? (
-        <PublishFormalJourneyForm reviewers={reviewers} />
+      {!v2Published && reviewers.length > 0 ? (
+        <PublishFormalJourneyForm
+          reviewers={reviewers}
+          expectedCurrentVersion={latestJourney?.version ?? 0}
+        />
       ) : null}
       <CreateInviteForm reviewers={reviewers} tasks={tasks} journeys={journeys} />
       <h3>最近邀请</h3>

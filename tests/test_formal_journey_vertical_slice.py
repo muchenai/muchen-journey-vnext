@@ -9,6 +9,7 @@ from journey_api.main import app
 from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
+    JourneyAdmissionDecision,
     JourneyOutcomeEvidence,
     Review,
 )
@@ -55,12 +56,17 @@ def finalize_current_review(
         )
     )
     dimensions = detail["rubric"]["dimensions"]
-    assert len(dimensions) == 4
+    assert 1 <= len(dimensions) <= 6
     request_revision = decision == "REQUEST_REVISION"
     rubric = [
         {
             "dimension_key": dimension["dimension_key"],
             "rating": "NEEDS_WORK" if request_revision and index == 0 else "MEETS",
+            "score": (
+                dimension["meets_threshold"] - 1
+                if request_revision and index == 0
+                else dimension["max_points"]
+            ),
             "feedback": "证据具体，下一步可执行。" if not request_revision or index else "请补充可定位的证据。",
         }
         for index, dimension in enumerate(dimensions)
@@ -91,7 +97,11 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
             "Idempotency-Key": str(uuid.uuid4()),
             **OPERATOR_HEADERS,
         },
-        json={"reviewed_by": str(REVIEWER_ID), "expected_absent": True},
+        json={
+            "reviewed_by": str(REVIEWER_ID),
+            "catalog_version": 2,
+            "expected_current_version": 0,
+        },
     )
     assert unacknowledged.status_code == 422
     published = post(
@@ -99,7 +109,8 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         "/api/v1/ops/formal-journeys/publish",
         json={
             "reviewed_by": str(REVIEWER_ID),
-            "expected_absent": True,
+            "catalog_version": 2,
+            "expected_current_version": 0,
             "review_acknowledged": True,
         },
         role_headers=OPERATOR_HEADERS,
@@ -114,6 +125,20 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         "ASSESSMENT",
         "ASSESSMENT",
     ]
+    duplicate = operator.post(
+        "/api/v1/ops/formal-journeys/publish",
+        headers={
+            "Idempotency-Key": str(uuid.uuid4()),
+            **OPERATOR_HEADERS,
+        },
+        json={
+            "reviewed_by": str(REVIEWER_ID),
+            "catalog_version": 2,
+            "expected_current_version": 1,
+            "review_acknowledged": True,
+        },
+    )
+    assert duplicate.status_code == 409
 
     invite = post(
         operator,
@@ -153,6 +178,15 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert action["responsible_party"] == "由你完成证据"
     assert action["feedback_expectation"] == "提交后进入下一站"
     assert "主管" not in action["reason"]
+    day_zero = ok(
+        learner.get(f"/api/v1/me/assignments/{action['resource_id']}")
+    )
+    day_zero_experience = day_zero["learning_experience"]
+    assert day_zero_experience["version"] == 2
+    assert day_zero_experience["mode"] == "ORIENTATION"
+    assert len(day_zero_experience["learning_blocks"]) >= 2
+    assert len(day_zero_experience["knowledge_checks"]) >= 2
+    assert day_zero_experience["response_sections"]
     locked_id = action["journey"]["nodes"][1]["assignment_id"]
     locked = learner.post(
         f"/api/v1/me/assignments/{locked_id}/start",
@@ -214,7 +248,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                 assert finalized["assignment_status"] == "NEEDS_REVISION"
             else:
                 assert finalized["assignment_status"] == "COMPLETED"
-                if stage["stable_key"] != "ASM-003-BOUNDARY-ESCALATION":
+                if stage["stable_key"] != "ASM-003-DATA-CONSTRUCTION":
                     # Intermediate formal stages must not expose a final result.
                     assert learner.get("/api/v1/me/result").status_code == 404
         action = ok(learner.get("/api/v1/me/current-action"))
@@ -225,7 +259,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert [item["stage_key"] for item in result["journey_evaluations"]] == [
         "ASM-001-RULE-BREAKDOWN",
         "ASM-002-MODEL-JUDGEMENT",
-        "ASM-003-BOUNDARY-ESCALATION",
+        "ASM-003-DATA-CONSTRUCTION",
     ]
     with SessionLocal() as session:
         enrollment = session.scalar(
@@ -240,3 +274,71 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                 JourneyOutcomeEvidence.enrollment_id == enrollment.id
             )
         ) == 3
+        enrollment_id = str(enrollment.id)
+
+    preview = ok(
+        operator.post(
+            f"/api/v1/ops/enrollments/{enrollment_id}/formal-admission/preview",
+            headers=OPERATOR_HEADERS,
+            json={
+                "scores": {
+                    "attendance_discipline": 10,
+                    "muchener_understanding": 10,
+                    "ai_data_fundamentals": 10,
+                    "project_organization_fit": 10,
+                }
+            },
+        )
+    )
+    assert preview["total_score"] == 100
+    assert preview["recommendation_tier"] == "A"
+    assert preview["recommended_decision"] == "ADMIT"
+    assert preview["advisory_only"] is True
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count(JourneyAdmissionDecision.id))) == 0
+
+    mismatched = operator.post(
+        f"/api/v1/ops/enrollments/{enrollment_id}/formal-admission",
+        headers={
+            "Idempotency-Key": str(uuid.uuid4()),
+            **OPERATOR_HEADERS,
+        },
+        json={
+            "expected_absent": True,
+            "human_judgement_acknowledged": True,
+            "scores": {
+                "attendance_discipline": 10,
+                "muchener_understanding": 10,
+                "ai_data_fundamentals": 10,
+                "project_organization_fit": 10,
+            },
+            "score_evidence": "全天八站均完成；学习记录与三项评测证据相互一致，且遵守隐私与升级边界。",
+            "decision": "DEFER",
+            "decision_reason": "人工希望覆盖系统 A 档建议，但还没有给出独立且可审计的覆盖理由。",
+            "override_reason": None,
+        },
+    )
+    assert mismatched.status_code == 422
+
+    admission = post(
+        operator,
+        f"/api/v1/ops/enrollments/{enrollment_id}/formal-admission",
+        json={
+            "expected_absent": True,
+            "human_judgement_acknowledged": True,
+            "scores": {
+                "attendance_discipline": 10,
+                "muchener_understanding": 10,
+                "ai_data_fundamentals": 10,
+                "project_organization_fit": 10,
+            },
+            "score_evidence": "全天八站均完成；学习记录与三项评测证据相互一致，且遵守隐私与升级边界。",
+            "decision": "ADMIT",
+            "decision_reason": "综合固定量化评分和人工观察，允许进入下一阶段；该结论由 Operator 独立作出。",
+            "override_reason": None,
+        },
+        role_headers=OPERATOR_HEADERS,
+    )
+    assert admission["total_score"] == 100
+    assert admission["recommendation_tier"] == "A"
+    assert admission["decision"] == "ADMIT"

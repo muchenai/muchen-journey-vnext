@@ -496,6 +496,30 @@ def finalize_review(
     submitted_keys = {item.dimension_key for item in command.rubric_evaluations}
     if submitted_keys != required_keys:
         raise ApiError(422, "VALIDATION_FAILED", "固定 Rubric 的必填维度必须全部填写。")
+    configured_by_key = {
+        str(item.get("dimension_key")): item
+        for item in configured_dimensions
+        if isinstance(item, dict) and item.get("dimension_key")
+    }
+    for item in command.rubric_evaluations:
+        configured = configured_by_key[item.dimension_key]
+        max_points = configured.get("max_points")
+        meets_threshold = configured.get("meets_threshold")
+        if isinstance(max_points, int):
+            if item.score is None or item.score > max_points:
+                raise ApiError(
+                    422,
+                    "VALIDATION_FAILED",
+                    f"{item.dimension_key} 必须填写 0–{max_points} 分。",
+                )
+            if not isinstance(meets_threshold, int):
+                raise ApiError(409, "INVALID_STATE_TRANSITION", "固定 Rubric 缺少评分阈值。")
+            if item.rating == "MEETS" and item.score < meets_threshold:
+                raise ApiError(422, "VALIDATION_FAILED", "达标评分不得低于固定阈值。")
+            if item.rating == "NEEDS_WORK" and item.score >= meets_threshold:
+                raise ApiError(422, "VALIDATION_FAILED", "待改进评分必须低于固定阈值。")
+        elif item.score is not None:
+            raise ApiError(422, "VALIDATION_FAILED", "当前旧版 Rubric 不接受数值评分。")
     all_meet = all(
         item.rating == "MEETS" for item in command.rubric_evaluations
     )
@@ -606,6 +630,9 @@ def finalize_review(
             "submission_version_id": str(context.version.id),
             "decision": evaluation.decision.value,
             "rubric_dimensions": len(command.rubric_evaluations),
+            "numeric_score": sum(
+                item.score or 0 for item in command.rubric_evaluations
+            ),
             "overall_feedback_characters": len(command.overall_feedback),
         },
     )

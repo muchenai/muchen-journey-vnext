@@ -336,6 +336,147 @@
         }
       }
     },
+    "/api/v1/ops/enrollments/{enrollment_id}/formal-admission/preview": {
+      "post": {
+        "summary": "Preview Formal Admission",
+        "operationId": "preview_formal_admission_api_v1_ops_enrollments__enrollment_id__formal_admission_preview_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Enrollment Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewFormalAdmissionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormalAdmissionPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/enrollments/{enrollment_id}/formal-admission": {
+      "post": {
+        "summary": "Create Formal Admission Decision",
+        "operationId": "create_formal_admission_decision_api_v1_ops_enrollments__enrollment_id__formal_admission_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Enrollment Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFormalAdmissionDecisionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormalAdmissionDecisionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/current-action": {
       "get": {
         "summary": "Current Action",
@@ -3385,6 +3526,11 @@
             "type": "array",
             "title": "Reference Materials"
           },
+          "learning_experience": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Learning Experience"
+          },
           "estimated_duration_minutes": {
             "type": "integer",
             "title": "Estimated Duration Minutes"
@@ -3465,6 +3611,7 @@
           "allowed_attachment_types",
           "max_attachment_size_bytes",
           "reference_materials",
+          "learning_experience",
           "estimated_duration_minutes",
           "feedback_sla_business_days",
           "rubric",
@@ -3857,6 +4004,68 @@
           "reason"
         ],
         "title": "CreateDataRightsRequestCommand"
+      },
+      "CreateFormalAdmissionDecisionCommand": {
+        "properties": {
+          "expected_absent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Expected Absent",
+            "default": true
+          },
+          "human_judgement_acknowledged": {
+            "type": "boolean",
+            "const": true,
+            "title": "Human Judgement Acknowledged"
+          },
+          "scores": {
+            "$ref": "#/components/schemas/FormalAdmissionScoreInput"
+          },
+          "score_evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 20,
+            "title": "Score Evidence"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ADMIT",
+              "DEFER",
+              "NOT_ADMIT"
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 20,
+            "title": "Decision Reason"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "human_judgement_acknowledged",
+          "scores",
+          "score_evidence",
+          "decision",
+          "decision_reason"
+        ],
+        "title": "CreateFormalAdmissionDecisionCommand"
       },
       "CreateIdentityLinkCommand": {
         "properties": {
@@ -4463,6 +4672,18 @@
             "type": "integer",
             "title": "Revision"
           },
+          "journey_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Version Id"
+          },
           "assignment_statuses": {
             "items": {
               "type": "string"
@@ -4480,6 +4701,62 @@
               }
             ],
             "title": "Open Review Status"
+          },
+          "admission_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission Decision Id"
+          },
+          "admission_total_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission Total Score"
+          },
+          "admission_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission Tier"
+          },
+          "admission_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ADMIT",
+                  "DEFER",
+                  "NOT_ADMIT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission Decision"
           },
           "allowed_commands": {
             "items": {
@@ -4499,8 +4776,13 @@
           "reviewer_display_name",
           "status",
           "revision",
+          "journey_version_id",
           "assignment_statuses",
           "open_review_status",
+          "admission_decision_id",
+          "admission_total_score",
+          "admission_tier",
+          "admission_decision",
           "allowed_commands"
         ],
         "title": "EnrollmentOpsOut"
@@ -4595,8 +4877,8 @@
               "$ref": "#/components/schemas/RubricEvaluationCommand"
             },
             "type": "array",
-            "maxItems": 4,
-            "minItems": 4,
+            "maxItems": 6,
+            "minItems": 1,
             "title": "Rubric Evaluations"
           }
         },
@@ -4609,6 +4891,249 @@
           "rubric_evaluations"
         ],
         "title": "FinalizeReviewCommand"
+      },
+      "FormalAdmissionDecisionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "enrollment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Enrollment Id"
+          },
+          "journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Journey Version Id"
+          },
+          "outcome_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Outcome Id"
+          },
+          "total_score": {
+            "type": "integer",
+            "title": "Total Score"
+          },
+          "recommendation_tier": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "title": "Recommendation Tier"
+          },
+          "scorecard": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scorecard"
+          },
+          "source_evaluation_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Evaluation Ids"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ADMIT",
+              "DEFER",
+              "NOT_ADMIT"
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "type": "string",
+            "title": "Decision Reason"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          },
+          "decided_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Decided By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "enrollment_id",
+          "journey_version_id",
+          "outcome_id",
+          "total_score",
+          "recommendation_tier",
+          "scorecard",
+          "source_evaluation_ids",
+          "decision",
+          "decision_reason",
+          "override_reason",
+          "decided_by",
+          "created_at"
+        ],
+        "title": "FormalAdmissionDecisionOut"
+      },
+      "FormalAdmissionDecisionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FormalAdmissionDecisionOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "FormalAdmissionDecisionResponse"
+      },
+      "FormalAdmissionPreviewOut": {
+        "properties": {
+          "enrollment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Enrollment Id"
+          },
+          "total_score": {
+            "type": "integer",
+            "title": "Total Score"
+          },
+          "recommendation_tier": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "title": "Recommendation Tier"
+          },
+          "recommended_decision": {
+            "type": "string",
+            "enum": [
+              "ADMIT",
+              "DEFER",
+              "NOT_ADMIT"
+            ],
+            "title": "Recommended Decision"
+          },
+          "scorecard": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scorecard"
+          },
+          "source_evaluation_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Evaluation Ids"
+          },
+          "advisory_only": {
+            "type": "boolean",
+            "const": true,
+            "title": "Advisory Only",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enrollment_id",
+          "total_score",
+          "recommendation_tier",
+          "recommended_decision",
+          "scorecard",
+          "source_evaluation_ids"
+        ],
+        "title": "FormalAdmissionPreviewOut"
+      },
+      "FormalAdmissionPreviewResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FormalAdmissionPreviewOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "FormalAdmissionPreviewResponse"
+      },
+      "FormalAdmissionScoreInput": {
+        "properties": {
+          "attendance_discipline": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Attendance Discipline"
+          },
+          "muchener_understanding": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Muchener Understanding"
+          },
+          "ai_data_fundamentals": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Ai Data Fundamentals"
+          },
+          "project_organization_fit": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Project Organization Fit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attendance_discipline",
+          "muchener_understanding",
+          "ai_data_fundamentals",
+          "project_organization_fit"
+        ],
+        "title": "FormalAdmissionScoreInput"
       },
       "FormalJourneyStageOut": {
         "properties": {
@@ -6255,6 +6780,19 @@
         ],
         "title": "PresignedAttachmentResponse"
       },
+      "PreviewFormalAdmissionCommand": {
+        "properties": {
+          "scores": {
+            "$ref": "#/components/schemas/FormalAdmissionScoreInput"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scores"
+        ],
+        "title": "PreviewFormalAdmissionCommand"
+      },
       "PublishFormalJourneyCommand": {
         "properties": {
           "reviewed_by": {
@@ -6262,11 +6800,29 @@
             "format": "uuid",
             "title": "Reviewed By"
           },
+          "catalog_version": {
+            "type": "integer",
+            "const": 2,
+            "title": "Catalog Version",
+            "default": 2
+          },
+          "expected_current_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Current Version",
+            "default": 0
+          },
           "expected_absent": {
-            "type": "boolean",
-            "const": true,
-            "title": "Expected Absent",
-            "default": true
+            "anyOf": [
+              {
+                "type": "boolean",
+                "const": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Absent"
           },
           "review_acknowledged": {
             "type": "boolean",
@@ -7313,6 +7869,49 @@
             "const": "REQUIRE_FEEDBACK",
             "title": "Blocking Rule",
             "default": "REQUIRE_FEEDBACK"
+          },
+          "max_points": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 15.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Points"
+          },
+          "meets_threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 15.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meets Threshold"
+          },
+          "score_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rule_decomposition",
+                  "model_judgement",
+                  "rationale_writing",
+                  "data_construction"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Category"
           }
         },
         "additionalProperties": false,
@@ -7344,6 +7943,19 @@
             ],
             "title": "Rating"
           },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 15.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
           "feedback": {
             "type": "string",
             "maxLength": 500,
@@ -7369,6 +7981,17 @@
           "rating": {
             "type": "string",
             "title": "Rating"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "feedback": {
             "anyOf": [
@@ -7404,8 +8027,8 @@
               "$ref": "#/components/schemas/RubricDimensionInput"
             },
             "type": "array",
-            "maxItems": 4,
-            "minItems": 4,
+            "maxItems": 6,
+            "minItems": 1,
             "title": "Dimensions"
           }
         },
@@ -8243,6 +8866,11 @@
             "type": "array",
             "title": "Reference Materials"
           },
+          "learning_experience": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Learning Experience"
+          },
           "estimated_duration_minutes": {
             "type": "integer",
             "title": "Estimated Duration Minutes"
@@ -8312,6 +8940,7 @@
           "allowed_attachment_types",
           "max_attachment_size_bytes",
           "reference_materials",
+          "learning_experience",
           "estimated_duration_minutes",
           "rubric",
           "rubric_version",

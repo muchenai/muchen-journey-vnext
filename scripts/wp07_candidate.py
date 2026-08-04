@@ -285,6 +285,7 @@ def task_version_content(version: Any) -> dict[str, Any]:
         "allowed_attachment_types": version.allowed_attachment_types,
         "max_attachment_size_bytes": version.max_attachment_size_bytes,
         "reference_materials": version.reference_materials,
+        "learning_experience": version.learning_experience,
         "estimated_duration_minutes": version.estimated_duration_minutes,
         "rubric": version.rubric,
         "rubric_version": version.rubric_version,
@@ -312,7 +313,7 @@ def formal_catalog_versions() -> list[dict[str, Any]]:
     return [
         {
             "stable_key": item.stable_key,
-            "version": 1,
+            "version": 2,
             "task_version_id": None,
             "publication_status": "RUNTIME_OPERATOR_PUBLISH_REQUIRED",
             "content_sha256": content_sha256(task_version_values(item)),

@@ -11,6 +11,7 @@ from journey_api.domain import AssignmentActionState, assignment_action, resolve
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
 from journey_api.journey_service import (
+    formal_admission_scorecard,
     journey_stages,
     lock_active_learner_assignment,
     publish_catalog_journey,
@@ -22,10 +23,12 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     JourneyCompletionPolicy,
+    JourneyAdmissionDecision,
     JourneyDefinition,
     JourneyDefinitionStatus,
     JourneyStageVersion,
     JourneyVersion,
+    FormalAdmissionDecisionType,
     OutboxEvent,
     OutboxStatus,
     Role,
@@ -42,6 +45,7 @@ from journey_api.schemas import (
     AssignmentResponse,
     CommandOut,
     CommandResponse,
+    CreateFormalAdmissionDecisionCommand,
     CreateTaskDefinitionCommand,
     CurrentActionOut,
     CurrentActionResponse,
@@ -51,9 +55,14 @@ from journey_api.schemas import (
     FormalJourneyVersionListResponse,
     FormalJourneyVersionOut,
     FormalJourneyVersionResponse,
+    FormalAdmissionDecisionOut,
+    FormalAdmissionDecisionResponse,
+    FormalAdmissionPreviewOut,
+    FormalAdmissionPreviewResponse,
     JourneyProgressNodeOut,
     JourneyProgressOut,
     PublishFormalJourneyCommand,
+    PreviewFormalAdmissionCommand,
     RevisionCommand,
     PublishTaskVersionCommand,
     TaskDefinitionListOut,
@@ -175,6 +184,7 @@ def task_version_out(
         allowed_attachment_types=version.allowed_attachment_types,
         max_attachment_size_bytes=version.max_attachment_size_bytes,
         reference_materials=version.reference_materials,
+        learning_experience=version.learning_experience,
         estimated_duration_minutes=version.estimated_duration_minutes,
         rubric=version.rubric,
         rubric_version=version.rubric_version,
@@ -223,6 +233,27 @@ def formal_journey_out(
             )
             for stage in stages
         ],
+        idempotency_replay=replay,
+    )
+
+
+def formal_admission_out(
+    decision: JourneyAdmissionDecision, *, replay: bool = False
+) -> FormalAdmissionDecisionOut:
+    return FormalAdmissionDecisionOut(
+        id=decision.id,
+        enrollment_id=decision.enrollment_id,
+        journey_version_id=decision.journey_version_id,
+        outcome_id=decision.outcome_id,
+        total_score=decision.total_score,
+        recommendation_tier=decision.recommendation_tier,
+        scorecard=decision.scorecard,
+        source_evaluation_ids=decision.source_evaluation_ids,
+        decision=decision.decision.value,
+        decision_reason=decision.decision_reason,
+        override_reason=decision.override_reason,
+        decided_by=decision.decided_by,
+        created_at=decision.created_at,
         idempotency_replay=replay,
     )
 
@@ -539,6 +570,7 @@ def publish_formal_journey(
         operator_id=actor.id,
         reviewer_id=reviewer.id,
         organization_id=actor.organization_id,
+        expected_current_version=command.expected_current_version,
     )
     result = {"id": str(version.id)}
     store_result(
@@ -549,7 +581,7 @@ def publish_formal_journey(
         payload=payload,
         response=result,
     )
-    add_event(session, "formal_journey.published.v1", "journey_version", version.id)
+    add_event(session, "formal_journey.published.v2", "journey_version", version.id)
     add_audit(
         session,
         request=request,
@@ -561,11 +593,162 @@ def publish_formal_journey(
             "reviewed_by": str(reviewer.id),
             "review_acknowledged": command.review_acknowledged,
             "stage_count": 8,
-            "audience": "CONTROLLED_BETA",
+            "audience": "FORMAL_CAMP_V2",
+            "catalog_version": command.catalog_version,
+            "previous_version": command.expected_current_version,
         },
     )
     session.commit()
     return envelope(request, formal_journey_out(session, version))
+
+
+@api.post(
+    "/ops/enrollments/{enrollment_id}/formal-admission/preview",
+    response_model=FormalAdmissionPreviewResponse,
+)
+def preview_formal_admission(
+    enrollment_id: uuid.UUID,
+    command: PreviewFormalAdmissionCommand,
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    enrollment = session.scalar(
+        select(Enrollment).where(
+            Enrollment.id == enrollment_id,
+            Enrollment.organization_id == actor.organization_id,
+        )
+    )
+    if enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可评分的 Enrollment。")
+    _outcome, scorecard, evaluation_ids, tier = formal_admission_scorecard(
+        session,
+        enrollment,
+        human_scores=command.scores.model_dump(),
+        score_evidence="PREVIEW_ONLY",
+    )
+    recommended_decision = "ADMIT" if tier in {"A", "B"} else "DEFER" if tier == "C" else "NOT_ADMIT"
+    return envelope(
+        request,
+        FormalAdmissionPreviewOut(
+            enrollment_id=enrollment.id,
+            total_score=int(dict(scorecard["total"])["score"]),
+            recommendation_tier=tier,
+            recommended_decision=recommended_decision,
+            scorecard=scorecard,
+            source_evaluation_ids=evaluation_ids,
+        ),
+    )
+
+
+@api.post(
+    "/ops/enrollments/{enrollment_id}/formal-admission",
+    response_model=FormalAdmissionDecisionResponse,
+)
+def create_formal_admission_decision(
+    enrollment_id: uuid.UUID,
+    command: CreateFormalAdmissionDecisionCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "enrollment_id": str(enrollment_id)}
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="formal_admission.decide",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        decision = session.get(JourneyAdmissionDecision, uuid.UUID(str(replay["id"])))
+        if decision is None or decision.organization_id != actor.organization_id:
+            raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的准入结论已不可用。")
+        return envelope(request, formal_admission_out(decision, replay=True))
+
+    enrollment = session.scalar(
+        select(Enrollment)
+        .where(
+            Enrollment.id == enrollment_id,
+            Enrollment.organization_id == actor.organization_id,
+        )
+        .with_for_update()
+    )
+    if enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可处置的 Enrollment。")
+    existing = session.scalar(
+        select(JourneyAdmissionDecision).where(
+            JourneyAdmissionDecision.enrollment_id == enrollment.id,
+            JourneyAdmissionDecision.organization_id == actor.organization_id,
+        )
+    )
+    if existing is not None:
+        raise ApiError(409, "VERSION_CONFLICT", "该 Enrollment 已有不可变人工准入结论。")
+    if enrollment.journey_version_id is None:
+        raise ApiError(422, "VALIDATION_FAILED", "Enrollment 未绑定正式探索营版本。")
+
+    outcome, scorecard, evaluation_ids, tier = formal_admission_scorecard(
+        session,
+        enrollment,
+        human_scores=command.scores.model_dump(),
+        score_evidence=command.score_evidence,
+    )
+    recommended_decision = "ADMIT" if tier in {"A", "B"} else "DEFER" if tier == "C" else "NOT_ADMIT"
+    if command.decision != recommended_decision and not command.override_reason:
+        raise ApiError(
+            422,
+            "VALIDATION_FAILED",
+            "人工结论与分档建议不一致时必须记录覆盖理由。",
+        )
+    decision = JourneyAdmissionDecision(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        enrollment_id=enrollment.id,
+        journey_version_id=enrollment.journey_version_id,
+        outcome_id=outcome.id,
+        total_score=int(dict(scorecard["total"])["score"]),
+        recommendation_tier=tier,
+        scorecard=scorecard,
+        source_evaluation_ids=[str(item) for item in evaluation_ids],
+        decision=FormalAdmissionDecisionType(command.decision),
+        decision_reason=command.decision_reason,
+        override_reason=command.override_reason,
+        decided_by=actor.id,
+    )
+    session.add(decision)
+    session.flush()
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="formal_admission.decide",
+        key=idempotency_key,
+        payload=payload,
+        response={"id": str(decision.id)},
+    )
+    add_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="formal_admission.decided",
+        resource_type="journey_admission_decision",
+        resource_id=decision.id,
+        details={
+            "enrollment_id": str(enrollment.id),
+            "journey_version_id": str(enrollment.journey_version_id),
+            "total_score": decision.total_score,
+            "recommendation_tier": tier,
+            "decision": decision.decision.value,
+            "override_recorded": bool(command.override_reason),
+            "score_evidence_characters": len(command.score_evidence),
+            "decision_reason_characters": len(command.decision_reason),
+            "human_judgement_acknowledged": command.human_judgement_acknowledged,
+        },
+    )
+    session.commit()
+    return envelope(request, formal_admission_out(decision))
 
 
 @api.get("/me/current-action", response_model=CurrentActionResponse)
@@ -803,6 +986,7 @@ def assignment_detail(
             task.max_attachment_size_bytes if get_settings().attachments_enabled else 0
         ),
         reference_materials=task.reference_materials,
+        learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
         feedback_sla_business_days=task.feedback_sla_business_days,
         rubric=task.rubric,
