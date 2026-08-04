@@ -85,7 +85,7 @@ WP-18 恢复了正式产品真相，但仅按数据层、内容层和页面层�
 | 真实浏览器纵向检查 | Firefox 桌面与 390px 窄视口完成邀请、加入、地图、热点提示、进入任务、提交 Day 0 和 `0/8 → 1/8` 推进；无产品 console error |
 | OpenAPI runtime equality | 由 source-mounted API 与 `contracts/openapi.json` 精确比较 |
 | 候选追溯 | migration/config/OpenAPI 与 8 个正式内容摘要进入候选检查 |
-| 依赖与仓库安全 | Python 固定锁文件无已知漏洞；Web 仅有已登记、dev-only 且 2026-08-31 到期的单项 waiver；Gitleaks 无泄漏 |
+| 依赖与仓库安全 | Python 与 Web 固定锁文件均无已知漏洞；Gitleaks 无泄漏 |
 
 Docker 首次重建期间曾在 build isolation 拉取 Python setuptools 时遇到外部 PyPI TLS 失败；这不是产品测试失败。源代码挂载到既有固定依赖镜像后，迁移和完整测试均通过。远端 Mainline Candidate Gate `30806515651` 随后重新构建三镜像、生成不可变候选 `ef0a512…` 并复验 registry digest；发布证据没有复用本地镜像。
 
