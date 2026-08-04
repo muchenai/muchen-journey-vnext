@@ -313,3 +313,10 @@
 - PR #144 将 Web 候选 `12bc627d4310cdba9eba4c67050dc875994ceb31` 绑定到 API/Worker 基线 `ef0a512cf357001cfd8cb6803f65cc17ae697325`。唯一 Web-only deploy run [`30875911123`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30875911123) 成功：公开 readiness 返回 `12bc627…`，根页面 200，匿名 `/ops` 与 `/review` 401；数据库、migration、业务事实、Terraform、DNS、云资源、消息和 WP-12B 未改变，临时 SSH 已关闭。
 - 刷新 `/ops` 后，固定旅程下拉框从服务端列出 `Muchen Journey 探索营 · V1 · 8 站`。Operator 只生成一次绑定该 JourneyVersion 的受控邀请；再次刷新后，一次性链接正文消失，最近邀请仍显示“待使用”。未读取、输出或记录 token。
 - 上述证据关闭发布事实的最小机器读回，并将 WP-19～WP-22 最小纵向切片记为 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`。内容真人有效性、独立 Reviewer 校准、WP-23 完整旅程与 production `NO_GO` 不变。
+
+## 2026-08-04 WP-24 候选与单次 staging 授权
+
+- PR #146 合入主线 `0589fc825e41dc0c536b3bf87ac284c9a50013fd`；Mainline Candidate Gate [`30909355182`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30909355182) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 为 `0016_wp24_formal_camp_v2`；
+- staging 合同固定 API `sha256:18f0e6fc…2d46`、Web `sha256:10db6534…0dd4`、Worker `sha256:2a98da14…bd14`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_0589FC8_TO_VOLCENGINE_STAGING`；
+- Owner 已明确授权以该主线生成新候选并在冻结 staging 执行一次部署。部署允许 migration 从 `0015` 前向升级至 `0016`、同步 runtime DML 权限并替换 API/Web/Worker/Edge；不运行 Terraform plan/apply、DNS、云资源、WP-12B，不发布 Journey V2、不创建邀请、不发送消息。失败不重试，临时 SSH 必须无条件关闭；
+- 本节只记录候选与授权边界；绑定 PR 未合入和唯一 workflow 未成功前，不得把 staging 记为已部署，production 继续 `NO_GO`。
