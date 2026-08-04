@@ -141,6 +141,10 @@ PENDING → SENDING → DELIVERED
 
 Journey Progress 只能从 Enrollment、Assignment、SubmissionVersion、Review 和 Evaluation 推导。不得建立可由前端或运营任意写入的 `current_stage` 第二事实源；如需缓存投影，必须可从权威事实重建并带 projection revision。
 
+### 4.2 正式 V2 人工准入
+
+`JourneyAdmissionDecision` 是完成正式 V2 后的独立、不可变人工事实。它引用 organization、Enrollment、JourneyVersion、Outcome、三项源 Evaluation、100 分 scorecard、建议分档、Operator 决定和理由。preview 只从既有完成事实与四项人工观察分计算建议，不写数据库；最终 create 只能执行一次。建议与人工决定不一致时必须记录覆盖理由。该模型不得改变 User/Enrollment/Outcome，不得自动发送消息，也不代表招聘录用事实。
+
 ## 5. 事务与一致性
 
 - start、submit、start_review、finalize 使用数据库事务和行级/乐观并发控制；
@@ -163,6 +167,7 @@ Journey Progress 只能从 Enrollment、Assignment、SubmissionVersion、Review 
 | 评审过程 | Review | 队列、分析 |
 | 最终人工结论 | Evaluation | Outcome、UI、分析 |
 | 结果与下一步 | Outcome | Learner UI、通知 |
+| 探索营人工准入 | JourneyAdmissionDecision | Operator、审计、后续受控流程 |
 | 通知结果 | NotificationDelivery | 运营、告警 |
 | 审计 | AuditEntry | 安全、运营 |
 

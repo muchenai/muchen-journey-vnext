@@ -15,6 +15,9 @@ type RubricDimension = {
   title: string;
   evidence_expected: string;
   required: boolean;
+  max_points?: number;
+  meets_threshold?: number;
+  score_category?: string;
 };
 
 function ActionError({ state }: { state: ReviewActionState }) {
@@ -113,6 +116,20 @@ export function ReviewWorkbench({
               {index + 1}. {dimension.title}
             </legend>
             <p>{dimension.evidence_expected}</p>
+            {dimension.max_points ? (
+              <label htmlFor={`${dimension.dimension_key}-score`}>
+                证据评分（0–{dimension.max_points}，{dimension.meets_threshold} 分起达标）
+                <input
+                  id={`${dimension.dimension_key}-score`}
+                  name={`${dimension.dimension_key}_score`}
+                  type="number"
+                  min={0}
+                  max={dimension.max_points}
+                  step={1}
+                  required
+                />
+              </label>
+            ) : null}
             <div className="radio-row">
               <label>
                 <input

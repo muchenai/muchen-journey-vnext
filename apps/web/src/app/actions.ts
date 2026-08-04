@@ -432,6 +432,7 @@ export async function finalizeReview(
     }
     const rubricEvaluations = (rubricKeys as string[]).map((dimensionKey) => {
       const rating = data.get(`${dimensionKey}_rating`);
+      const scoreValue = data.get(`${dimensionKey}_score`);
       const feedback = data.get(`${dimensionKey}_feedback`);
       if (rating !== "MEETS" && rating !== "NEEDS_WORK") {
         throw new Error("请完成全部 Rubric 评分。");
@@ -439,9 +440,16 @@ export async function finalizeReview(
       if (typeof feedback !== "string" || feedback.trim().length < 5 || feedback.length > 500) {
         throw new Error("每个 Rubric 维度需填写 5–500 个字符的具体反馈。");
       }
+      const score = typeof scoreValue === "string" && scoreValue !== ""
+        ? Number(scoreValue)
+        : null;
+      if (score !== null && (!Number.isInteger(score) || score < 0 || score > 15)) {
+        throw new Error("Rubric 分数必须是 0–15 的整数。");
+      }
       return {
         dimension_key: dimensionKey,
         rating,
+        score,
         feedback: feedback.trim(),
       };
     });
@@ -567,13 +575,18 @@ export async function publishFormalJourney(
 ): Promise<PublishFormalJourneyActionState> {
   try {
     const reviewedBy = requiredUuid(data, "reviewed_by");
+    const expectedCurrentVersion = Number(data.get("expected_current_version"));
+    if (!Number.isInteger(expectedCurrentVersion) || expectedCurrentVersion < 0) {
+      throw new Error("当前旅程版本无效，请刷新后重试。");
+    }
     const reviewAcknowledged = data.get("review_acknowledged") === "on";
     await apiRequest("/api/v1/ops/formal-journeys/publish", "OPERATOR", {
       method: "POST",
       headers: commandHeaders(),
       body: JSON.stringify({
         reviewed_by: reviewedBy,
-        expected_absent: true,
+        catalog_version: 2,
+        expected_current_version: expectedCurrentVersion,
         review_acknowledged: reviewAcknowledged,
       }),
     });
@@ -596,6 +609,99 @@ export async function revokeLearnerInvite(data: FormData) {
   });
   revalidatePath("/ops");
   redirect("/ops?updated=invite-revoked#learner-invites");
+}
+
+type AdmissionScores = {
+  attendance_discipline: number;
+  muchener_understanding: number;
+  ai_data_fundamentals: number;
+  project_organization_fit: number;
+};
+
+export type AdmissionPreviewActionState = SubmissionActionState & {
+  enrollmentId?: string;
+  scores?: AdmissionScores;
+  totalScore?: number;
+  recommendationTier?: "A" | "B" | "C" | "D";
+  recommendedDecision?: "ADMIT" | "DEFER" | "NOT_ADMIT";
+};
+
+function admissionScores(data: FormData): AdmissionScores {
+  const read = (key: keyof AdmissionScores) => {
+    const value = Number(data.get(key));
+    if (!Number.isInteger(value) || value < 0 || value > 10) {
+      throw new Error("四项人工观察分必须是 0–10 的整数。");
+    }
+    return value;
+  };
+  return {
+    attendance_discipline: read("attendance_discipline"),
+    muchener_understanding: read("muchener_understanding"),
+    ai_data_fundamentals: read("ai_data_fundamentals"),
+    project_organization_fit: read("project_organization_fit"),
+  };
+}
+
+export async function previewFormalAdmission(
+  _previousState: AdmissionPreviewActionState,
+  data: FormData,
+): Promise<AdmissionPreviewActionState> {
+  try {
+    const enrollmentId = requiredUuid(data, "enrollment_id");
+    const scores = admissionScores(data);
+    const preview = await apiRequest<{
+      total_score: number;
+      recommendation_tier: "A" | "B" | "C" | "D";
+      recommended_decision: "ADMIT" | "DEFER" | "NOT_ADMIT";
+    }>(`/api/v1/ops/enrollments/${enrollmentId}/formal-admission/preview`, "OPERATOR", {
+      method: "POST",
+      body: JSON.stringify({ scores }),
+    });
+    return {
+      enrollmentId,
+      scores,
+      totalScore: preview.total_score,
+      recommendationTier: preview.recommendation_tier,
+      recommendedDecision: preview.recommended_decision,
+    };
+  } catch (error) {
+    return submissionError(error);
+  }
+}
+
+export async function createFormalAdmissionDecision(data: FormData) {
+  const enrollmentId = requiredUuid(data, "enrollment_id");
+  const decision = data.get("decision");
+  if (!["ADMIT", "DEFER", "NOT_ADMIT"].includes(String(decision))) {
+    throw new Error("请选择人工准入结论。");
+  }
+  const scoreEvidence = data.get("score_evidence");
+  const decisionReason = data.get("decision_reason");
+  const overrideValue = data.get("override_reason");
+  if (typeof scoreEvidence !== "string" || scoreEvidence.trim().length < 20) {
+    throw new Error("请记录至少 20 个字符的人工评分证据。");
+  }
+  if (typeof decisionReason !== "string" || decisionReason.trim().length < 20) {
+    throw new Error("请记录至少 20 个字符的人工决定理由。");
+  }
+  const overrideReason = typeof overrideValue === "string" && overrideValue.trim()
+    ? overrideValue.trim()
+    : null;
+  await apiRequest(`/api/v1/ops/enrollments/${enrollmentId}/formal-admission`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_absent: true,
+      human_judgement_acknowledged: data.get("human_judgement_acknowledged") === "on",
+      scores: admissionScores(data),
+      score_evidence: scoreEvidence.trim(),
+      decision,
+      decision_reason: decisionReason.trim(),
+      override_reason: overrideReason,
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=formal-admission-decided#admission-decisions");
 }
 
 export type LearnerReentryActionState = {

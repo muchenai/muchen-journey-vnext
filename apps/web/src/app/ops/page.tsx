@@ -20,6 +20,7 @@ import {
 import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
+import { FormalAdmissionPanel } from "@/app/ops/formal-admission-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -137,7 +138,7 @@ export default async function OpsPage({
         </ul>
       </section>
 
-      <section className="panel ops-section" aria-labelledby="enrollment-heading">
+      <section className="panel ops-section" id="admission-decisions" aria-labelledby="enrollment-heading">
         <p className="section-label">ENROLLMENT COMMANDS</p>
         <h2 id="enrollment-heading">Enrollment 受控处置</h2>
         <ul className="ops-list">
@@ -152,6 +153,15 @@ export default async function OpsPage({
               </div>
               {enrollment.open_review_status ? (
                 <p className="inline-error">已有 {enrollment.open_review_status} Review；Reviewer 重分配与 Enrollment 取消均被状态机阻断。</p>
+              ) : null}
+              {enrollment.admission_decision ? (
+                <div className="admission-preview">
+                  <strong>{enrollment.admission_total_score} / 100 · {enrollment.admission_tier} 档</strong>
+                  <span>人工结论：{enrollment.admission_decision} · 已不可变记录</span>
+                </div>
+              ) : null}
+              {enrollment.allowed_commands.includes("create_formal_admission") ? (
+                <FormalAdmissionPanel enrollmentId={enrollment.id} />
               ) : null}
               {enrollment.allowed_commands.includes("create_learner_reentry") ? (
                 <LearnerReentryPanel

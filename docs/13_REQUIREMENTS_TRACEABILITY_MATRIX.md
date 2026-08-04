@@ -22,8 +22,9 @@
 | REQ-BR-010 不可变历史 | 全旅程；`/app/result` timeline/history | SubmissionVersion、Review/Evaluation、Outcome/Handoff、OutboxEvent/NotificationAttempt | submission history；`GET /me/timeline`；所有写事件 | role + organization + owner + object 裁剪；事件/日志最小化；历史事实 DB 不可覆盖 | AT-DATA-005；审计结构测试 | WP-05 完成跨域时间线与 Outcome/Handoff/NotificationAttempt 不可变证明；早期 Task/Submission/Review 历史证据仍见 18/19/20；见 21 |
 | REQ-BR-011 版本化探索营旅程 | JRN-007；`/app` 旅程投影 | JourneyDefinition/Version/StageVersion、Enrollment、Resolver | Journey publish/read；Current Action + JourneyProgress | organization + audience；发布后不可变；在途版本固定 | AT-PRODUCT-001；AT-DATA-009；AT-UX-010 | migration `0015`、发布、固定版本、8 阶段顺序与 Current Action 工程切片 PASS；staging/真人 UX `NOT_RUN`；见 34/35 |
 | REQ-BR-012 四个认知宝藏 | JRN-007；`/app/tasks/{id}` | JourneyStageVersion、TaskVersion、Assignment、SubmissionVersion | current-action、start、submit/history | Learner owner + org；内容 audience；禁止伪造 Evaluation | AT-CONTENT-009；AT-DATA-009；AT-UX-010 | Day 0＋四个固定 TaskVersion 与 Learner evidence 路径已自动化；候选摘要已绑定；版权签署与目标 Learner 真人理解 `NOT_RUN`；见 35 |
-| REQ-BR-013 三个能力评测 | JRN-007/002；task/review/result | TaskVersion、Assignment、SubmissionVersion、Review、Evaluation | submit/start_review/finalize/history | Learner/Reviewer explicit scope + org；固定版本；人工结论 | AT-CONTENT-010；AT-DATA-003/005/009；AT-UAT-009 | 三项独立 Rubric、评审、一次修订、再次提交与通过的自动化切片 PASS；独立 Reviewer 真人校准与完整 UAT `NOT_RUN`；见 35 |
+| REQ-BR-013 三个能力评测 | JRN-007/002；task/review/result | TaskVersion、Assignment、SubmissionVersion、Review、Evaluation | submit/start_review/finalize/history | Learner/Reviewer explicit scope + org；固定版本；人工结论 | AT-CONTENT-010；AT-DATA-003/005/009；AT-UAT-009；AT-WP24-002/003 | V2 固定规则拆解、模型判断、通用数据构建三项题面和数值 Rubric；独立 Reviewer 真人校准仍 `NOT_RUN`；见 36 |
 | REQ-BR-014 完整旅程结果 | JRN-007；`/app/result` | JourneyVersion、Assignment、Evaluation、JourneyOutcomeEvidence、Outcome/Handoff | result/timeline；outcome.created/handoff.ready | 完整性服务端强制；缺阶段拒绝；来源评价不可变 | AT-PRODUCT-001；AT-DATA-009；AT-UAT-009 | 只有 8 阶段完整且三评测 PASS 才生成 Outcome 的自动化切片 PASS；真人完整四加三结果 `NOT_RUN`；见 35 |
+| REQ-BR-015 建议评分与人工准入 | `/ops` enrollment admission | JourneyAdmissionDecision、Outcome、Evaluation | preview/create formal admission | Operator only + org；preview 无写入；覆盖理由；决定不可变 | AT-WP24-004/005/007 | 100 分聚合、建议分档、人工覆盖保护和不可变写入自动化 PASS；真人内容/准入复核 `NOT_RUN`；见 36 |
 
 ## 2. Greenfield 隔离追溯
 
@@ -108,6 +109,7 @@
 | DEC-015 | 04 体验、14 UI token/组件、09 可访问性验收 |
 | DEC-016 | 03 P0 范围、05 TaskVersion、07 配置 API、09 UAT、15 内容/Rubric |
 | DEC-024 | 03 正式产品范围、04 JRN-007/IA、05 Journey/状态、10 WP-18～23、12 风险、13 追溯、15 内容、33/34 体验与重接 |
+| DEC-025 | 03 V2 内容与人工准入、04 一天旅程、05 JourneyAdmissionDecision、09 WP-24 UAT、10 WP-24、12 风险、13 追溯、15 题面/Rubric、36 构建合同 |
 
 ## 7. PR 与发布使用规则
 
@@ -161,3 +163,4 @@ CI 后续应验证：
 | WP-15 生产切换与观察 | DEC-003/010/013/014/019/023；ISO-MUST-007/008/009/010/012 | 完整 release gate 保持 18 项检查与双人批准；DEC-023 另建受保护的受控 Alpha 路径，锁定候选、独立 production DB/Compose/secrets、加密异机备份+空库恢复、双域名 Caddy、正式 OAuth/canonical URL 和维护页；见 31 与 WP15 runbook | run `30760806984` 的备份/恢复/一致性证明通过但 TOS 归档步骤失败；精确密文由 run `30761088830` 成功私有归档。维护/TLS `30779397520` 与 live `30779441351` 通过；正式域名 root/readiness=200、候选精确、匿名受限路由=401、正式 OAuth 与 staging 回归通过。共享 ECS/RDS/Caddy 物理故障域仍延期 30 日 | `CONTROLLED_ALPHA_LIVE / FULL_RELEASE_GATE_NO_GO / MUTATION_TRUE` |
 | WP-18 正式产品真相恢复 | DEC-024；REQ-BR-011..014；AT-PRODUCT-001；AT-DATA-009；AT-CONTENT-009/010；AT-UX-010；AT-UAT-009 | 旧归档只读对照、四/五宝藏歧义关闭、四宝藏＋三评测稳定身份、TSK-001 重定位、vNext 重接与单一 WIP 合同；见 34 | 无运行代码、数据库、云资源、历史事实或部署变更；最终内容材料、schema/API/migration、真实完整旅程仍未执行 | `PRODUCT_TRUTH_RECOVERED / IMPLEMENTATION_NOT_STARTED / LIVE_ALPHA_UNCHANGED` |
 | WP-19～WP-22 最小纵向切片 | REQ-BR-011..014；AT-PRODUCT-001；AT-DATA-009；AT-CONTENT-009/010；AT-UX-010 | migration `0015`、Journey publish/immutable stage、8 阶段顺序、5 个 Learner evidence 阶段、3 个评测与修订、JourneyOutcomeEvidence、正式 Learner 路由、候选正式目录摘要；完整证据见 35 | 空库升级/降级/再升级 PASS；API `266 passed / 2 skipped`；Web lint/type/10 tests/build PASS；API/Worker `ef0a512…` 与 Web `12bc627…` 已在公开 staging 验证；Journey V1 和一条状态“待使用”的绑定邀请在刷新后完成服务端读回，链接正文未重复展示 | `MINIMAL_VERTICAL_SLICE_COMPLETE / ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_VERIFIED / MACHINE_READBACK_VERIFIED / HUMAN_GATES_NOT_RUN` |
+| WP-24 Formal Exploration Camp V2 | DEC-024；REQ-BR-011..014；AT-WP24-001..008 | migration `0016`、TaskVersion learning experience、V2 immutable catalog、三项 scored Rubric、admission preview/decision、Learner/Reviewer/Operator Web；见 36 | 空库 `0001→0016`、API 290 项、Web lint/type/13 tests/build、OpenAPI、isolation、traceability、secret scan 与隔离浏览器 390/1280 PASS；Python 在线依赖审计因 PyPI TLS EOF 无证据，内容复核、768/键盘、真人完整旅程与物理环境仍待执行 | `IMPLEMENTED_LOCALLY / V1_FACTS_PRESERVED / CONTENT_REVIEW_REQUIRED / NOT_PUBLISHED / NOT_DEPLOYED` |

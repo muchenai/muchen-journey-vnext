@@ -311,7 +311,7 @@ def test_ops_permissions_cross_org_audit_filters_and_runtime_status_fail_closed(
     )
     assert hidden.status_code == 404
     runtime = assert_ok(client.get("/api/v1/ops/runtime-status", headers=operator_headers))
-    assert runtime["migration_revision"] == "0015_wp19_formal_journey"
+    assert runtime["migration_revision"] == "0016_wp24_formal_camp_v2"
     assert runtime["config_schema_version"] == 3
     assert runtime["external_observability_confirmed"] is False
     assert runtime["observability_mode"] == "STRUCTURED_STDOUT"

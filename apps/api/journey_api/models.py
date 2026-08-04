@@ -108,6 +108,12 @@ class Decision(str, enum.Enum):
     REVISION_REQUIRED = "REVISION_REQUIRED"
 
 
+class FormalAdmissionDecisionType(str, enum.Enum):
+    ADMIT = "ADMIT"
+    DEFER = "DEFER"
+    NOT_ADMIT = "NOT_ADMIT"
+
+
 class OutboxStatus(str, enum.Enum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
@@ -418,6 +424,7 @@ class TaskVersion(Base):
     allowed_attachment_types: Mapped[list[str]] = mapped_column(JSON)
     max_attachment_size_bytes: Mapped[int] = mapped_column(default=0)
     reference_materials: Mapped[list[str]] = mapped_column(JSON)
+    learning_experience: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     estimated_duration_minutes: Mapped[int]
     rubric: Mapped[dict[str, Any]] = mapped_column(JSON)
     rubric_version: Mapped[int]
@@ -903,7 +910,7 @@ class Evaluation(Base):
     review_revision: Mapped[int]
     decision: Mapped[Decision] = mapped_column(Enum(Decision, native_enum=False))
     rubric_scores: Mapped[dict[str, str]] = mapped_column(JSON)
-    structured_feedback: Mapped[list[dict[str, str]] | None] = mapped_column(
+    structured_feedback: Mapped[list[dict[str, Any]] | None] = mapped_column(
         JSON, nullable=True
     )
     feedback_structure_version: Mapped[int] = mapped_column(default=1)
@@ -964,6 +971,60 @@ class Outcome(Base):
     source_evaluation_id: Mapped[uuid.UUID] = mapped_column(unique=True)
     status: Mapped[str] = mapped_column(String(40))
     summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class JourneyAdmissionDecision(Base):
+    __tablename__ = "journey_admission_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["enrollment_id", "organization_id"],
+            ["enrollments.id", "enrollments.organization_id"],
+            name="fk_journey_admission_enrollment_scope",
+        ),
+        ForeignKeyConstraint(
+            ["journey_version_id", "organization_id"],
+            ["journey_versions.id", "journey_versions.organization_id"],
+            name="fk_journey_admission_version_scope",
+        ),
+        ForeignKeyConstraint(
+            ["outcome_id", "organization_id", "enrollment_id"],
+            ["outcomes.id", "outcomes.organization_id", "outcomes.enrollment_id"],
+            name="fk_journey_admission_outcome_scope",
+        ),
+        ForeignKeyConstraint(
+            ["decided_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_journey_admission_decider_scope",
+        ),
+        UniqueConstraint(
+            "enrollment_id",
+            "journey_version_id",
+            name="uq_journey_admission_enrollment_version",
+        ),
+        CheckConstraint(
+            "total_score BETWEEN 0 AND 100",
+            name="ck_journey_admission_total_score",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    journey_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    outcome_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    total_score: Mapped[int]
+    recommendation_tier: Mapped[str] = mapped_column(String(32))
+    scorecard: Mapped[dict[str, Any]] = mapped_column(JSON)
+    source_evaluation_ids: Mapped[list[str]] = mapped_column(JSON)
+    decision: Mapped[FormalAdmissionDecisionType] = mapped_column(
+        Enum(FormalAdmissionDecisionType, native_enum=False)
+    )
+    decision_reason: Mapped[str] = mapped_column(Text)
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[uuid.UUID] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

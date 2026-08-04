@@ -45,6 +45,7 @@
 | DEC-022 | 2026-08-03 受控 Alpha 上线 | 停止把完整 production 门禁作为 Alpha 使用前置。候选 `8f77ceec570e2ec5e9c52861fcdc27748d7bb44a` 仅在一次冻结基础设施 staging 部署成功，并完成 readiness/revision、真实邀请、提交、要求修订、安全重新进入和越权拒绝的 20 分钟最小核验后，向单一组织私密名单开放真实使用。附件、真实通知、WP-12B 重跑、灾备故障域和 production 切换继续延期；正式 UAT 未完成、production 继续 `NO_GO` | `APPROVED` | 仅允许受控 Alpha 使用；部署仍需候选、主线、环境和次数的当轮精确授权 | Liu Mowen（Product + Tech + QA/UAT + Release Owner） |
 | DEC-023 | 受控 Alpha 正式域名切换 | 候选 `8f77ceec…` 已完成一条真实“提交→要求修订→安全重新进入→再次提交→通过”闭环。允许以 `journey.muchenai.com` 作为单一组织私密名单的正式 Alpha 入口：production Compose/DB/application secrets 与 staging 逻辑隔离，现阶段共享北京 ECS/RDS/Caddy 故障域；先完成加密异机备份和空库隔离恢复，再配置 TLS/OAuth/canonical URL；维护页为一键止血，旧站 DNS 仅作入口级回退，禁止回写或覆盖 vNext 新事实；staging 永久保留。该决定不把 WP-13 全量签署、WP-14、WP-11 延期项、WP-12B 原 FAIL 或完整 production release gate 记为通过 | `APPROVED` | 授权本手册三项最小切换动作；仍限单组织 Alpha，30 日后重开故障域 | Liu Mowen（Product + Data + Security + Tech + Ops + Release Owner） |
 | DEC-024 | 正式探索营产品真相恢复 | 当前 TSK-001 是验证 vNext 闭环的 Alpha 切片，不代表正式探索营全部产品。正式目标固定为 Day 0、四个认知宝藏、三个能力评测和完整结果；旧前端所谓“第五个宝藏”是能力准入容器，不是独立宝藏。后续只在 vNext Identity/Enrollment/Task/Submission/Review/Outcome 基座上增加版本化 Journey 编排，不复用旧代码、路由、状态、数据库或运行时 | `APPROVED` | WP-18 产品合同生效；当前 Alpha 历史不变；WP-19 实现前需 schema/API/迁移评审 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
+| DEC-025 | 正式探索营 V2 内容、评分与准入 | 以完整正式方案而非最小技术切片为内容事实源：10:00–19:00 先完成 Day 0 与四个学习宝藏，再完成规则拆解、模型回答判断和通用数据构建三项真实题面；边界识别与提报是横向能力，不是第三项独立评测。固定 100 分只形成 A/B/C/D 建议，最终下一阶段准入必须由授权 Operator 基于证据人工决定；覆盖建议必须记录理由，系统不得自动淘汰或录用。V1 与既有事实不可变，V2 以新版本发布 | `APPROVED` | 授权 WP-24 本地实现和 PR；不授权业务发布、邀请、部署或现有 Enrollment 迁移 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -145,6 +146,7 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-021 | pending 候选重绑定或混合组件版本被误当成已部署 | 中/高 | Web readiness 为新 SHA，但 API/Worker/migration 仍为旧基线或 Worker stale；新 UAT 证据引用失败 run | DEC-021；组件级 Web-only + runtime-repair 合同；deployment run 为空时 resume=false；Web/API/Worker/migration/HTTP 全部通过后才单独 PR 激活 | Product/Tech/QA/Release |
 | RSK-022 | 受控 Alpha 正式域名被误解为完整 production GO | 中/高 | 对外扩大名单、关闭 staging、把延期门禁写成 PASS，或共享 ECS/RDS 故障被当作独立灾备 | DEC-023；入口标记受控 Alpha；逻辑隔离、异机加密备份、维护模式、私密名单和 30 日故障域复审 | Product/Data/Security/Ops/Release |
 | RSK-023 | 最小技术切片被误当成正式产品 | 高/高 | 继续只为 TSK-001 做视觉包装；路线点与正式阶段无对应；无法解释四宝藏和三评测去了哪里 | DEC-024；34 号合同；TSK-001 重定位；WP-19～23 单一 WIP | Product/Content/Design/Tech |
+| RSK-024 | 量化评分被误当成自动淘汰或录用 | 高/高 | 达到阈值即自动准入；低分自动关闭身份；人工看不到证据或无法覆盖建议 | DEC-025；preview 与最终决定分离；覆盖理由；决定不可变；不得触发消息/身份/人事动作 | Product/Content/QA/Security/Tech |
 
 ## 5. 原开放问题的关闭结论
 
