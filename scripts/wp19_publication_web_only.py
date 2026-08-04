@@ -132,8 +132,11 @@ def validate_repository(contract: dict[str, object]) -> None:
         raise ContractError("publication Web candidate lacks visible error state")
 
 
-def validate_dispatch_boundary() -> None:
-    workflow = WORKFLOW.read_text()
+def validate_dispatch_boundary(
+    workflow: str | None = None,
+    deploy_script: str | None = None,
+) -> None:
+    workflow = WORKFLOW.read_text() if workflow is None else workflow
     forbidden = (
         "journey.muchenai.com",
         "/srv/journey-next-production",
@@ -154,7 +157,7 @@ def validate_dispatch_boundary() -> None:
     )
     if any(fragment not in workflow for fragment in required):
         raise ContractError("publication workflow is incomplete")
-    deploy_script = DEPLOY_SCRIPT.read_text()
+    deploy_script = DEPLOY_SCRIPT.read_text() if deploy_script is None else deploy_script
     if "WP16_EXPECTED_HOME_MARKER" not in deploy_script:
         raise ContractError("Web-only rollback script lacks the candidate home marker")
 
