@@ -2,15 +2,15 @@
 
 状态：`AS_BUILT`
 
-实现结论：`ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`
+实现结论：`MINIMAL_VERTICAL_SLICE_COMPLETE / ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_VERIFIED / MACHINE_READBACK_VERIFIED / HUMAN_GATES_NOT_RUN`
 
-版本：V0.1
+版本：V0.2
 
-日期：2026-08-03
+日期：2026-08-04
 
 适用范围：WP-19 Journey Composition、WP-20 Four Treasures Content、WP-21 Three Ability Assessments 与 WP-22 Formal Learner Experience 的首个端到端工程切片。
 
-发布边界：精确候选 `ef0a512…` 已在 staging 完成 migration `0015`、Web/API/Worker/Edge 运行面部署，并经 Edge 修复 run `30826160950` 连续证明公开 staging 只路由到该候选。这仍不等同于正式 Journey V1 已由 Operator 与独立 Reviewer 生成不可变发布事实，也不声称内容真人有效、独立 Reviewer 校准、WP-23 或 production GO 已通过。
+发布边界：API/Worker 精确基线 `ef0a512…` 已在 staging 完成 migration `0015` 与运行面部署，Edge 修复 run `30826160950` 连续证明公开 staging 只路由到预期运行态。Web 修复候选 `12bc627…` 经唯一 run `30875911123` 部署成功并保持 API/Worker、数据库与业务事实不变。Operator 随后发布 Journey V1，并通过一条绑定该 JourneyVersion、刷新后状态为“待使用”的受控邀请完成最小机器读回。这只关闭 WP-19～WP-22 的最小纵向切片，不声称内容真人有效、独立 Reviewer 校准、WP-23 或 production GO 已通过。
 
 ## 1. 为什么按一个纵向切片收口
 
@@ -93,13 +93,16 @@ Docker 首次重建期间曾在 build isolation 拉取 Python setuptools 时遇�
 
 “先完成切片、再发布”的前四个工程步骤已完成：PR 已合入受保护主线，mainline 已生成绑定 migration `0015` 和 8 个正式阶段摘要的候选 `ef0a512…`，该候选已在单次精确授权下部署到现有 staging，并经内部 runtime inventory 与公开 Edge 连续路由验收。
 
-候选发布后，Owner 于 2026-08-04 报告：当前 Operator 已在 staging 选择完成线下复核的独立 Reviewer，确认正文不可原地修改，并发布受控内测 Journey V1。该证据只是真人 Operator 陈述，不伪造数据库机器读回或独立 Reviewer 校准 PASS。
+候选发布后，Owner 于 2026-08-04 报告：当前 Operator 已在 staging 选择完成线下复核的独立 Reviewer，确认正文不可原地修改，并发布受控内测 Journey V1。刷新 `/ops` 后，固定旅程下拉框从服务端列出 `Muchen Journey 探索营 · V1 · 8 站`，因此发布事实由“仅 Owner 陈述”升级为运行态机器读回。
 
-剩余顺序固定为：
+此前通用 Next 错误无法证明请求进入 API；唯一只读诊断 run `30872474226` 在固定窗口内没有找到发布请求并失败关闭，SSH 已关闭且未重跑。PR #142/#143 修复发布错误呈现并增加有界诊断后，PR #144 将 Web 候选 `12bc627d4310cdba9eba4c67050dc875994ceb31` 绑定到 API/Worker 基线 `ef0a512cf357001cfd8cb6803f65cc17ae697325`。唯一 Web-only deploy run [`30875911123`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30875911123) 成功：公开 readiness 返回 Web `12bc627…`，根页面 200，匿名 `/ops` 与 `/review` 为 401；数据库、migration、业务事实、消息、Terraform 和云资源均未改变，临时 SSH 已关闭。
 
-1. 在 Operator 页生成一条绑定已发布 JourneyVersion 的受控内测邀请，以邀请成功作为发布事实的最小机器读回；
-2. 由 Learner 使用该邀请加入，验证 Enrollment 固定到该 JourneyVersion 且首个 Current Action 为 Day 0；
-3. 小范围学员、NPC、直培班班主任和人才发展主管使用真实路径；这些反馈属于 WP-23，不反写已发布 V1，只能形成 V2 决策；
-4. 未经新的精确授权，不把此候选切到 `journey.muchenai.com`。
+Operator 只生成一次绑定上述固定 Journey V1 的 24 小时受控邀请。页面刷新后，一次性链接正文消失，最近邀请仍由服务端读回并显示“待使用”。这同时证明 JourneyVersion 可被邀请引用、邀请事实已持久化、一次性链接不会在后续读取中重复暴露；未读取或记录邀请 token。
 
-WP-19～WP-22 的“最小纵向切片”已可在工程和 staging 运行层记为 `ENGINEERING_SLICE_VERIFIED / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED`。正式 Journey V1 当前记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`，只有受控正式 Journey 邀请成功后才能升级为机器已验证。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 均为 `NOT_RUN`，所以完整 WP-20、WP-21、WP-22 退出签署与 WP-23 仍未关闭。
+后续顺序固定为：
+
+1. 由 Learner 使用受控邀请加入，验证 Enrollment 固定到该 JourneyVersion 且首个 Current Action 为 Day 0；
+2. 小范围学员、NPC、直培班班主任和人才发展主管使用真实路径；这些反馈属于 WP-23，不反写已发布 V1，只能形成 V2 决策；
+3. 未经新的精确授权和生产门禁通过，不把此候选切到 `journey.muchenai.com`。
+
+WP-19～WP-22 的“最小纵向切片”现记为 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`：代码、数据库编排、正式内容目录、正式 Learner 页面、staging 运行态、Journey V1 发布和受控邀请持久读回已在同一路径闭合。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 仍为 `NOT_RUN`，所以这不是完整 WP-20、WP-21、WP-22 退出签署，也不关闭 WP-23 或 production `NO_GO`。

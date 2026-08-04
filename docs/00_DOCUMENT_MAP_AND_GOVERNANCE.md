@@ -50,7 +50,7 @@
 | 32 | [WP-12B 多租户容量与隔离门禁证据](32_WP12B_MULTI_TENANT_LOAD_AND_ISOLATION_EVIDENCE.md) | 十几个真实组织上线前如何证明多租户并发容量、隔离和事实唯一性？ | run `30525165474` 的隔离/正确性/退役 PASS、原 1 秒性能 FAIL 均已固化；DEC-020 仅允许同一候选按 ≤1.2 秒进入 WP-13，不记 `WP12B_CLOSED` |
 | 33 | [WP-17 Learner Experience 高保真原型合同](33_WP17_LEARNER_EXPERIENCE_PROTOTYPE.md) | 如何让 Learner 在首次进入、任务执行和结果反馈中形成清晰而克制的旅程感？ | 视觉方向已关闭；三个路线点只验证交互语言，不代表正式阶段数量。正式路由实现等待 WP-18/19，`/review` 与 `/ops` 保持专业工具界面 |
 | 34 | [WP-18 正式产品真相恢复与 vNext 重接合同](34_WP18_FORMAL_PRODUCT_TRUTH_RECOVERY.md) | 旧正式探索营与单任务 Alpha 为什么不一致，四宝藏＋三评测如何接回 vNext？ | `DEC-024` 锁定 Day 0＋四宝藏＋三能力评测＋结果；TSK-001 保留为 Alpha 验证任务；后续只在现有 vNext 基座上补多阶段 Journey 编排，不复用旧运行时 |
-| 35 | [WP-19～WP-22 正式探索营最小纵向切片证据](35_WP19_WP22_FORMAL_JOURNEY_VERTICAL_SLICE_EVIDENCE.md) | 多阶段 Journey、四宝藏、三评测和正式 Learner 页面是否已在同一条真实路径上接通？ | 代码、migration、API、Web 与候选内容摘要已形成 `ENGINEERING_SLICE_VERIFIED`；新候选、staging 部署、内容真人有效性、Reviewer 校准和 WP-23 仍独立 |
+| 35 | [WP-19～WP-22 正式探索营最小纵向切片证据](35_WP19_WP22_FORMAL_JOURNEY_VERTICAL_SLICE_EVIDENCE.md) | 多阶段 Journey、四宝藏、三评测和正式 Learner 页面是否已在同一条真实路径上接通？ | 代码、migration、API、Web、staging、Journey V1 发布与绑定邀请读回已形成 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`；内容真人有效性、Reviewer 校准、WP-23 和 production GO 仍独立 |
 | RB-15 | [受控 Alpha 正式域名切换手册](runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md) | 如何在不丢失 staging 和新业务事实的前提下备份恢复、切换正式域名并一键止血？ | 受保护主线唯一入口；锁定候选、空库恢复、加密异机备份、双 host、OAuth/TLS、维护页与旧站入口回退边界 |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 

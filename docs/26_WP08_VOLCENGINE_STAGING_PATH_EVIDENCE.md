@@ -306,3 +306,10 @@
 
 - Owner 报告当前 staging Operator 已选择完成线下复核的独立 Reviewer，确认发布后正文不可原地修改，并发布一次受控内测 Journey V1；未同时创建邀请或发送消息。
 - 这是合格的真人 Operator 操作陈述，不是应用或数据库机器读回。发布事实暂记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`；下一步只允许以一条绑定正式 JourneyVersion 的受控邀请关闭最小读回，不因此改写真人内容门禁、WP-23 或 production `NO_GO`。
+
+## 2026-08-04 正式 Journey V1 发布与邀请机器读回
+
+- PR #142/#143 修复发布错误呈现并增加只读有界诊断；唯一诊断 run `30872474226` 在固定窗口未找到发布请求并失败关闭，未连接数据库或重跑，SSH 已关闭。
+- PR #144 将 Web 候选 `12bc627d4310cdba9eba4c67050dc875994ceb31` 绑定到 API/Worker 基线 `ef0a512cf357001cfd8cb6803f65cc17ae697325`。唯一 Web-only deploy run [`30875911123`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30875911123) 成功：公开 readiness 返回 `12bc627…`，根页面 200，匿名 `/ops` 与 `/review` 401；数据库、migration、业务事实、Terraform、DNS、云资源、消息和 WP-12B 未改变，临时 SSH 已关闭。
+- 刷新 `/ops` 后，固定旅程下拉框从服务端列出 `Muchen Journey 探索营 · V1 · 8 站`。Operator 只生成一次绑定该 JourneyVersion 的受控邀请；再次刷新后，一次性链接正文消失，最近邀请仍显示“待使用”。未读取、输出或记录 token。
+- 上述证据关闭发布事实的最小机器读回，并将 WP-19～WP-22 最小纵向切片记为 `MINIMAL_VERTICAL_SLICE_COMPLETE / MACHINE_READBACK_VERIFIED`。内容真人有效性、独立 Reviewer 校准、WP-23 完整旅程与 production `NO_GO` 不变。
