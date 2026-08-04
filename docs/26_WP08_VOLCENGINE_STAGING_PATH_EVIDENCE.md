@@ -327,3 +327,9 @@
 - staging 合同固定 API `sha256:a2dea31e…6ad4`、Web `sha256:646e7965…30bc`、Worker `sha256:d8a1cbc7…31b4`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_A2312B2_TO_VOLCENGINE_STAGING`；
 - Owner 已授权文档 39 的待授权事项按顺序执行。该授权允许本候选在冻结 staging 进行一次完整部署；部署只允许 migration 从现有 `0016` 前向升级至 `0019`、同步 runtime DML 权限并替换 API/Web/Worker/Edge，不运行 Terraform、DNS、云资源、WP‑12B，不发布 Journey V3、不创建邀请、不发送消息；失败不重试，临时 SSH 必须无条件关闭；
 - 真实 Content Editor 身份、材料导入、独立 Reviewer 复核、八版本发布、Journey V3、真人门禁和 UAT 仍是部署后的独立业务事实；候选绑定不得替代这些步骤，production 继续 `NO_GO`。
+
+## 2026-08-05 WP-26～WP-30 staging 部署与身份入口停止点
+
+- 绑定 PR #149 通过 Fast Gate 后合入主线 `987a3d4d7ba1f92c63a34b76b5445865ab827fba`。唯一 staging deploy run [`30959911465`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30959911465) 成功且未重试：固定三镜像摘要，migration 依次完成 `0016→0017→0018→0019`，公开 readiness 返回候选 `a2312b2…`，临时 SSH 已关闭；Terraform、DNS、云资源、WP‑12B、Journey V3、邀请和消息均未执行；
+- workflow 内 `/ops` 与 `/review` 匿名 401 通过。主任务随后独立核对新增 `/content`，发现匿名请求因未被 Next.js proxy 提前拦截而进入服务端数据请求并返回 500；这是身份入口合同缺口，不是数据库或材料事实失败；
+- 按“只修 P0 blocker”边界停止 Content Editor 创建与绑定。修复仅把 `/content` 及子路由加入现有身份前置 401，并把该路由加入 Web 静态回归和 staging 外部验收；修复 PR 合入不等于获得第二次部署授权，production 继续 `NO_GO`。

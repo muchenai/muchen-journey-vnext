@@ -104,6 +104,8 @@ jobs:
             git show "$candidate:deploy/staging/compose.yaml" | \
               grep -Fq "http://localhost:3000/health/ready"
             git show "$candidate:apps/web/src/proxy.ts" | grep -Fq 'code: "AUTH_REQUIRED"'
+            git show "$candidate:apps/web/src/proxy.ts" | \
+              grep -Fq '["/ops", "/review", "/content"]'
             git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts" | \
               grep -Fq "sameOriginIdentityRedirect"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
@@ -411,6 +413,8 @@ jobs:
             https://staging-vnext.muchenai.com/ops)" = "401"
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
+          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            https://staging-vnext.muchenai.com/content)" = "401"
       - name: Close SSH ingress
         if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |

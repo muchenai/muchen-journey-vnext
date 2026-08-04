@@ -706,6 +706,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
+        '["/ops", "/review", "/content"]',
         "INSPECT_RUNTIME_A2312B2_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
@@ -747,7 +748,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
-        or workflow.count('git show "$candidate:') != 12
+        or workflow.count('git show "$candidate:') != 13
     ):
         raise StagingError(
             "deploy must verify the Web, bounded database pool, WP-11, and WP-12B contracts "

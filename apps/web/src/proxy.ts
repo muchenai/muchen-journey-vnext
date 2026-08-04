@@ -32,7 +32,7 @@ export function proxy(request: NextRequest) {
   // instructs the browser and leaves those generated scripts un-nonced.
   requestHeaders.set("Content-Security-Policy", policy);
 
-  const isIdentityRoute = ["/ops", "/review"].some(
+  const isIdentityRoute = ["/ops", "/review", "/content"].some(
     (prefix) => request.nextUrl.pathname === prefix
       || request.nextUrl.pathname.startsWith(`${prefix}/`),
   );
