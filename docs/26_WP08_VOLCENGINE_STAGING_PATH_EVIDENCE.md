@@ -320,3 +320,10 @@
 - staging 合同固定 API `sha256:18f0e6fc…2d46`、Web `sha256:10db6534…0dd4`、Worker `sha256:2a98da14…bd14`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_0589FC8_TO_VOLCENGINE_STAGING`；
 - Owner 已明确授权以该主线生成新候选并在冻结 staging 执行一次部署。部署允许 migration 从 `0015` 前向升级至 `0016`、同步 runtime DML 权限并替换 API/Web/Worker/Edge；不运行 Terraform plan/apply、DNS、云资源、WP-12B，不发布 Journey V2、不创建邀请、不发送消息。失败不重试，临时 SSH 必须无条件关闭；
 - 本节只记录候选与授权边界；绑定 PR 未合入和唯一 workflow 未成功前，不得把 staging 记为已部署，production 继续 `NO_GO`。
+
+## 2026-08-05 WP-26～WP-30 候选与 staging 绑定
+
+- PR #148 合入主线 `a2312b269b1806cd3d5ce7d26fbc693466399035`；Mainline Candidate Gate [`30958975566`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30958975566) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 为 `0019_wp30_invitation_control`；
+- staging 合同固定 API `sha256:a2dea31e…6ad4`、Web `sha256:646e7965…30bc`、Worker `sha256:d8a1cbc7…31b4`，并绑定唯一 artifact 名、run ID、Terraform candidate、部署 bundle、脚本 preflight 与确认词 `DEPLOY_A2312B2_TO_VOLCENGINE_STAGING`；
+- Owner 已授权文档 39 的待授权事项按顺序执行。该授权允许本候选在冻结 staging 进行一次完整部署；部署只允许 migration 从现有 `0016` 前向升级至 `0019`、同步 runtime DML 权限并替换 API/Web/Worker/Edge，不运行 Terraform、DNS、云资源、WP‑12B，不发布 Journey V3、不创建邀请、不发送消息；失败不重试，临时 SSH 必须无条件关闭；
+- 真实 Content Editor 身份、材料导入、独立 Reviewer 复核、八版本发布、Journey V3、真人门禁和 UAT 仍是部署后的独立业务事实；候选绑定不得替代这些步骤，production 继续 `NO_GO`。

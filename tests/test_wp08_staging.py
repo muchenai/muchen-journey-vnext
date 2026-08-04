@@ -449,7 +449,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
-            "INSPECT_RUNTIME_0589FC8_STAGING",
+            "INSPECT_RUNTIME_A2312B2_STAGING",
             "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
             "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
             "id: terraform_init",

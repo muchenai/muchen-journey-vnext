@@ -706,7 +706,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        "INSPECT_RUNTIME_0589FC8_STAGING",
+        "INSPECT_RUNTIME_A2312B2_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
