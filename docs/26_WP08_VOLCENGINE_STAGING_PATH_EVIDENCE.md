@@ -333,3 +333,10 @@
 - 绑定 PR #149 通过 Fast Gate 后合入主线 `987a3d4d7ba1f92c63a34b76b5445865ab827fba`。唯一 staging deploy run [`30959911465`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30959911465) 成功且未重试：固定三镜像摘要，migration 依次完成 `0016→0017→0018→0019`，公开 readiness 返回候选 `a2312b2…`，临时 SSH 已关闭；Terraform、DNS、云资源、WP‑12B、Journey V3、邀请和消息均未执行；
 - workflow 内 `/ops` 与 `/review` 匿名 401 通过。主任务随后独立核对新增 `/content`，发现匿名请求因未被 Next.js proxy 提前拦截而进入服务端数据请求并返回 500；这是身份入口合同缺口，不是数据库或材料事实失败；
 - 按“只修 P0 blocker”边界停止 Content Editor 创建与绑定。修复仅把 `/content` 及子路由加入现有身份前置 401，并把该路由加入 Web 静态回归和 staging 外部验收；修复 PR 合入不等于获得第二次部署授权，production 继续 `NO_GO`。
+
+## 2026-08-05 `/content` 身份入口修复候选绑定
+
+- PR #150 通过 Fast Gate 后合入主线 `e61cb3af80baef389157ead79fc91ebf89e52adc`。修复把 `/content` 及子路由纳入与 `/ops`、`/review` 相同的匿名 401 前置，增加独立 identity route contract，并把候选源码核验和 staging 外部验收扩展到 `/content`；没有修改业务事实、角色、材料、Journey 或邀请；
+- Mainline Candidate Gate [`30960806357`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/30960806357) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
+- 修复候选固定 API `sha256:98f9ab54…8db9`、Web `sha256:242070d6…03dc`、Worker `sha256:5574f0ee…6d63`。虽然应用变更仅涉及 Web 身份入口与部署验收合同，仍选择既有完整原子部署和自动回退路径，不新增临时 Web-only 分支；
+- 本绑定不消费部署授权。`a2312b2…` 的首次授权已由 run `30959911465` 消费；只有绑定 PR 合入并取得完整候选 `e61cb3af80baef389157ead79fc91ebf89e52adc` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。此前 Content Editor 创建与绑定继续停止，production 继续 `NO_GO`。

@@ -70,7 +70,7 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 1. 审阅并合入本地 PR；合入本身不部署。`DONE`：PR #148 已通过 Fast Gate 并合入主线 `a2312b269b1806cd3d5ce7d26fbc693466399035`。
 2. 在 staging 创建/绑定真实 Content Editor；不读取通讯录，不扩大其他身份。
 3. 由 Content Editor 导入并提交批准材料，由独立 Reviewer 线下复核，Operator 精确发布八个 TaskVersion。
-4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。`DEPLOYED_WITH_P0_BLOCKER`：run `30959911465` 已部署候选 `a2312b2…` 并完成 `0016→0019`、readiness、`/ops`/`/review` 匿名 401 和 SSH 关闭；独立 readback 发现新增 `/content` 匿名返回 500，已停止身份写入并进入最小修复，修复部署前本项不得记为完成。
+4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。`P0_FIX_MERGED / REPAIR_CANDIDATE_READY / SECOND_DEPLOY_AUTHORIZATION_REQUIRED`：run `30959911465` 已部署候选 `a2312b2…` 并完成 `0016→0019`、readiness、`/ops`/`/review` 匿名 401 和 SSH 关闭；独立 readback 发现新增 `/content` 匿名返回 500，身份写入随即停止。PR #150 已把 `/content` 纳入匿名 401 前置并通过 Fast Gate；Mainline Candidate Gate `30960806357` 已为修复候选 `e61cb3a…` 生成并远端复验三镜像，migration 保持 `0019`。首次授权已消费，修复候选未部署，必须以完整候选和绑定 PR 合入后主线 SHA 另行取得一次精确授权，本项仍不得记为完成。
 5. Operator 单独发布 Journey V3；不迁移 V1/V2 Enrollment，不自动创建邀请。
 6. 依次执行 WP-26、WP-27、WP-28 真人门禁；失败保留原证据，只修 P0 blocker。
 7. 固定候选与 V3 后执行 WP-29 整日 UAT；只有私密证据通过验证器并完成六方签署，才可形成 `P0_RC_SIGNED`。
