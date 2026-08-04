@@ -24,6 +24,7 @@ INFRA_MAIN = ROOT / "infra" / "staging" / "main.tf"
 INFRA_VERSIONS = ROOT / "infra" / "staging" / "versions.tf"
 DEPLOY_SCRIPT = ROOT / "deploy" / "staging" / "deploy.sh"
 RUNTIME_INVENTORY_SCRIPT = ROOT / "scripts" / "wp08_runtime_inventory.py"
+PUBLICATION_DIAGNOSTIC_SCRIPT = ROOT / "scripts" / "wp19_publication_diagnostic.py"
 FAILED_RELEASE_CLEANUP_SCRIPT = ROOT / "scripts" / "wp08_failed_release_cleanup.py"
 EDGE_ROUTE_REPAIR_SCRIPT = ROOT / "scripts" / "wp08_edge_route_repair.py"
 STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
@@ -148,6 +149,7 @@ def validate_files() -> None:
         "scripts/wp08_rds_network_audit.py",
         "scripts/wp08_security_group.py",
         "scripts/wp08_runtime_inventory.py",
+        "scripts/wp19_publication_diagnostic.py",
         "scripts/wp08_failed_release_cleanup.py",
         "scripts/wp08_edge_route_repair.py",
         "scripts/wp08_web_only.py",
@@ -169,6 +171,7 @@ def validate_files() -> None:
         raise StagingError("scripts/wp08_edge_route_repair.py must be mode 0755")
     validate_deploy_script()
     validate_runtime_inventory_script()
+    validate_publication_diagnostic_script()
     validate_failed_release_cleanup_script()
     validate_edge_route_repair_script()
     validate_staging_compose()
@@ -213,6 +216,48 @@ def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> 
     )
     if any(marker in source for marker in forbidden):
         raise StagingError("runtime inventory script exceeds its read-only boundary")
+
+
+def validate_publication_diagnostic_script(
+    path: Path = PUBLICATION_DIAGNOSTIC_SCRIPT,
+) -> None:
+    source = path.read_text()
+    required = (
+        'AUTHORIZED_CANDIDATE = "ef0a512cf357001cfd8cb6803f65cc17ae697325"',
+        'WINDOW_START = "2026-08-04T01:20:00Z"',
+        'WINDOW_END = "2026-08-04T01:30:30Z"',
+        '"docker",\n        "inspect"',
+        '"docker",\n        "logs"',
+        'PUBLICATION_PATH = "/api/v1/ops/formal-journeys/publish"',
+        '"read_only": True',
+        "WP19_PUBLICATION_DIAGNOSTIC=",
+        "raw log lines",
+    )
+    if any(marker not in source for marker in required):
+        raise StagingError("formal Journey publication diagnostic is incomplete")
+    forbidden = (
+        '"docker", "exec"',
+        '"docker", "pull"',
+        '"docker", "restart"',
+        '"docker", "stop"',
+        '"docker", "kill"',
+        '"docker", "rm"',
+        "docker compose",
+        "alembic upgrade",
+        "journey_api.seed",
+        "grant_runtime",
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "terraform ",
+        ".write_text(",
+        ".write_bytes(",
+        ".unlink(",
+    )
+    if any(marker in source for marker in forbidden):
+        raise StagingError(
+            "formal Journey publication diagnostic exceeds its read-only boundary"
+        )
 
 
 def validate_failed_release_cleanup_script(
@@ -599,6 +644,7 @@ def check(phase: str) -> None:
 
 def validate_workflow(path: Path = WORKFLOW) -> None:
     validate_infrastructure()
+    validate_publication_diagnostic_script()
     workflow = path.read_text()
     jobs_start = workflow.find("jobs:\n")
     guard_end = workflow.find("    runs-on:", jobs_start)
@@ -625,7 +671,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "if: inputs.phase == 'provision'",
         "id: frozen_infrastructure",
         "terraform output -raw staging_public_ip",
-        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
+        "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
         "terraform show -json",
         "scripts/wp08_plan_guard.py",
         "scripts/wp08_dns_record.py",
@@ -662,6 +708,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
         "INSPECT_RUNTIME_EF0A512_STAGING",
         "scripts/wp08_runtime_inventory.py",
+        "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
+        "scripts/wp19_publication_diagnostic.py",
         "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
         "scripts/wp08_edge_route_repair.py",
         "id: edge_repair_apply",
@@ -691,6 +739,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow audit-only step count must be exactly 1")
     if workflow.count("if: inputs.phase == 'inspect-runtime'") != 1:
         raise StagingError("staging workflow runtime inventory step count must be exactly 1")
+    if workflow.count("if: inputs.phase == 'diagnose-publication'") != 1:
+        raise StagingError("formal Journey diagnostic step count must be exactly 1")
     if workflow.count("if: inputs.phase == 'repair-edge-route'") != 2:
         raise StagingError("staging workflow Edge repair success path must have exactly 2 steps")
     if workflow.count("if: inputs.phase == 'cleanup-failed-release'") != 1:
@@ -764,6 +814,25 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     ):
         if forbidden in inventory_step:
             raise StagingError("runtime inventory must remain read-only")
+    diagnostic_step_start = workflow.find("- name: Diagnose failed formal Journey publication")
+    diagnostic_step_end = workflow.find("\n      - name:", diagnostic_step_start + 1)
+    if diagnostic_step_start < 0 or diagnostic_step_end < 0:
+        raise StagingError("formal Journey publication diagnostic step is missing")
+    diagnostic_step = workflow[diagnostic_step_start:diagnostic_step_end]
+    for forbidden in (
+        "terraform plan",
+        "terraform apply",
+        "terraform import",
+        "docker pull",
+        "deploy.sh",
+        "grant_runtime",
+        "alembic",
+        "wp12b",
+        "journey_api.seed",
+        "docker exec",
+    ):
+        if forbidden in diagnostic_step:
+            raise StagingError("formal Journey publication diagnostic exceeds its read-only boundary")
     edge_step_start = workflow.find("- name: Apply reviewed Edge route repair")
     edge_step_end = workflow.find("\n      - name:", edge_step_start + 1)
     if edge_step_start < 0 or edge_step_end < 0:
@@ -801,7 +870,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,edge-route-repair,exact-failed-release-cleanup"
+        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
         " retired=provision,bounded-web-only,runtime-repair"
     )
 
