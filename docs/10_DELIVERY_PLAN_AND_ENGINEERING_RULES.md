@@ -95,7 +95,7 @@
 | WP-22 Formal Learner Experience | 把 WP-17 视觉语言接入真实四加三状态 | `/review`、`/ops` 游戏皮肤 | PRODUCT-001、UX-010、三视口/键盘/减弱动效通过 |
 | WP-23 Full Journey UAT | 真人完成四宝藏、三评测、至少一次修订和最终结果 | 自动化代替真人、扩大 production 名单 | UAT-009 与正式签署通过 |
 
-2026-08-03 的 WP-19～WP-22 最小纵向切片已按同一条 migration/domain/API/Web/test/evidence 路径接通，工程状态为 `ENGINEERING_SLICE_VERIFIED / NOT_DEPLOYED`，详见 35。该结论只关闭“各层能否组成产品”的工程风险，不跳过 WP-20 内容真人理解、WP-21 独立 Reviewer 校准、WP-22 真人体验和 WP-23 完整旅程；发布必须等待合入主线后的新候选与单次精确授权。
+2026-08-03 的 WP-19～WP-22 最小纵向切片已按同一条 migration/domain/API/Web/test/evidence 路径接通，精确候选 `ef0a512…` 已部署到 staging，公开 Edge 经 12 轮连续新连接验证只路由到该候选，工程状态为 `ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED`。2026-08-04，Owner 报告已由 Operator 选择完成线下复核的独立 Reviewer 并发布 Journey V1，当前发布事实记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`，详见 35。该结论不跳过 WP-20 内容真人理解、WP-21 独立 Reviewer 校准、WP-22 真人体验和 WP-23 完整旅程。
 
 WP-19 未关闭前不得并行启动 WP-20～23；正式内容不能通过修改当前 TSK-001 在途版本进入系统。
 

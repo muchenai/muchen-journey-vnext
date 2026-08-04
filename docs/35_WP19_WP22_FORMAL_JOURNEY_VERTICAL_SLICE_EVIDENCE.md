@@ -2,7 +2,7 @@
 
 状态：`AS_BUILT`
 
-实现结论：`ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / NOT_DEPLOYED`
+实现结论：`ENGINEERING_SLICE_VERIFIED / CONTROLLED_BETA_CONTENT / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED / RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`
 
 版本：V0.1
 
@@ -10,7 +10,7 @@
 
 适用范围：WP-19 Journey Composition、WP-20 Four Treasures Content、WP-21 Three Ability Assessments 与 WP-22 Formal Learner Experience 的首个端到端工程切片。
 
-发布边界：本文证明代码、迁移、API、页面和自动化形成一条可发布候选路径；不等同于候选已生成、staging 已部署、内容真人有效、独立 Reviewer 已校准或 WP-23 已通过。
+发布边界：精确候选 `ef0a512…` 已在 staging 完成 migration `0015`、Web/API/Worker/Edge 运行面部署，并经 Edge 修复 run `30826160950` 连续证明公开 staging 只路由到该候选。这仍不等同于正式 Journey V1 已由 Operator 与独立 Reviewer 生成不可变发布事实，也不声称内容真人有效、独立 Reviewer 校准、WP-23 或 production GO 已通过。
 
 ## 1. 为什么按一个纵向切片收口
 
@@ -85,20 +85,21 @@ WP-18 恢复了正式产品真相，但仅按数据层、内容层和页面层�
 | 真实浏览器纵向检查 | Firefox 桌面与 390px 窄视口完成邀请、加入、地图、热点提示、进入任务、提交 Day 0 和 `0/8 → 1/8` 推进；无产品 console error |
 | OpenAPI runtime equality | 由 source-mounted API 与 `contracts/openapi.json` 精确比较 |
 | 候选追溯 | migration/config/OpenAPI 与 8 个正式内容摘要进入候选检查 |
-| 依赖与仓库安全 | Python 固定锁文件无已知漏洞；Web 仅有已登记、dev-only 且 2026-08-31 到期的单项 waiver；Gitleaks 无泄漏 |
+| 依赖与仓库安全 | Python 与 Web 固定锁文件均无已知漏洞；Gitleaks 无泄漏 |
 
-Docker 首次重建期间曾在 build isolation 拉取 Python setuptools 时遇到外部 PyPI TLS 失败；这不是产品测试失败。源代码挂载到既有固定依赖镜像后，迁移和完整测试均通过。最终 PR/主线仍必须在远端 CI 重新构建三镜像并生成新的不可变候选，不能复用这次本地镜像作为发布证据。
+Docker 首次重建期间曾在 build isolation 拉取 Python setuptools 时遇到外部 PyPI TLS 失败；这不是产品测试失败。源代码挂载到既有固定依赖镜像后，迁移和完整测试均通过。远端 Mainline Candidate Gate `30806515651` 随后重新构建三镜像、生成不可变候选 `ef0a512…` 并复验 registry digest；发布证据没有复用本地镜像。
 
-## 6. 发布前剩余门槛
+## 6. 当前发布状态与剩余门槛
 
-按照“先完成切片、再发布”，下一步顺序固定为：
+“先完成切片、再发布”的前四个工程步骤已完成：PR 已合入受保护主线，mainline 已生成绑定 migration `0015` 和 8 个正式阶段摘要的候选 `ef0a512…`，该候选已在单次精确授权下部署到现有 staging，并经内部 runtime inventory 与公开 Edge 连续路由验收。
 
-1. 通过 PR 合入受保护主线；
-2. 由 mainline 对合入后的精确 SHA 重建 API/Web/Worker，生成包含 migration `0015` 和正式内容摘要的 release manifest；
-3. 取得该精确候选、主线 SHA、环境与失败不重试边界的单次部署授权；
-4. 先部署现有 staging，核对 Web/API/Worker revision、migration、匿名拒绝和旧 Alpha 回归；
-5. Operator 显式选择内容 Reviewer，发布正式 Journey V1，再生成内测邀请；
-6. 小范围学员、NPC、直培班班主任和人才发展主管使用真实路径；这些反馈属于 WP-23，不反写已发布 V1，只能形成 V2 决策；
-7. 未经新的精确授权，不把此候选切到 `journey.muchenai.com`。
+候选发布后，Owner 于 2026-08-04 报告：当前 Operator 已在 staging 选择完成线下复核的独立 Reviewer，确认正文不可原地修改，并发布受控内测 Journey V1。该证据只是真人 Operator 陈述，不伪造数据库机器读回或独立 Reviewer 校准 PASS。
 
-WP-19～WP-22 的“最小纵向切片”可在工程层记为 `ENGINEERING_SLICE_VERIFIED`。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 均为 `NOT_RUN`，所以完整 WP-20、WP-21、WP-22 退出签署与 WP-23 仍未关闭。
+剩余顺序固定为：
+
+1. 在 Operator 页生成一条绑定已发布 JourneyVersion 的受控内测邀请，以邀请成功作为发布事实的最小机器读回；
+2. 由 Learner 使用该邀请加入，验证 Enrollment 固定到该 JourneyVersion 且首个 Current Action 为 Day 0；
+3. 小范围学员、NPC、直培班班主任和人才发展主管使用真实路径；这些反馈属于 WP-23，不反写已发布 V1，只能形成 V2 决策；
+4. 未经新的精确授权，不把此候选切到 `journey.muchenai.com`。
+
+WP-19～WP-22 的“最小纵向切片”已可在工程和 staging 运行层记为 `ENGINEERING_SLICE_VERIFIED / STAGING_RUNTIME_DEPLOYED / PUBLIC_ROUTE_VERIFIED`。正式 Journey V1 当前记为 `RUNTIME_CONTENT_PUBLICATION_OWNER_REPORTED / MACHINE_READBACK_PENDING`，只有受控正式 Journey 邀请成功后才能升级为机器已验证。`AT-CONTENT-009`、`AT-CONTENT-010`、`AT-UX-010` 真人部分和 `AT-UAT-009` 均为 `NOT_RUN`，所以完整 WP-20、WP-21、WP-22 退出签署与 WP-23 仍未关闭。

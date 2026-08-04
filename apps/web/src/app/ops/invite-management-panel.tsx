@@ -6,6 +6,7 @@ import {
   createLearnerInvite,
   InviteActionState,
   publishFormalJourney,
+  PublishFormalJourneyActionState,
   revokeLearnerInvite,
 } from "@/app/actions";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/server/api";
 
 const INITIAL_STATE: InviteActionState = {};
+const INITIAL_PUBLISH_STATE: PublishFormalJourneyActionState = {};
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -144,6 +146,52 @@ function CreateInviteForm({
   );
 }
 
+function PublishFormalJourneyForm({
+  reviewers,
+}: {
+  reviewers: OpsIdentityAccess[];
+}) {
+  const [state, action, pending] = useActionState(
+    publishFormalJourney,
+    INITIAL_PUBLISH_STATE,
+  );
+
+  return (
+    <form action={action} className="ops-command-form invite-create-form">
+      <div>
+        <strong>正式探索营尚未发布</strong>
+        <p className="status-meta">
+          发布后固定为 Day 0、四个宝藏、三个能力评测；正文版本不可原地修改。
+        </p>
+      </div>
+      <label>
+        已完成线下复核的 Reviewer
+        <select name="reviewed_by" required defaultValue="">
+          <option value="" disabled>选择独立 Reviewer</option>
+          {reviewers.map((reviewer) => (
+            <option key={reviewer.user_id} value={reviewer.user_id}>
+              {reviewer.display_name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="checkbox-row">
+        <input name="review_acknowledged" type="checkbox" required />
+        我确认该 Reviewer 已复核本次受控内测 V1；发布后正文不可原地修改
+      </label>
+      <button className="button secondary" type="submit" disabled={pending}>
+        {pending ? "正在发布…" : "发布受控内测 V1"}
+      </button>
+      {state.error ? (
+        <p className="inline-error" role="alert">
+          {state.error}
+          {state.requestId ? <code>request ID: {state.requestId}</code> : null}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 export function InviteManagementPanel({
   invites,
   identityAccess,
@@ -162,32 +210,7 @@ export function InviteManagementPanel({
   return (
     <>
       {journeys.length === 0 && reviewers.length > 0 ? (
-        <form action={publishFormalJourney} className="ops-command-form invite-create-form">
-          <div>
-            <strong>正式探索营尚未发布</strong>
-            <p className="status-meta">
-              发布后固定为 Day 0、四个宝藏、三个能力评测；正文版本不可原地修改。
-            </p>
-          </div>
-          <label>
-            已完成线下复核的 Reviewer
-            <select name="reviewed_by" required defaultValue="">
-              <option value="" disabled>选择独立 Reviewer</option>
-              {reviewers.map((reviewer) => (
-                <option key={reviewer.user_id} value={reviewer.user_id}>
-                  {reviewer.display_name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="checkbox-row">
-            <input name="review_acknowledged" type="checkbox" required />
-            我确认该 Reviewer 已复核本次受控内测 V1；发布后正文不可原地修改
-          </label>
-          <button className="button secondary" type="submit">
-            发布受控内测 V1
-          </button>
-        </form>
+        <PublishFormalJourneyForm reviewers={reviewers} />
       ) : null}
       <CreateInviteForm reviewers={reviewers} tasks={tasks} journeys={journeys} />
       <h3>最近邀请</h3>

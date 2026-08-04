@@ -22,7 +22,7 @@
 - WP-11：独立飞书通知适配器、加密接收人、provider receipt、限流/超时/重试/DEAD/人工重驱、JSON 结构化日志和运行指标的工程路径已完成；配置合同升级为 V3。真实飞书收件、火山引擎 TLS/Cloud Monitor、外部告警与演练保持 `NOT_RUN`，staging 通知适配器继续禁用；
 - 候选 `8f77ceec…` 已通过 `journey.muchenai.com` 向单一组织私密名单开放受控 Alpha：独立 production Compose/应用 secret/逻辑数据库、TLS、正式飞书 OAuth 回调、canonical URL、加密备份与隔离恢复均已验证，staging 保持在线；维护页 503 与恢复 live 已实际演练。真实旧系统数据导入、真实飞书通知/外部告警、独立故障域、完整真人 UAT、WP-14 与完整发布签署仍未完成，因此这是 `CONTROLLED_ALPHA_LIVE`，不是完整 `RELEASE_GO`。
 - WP-17/18：Learner 视觉方向已关闭；正式产品真相已恢复为 Day 0＋四个认知宝藏＋三个能力评测＋完整结果。当前 TSK-001 保留为已验证 Alpha 任务，不再代表完整探索营；后续只在现有 vNext 基座上按 WP-19～23 单一 WIP 补足多阶段 Journey、正式内容与真人完整旅程。
-- WP-19～22 最小纵向切片：版本化 Journey、Day 0＋四宝藏 Learner evidence、三项独立能力评测/修订/通过、完整 Journey Outcome 与正式 Learner 页面已在代码和空库自动化中接通；候选工件会同时绑定旧 TSK-001 与 8 个正式阶段内容摘要。该切片尚未合入主线或部署，内容真人理解、独立 Reviewer 校准和 WP-23 完整旅程仍为独立门禁。
+- WP-19～22 最小纵向切片：版本化 Journey、Day 0＋四宝藏 Learner evidence、三项独立能力评测/修订/通过、完整 Journey Outcome 与正式 Learner 页面已合入主线并以候选 `ef0a512…` 部署到 staging；migration `0015`、内部服务和公开 Edge 路由已验证。2026-08-04，Owner 报告当前 Operator 已选择完成线下复核的独立 Reviewer 并发布受控内测 Journey V1；下一步以绑定该 JourneyVersion 的受控邀请作为最小机器读回。内容真人理解、独立 Reviewer 校准和 WP-23 完整旅程仍为独立门禁。
 
 从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
 
