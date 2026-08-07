@@ -4,7 +4,7 @@ from hmac import compare_digest
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Header, Request, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
@@ -57,6 +57,8 @@ from journey_api.schemas import (
     OAuthStartResponse,
     RevokeExternalIdentityCommand,
     RevokeIdentityLinkCommand,
+    RevokedIdentityTransferCandidateOut,
+    TransferRevokedExternalIdentityCommand,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -214,7 +216,78 @@ def list_identity_access(
                 allowed_commands=allowed_commands,
             )
         )
-    return envelope(request, IdentityAccessListOut(items=items))
+
+    revoked_rows = session.execute(
+        select(ExternalIdentity, User)
+        .join(User, User.id == ExternalIdentity.user_id)
+        .where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.provider == PROVIDER,
+            ExternalIdentity.revoked_at.is_not(None),
+            User.organization_id == actor.organization_id,
+        )
+        .order_by(ExternalIdentity.revoked_at.desc(), ExternalIdentity.id)
+        .limit(100)
+    ).all()
+    revoked_user_ids = {user.id for _identity, user in revoked_rows}
+    revoked_roles = (
+        session.execute(
+            select(RoleAssignment.user_id, RoleAssignment.role).where(
+                RoleAssignment.organization_id == actor.organization_id,
+                RoleAssignment.user_id.in_(revoked_user_ids),
+                RoleAssignment.role.in_(
+                    [Role.REVIEWER, Role.OPERATOR, Role.CONTENT_EDITOR]
+                ),
+            )
+        ).all()
+        if revoked_user_ids
+        else []
+    )
+    roles_by_user: dict[uuid.UUID, list[Role]] = {}
+    for user_id, role in revoked_roles:
+        roles_by_user.setdefault(user_id, []).append(role)
+    revoked_identity_ids = {identity.id for identity, _user in revoked_rows}
+    active_session_rows = (
+        session.execute(
+            select(IdentitySession.external_identity_id, func.count(IdentitySession.id))
+            .where(
+                IdentitySession.external_identity_id.in_(revoked_identity_ids),
+                IdentitySession.revoked_at.is_(None),
+                IdentitySession.expires_at > now,
+            )
+            .group_by(IdentitySession.external_identity_id)
+        ).all()
+        if revoked_identity_ids
+        else []
+    )
+    active_sessions_by_identity = dict(active_session_rows)
+    revoked_transfer_candidates = [
+        RevokedIdentityTransferCandidateOut(
+            identity_id=identity.id,
+            identity_revision=identity.revision,
+            source_user_id=user.id,
+            source_display_name=user.display_name,
+            source_roles=[
+                role.value
+                for role in sorted(
+                    roles_by_user.get(user.id, []), key=lambda value: value.value
+                )
+            ],
+            revoked_at=identity.revoked_at,
+            active_session_count=int(
+                active_sessions_by_identity.get(identity.id, 0)
+            ),
+        )
+        for identity, user in revoked_rows
+        if identity.revoked_at is not None
+    ]
+    return envelope(
+        request,
+        IdentityAccessListOut(
+            items=items,
+            revoked_transfer_candidates=revoked_transfer_candidates,
+        ),
+    )
 
 
 @router.post("/ops/identity-links", response_model=IdentityLinkResponse)
@@ -495,6 +568,182 @@ def revoke_external_identity(
     return envelope(request, CommandOut(**result))
 
 
+@router.post(
+    "/ops/external-identities/{identity_id}/transfer-revoked",
+    response_model=CommandResponse,
+)
+def transfer_revoked_external_identity(
+    identity_id: uuid.UUID,
+    command: TransferRevokedExternalIdentityCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = command.model_dump(mode="json")
+    identity = session.scalar(
+        select(ExternalIdentity)
+        .where(
+            ExternalIdentity.id == identity_id,
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.provider == PROVIDER,
+        )
+        .with_for_update()
+    )
+    if identity is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的历史外部身份。")
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="external_identity.transfer_revoked",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    ensure_revision(identity.revision, command.expected_revision)
+    if identity.revoked_at is None:
+        raise ApiError(
+            409,
+            "IDENTITY_NOT_REVOKED",
+            "仅允许迁移已经撤销的历史外部身份。",
+        )
+    if identity.user_id == actor.id:
+        raise ApiError(
+            409,
+            "SELF_IDENTITY_TRANSFER_DENIED",
+            "不能迁移当前登录使用的运营身份。",
+        )
+
+    source_reviewer_role = session.scalar(
+        select(RoleAssignment.id)
+        .where(
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.user_id == identity.user_id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+        .with_for_update()
+    )
+    if source_reviewer_role is None:
+        raise ApiError(
+            409,
+            "SOURCE_ROLE_MISMATCH",
+            "历史身份不属于已确认的 Reviewer 来源。",
+        )
+    source_active_identity = session.scalar(
+        select(ExternalIdentity.id)
+        .where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id == identity.user_id,
+            ExternalIdentity.provider == PROVIDER,
+            ExternalIdentity.id != identity.id,
+            ExternalIdentity.revoked_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if source_active_identity is None:
+        raise ApiError(
+            409,
+            "SOURCE_IDENTITY_NOT_PROTECTED",
+            "来源 Reviewer 没有独立有效身份，拒绝迁移。",
+        )
+
+    target = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == command.target_user_id,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.CONTENT_EDITOR,
+        )
+        .with_for_update()
+    )
+    if target is None or command.target_role != Role.CONTENT_EDITOR.value:
+        raise ApiError(422, "VALIDATION_FAILED", "目标 Content Editor 无效。")
+    if target.id == identity.user_id:
+        raise ApiError(409, "IDENTITY_ALREADY_LINKED", "历史身份已属于目标用户。")
+    target_identity = session.scalar(
+        select(ExternalIdentity.id)
+        .where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id == target.id,
+            ExternalIdentity.provider == PROVIDER,
+        )
+        .with_for_update()
+    )
+    if target_identity is not None:
+        raise ApiError(409, "IDENTITY_ALREADY_LINKED", "目标身份已经存在飞书映射。")
+    pending_target_link = session.scalar(
+        select(ExternalIdentityLink.id)
+        .where(
+            ExternalIdentityLink.organization_id == actor.organization_id,
+            ExternalIdentityLink.user_id == target.id,
+            ExternalIdentityLink.provider == PROVIDER,
+            ExternalIdentityLink.status == IdentityLinkStatus.PENDING,
+            ExternalIdentityLink.expires_at > utc_now(),
+        )
+        .with_for_update()
+    )
+    if pending_target_link is not None:
+        raise ApiError(
+            409,
+            "IDENTITY_LINK_PENDING",
+            "目标身份仍有未过期绑定链接，拒绝迁移。",
+        )
+
+    unrevoked_sessions = session.scalars(
+        select(IdentitySession)
+        .where(
+            IdentitySession.external_identity_id == identity.id,
+            IdentitySession.revoked_at.is_(None),
+        )
+        .with_for_update()
+    ).all()
+    if unrevoked_sessions:
+        raise ApiError(
+            409,
+            "ACTIVE_SESSION_EXISTS",
+            "历史身份仍有未撤销会话，拒绝迁移。",
+        )
+
+    identity.user_id = target.id
+    identity.revision += 1
+    result = {
+        "resource_id": str(identity.id),
+        "status": "TRANSFERRED_REVOKED",
+        "revision": identity.revision,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="external_identity.transfer_revoked",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action="external_identity.transferred_revoked",
+        resource_type="external_identity",
+        resource_id=identity.id,
+        result="SUCCESS",
+        details={
+            "provider": PROVIDER,
+            "role": Role.CONTENT_EDITOR.value,
+            "status": "REVOKED",
+            "reason_provided": True,
+        },
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
+
+
 @router.post("/auth/feishu/start", response_model=OAuthStartResponse)
 def start_feishu_oauth(
     command: OAuthStartCommand,
@@ -643,7 +892,8 @@ def complete_feishu_oauth(
         )
         .with_for_update()
     )
-    if identity is not None and identity.revoked_at is not None:
+    identity_was_revoked = identity is not None and identity.revoked_at is not None
+    if identity_was_revoked and identity_link_id is None:
         raise ApiError(403, "IDENTITY_REVOKED", "该外部身份已撤销。")
 
     role = requested_role(return_to)
@@ -664,6 +914,19 @@ def complete_feishu_oauth(
             raise ApiError(410, "IDENTITY_LINK_INVALID", "身份绑定链接无效或已过期。")
         if identity is not None and identity.user_id != link.user_id:
             raise ApiError(409, "IDENTITY_ALREADY_LINKED", "飞书身份已经绑定其他用户。")
+        if (
+            identity_was_revoked
+            and identity is not None
+            and (
+                identity.revoked_at is None
+                or link.created_at <= identity.revoked_at
+            )
+        ):
+            raise ApiError(
+                403,
+                "IDENTITY_REVOKED",
+                "该外部身份已撤销，必须使用撤销后新生成的绑定链接。",
+            )
         target_identity = session.scalar(
             select(ExternalIdentity.id).where(
                 ExternalIdentity.organization_id == link.organization_id,
@@ -685,6 +948,10 @@ def complete_feishu_oauth(
             )
             session.add(identity)
             session.flush()
+        elif identity_was_revoked:
+            identity.revoked_at = None
+            identity.verified_at = utc_now()
+            identity.revision += 1
         link.status = IdentityLinkStatus.CONSUMED
         link.consumed_at = utc_now()
         link.revision += 1
@@ -708,6 +975,22 @@ def complete_feishu_oauth(
         raise ApiError(403, "FORBIDDEN", "当前身份没有该入口的有效权限。")
 
     issued_at = utc_now()
+    if identity_was_revoked:
+        add_audit(
+            session,
+            request_id=request.state.request_id,
+            organization_id=user.organization_id,
+            actor_id=user.id,
+            action="external_identity.reactivated_by_link",
+            resource_type="external_identity",
+            resource_id=identity.id,
+            result="SUCCESS",
+            details={
+                "provider": PROVIDER,
+                "role": role.value,
+                "status": "ACTIVE",
+            },
+        )
     previous_sessions = session.scalars(
         select(IdentitySession)
         .where(

@@ -13,6 +13,7 @@ import {
   OpsEnrollment,
   OpsFormalJourney,
   OpsIdentityAccess,
+  OpsRevokedIdentityTransferCandidate,
   OpsInvite,
   OpsInvitationControl,
   OpsNotificationDelivery,
@@ -61,7 +62,10 @@ export default async function OpsPage({
     identityPageRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
     identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
     identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
-    identityPageRequest<{ items: OpsIdentityAccess[] }>("/api/v1/ops/identity-access", "OPERATOR"),
+    identityPageRequest<{
+      items: OpsIdentityAccess[];
+      revoked_transfer_candidates: OpsRevokedIdentityTransferCandidate[];
+    }>("/api/v1/ops/identity-access", "OPERATOR"),
     identityPageRequest<{ items: OpsInvite[] }>("/api/v1/ops/invites", "OPERATOR"),
     identityPageRequest<OpsInvitationControl>("/api/v1/ops/invitation-control", "OPERATOR"),
     identityPageRequest<{ items: OpsNotificationEndpoint[] }>(
@@ -337,7 +341,10 @@ export default async function OpsPage({
             <button className="button secondary compact" type="submit">创建最小内容身份</button>
           </form>
         )}
-        <IdentityAccessPanel items={identityAccess.items} />
+        <IdentityAccessPanel
+          items={identityAccess.items}
+          revokedCandidates={identityAccess.revoked_transfer_candidates}
+        />
       </section>
 
       <section className="panel ops-section" aria-labelledby="audit-heading">

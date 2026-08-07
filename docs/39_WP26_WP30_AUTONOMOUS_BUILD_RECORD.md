@@ -81,3 +81,19 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 以下任一事实出现，立即冻结新邀请：业务事实丢失、跨组织访问、持续登录失败、核心闭环中断或 P0 事件。冻结不撤销已接受邀请，不删除已有业务事实；恢复必须由 Operator 以新理由和新 expected revision 明确执行。
 
 `P0_LIVE_CONTROLLED` 只在固定候选、固定 V3、正式域名、私密名单和回退能力完成真实 readback 后成立；`P0_VALIDATED` 只能在 cohort 结束后依据真实分子/分母判断。
+
+## 7. Content Editor 历史飞书身份迁移修复
+
+2026-08-05，真实 Content Editor 首次使用绑定链接时，OAuth 命中此前按 WP-09 合同撤销的 Reviewer 外部身份并返回 `IDENTITY_REVOKED`。只读核验证明：目标 Content Editor 仍为 `UNLINKED`；历史身份原角色为 Reviewer、有效会话为 0；当前 Reviewer 已使用另一条后来验证的有效身份。账号持有人随后由 Owner 明确确认为目标 Content Editor 本人。
+
+本次修复不允许直接清除 `revoked_at` 或绕过本人验证：
+
+1. Operator 只能选择同组织、已撤销、来源仍有独立有效身份、来源角色为 Reviewer、且无任何未撤销会话的历史飞书身份；
+2. 目标必须是同组织、ACTIVE、尚无任何飞书映射的 Content Editor，且不能存在未过期绑定链接；
+3. 迁移命令只转移历史身份归属并增加 revision，身份继续保持 `REVOKED`；命令要求 expected revision、幂等键、至少 10 字理由和显式账号归属确认，并写入脱敏审计；
+4. 迁移后必须由 Operator 新建撤销时间之后的一次性绑定链接，并由账号持有人本人重新完成飞书 OAuth；只有这一步才清除撤销状态、轮换会话并写入独立重新激活审计；
+5. 撤销前生成的旧链接、跨组织目标、错误角色、目标已有映射、来源无独立有效身份或任何未撤销会话全部 fail closed。
+
+本地复验：API `308 passed`；Web 合同 `19 passed` 且 Next.js production build 通过；OpenAPI readback、隔离检查、traceability 与 gitleaks 均通过。
+
+当前仅完成本地代码与机器回归；未修改 staging 身份、角色或业务事实，未部署，也未生成新的真人绑定链接。必须在 PR 合入、形成新候选并取得精确 staging 部署授权后，才能由当前 Operator 执行一次迁移，再单独生成一次新链接供郑田源本人验证。

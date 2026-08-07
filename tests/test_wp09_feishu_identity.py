@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -13,7 +14,7 @@ from journey_api.feishu_oauth import (
     get_feishu_oauth_client,
 )
 from journey_api.fixtures import OPERATOR_ID, ORGANIZATION_ID
-from journey_api.identity import OAUTH_COOKIE, SESSION_COOKIE
+from journey_api.identity import OAUTH_COOKIE, SESSION_COOKIE, credential_hash, utc_now
 from journey_api.main import app
 from journey_api.models import (
     AuditEntry,
@@ -346,6 +347,269 @@ def test_external_identity_revocation_is_idempotent(
     )
     assert assert_ok(first)["idempotency_replay"] is False
     assert assert_ok(replay)["idempotency_replay"] is True
+
+
+def test_operator_transfers_revoked_reviewer_identity_and_owner_reactivates_by_new_link(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    reviewer_id = create_role_user(Role.REVIEWER)
+    original_link = create_link(Role.REVIEWER, reviewer_id)
+    raw_subject = f"ou_transfer_{uuid.uuid4().hex}"
+    oauth_provider.subjects["transfer-original-code"] = raw_subject
+    original_browser = client_for("wp09-transfer-original-reviewer")
+    original_state = begin_oauth(
+        original_browser,
+        "/review",
+        str(original_link["link_token"]),
+    )
+    assert_ok(callback(original_browser, "transfer-original-code", original_state))
+    with SessionLocal() as session:
+        identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == reviewer_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        assert identity is not None
+        identity_id = identity.id
+        identity_revision = identity.revision
+
+    revoke_response = client_for("wp09-transfer-operator-revoke").post(
+        f"/api/v1/ops/external-identities/{identity_id}/revoke",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"external-identity-revoke-{uuid.uuid4()}",
+        },
+        json={
+            "expected_revision": identity_revision,
+            "reason": "历史 Reviewer 身份已完成受控撤销",
+        },
+    )
+    revoked = assert_ok(revoke_response)
+    content_editor_id = create_role_user(Role.CONTENT_EDITOR)
+    with SessionLocal.begin() as session:
+        session.add(
+            ExternalIdentity(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=reviewer_id,
+                provider="FEISHU",
+                subject=uuid.uuid4().hex + uuid.uuid4().hex,
+                revision=1,
+            )
+        )
+
+    reason = "账号持有人已确认，迁移到目标 Content Editor"
+    transfer_key = f"external-identity-transfer-{uuid.uuid4()}"
+    operator = client_for("wp09-transfer-operator")
+    candidate_response = operator.get(
+        "/api/v1/ops/identity-access",
+        headers=OPERATOR_HEADERS,
+    )
+    candidates = assert_ok(candidate_response)["revoked_transfer_candidates"]
+    candidate = next(
+        item for item in candidates if item["identity_id"] == str(identity_id)
+    )
+    assert candidate["source_roles"] == ["REVIEWER"]
+    assert candidate["active_session_count"] == 0
+    assert raw_subject not in candidate_response.text
+
+    transfer_response = operator.post(
+        f"/api/v1/ops/external-identities/{identity_id}/transfer-revoked",
+        headers={**OPERATOR_HEADERS, "Idempotency-Key": transfer_key},
+        json={
+            "target_user_id": str(content_editor_id),
+            "target_role": "CONTENT_EDITOR",
+            "expected_revision": revoked["revision"],
+            "reason": reason,
+        },
+    )
+    transferred = assert_ok(transfer_response)
+    assert transferred["status"] == "TRANSFERRED_REVOKED"
+    replay = operator.post(
+        f"/api/v1/ops/external-identities/{identity_id}/transfer-revoked",
+        headers={**OPERATOR_HEADERS, "Idempotency-Key": transfer_key},
+        json={
+            "target_user_id": str(content_editor_id),
+            "target_role": "CONTENT_EDITOR",
+            "expected_revision": revoked["revision"],
+            "reason": reason,
+        },
+    )
+    assert assert_ok(replay)["idempotency_replay"] is True
+
+    with SessionLocal() as session:
+        transferred_identity = session.get(ExternalIdentity, identity_id)
+        assert transferred_identity is not None
+        assert transferred_identity.user_id == content_editor_id
+        assert transferred_identity.revoked_at is not None
+        assert not session.scalars(
+            select(IdentitySession).where(
+                IdentitySession.external_identity_id == identity_id,
+                IdentitySession.revoked_at.is_(None),
+            )
+        ).all()
+        audit = session.scalar(
+            select(AuditEntry).where(
+                AuditEntry.action == "external_identity.transferred_revoked",
+                AuditEntry.resource_id == identity_id,
+            )
+        )
+        assert audit is not None
+        assert audit.details["role"] == "CONTENT_EDITOR"
+        assert audit.details["status"] == "REVOKED"
+        assert reason not in str(audit.details)
+
+    access_response = operator.get(
+        "/api/v1/ops/identity-access",
+        headers=OPERATOR_HEADERS,
+    )
+    access = assert_ok(access_response)
+    target = next(
+        item
+        for item in access["items"]
+        if item["user_id"] == str(content_editor_id)
+    )
+    assert target["identity_status"] == "REVOKED"
+    assert target["allowed_commands"] == ["create_identity_link"]
+    assert raw_subject not in access_response.text
+
+    new_link = create_link(Role.CONTENT_EDITOR, content_editor_id)
+    oauth_provider.subjects["transfer-reactivation-code"] = raw_subject
+    content_editor = client_for("wp09-transferred-content-editor")
+    new_state = begin_oauth(
+        content_editor,
+        "/content",
+        str(new_link["link_token"]),
+    )
+    completed = assert_ok(
+        callback(content_editor, "transfer-reactivation-code", new_state)
+    )
+    assert completed["safe_entry"] == "/content"
+    assert assert_ok(content_editor.get("/api/v1/session"))["safe_entry"] == "/content"
+    with SessionLocal() as session:
+        reactivated = session.get(ExternalIdentity, identity_id)
+        assert reactivated is not None
+        assert reactivated.user_id == content_editor_id
+        assert reactivated.revoked_at is None
+        reactivation_audit = session.scalar(
+            select(AuditEntry).where(
+                AuditEntry.action == "external_identity.reactivated_by_link",
+                AuditEntry.resource_id == identity_id,
+            )
+        )
+        assert reactivation_audit is not None
+        assert reactivation_audit.details["role"] == "CONTENT_EDITOR"
+
+
+def test_revoked_identity_transfer_fails_closed_on_sessions_and_stale_link(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    reviewer_id = create_role_user(Role.REVIEWER)
+    content_editor_id = create_role_user(Role.CONTENT_EDITOR)
+    identity_id = uuid.uuid4()
+    revoked_at = utc_now()
+    with SessionLocal.begin() as session:
+        identity = ExternalIdentity(
+            id=identity_id,
+            organization_id=ORGANIZATION_ID,
+            user_id=reviewer_id,
+            provider="FEISHU",
+            subject=uuid.uuid4().hex + uuid.uuid4().hex,
+            revision=2,
+            verified_at=revoked_at,
+            revoked_at=revoked_at,
+        )
+        session.add(identity)
+        session.flush()
+        session.add(
+            ExternalIdentity(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=reviewer_id,
+                provider="FEISHU",
+                subject=uuid.uuid4().hex + uuid.uuid4().hex,
+                revision=1,
+            )
+        )
+        session.add(
+            IdentitySession(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=reviewer_id,
+                external_identity_id=identity_id,
+                role=Role.REVIEWER,
+                token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+                csrf_token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+                expires_at=revoked_at + timedelta(hours=1),
+            )
+        )
+    blocked = client_for("wp09-transfer-active-session").post(
+        f"/api/v1/ops/external-identities/{identity_id}/transfer-revoked",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"external-identity-transfer-{uuid.uuid4()}",
+        },
+        json={
+            "target_user_id": str(content_editor_id),
+            "target_role": "CONTENT_EDITOR",
+            "expected_revision": 2,
+            "reason": "必须拒绝仍有未撤销会话的历史身份",
+        },
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "ACTIVE_SESSION_EXISTS"
+
+    with SessionLocal.begin() as session:
+        active_session = session.scalar(
+            select(IdentitySession).where(
+                IdentitySession.external_identity_id == identity_id,
+                IdentitySession.revoked_at.is_(None),
+            )
+        )
+        assert active_session is not None
+        active_session.revoked_at = active_session.expires_at
+    transferred = client_for("wp09-transfer-stale-link-operator").post(
+        f"/api/v1/ops/external-identities/{identity_id}/transfer-revoked",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"external-identity-transfer-{uuid.uuid4()}",
+        },
+        json={
+            "target_user_id": str(content_editor_id),
+            "target_role": "CONTENT_EDITOR",
+            "expected_revision": 2,
+            "reason": "会话已撤销，迁移后仍必须重新验证",
+        },
+    )
+    transferred_data = assert_ok(transferred)
+    stale_link = create_link(Role.CONTENT_EDITOR, content_editor_id)
+    with SessionLocal.begin() as session:
+        identity = session.get(ExternalIdentity, identity_id)
+        link = session.get(ExternalIdentityLink, uuid.UUID(str(stale_link["id"])))
+        assert identity is not None and identity.revoked_at is not None
+        assert link is not None
+        link.created_at = identity.revoked_at - timedelta(minutes=1)
+    raw_subject = f"ou_stale_{uuid.uuid4().hex}"
+    with SessionLocal.begin() as session:
+        identity = session.get(ExternalIdentity, identity_id)
+        assert identity is not None
+        settings = get_settings()
+        identity.subject = credential_hash(
+            settings.identity_subject_secret,
+            f"external:FEISHU:{settings.feishu_app_id}",
+            raw_subject,
+        )
+    oauth_provider.subjects["stale-reactivation-code"] = raw_subject
+    browser = client_for("wp09-stale-reactivation")
+    state = begin_oauth(browser, "/content", str(stale_link["link_token"]))
+    denied = callback(browser, "stale-reactivation-code", state)
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "IDENTITY_REVOKED"
+    with SessionLocal() as session:
+        identity = session.get(ExternalIdentity, identity_id)
+        assert identity is not None and identity.revoked_at is not None
+        assert identity.revision == transferred_data["revision"]
 
 
 def test_disabled_user_or_removed_role_invalidates_external_session(

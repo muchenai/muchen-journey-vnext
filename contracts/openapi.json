@@ -3595,6 +3595,81 @@
         }
       }
     },
+    "/api/v1/ops/external-identities/{identity_id}/transfer-revoked": {
+      "post": {
+        "summary": "Transfer Revoked External Identity",
+        "operationId": "transfer_revoked_external_identity_api_v1_ops_external_identities__identity_id__transfer_revoked_post",
+        "parameters": [
+          {
+            "name": "identity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identity Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRevokedExternalIdentityCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/feishu/start": {
       "post": {
         "summary": "Start Feishu Oauth",
@@ -6601,12 +6676,20 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "revoked_transfer_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/RevokedIdentityTransferCandidateOut"
+            },
+            "type": "array",
+            "title": "Revoked Transfer Candidates"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "revoked_transfer_candidates"
         ],
         "title": "IdentityAccessListOut"
       },
@@ -9546,6 +9629,61 @@
         ],
         "title": "RevokeNotificationEndpointCommand"
       },
+      "RevokedIdentityTransferCandidateOut": {
+        "properties": {
+          "identity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Identity Id"
+          },
+          "identity_revision": {
+            "type": "integer",
+            "title": "Identity Revision"
+          },
+          "source_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source User Id"
+          },
+          "source_display_name": {
+            "type": "string",
+            "title": "Source Display Name"
+          },
+          "source_roles": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "REVIEWER",
+                "OPERATOR",
+                "CONTENT_EDITOR"
+              ]
+            },
+            "type": "array",
+            "title": "Source Roles"
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Revoked At"
+          },
+          "active_session_count": {
+            "type": "integer",
+            "title": "Active Session Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "identity_id",
+          "identity_revision",
+          "source_user_id",
+          "source_display_name",
+          "source_roles",
+          "revoked_at",
+          "active_session_count"
+        ],
+        "title": "RevokedIdentityTransferCandidateOut"
+      },
       "RubricDimensionInput": {
         "properties": {
           "dimension_key": {
@@ -11032,6 +11170,40 @@
           "request_id"
         ],
         "title": "TimelineResponse"
+      },
+      "TransferRevokedExternalIdentityCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "target_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target User Id"
+          },
+          "target_role": {
+            "type": "string",
+            "const": "CONTENT_EDITOR",
+            "title": "Target Role"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "target_user_id",
+          "target_role",
+          "reason"
+        ],
+        "title": "TransferRevokedExternalIdentityCommand"
       },
       "UpdateContentDraftCommand": {
         "properties": {

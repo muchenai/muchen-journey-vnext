@@ -7,8 +7,12 @@ import {
   IdentityLinkActionState,
   revokeExternalIdentity,
   revokeIdentityLink,
+  transferRevokedExternalIdentity,
 } from "@/app/actions";
-import { OpsIdentityAccess } from "@/lib/server/api";
+import {
+  OpsIdentityAccess,
+  OpsRevokedIdentityTransferCandidate,
+} from "@/lib/server/api";
 
 const INITIAL_STATE: IdentityLinkActionState = {};
 
@@ -64,7 +68,57 @@ function CreateLinkForm({ item }: { item: OpsIdentityAccess }) {
   );
 }
 
-function IdentityAccessItem({ item }: { item: OpsIdentityAccess }) {
+function RevokedIdentityTransferForms({
+  item,
+  candidates,
+}: {
+  item: OpsIdentityAccess;
+  candidates: OpsRevokedIdentityTransferCandidate[];
+}) {
+  const eligible = candidates.filter(
+    (candidate) => candidate.source_roles.includes("REVIEWER")
+      && candidate.active_session_count === 0,
+  );
+  if (item.role !== "CONTENT_EDITOR" || item.identity_status !== "UNLINKED" || eligible.length === 0) {
+    return null;
+  }
+  return (
+    <div className="identity-transfer-panel">
+      <strong>受控迁移历史已撤销身份</strong>
+      <p>迁移后身份仍保持撤销；必须重新生成一次性链接并由本人完成飞书验证，才会重新激活。</p>
+      {eligible.map((candidate) => (
+        <form action={transferRevokedExternalIdentity} className="ops-command-form" key={candidate.identity_id}>
+          <input type="hidden" name="identity_id" value={candidate.identity_id} />
+          <input type="hidden" name="target_user_id" value={item.user_id} />
+          <input type="hidden" name="target_role" value="CONTENT_EDITOR" />
+          <input type="hidden" name="revision" value={candidate.identity_revision} />
+          <p>
+            来源：{candidate.source_display_name} · Reviewer · 已撤销于 {formatTime(candidate.revoked_at)} · 有效会话 0
+          </p>
+          <label>
+            迁移理由
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <label className="checkbox-row">
+            <input name="ownership_confirmed" type="checkbox" required />
+            我确认该历史飞书账号归 {item.display_name} 本人所有
+          </label>
+          <button className="button secondary compact" type="submit">
+            迁移身份（保持撤销）
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
+function IdentityAccessItem({
+  item,
+  revokedCandidates,
+}: {
+  item: OpsIdentityAccess;
+  revokedCandidates: OpsRevokedIdentityTransferCandidate[];
+}) {
   const roleName = item.role === "OPERATOR"
     ? "Operator"
     : item.role === "CONTENT_EDITOR"
@@ -90,6 +144,8 @@ function IdentityAccessItem({ item }: { item: OpsIdentityAccess }) {
       )}
 
       {item.allowed_commands.includes("create_identity_link") ? <CreateLinkForm item={item} /> : null}
+
+      <RevokedIdentityTransferForms item={item} candidates={revokedCandidates} />
 
       {item.allowed_commands.includes("revoke_identity_link") && item.link_id && item.link_revision ? (
         <form action={revokeIdentityLink} className="ops-command-form">
@@ -122,11 +178,21 @@ function IdentityAccessItem({ item }: { item: OpsIdentityAccess }) {
   );
 }
 
-export function IdentityAccessPanel({ items }: { items: OpsIdentityAccess[] }) {
+export function IdentityAccessPanel({
+  items,
+  revokedCandidates,
+}: {
+  items: OpsIdentityAccess[];
+  revokedCandidates: OpsRevokedIdentityTransferCandidate[];
+}) {
   return (
     <ul className="ops-list identity-access-list">
       {items.map((item) => (
-        <IdentityAccessItem item={item} key={`${item.user_id}:${item.role}`} />
+        <IdentityAccessItem
+          item={item}
+          key={`${item.user_id}:${item.role}`}
+          revokedCandidates={revokedCandidates}
+        />
       ))}
     </ul>
   );

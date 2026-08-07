@@ -1133,3 +1133,30 @@ export async function revokeExternalIdentity(data: FormData) {
   revalidatePath("/ops");
   redirect("/ops?updated=external-identity-revoked");
 }
+
+export async function transferRevokedExternalIdentity(data: FormData) {
+  const identityId = requiredUuid(data, "identity_id");
+  const targetUserId = requiredUuid(data, "target_user_id");
+  if (data.get("target_role") !== "CONTENT_EDITOR") {
+    throw new Error("仅允许迁移到已确认的 Content Editor。");
+  }
+  if (data.get("ownership_confirmed") !== "on") {
+    throw new Error("必须确认历史飞书账号归目标 Content Editor 本人所有。");
+  }
+  await apiRequest(
+    `/api/v1/ops/external-identities/${identityId}/transfer-revoked`,
+    "OPERATOR",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        target_user_id: targetUserId,
+        target_role: "CONTENT_EDITOR",
+        expected_revision: requiredRevision(data),
+        reason: requiredReason(data),
+      }),
+    },
+  );
+  revalidatePath("/ops");
+  redirect("/ops?updated=external-identity-transferred#identity-access");
+}

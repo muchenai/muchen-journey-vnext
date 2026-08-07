@@ -547,8 +547,19 @@ class IdentityAccessOut(StrictModel):
     ]
 
 
+class RevokedIdentityTransferCandidateOut(StrictModel):
+    identity_id: UUID
+    identity_revision: int
+    source_user_id: UUID
+    source_display_name: str
+    source_roles: list[Literal["REVIEWER", "OPERATOR", "CONTENT_EDITOR"]]
+    revoked_at: datetime
+    active_session_count: int
+
+
 class IdentityAccessListOut(StrictModel):
     items: list[IdentityAccessOut]
+    revoked_transfer_candidates: list[RevokedIdentityTransferCandidateOut]
 
 
 class IdentityAccessListResponse(StrictModel):
@@ -561,6 +572,12 @@ class RevokeIdentityLinkCommand(RevisionCommand):
 
 
 class RevokeExternalIdentityCommand(RevisionCommand):
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class TransferRevokedExternalIdentityCommand(RevisionCommand):
+    target_user_id: UUID
+    target_role: Literal["CONTENT_EDITOR"]
     reason: str = Field(min_length=10, max_length=500)
 
 
