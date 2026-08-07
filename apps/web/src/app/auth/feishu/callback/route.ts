@@ -8,7 +8,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const OAUTH_VALUE = /^[A-Za-z0-9._~-]{1,512}$/;
-const SAFE_ENTRIES = new Set(["/review", "/ops"]);
+const SAFE_ENTRIES = new Set(["/review", "/ops", "/content"]);
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = request.nextUrl.searchParams.get("code") ?? "";
