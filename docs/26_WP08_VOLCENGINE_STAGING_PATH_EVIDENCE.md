@@ -348,3 +348,11 @@
 - PR #152 以受控、可审计、fail-closed 的方式实现上述迁移合同，并合入主线 `2223fc1589d772e5397e43357fc5682f27c1c3a8`。Mainline Candidate Gate [`31137770622`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31137770622) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验；artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
 - 新候选固定 API `sha256:69ab50c2…c393`、Web `sha256:2d36bcd6…8ac`、Worker `sha256:d16cc5d0…a89b`。本绑定只建立下一次部署的候选、摘要、artifact、确认词和回归合同，不执行 staging 部署，不迁移身份，不生成链接，不修改角色或业务事实；
 - 只有本候选绑定 PR 合入并取得完整候选 `2223fc1589d772e5397e43357fc5682f27c1c3a8` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。部署成功后仍须由当前 Operator 分两步执行身份转移和新链接生成，并由郑田源本人完成 OAuth；production 继续 `NO_GO`。
+
+## 2026-08-07 Content Editor OAuth callback 修复候选绑定
+
+- 身份迁移绑定 PR #153 合入后，唯一 staging deploy run [`31147474464`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31147474464) 成功部署 `2223fc1589d772e5397e43357fc5682f27c1c3a8`；migration 保持 `0019_wp30_invitation_control`，readiness 与匿名拒绝通过，临时 SSH 已关闭。该候选已经消费，不得再次部署；
+- Operator 随后按受控流程转移仍保持撤销的历史身份、生成一次新的 30 分钟 Content Editor 链接，账号持有人本人完成 OAuth。机器读回确认身份重新激活且服务端创建了 Content Editor 会话；但 Web callback 的安全入口仅包含 `/review`、`/ops`，拒绝 `/content` 后未转发 API 的 cookie 响应，浏览器因此继续得到 `AUTH_REQUIRED`；
+- PR #154 仅把 `/content` 加入精确同源安全入口，并增加未知入口拒绝、成功回跳和 cookie 响应转发合同；没有修改数据库、身份、角色或业务事实。PR 合入主线 `c0765eb625fc3c99205dc3d05abf9fad0475d81d`，Mainline Candidate Gate [`31171640166`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31171640166) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration head 保持 `0019_wp30_invitation_control`；
+- 新候选固定 API `sha256:49f2412e…8b37`、Web `sha256:9369885d…f0f8`、Worker `sha256:bd9686fb…d95e`。本绑定只建立候选、摘要、artifact、确认词和回归合同，不执行 staging 部署，不修改身份或业务事实；
+- 只有本绑定 PR 合入并取得完整候选 `c0765eb625fc3c99205dc3d05abf9fad0475d81d` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。部署失败不重试，production 继续 `NO_GO`。

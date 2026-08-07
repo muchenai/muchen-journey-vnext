@@ -14,14 +14,14 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-CANDIDATE = "2223fc1589d772e5397e43357fc5682f27c1c3a8"
+CANDIDATE = "c0765eb625fc3c99205dc3d05abf9fad0475d81d"
 WEB_ONLY_BASELINE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
 STAGING_HOST = "staging-vnext.muchenai.com"
 PRODUCTION_HOST = "journey.muchenai.com"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:69ab50c2fea5b9a7aa63af8ec81ac9d720bd86abf0586b69d0665408c2ccc393",
-    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:2d36bcd6f13cf6875df5426eac355b9185b4a8042b0be56ec0ea3011ef1688ac",
-    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:d16cc5d01eca42d1b1c41210520cecae21a428e3b6282045c0ba30e117c8a89b",
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:49f2412e584f635fa2a8e2ae52a44446b0e99d18c8daef3d3e7485b54e438b37",
+    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:9369885d58387b323044825a823448d56d1c5e520676bfd85de708090afbf0f8",
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:bd9686fb5f4caf84c5e96ec384e18f9fe888336f9e8d1566c5dad293a7afd95e",
 }
 WEB_ONLY_IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
