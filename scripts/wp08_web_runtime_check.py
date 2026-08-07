@@ -29,6 +29,32 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         del format, args
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        if self.path == "/api/v1/auth/feishu/start":
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length))
+            if payload != {"return_to": "/content"}:
+                self.send_error(400)
+                return
+            body = json.dumps(
+                {
+                    "data": {
+                        "authorization_url": (
+                            "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
+                            f"?state={'s' * 32}"
+                        )
+                    }
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header(
+                "Set-Cookie",
+                "journey_next_oauth=runtime-browser; Path=/; HttpOnly; SameSite=Lax",
+            )
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path != "/api/v1/auth/feishu/callback":
             self.send_error(404)
             return
@@ -37,13 +63,17 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if payload != {"code": "runtime-code", "state": "s" * 32}:
             self.send_error(400)
             return
-        body = json.dumps({"data": {"safe_entry": "/ops"}}).encode()
+        body = json.dumps({"data": {"safe_entry": "/content"}}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header(
             "Set-Cookie",
             "journey_next_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
+        )
+        self.send_header(
+            "Set-Cookie",
+            "journey_next_csrf=runtime-csrf; Path=/; Secure; SameSite=Lax",
         )
         self.end_headers()
         self.wfile.write(body)
@@ -86,14 +116,22 @@ def request(url: str) -> tuple[int, bytes, dict[str, str]]:
             return (
                 response.status,
                 response.read(),
-                {key.lower(): value for key, value in response.headers.items()},
+                normalized_headers(response.headers),
             )
     except urllib.error.HTTPError as error:
         return (
             error.code,
             error.read(),
-            {key.lower(): value for key, value in error.headers.items()},
+            normalized_headers(error.headers),
         )
+
+
+def normalized_headers(headers) -> dict[str, str]:  # type: ignore[no-untyped-def]
+    result = {key.lower(): value for key, value in headers.items()}
+    set_cookies = headers.get_all("Set-Cookie") or []
+    if set_cookies:
+        result["set-cookie"] = "\n".join(set_cookies)
+    return result
 
 
 def request_without_redirect(
@@ -106,13 +144,13 @@ def request_without_redirect(
             return (
                 response.status,
                 response.read(),
-                {key.lower(): value for key, value in response.headers.items()},
+                normalized_headers(response.headers),
             )
     except urllib.error.HTTPError as error:
         return (
             error.code,
             error.read(),
-            {key.lower(): value for key, value in error.headers.items()},
+            normalized_headers(error.headers),
         )
 
 
@@ -147,6 +185,11 @@ def main() -> None:
         text=True,
     )
     base_url = f"http://127.0.0.1:{port}"
+    proxy_headers = {
+        "Host": "staging-vnext.muchenai.com",
+        "X-Forwarded-Host": "staging-vnext.muchenai.com",
+        "X-Forwarded-Proto": "https",
+    }
     try:
         deadline = time.monotonic() + 20
         while True:
@@ -182,6 +225,44 @@ def main() -> None:
         if "no-store" not in review_headers.get("cache-control", ""):
             raise RuntimeError("anonymous /review denial is cacheable")
 
+        content_status, _, content_headers = request_without_redirect(
+            f"{base_url}/content", {}
+        )
+        if content_status != 303 or content_headers.get("location") != "/content/login":
+            raise RuntimeError(
+                "anonymous /content did not redirect to the dedicated login page: "
+                f"status={content_status} location={content_headers.get('location')!r}"
+            )
+        if "no-store" not in content_headers.get("cache-control", ""):
+            raise RuntimeError("anonymous /content redirect is cacheable")
+
+        content_login_status, content_login_body, _ = request(
+            f"{base_url}/content/login"
+        )
+        if content_login_status != 200:
+            raise RuntimeError(
+                f"Content Editor login page returned HTTP {content_login_status}"
+            )
+        if "使用飞书进入".encode() not in content_login_body:
+            raise RuntimeError("Content Editor login page has no Feishu entry action")
+
+        oauth_start_status, _, oauth_start_headers = request_without_redirect(
+            f"{base_url}/auth/feishu?return_to=%2Fcontent", proxy_headers,
+        )
+        if oauth_start_status != 303:
+            raise RuntimeError(
+                f"Content Editor OAuth start returned HTTP {oauth_start_status}"
+            )
+        authorization_url = oauth_start_headers.get("location", "")
+        if not authorization_url.startswith(
+            "https://accounts.feishu.cn/open-apis/authen/v1/authorize?"
+        ):
+            raise RuntimeError("Content Editor OAuth start left the approved Feishu host")
+        if "journey_next_oauth=runtime-browser" not in oauth_start_headers.get(
+            "set-cookie", ""
+        ):
+            raise RuntimeError("Content Editor OAuth start did not preserve browser context")
+
         expired_status, _, expired_headers = request_without_redirect(
             f"{base_url}/review",
             {"Cookie": "journey_next_session=revoked-runtime-only"},
@@ -214,24 +295,21 @@ def main() -> None:
         if second_nonce is None or second_nonce.group(1) == policy_nonce.group(1):
             raise RuntimeError("CSP nonce is not unique per request")
 
-        proxy_headers = {
-            "Host": "staging-vnext.muchenai.com",
-            "X-Forwarded-Host": "staging-vnext.muchenai.com",
-            "X-Forwarded-Proto": "https",
-        }
         callback_status, _, callback_headers = request_without_redirect(
             f"{base_url}/auth/feishu/callback?code=runtime-code&state={'s' * 32}",
             proxy_headers,
         )
         if callback_status != 303:
             raise RuntimeError(f"OAuth callback returned HTTP {callback_status}")
-        if callback_headers.get("location") != "/ops":
+        if callback_headers.get("location") != "/content":
             raise RuntimeError(
-                "OAuth callback did not return a root-relative /ops redirect: "
+                "OAuth callback did not return a root-relative /content redirect: "
                 f"{callback_headers.get('location')!r}"
             )
         if "journey_next_session=runtime-only" not in callback_headers.get("set-cookie", ""):
             raise RuntimeError("OAuth callback did not preserve the upstream session cookie")
+        if "journey_next_csrf=runtime-csrf" not in callback_headers.get("set-cookie", ""):
+            raise RuntimeError("OAuth callback did not preserve the upstream CSRF cookie")
 
         invalid_status, _, invalid_headers = request_without_redirect(
             f"{base_url}/auth/feishu/callback?code=invalid",
@@ -259,8 +337,8 @@ def main() -> None:
 
     print(
         "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401 anonymous_review=401"
-        " expired_reviewer=explicit-relogin root=200 csp_nonce=per-request"
-        " oauth_redirect=root-relative"
+        " anonymous_content=login-page expired_reviewer=explicit-relogin"
+        " root=200 csp_nonce=per-request oauth_redirect=root-relative-content"
     )
 
 
