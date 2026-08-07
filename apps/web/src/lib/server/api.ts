@@ -435,6 +435,16 @@ export type OpsIdentityAccess = {
   >;
 };
 
+export type OpsRevokedIdentityTransferCandidate = {
+  identity_id: string;
+  identity_revision: number;
+  source_user_id: string;
+  source_display_name: string;
+  source_roles: Array<"REVIEWER" | "OPERATOR" | "CONTENT_EDITOR">;
+  revoked_at: string;
+  active_session_count: number;
+};
+
 export type OpsInvite = {
   id: string;
   purpose: string;
