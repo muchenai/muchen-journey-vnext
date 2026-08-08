@@ -117,6 +117,7 @@ def browser_spec(path: Path) -> dict[str, Any]:
         "horizontal_overflow",
         "focus_keyboard",
         "anonymous_protected_status",
+        "anonymous_content_reentry",
     }
     if set(spec.get("checks", [])) != required_checks:
         raise ReadinessError("browser spec is missing a canonical smoke check")
