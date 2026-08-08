@@ -356,3 +356,11 @@
 - PR #154 仅把 `/content` 加入精确同源安全入口，并增加未知入口拒绝、成功回跳和 cookie 响应转发合同；没有修改数据库、身份、角色或业务事实。PR 合入主线 `c0765eb625fc3c99205dc3d05abf9fad0475d81d`，Mainline Candidate Gate [`31171640166`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31171640166) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration head 保持 `0019_wp30_invitation_control`；
 - 新候选固定 API `sha256:49f2412e…8b37`、Web `sha256:9369885d…f0f8`、Worker `sha256:bd9686fb…d95e`。本绑定只建立候选、摘要、artifact、确认词和回归合同，不执行 staging 部署，不修改身份或业务事实；
 - 只有本绑定 PR 合入并取得完整候选 `c0765eb625fc3c99205dc3d05abf9fad0475d81d` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。部署失败不重试，production 继续 `NO_GO`。
+
+## 2026-08-08 Content Editor 无会话重新进入候选绑定
+
+- PR #156 为匿名访问 `/content` 增加同源 `/content/login` 与“使用飞书进入”，并以真实浏览器端到端合同覆盖登录入口；`/ops` 与 `/review` 对匿名访问继续返回 401。该变更没有修改数据库、身份、角色或业务事实；
+- PR #156 合入后的 Mainline Candidate Gate [`31258836950`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31258836950) 在候选打包前被新披露的 `GHSA-2v37-7h3g-55p8` 拒绝，因此没有候选 artifact 或镜像 push。PR #157 只把既有 Web override 中的 `nanoid` 固定为 `3.3.17`，没有扩大依赖或产品范围；
+- PR #157 合入新主线 `3b7d7573cd70b72868e427b523ff630b732f0603` 后，Mainline Candidate Gate [`31259643008`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31259643008) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
+- 新候选固定 API `sha256:009be6c7…6b9a`、Web `sha256:b8073419…f2e5`、Worker `sha256:9796479e…7323`。机器合同同时要求匿名 `/content` 返回 303、`Location: /content/login`、`Cache-Control: no-store`，且登录页展示“使用飞书进入”；
+- 本绑定只更新候选、artifact run、三镜像摘要、唯一确认词与外部 smoke，不执行 staging 部署，不修改身份或业务事实。只有绑定 PR 合入并取得完整候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署；失败不重试并必须关闭临时 SSH。production 继续 `NO_GO`。

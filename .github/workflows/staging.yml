@@ -36,10 +36,10 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == 'c0765eb625fc3c99205dc3d05abf9fad0475d81d' &&
+      inputs.candidate == '3b7d7573cd70b72868e427b523ff630b732f0603' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_C0765EB_TO_VOLCENGINE_STAGING') ||
-      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_C0765EB_STAGING') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_3B7D757_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_3B7D757_STAGING') ||
       (inputs.phase == 'diagnose-publication' && inputs.confirmation == 'DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING') ||
       (inputs.phase == 'repair-edge-route' && inputs.confirmation == 'REPAIR_EDGE_ROUTE_EF0A512_STAGING') ||
       (inputs.phase == 'cleanup-failed-release' && inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'))
@@ -90,10 +90,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-c0765eb625fc3c99205dc3d05abf9fad0475d81d
+          name: wp07-candidate-3b7d7573cd70b72868e427b523ff630b732f0603
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 31171640166
+          run-id: 31259643008
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
@@ -105,11 +105,17 @@ jobs:
               grep -Fq "http://localhost:3000/health/ready"
             git show "$candidate:apps/web/src/proxy.ts" | grep -Fq 'code: "AUTH_REQUIRED"'
             git show "$candidate:apps/web/src/proxy.ts" | \
-              grep -Fq '["/ops", "/review", "/content"]'
+              grep -Fq '["/ops", "/review"]'
+            git show "$candidate:apps/web/src/proxy.ts" | \
+              grep -Fq 'isContentRoute && !isContentLogin && !hasSession'
+            git show "$candidate:apps/web/src/app/content/login/page.tsx" | \
+              grep -Fq '使用飞书进入'
             git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts" | \
               grep -Fq "sameOriginIdentityRedirect"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
-              grep -Fq "oauth_redirect=root-relative"
+              grep -Fq "anonymous_content=login-page"
+            git show "$candidate:scripts/wp08_web_runtime_check.py" | \
+              grep -Fq "oauth_redirect=root-relative-content"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
               grep -Fq "expired_reviewer=explicit-relogin"
             git show "$candidate:apps/worker/journey_worker/main.py" | \
@@ -413,8 +419,14 @@ jobs:
             https://staging-vnext.muchenai.com/ops)" = "401"
           test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             https://staging-vnext.muchenai.com/review)" = "401"
-          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            https://staging-vnext.muchenai.com/content)" = "401"
+          content_headers="$RUNNER_TEMP/wp08-content-entry-headers"
+          test "$(curl --silent --show-error --dump-header "$content_headers" \
+            --output /dev/null --write-out '%{http_code}' \
+            https://staging-vnext.muchenai.com/content)" = "303"
+          grep -Eiq '^location: /content/login\r?$' "$content_headers"
+          grep -Eiq '^cache-control: .*no-store' "$content_headers"
+          curl --fail --silent --show-error \
+            https://staging-vnext.muchenai.com/content/login | grep -Fq '使用飞书进入'
       - name: Close SSH ingress
         if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |

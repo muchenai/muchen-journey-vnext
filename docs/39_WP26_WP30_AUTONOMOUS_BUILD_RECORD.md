@@ -1,10 +1,10 @@
 # 39｜WP-26～WP-30 本地构建记录与待授权账本
 
-状态：`CONTENT_EDITOR_LINKED / OAUTH_CALLBACK_FIX_CANDIDATE_BINDING / HUMAN_GATES_NOT_RUN / PRODUCTION_NO_GO`
+状态：`CONTENT_EDITOR_LINKED / ANONYMOUS_ENTRY_CANDIDATE_BINDING / HUMAN_GATES_NOT_RUN / PRODUCTION_NO_GO`
 
 版本：V0.3
 
-日期：2026-08-07
+日期：2026-08-08
 
 依据：DEC-026、REQ-BR-016..018、AT-WP26-001..005、AT-WP27-001..005、AT-WP28-001..005、AT-WP29-001..005、AT-WP30-001..006
 
@@ -68,9 +68,9 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 2026-08-05 Owner 已明确同意本节全部待授权事项。该授权允许按以下顺序推进，但不把尚未发生的真人材料、独立复核、UAT、六方签署、正式域名 readback 或观察窗口写成通过；任何前置门禁失败即停止，production 在 `P0_RC_SIGNED` 前继续 `NO_GO`。
 
 1. 审阅并合入本地 PR；合入本身不部署。`DONE`：PR #148 已通过 Fast Gate 并合入主线 `a2312b269b1806cd3d5ce7d26fbc693466399035`。
-2. 在 staging 创建/绑定真实 Content Editor；不读取通讯录，不扩大其他身份。`IDENTITY_LINKED / BROWSER_SESSION_BLOCKED_BY_WEB_CALLBACK`：受控历史身份迁移、新链接和本人 OAuth 已完成，机器读回确认身份为 `LINKED`；Web callback 未允许 `/content` 导致 cookie 未进入浏览器，PR #154 已修复并形成新候选，尚未部署。
+2. 在 staging 创建/绑定真实 Content Editor；不读取通讯录，不扩大其他身份。`IDENTITY_LINKED / ANONYMOUS_ENTRY_RECOVERY_CANDIDATE_READY`：受控历史身份迁移、新链接和本人 OAuth 已完成，机器读回确认身份为 `LINKED`；PR #154 已修复 `/content` callback cookie 转发，PR #156 又为匿名 `/content` 增加同源登录入口，当前等待候选绑定与新的部署授权。
 3. 由 Content Editor 导入并提交批准材料，由独立 Reviewer 线下复核，Operator 精确发布八个 TaskVersion。
-4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。`IDENTITY_TRANSFER_DEPLOYED / OAUTH_CALLBACK_FIX_CANDIDATE_READY / NEW_DEPLOY_AUTHORIZATION_REQUIRED`：run `31147474464` 已成功部署候选 `2223fc1…` 并关闭 SSH；身份迁移与本人 OAuth 已完成。PR #154 已合入主线 `c0765eb…`，Mainline Candidate Gate `31171640166` 已生成并远端复验三镜像，migration 保持 `0019`。回调修复候选尚未部署，必须在新的绑定 PR 合入后，以完整候选和合入后主线 SHA 另行取得精确授权。
+4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。`IDENTITY_TRANSFER_DEPLOYED / ANONYMOUS_ENTRY_CANDIDATE_READY / NEW_DEPLOY_AUTHORIZATION_REQUIRED`：run `31147474464` 已成功部署候选 `2223fc1…` 并关闭 SSH；身份迁移与本人 OAuth 已完成。PR #156/#157 已合入新主线 `3b7d757…`，Mainline Candidate Gate `31259643008` 已生成并远端复验三镜像，migration 保持 `0019`。当前候选尚未部署，必须在新的绑定 PR 合入后，以完整候选和合入后主线 SHA 另行取得精确授权。
 5. Operator 单独发布 Journey V3；不迁移 V1/V2 Enrollment，不自动创建邀请。
 6. 依次执行 WP-26、WP-27、WP-28 真人门禁；失败保留原证据，只修 P0 blocker。
 7. 固定候选与 V3 后执行 WP-29 整日 UAT；只有私密证据通过验证器并完成六方签署，才可形成 `P0_RC_SIGNED`。
@@ -96,4 +96,4 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 
 本地复验：API `308 passed`；Web 合同 `19 passed` 且 Next.js production build 通过；OpenAPI readback、隔离检查、traceability 与 gitleaks 均通过。
 
-PR #152/#153 已完成受控身份迁移实现、候选绑定和唯一 staging 部署；Operator 随后完成迁移和新链接，本人 OAuth 的机器读回确认身份为 `LINKED`。PR #154 已修复 `/content` OAuth callback 并合入主线 `c0765eb625fc3c99205dc3d05abf9fad0475d81d`；Mainline Candidate Gate `31171640166` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration 保持 `0019_wp30_invitation_control`。当前新候选尚未部署；必须先合入候选绑定 PR，再以完整候选 `c0765eb625fc3c99205dc3d05abf9fad0475d81d` 与合入后主线 SHA 取得精确 staging 部署授权。
+PR #152/#153 已完成受控身份迁移实现、候选绑定和唯一 staging 部署；Operator 随后完成迁移和新链接，本人 OAuth 的机器读回确认身份为 `LINKED`。PR #154 修复 `/content` OAuth callback；PR #156 增加匿名 `/content` 的同源登录恢复与真实浏览器合同；PR #157 仅固定 `nanoid 3.3.17` 以关闭新出现的安全公告。新主线 `3b7d7573cd70b72868e427b523ff630b732f0603` 的 Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration 保持 `0019_wp30_invitation_control`。当前新候选尚未部署；必须先合入候选绑定 PR，再以完整候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 与合入后主线 SHA 取得精确 staging 部署授权。

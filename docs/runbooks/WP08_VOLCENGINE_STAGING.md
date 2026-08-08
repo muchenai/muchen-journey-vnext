@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`CONTENT_EDITOR_OAUTH_CALLBACK_CANDIDATE_BOUND_PENDING_AUTHORIZATION / LAST_DEPLOYED_API_WEB_WORKER_2223FC1 / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。最近一次成功部署证据为 API/Web/Worker=`2223fc1…`、migration=`0019_wp30_invitation_control` 的 run `31147474464`；该候选的唯一部署已消费。随后 Operator 完成了受控历史身份迁移、生成新链接，且账号持有人本人完成 OAuth；机器读回确认 Content Editor 已重新激活，但 Web OAuth callback 未允许 `/content` 作为安全回跳入口，导致 API 已创建会话而浏览器未收到 cookie。PR #154 已修复该 Web 回调并合入主线 `c0765eb…`，Mainline Gate 已远端复验三镜像；新候选尚未部署。候选绑定不替真人提供材料、复核或签署，不发布 Journey V3、不创建邀请、不发送消息；production 继续 `NO_GO`。
+状态：`CONTENT_EDITOR_ANONYMOUS_ENTRY_CANDIDATE_BOUND_PENDING_AUTHORIZATION / LAST_DEPLOYED_API_WEB_WORKER_2223FC1 / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。最近一次成功部署证据为 API/Web/Worker=`2223fc1…`、migration=`0019_wp30_invitation_control` 的 run `31147474464`；该候选的唯一部署已消费。PR #154/#156 依次修复 `/content` OAuth 回调 cookie 转发和无会话安全重新进入；PR #157 只关闭候选生成时新出现的 `nanoid` 公告。新主线 `3b7d757…` 的 Mainline Gate 已远端复验三镜像，当前只建立其部署合同，尚未部署。候选绑定不替真人提供材料、复核或签署，不发布 Journey V3、不创建邀请、不发送消息；production 继续 `NO_GO`。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -27,6 +27,7 @@
 - `/content` 身份入口修复候选：`e61cb3af80baef389157ead79fc91ebf89e52adc`；Mainline Candidate Gate `30960806357` 与唯一 staging deploy run `31006041324` 均成功，migration head 保持 `0019_wp30_invitation_control`，临时 SSH 已关闭。该候选已经消费，不得再次部署；
 - Content Editor 历史身份迁移候选：`2223fc1589d772e5397e43357fc5682f27c1c3a8`；Mainline Candidate Gate `31137770622` 与唯一 staging deploy run `31147474464` 均成功，migration head 保持 `0019_wp30_invitation_control`，临时 SSH 已关闭。Operator 随后完成受控迁移和新链接生成，账号持有人本人完成 OAuth，机器读回确认 Content Editor 为 `LINKED`；该候选已经消费，不得再次部署；
 - Content Editor OAuth 回调修复候选：`c0765eb625fc3c99205dc3d05abf9fad0475d81d`；PR #154 把 `/content` 加入 Web callback 的精确同源安全入口，并增加 cookie 响应转发合同。Mainline Candidate Gate `31171640166` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration head 保持 `0019_wp30_invitation_control`；候选尚未部署；
+- Content Editor 无会话重新进入候选：`3b7d7573cd70b72868e427b523ff630b732f0603`；PR #156 为匿名 `/content` 增加同源 `/content/login` 与“使用飞书进入”，保持 `/ops`、`/review` 匿名 401；PR #157 仅固定 `nanoid 3.3.17` 以关闭候选门禁公告。Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与摘要复验，migration head 保持 `0019_wp30_invitation_control`；候选尚未部署；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -96,11 +97,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 原子绑定 Content Editor OAuth 回调修复候选 `c0765eb…`、Mainline run `31171640166`、API `sha256:49f2412e…8b37`、Web `sha256:9369885d…f0f8`、Worker `sha256:bd9686fb…d95e`、artifact name 和唯一确认词；绑定只描述部署合同，不授予部署。最近一次成功部署证据仍是 run `31147474464` 的 `2223fc1…`。真人输入与签署仍须真实完成，任何前置门禁失败都停止后续步骤。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review`/`/content` 匿名拒绝、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、OAuth callback 安全入口与 cookie 响应转发、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
+当前 workflow/config 原子绑定 Content Editor 无会话重新进入候选 `3b7d757…`、Mainline run `31259643008`、API `sha256:009be6c7…b9a`、Web `sha256:b8073419…2e5`、Worker `sha256:9796479e…323`、artifact name 和唯一确认词；绑定只描述部署合同，不授予部署。最近一次成功部署证据仍是 run `31147474464` 的 `2223fc1…`。真人输入与签署仍须真实完成，任何前置门禁失败都停止后续步骤。workflow 必须从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名 401、`/content` 匿名 303 同源登录恢复、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、OAuth callback 安全入口与 cookie 响应转发、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. 所有历史确认词均不得复用；本候选只接受 `DEPLOY_C0765EB_TO_VOLCENGINE_STAGING`。绑定 PR 合入且 required check 通过仍不等于部署授权；只有 Owner 再明确授权完整候选 `c0765eb625fc3c99205dc3d05abf9fad0475d81d` 和绑定 PR 的合入后主线 SHA，才能消费一次冻结基础设施 staging 部署，失败不重试。任何前置状态漂移必须零业务写入停止，不得退化为 provision、Web-only、runtime-repair 或修改期望基线。
+3. 所有历史确认词均不得复用；本候选只接受 `DEPLOY_3B7D757_TO_VOLCENGINE_STAGING`。绑定 PR 合入且 required check 通过仍不等于部署授权；只有 Owner 再明确授权完整候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 和绑定 PR 的合入后主线 SHA，才能消费一次冻结基础设施 staging 部署，失败不重试。任何前置状态漂移必须零业务写入停止，不得退化为 provision、Web-only、runtime-repair 或修改期望基线。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 
