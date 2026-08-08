@@ -685,8 +685,13 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         "https://staging-vnext.muchenai.com/ops",
         "https://staging-vnext.muchenai.com/review",
         "https://staging-vnext.muchenai.com/content",
+        "https://staging-vnext.muchenai.com/content/login",
         "'%{http_code}'",
         '= "401"',
+        '= "303"',
+        "^location: /content/login",
+        "^cache-control: .*no-store",
+        "使用飞书进入",
         "expired_reviewer=explicit-relogin",
         'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
         'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
@@ -707,8 +712,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        '["/ops", "/review", "/content"]',
-        "INSPECT_RUNTIME_C0765EB_STAGING",
+        '["/ops", "/review"]',
+        "isContentRoute && !isContentLogin && !hasSession",
+        'git show "$candidate:apps/web/src/app/content/login/page.tsx"',
+        "anonymous_content=login-page",
+        "oauth_redirect=root-relative-content",
+        "INSPECT_RUNTIME_3B7D757_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
@@ -749,7 +758,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
-        or workflow.count('git show "$candidate:') != 13
+        or workflow.count('git show "$candidate:') != 16
     ):
         raise StagingError(
             "deploy must verify the Web, bounded database pool, WP-11, and WP-12B contracts "
