@@ -379,3 +379,12 @@
 - PR #160 合入主线 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 后，Mainline Candidate Gate [`31317525199`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31317525199) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端摘要复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
 - 新候选固定 API `sha256:2b67a095…ca8b`、Web `sha256:0e1cbd1b…777d`、Worker `sha256:ce63089b…b447`。本绑定只更新候选、artifact run、三镜像摘要、唯一确认词与回归合同；不执行 staging 部署，不创建邀请，不修改 Journey V3、Enrollment、身份或消息事实；
 - 只有绑定 PR 合入并取得完整候选 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。部署成功且标签机器读回正确后，仍需单独授权创建首条 Journey V3 受控邀请；production 继续 `NO_GO`。
+
+## 2026-08-10 staging 外部表面门禁可观测化候选绑定
+
+- Journey V3 标签修复候选 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 的唯一 deploy run [`31325490856`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31325490856) 已完成三服务与 Edge 替换并关闭临时 SSH；最后的外部 smoke 在短暂切换窗口标红。随后只读核对确认实际运行态 release=`3445b57…`、migration=`0019_wp30_invitation_control`、API/DB READY、Worker release 正确，公开根页/readiness、匿名受保护路由及 Journey V3 标签均满足合同。该 run 原始失败记录保留，候选不得重跑；
+- PR #162 将部署后的九项外部合同改为逐项输出 `WP08_SURFACE_CHECK`，只记录检查名、轮次、PASS/FAIL、HTTP 状态与经过白名单清洗的 readiness 字段，不输出响应正文、地址、身份、业务数据或凭据；
+- 同一 workflow 最多执行 12 轮只读外部核验，每轮间隔 5 秒，单请求连接时限 2 秒、总时限 3 秒。任一轮九项全通过即结束；窗口耗尽仍 fail closed。该重试不拉取镜像、不重启容器、不重复 migration、grant、seed 或业务写入，也不等于第二次部署；
+- PR #162 合入主线 `ff53052847a268d025bceb93c3eab37986d50219` 后，Mainline Candidate Gate [`31340959377`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31340959377) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端摘要复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
+- 新候选固定 API `sha256:2a053bad…a6a6c`、Web `sha256:a3335542…e2aee`、Worker `sha256:2ef3cd1b…9f38`。本绑定只更新候选、artifact run、三镜像摘要、唯一确认词和候选源码反查合同；不运行 Terraform、DNS、云资源或 WP-12B，不发布 Journey V3、不创建邀请、不发送消息、不修改身份或业务事实；
+- 绑定合入并通过门禁后，只允许按 Owner 本次授权执行一次冻结基础设施 staging 部署验收。部署失败不重试且必须关闭临时 SSH；成功后须核对 exact release、migration、API/DB readiness、Worker revision、匿名路由与 Journey V3 标签。production 继续 `NO_GO`。
