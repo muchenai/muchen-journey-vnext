@@ -364,3 +364,10 @@
 - PR #157 合入新主线 `3b7d7573cd70b72868e427b523ff630b732f0603` 后，Mainline Candidate Gate [`31259643008`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31259643008) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
 - 新候选固定 API `sha256:009be6c7…6b9a`、Web `sha256:b8073419…f2e5`、Worker `sha256:9796479e…7323`。机器合同同时要求匿名 `/content` 返回 303、`Location: /content/login`、`Cache-Control: no-store`，且登录页展示“使用飞书进入”；
 - 本绑定只更新候选、artifact run、三镜像摘要、唯一确认词与外部 smoke，不执行 staging 部署，不修改身份或业务事实。只有绑定 PR 合入并取得完整候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署；失败不重试并必须关闭临时 SSH。production 继续 `NO_GO`。
+
+## 2026-08-09 Content Editor 无会话重新进入候选部署
+
+- Owner 精确授权候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 基于主线 `a7d6a86f07efbcf2f8e9771108b19dbe1a15026f`，在华北2（北京）的冻结 staging 基础设施执行一次 `phase=deploy`；
+- 唯一 run [`31261406217`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31261406217) 完成候选校验、既有 `0019_wp30_invitation_control` migration 核对、API/Web/Worker/Edge 替换和临时 SSH 关闭。没有 Terraform、DNS、云资源、WP-12B、Journey V3、邀请、消息、身份或业务事实变更，也没有重试；
+- 工作流末尾外部验证发生竞态并使 run 最终状态为失败，原始失败保持不变；随后同一运行态 exact public contract 立即通过且连续三次通过：根页 `200`、readiness 精确返回 `3b7d757…`、匿名 `/ops` 和 `/review` 为 `401`、匿名 `/content` 为 `303` 且只转向 `/content/login`、登录页展示“使用飞书进入”；
+- 因部署授权已消费且运行态合同稳定通过，不允许以工作流红色结论为由再次部署。当前下一项是八个不可变 TaskVersion 与 Journey V3 的受控业务发布准备，production 继续 `NO_GO`。

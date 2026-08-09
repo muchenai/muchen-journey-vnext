@@ -1,12 +1,12 @@
 # 38｜WP-25 P0 Experience & Content Freeze 执行包
 
-状态：`PROTOTYPE_MACHINE_VERIFIED / HUMAN_GATES_NOT_RUN / CONTENT_INPUT_REQUIRED`
+状态：`CONTENT_SOURCE_FROZEN / REVIEWER_REVIEW_OWNER_REPORTED / RESULT_COPY_DRAFTED / OPERATOR_APPROVAL_PENDING`
 
-版本：V0.1
+版本：V0.2
 
-日期：2026-08-04
+日期：2026-08-09
 
-授权边界：仅允许内容盘点、完整交互原型和真人验证准备；不修改产品代码、API、数据库、权限、运行配置或外部环境，不部署、不发布 Journey V3、不创建邀请。
+本轮授权边界：允许把已确认的唯一内容源、Reviewer 复核陈述和结果文案草案写入施工文档，并完成 Journey V3 发布准备；不发布 Journey V3、不创建邀请、不发送消息、不修改身份、既有业务事实或外部环境。
 
 ## 1. 开工事实
 
@@ -15,24 +15,43 @@
 - latest release evidence snapshot：本地存在文档/原型变更，候选仍为 `0589fc825e41dc0c536b3bf87ac284c9a50013fd`，完整 release gate 保持 `NO_GO`；
 - 产品事实源：《MUCHEN新人启航探索营 V1.0》、DEC-024/025/026、WP-17/18/24 与 37 号工作包；
 - 原型为零网络写入的本地设计工件，不是产品实现、发布候选或真人 UAT 证据。
+- 2026-08-09 发布准备基线：主线 `a7d6a86f07efbcf2f8e9771108b19dbe1a15026f`，施工分支 `codex/journey-v3-release-prep`；staging 当前运行候选为 `3b7d7573cd70b72868e427b523ff630b732f0603`，Journey V3 尚未发布。
 
 ## 2. 正式内容盘点
 
-《MUCHEN新人启航探索营 V1.0》已明确 Day 0、四宝藏、三评测、一天课表、评分建议和人工分工，但多数公司/项目材料只出现名称，没有可直接发布的批准正文。不能由工程师自行补写公司事实或把题目说明当学习材料。
+2026-08-09，Owner 指定下列飞书表格为本轮唯一正式内容源，并明确其取代此前 Base、Wiki、PDF 和本地映射中的冲突版本：
+
+- [Muchen Journey 正式内容表](https://zx6w57w0j34.feishu.cn/sheets/LpnOsAMGth34BVtzRdXcq96Unwh?from=from_copylink&sheet=0HnpkV)
+
+该表把内容组织成**八个站点、十六份学习材料**：`DAY-0` 含“给 Muchener 的一封信”和“公司介绍与培训流程”两份开营材料；其后为四个宝藏和三项能力评测，每站各有材料记录。`DAY-1` 是 `DAY-0` 站内材料标签，不是第九个 Journey 节点。代码合同继续固定 `DAY-0 + 四宝藏 + 三评测`，不得因表格行名改变路线结构。
+
+Reviewer 复核完成由 Owner 于 2026-08-09 明确陈述。本记录可以作为发布准备输入，但不能替代 Operator 在产品界面选择 Reviewer、确认八个不可变 TaskVersion、填写复核记录并提交发布命令后的机器读回。
 
 | 阶段 | 正式方案已经锁定 | 仍需 Content Editor 提供/确认 | 当前状态 |
 | --- | --- | --- | --- |
-| Day 0 | 《给 Muchener 的一封信》、公司基础介绍、Day 1 流程 | 经批准的信件正文/摘要、公司介绍正文、可公开给候选人的流程短版 | `SOURCE_REQUIRED` |
-| 宝藏一 | 公司认知与 Muchener 价值理解；3–5 句反思题 | 公司介绍、业务定位、人才培养与成长方式的批准材料；来源和受众 | `SOURCE_REQUIRED` |
-| 宝藏二 | AI 数据与模型基础；三个理解问题 | 批准的视频/资料 URL、模型错误例、数据质量与证据链材料；版权/可访问性 | `PARTIAL_SOURCE` |
-| 宝藏三 | 项目类型、客户问题、项目价值；3 选择＋1 判断＋1 简答 | 脱敏项目说明、案例、客户需求示例和价值说明；禁止泄露客户/经营信息 | `SOURCE_REQUIRED` |
-| 宝藏四 | 角色、责任边界、提报机制；4 选择＋1 简答 | 项目角色、MDOS 简版、提报机制、新手村基础说明的候选人版本 | `SOURCE_REQUIRED` |
-| 评测一 | 规则拆解：目标、维度、红线、提报点 | WP-24 合成题面与 Rubric 的 Reviewer 最终复核 | `REVIEW_REQUIRED` |
-| 评测二 | 模型回答比较与理由书写 | WP-24 A/B 回答、约束与 Rubric 的 Reviewer 最终复核 | `REVIEW_REQUIRED` |
-| 评测三 | 通用数据构造、覆盖矩阵和自检 | WP-24 合成任务、schema、样本边界与 Rubric 的 Reviewer 最终复核 | `REVIEW_REQUIRED` |
-| 结果 | 100 分建议、A/B/C/D、Operator 人工准入 | Learner 可见的结果措辞、DEFER/NOT_ADMIT 边界和下一步责任人 | `COPY_REVIEW_REQUIRED` |
+| Day 0 | 《给 Muchener 的一封信》、公司介绍与培训流程 | 按唯一正式内容源导入两份 required materials，并由 Operator 核对预览 | `SOURCE_FROZEN / IMPORT_NOT_READ_BACK` |
+| 宝藏一 | 公司认知与 Muchener 价值理解；对应主题小任务 | 按正式表格导入文档、视频/外链、小任务和自检 | `SOURCE_FROZEN / IMPORT_NOT_READ_BACK` |
+| 宝藏二 | AI 数据与模型基础；对应主题小任务 | 按正式表格导入文档、视频/外链、小任务和自检 | `SOURCE_FROZEN / IMPORT_NOT_READ_BACK` |
+| 宝藏三 | 项目认知与项目管理流程；对应主题小任务 | 按正式表格导入脱敏材料、小任务和自检 | `SOURCE_FROZEN / IMPORT_NOT_READ_BACK` |
+| 宝藏四 | 关键角色、新人责任边界与交付适配；对应主题小任务 | 按正式表格导入脱敏材料、小任务和自检 | `SOURCE_FROZEN / IMPORT_NOT_READ_BACK` |
+| 评测一 | 规则拆解题面、交付格式和 Rubric | Operator 发布时绑定已完成复核的 Reviewer 与不可变版本 | `REVIEWER_REVIEW_OWNER_REPORTED / PUBLISH_NOT_READ_BACK` |
+| 评测二 | 模型判断题面、交付格式和 Rubric | Operator 发布时绑定已完成复核的 Reviewer 与不可变版本 | `REVIEWER_REVIEW_OWNER_REPORTED / PUBLISH_NOT_READ_BACK` |
+| 评测三 | 数据构造题面、交付格式和 Rubric | Operator 发布时绑定已完成复核的 Reviewer 与不可变版本 | `REVIEWER_REVIEW_OWNER_REPORTED / PUBLISH_NOT_READ_BACK` |
+| 结果 | Operator 人工准入的 `ADMIT / DEFER / NOT_ADMIT` | Owner/Operator 审阅本节草案；产品发布后保持版本化、不可原地改写 | `COPY_DRAFTED / OPERATOR_APPROVAL_PENDING` |
 
-允许进入原型的内容只能来自正式方案的已写明目标、问题和结构，统一标记 `DRAFT_FROM_APPROVED_SOURCE`。未提供的公司/项目事实不以占位正文冒充已冻结内容。
+允许进入 Journey V3 的内容只能来自上述唯一正式内容源。正文、URL、题面、Rubric 或状态存在冲突时必须停止并回到该表核对；工程师不得自行补写公司事实，也不得把旧 PDF/Base 内容静默混入 V3。
+
+### 2.1 Learner 可见结果文案 V0.1
+
+以下为 Owner 授权先行拟定的版本。它们只描述本轮证据与下一步，不把系统建议写成自动录用或永久能力判断。发布前仍需 Operator 在产品内确认。
+
+| 结果 | 标题 | Learner 可见说明 | 唯一下一步 | 责任人 |
+| --- | --- | --- | --- | --- |
+| `ADMIT` | 通过，进入下一阶段 | 你已完成本轮探索与三项能力评测，当前证据达到准入要求。通过不是终点，下一阶段将进入真实任务与协作验证。 | 等待运营确认下一阶段安排 | Operator |
+| `DEFER` | 需要补充一次 | 当前提交已展示部分能力，但证据尚不足以作出最终准入判断。请只补充反馈中指出的内容；原提交和评审记录会保留。 | 按评审反馈补充并重新提交 | Learner |
+| `NOT_ADMIT` | 本次暂不进入下一阶段 | 基于本轮探索材料与三项能力评测，当前证据未达到本次准入要求。该结果只针对本轮岗位匹配与提交表现，不代表对个人能力的永久判断。 | 阅读最终反馈并结束本轮探索 | Learner |
+
+结果页必须同时保留：已完成的学习事实、三项能力证据、Reviewer 结论、系统非决定建议和 Operator 人工决定；不得只显示上表一句文案。
 
 ## 3. P0 页面与状态矩阵
 
@@ -99,21 +118,20 @@
 
 ## 8. 当前退出差距
 
-- `AT-WP25-001`：`BLOCKED`，真实公司/项目材料和结果措辞尚未由 Content Editor 提供并复核；
+- `AT-WP25-001`：`CONTENT_SOURCE_FROZEN / IMPORT_AND_OPERATOR_READBACK_PENDING`，唯一正式内容源、四宝藏小任务、三评测和结果文案草案已齐；产品内导入、预览、不可变版本与 Operator 读回尚未发生；
 - `AT-WP25-002`：`MACHINE_PASS / HUMAN_REVIEW_NOT_RUN`，完整原型已经覆盖正常、等待、修订、恢复、通过和错误恢复合同；
 - `AT-WP25-003`：`NOT_RUN`，三名目标用户尚未执行；
 - `AT-WP25-004`：`MACHINE_PASS / CONTENT_DESIGN_QA_SIGNOFF_NOT_RUN`，三视口、路线坐标、唯一主操作、键盘提示和 reduced-motion 已通过；
-- `AT-WP25-005`：待材料、状态、页面与后续 API 追踪表最终核对。
+- `AT-WP25-005`：`MAPPING_FROZEN / RUNTIME_READBACK_PENDING`，八站映射已经与代码 stable key 合同核对；发布 TaskVersion/JourneyVersion 后仍须读取摘要证明运行态与本文一致。
 
-因此 WP-25 当前只能记 `IN_PROGRESS`，不得记 `P0_EXPERIENCE_CONTENT_APPROVED`，不得启动 WP-26。
+因此本轮内容缺失不再是阻塞，但 WP-25 真人体验门禁仍未完成，只能记 `IN_PROGRESS`，不得伪造 `P0_EXPERIENCE_CONTENT_APPROVED`。Journey V3 可以进入受控发布准备，但“发布成功”不能替代 WP-25～WP-29 的真人通过。
 
 ## 9. 下一项人工输入
 
-Content Editor 只需按阶段提供以下最小包，不需要先建设内容后台：
+下一步不再向 Content Editor 索取另一份材料包，而是执行一次可审计的产品内读回：
 
-1. 每份材料的短标题、正文或 HTTPS URL、来源、适用受众、预计时长；
-2. 四个宝藏各自最终小任务、交付格式和自检；
-3. 三评测题面与 Rubric 的 Reviewer 复核结论；
-4. 结果页的 ADMIT/DEFER/NOT_ADMIT Learner 可见措辞与下一步负责人。
-
-收到后只更新本原型和内容清单；仍不进入产品代码。
+1. Content Editor 只从唯一正式内容源导入八站内容，`DAY-0` 内含两份开营材料；
+2. 独立 Reviewer 的复核人和复核记录由 Operator 在发布动作中显式绑定；
+3. Operator 精确发布八个新的不可变 TaskVersion，禁止修改 V1/V2 或在途 Learner；
+4. 只读核对每个 stable key、版本号、required material 数量和摘要；
+5. 另行取得 Journey V3 发布授权后，才组合并发布固定 JourneyVersion；发布后只读核对八站顺序与摘要，不创建邀请。
