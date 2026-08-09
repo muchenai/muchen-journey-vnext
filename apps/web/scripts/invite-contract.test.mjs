@@ -19,6 +19,13 @@ test("ops exposes a discoverable, human-readable learner invitation entry", () =
   assert.doesNotMatch(panel, /Reviewer UUID/);
 });
 
+test("formal journey labels do not repeat a version already present in the title", () => {
+  assert.match(panel, /function formatJourneyOptionLabel/);
+  assert.match(panel, /titleAlreadyIncludesVersion/);
+  assert.match(panel, /formatJourneyOptionLabel\(journey\)/);
+  assert.doesNotMatch(panel, /\{journey\.title\} · V\{journey\.version\}/);
+});
+
 test("ops reuses scoped invitation contracts and keeps credentials out of query strings", () => {
   assert.match(actions, /"\/api\/v1\/ops\/invites"/);
   assert.match(actions, /reviewer_id: reviewerId/);
