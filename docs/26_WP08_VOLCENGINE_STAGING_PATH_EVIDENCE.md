@@ -388,3 +388,11 @@
 - PR #162 合入主线 `ff53052847a268d025bceb93c3eab37986d50219` 后，Mainline Candidate Gate [`31340959377`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31340959377) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端摘要复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
 - 新候选固定 API `sha256:2a053bad…a6a6c`、Web `sha256:a3335542…e2aee`、Worker `sha256:2ef3cd1b…9f38`。本绑定只更新候选、artifact run、三镜像摘要、唯一确认词和候选源码反查合同；不运行 Terraform、DNS、云资源或 WP-12B，不发布 Journey V3、不创建邀请、不发送消息、不修改身份或业务事实；
 - 绑定合入并通过门禁后，只允许按 Owner 本次授权执行一次冻结基础设施 staging 部署验收。部署失败不重试且必须关闭临时 SSH；成功后须核对 exact release、migration、API/DB readiness、Worker revision、匿名路由与 Journey V3 标签。production 继续 `NO_GO`。
+
+## 2026-08-10 staging 可观测表面门禁正式部署验收
+
+- 绑定 PR #163 通过 Fast Gate 并合入主线 `7d2c17a6a6fb2468806731a7879716394df50f38`。候选 `ff53052847a268d025bceb93c3eab37986d50219` 的唯一冻结基础设施 deploy run [`31342063864`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31342063864) 成功：API/Web/Worker/Edge 完成替换，migration 保持 `0019_wp30_invitation_control`，没有 Terraform、DNS、云资源、WP-12B、Journey 发布、邀请或消息写入；
+- 九项外部合同均在 attempt 1 通过：根页 `200`，readiness `200/ready` 且 release 精确匹配，匿名 `/ops` 与 `/review` 均为 `401`，匿名 `/content` 为 `303`、只跳转 `/content/login`且 `Cache-Control: no-store`，登录页 `200` 并展示“使用飞书进入”。工作流未触发第二轮，不存在应用重试或二次部署；
+- 独立公开接口复验确认 staging readiness release=`ff530528…`，同时 production readiness 仍为 `8e56e759152efcbf17f4373f2132e02a8762af81`；本次 staging 不影响 production。Operator 页可见固定旅程标签 `Muchen Journey 新人启航探索营 · V3 · 8 站`；
+- 部署后只读 inventory run [`31342539916`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31342539916) 直接从 ECS 运行容器核对：deployed marker、API readiness/config release、Web release、Worker env/heartbeat release 全部精确为 `ff53052847a268d025bceb93c3eab37986d50219`，Worker 不 stale，migration=`0019_wp30_invitation_control`，config schema=3；API/Web/Worker/Edge 各且仅一个运行容器，镜像摘要与候选 manifest 完全一致，staging/production Caddy 上游仍隔离；
+- deploy 与 inventory 两个 run 都记录 `WP08_SSH_INGRESS=CLOSED`。现有 Operator 浏览器标签中的“运行快照”仍保留部署前 `3445b578…` 文本；鉴于公开 readiness 与 ECS 容器内独立 inventory 均一致证明实际运行态已是 `ff530528…`，该观察记为现有标签页的陈旧页面快照，不视为运行态回退。候选的一次部署验收结论为 `PASS`；候选已消费，不得重新部署，production 仍为 `NO_GO`。
