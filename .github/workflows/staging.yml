@@ -411,24 +411,131 @@ jobs:
       - name: Verify external TLS and release surface
         if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'
         run: |
-          curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors \
-            https://staging-vnext.muchenai.com/ >/dev/null
-          curl --fail --silent --show-error --retry 6 --retry-delay 5 \
-            https://staging-vnext.muchenai.com/health/ready | \
-            jq -e --arg release "${{ inputs.candidate }}" \
-              '.status == "ready" and .release == $release' >/dev/null
-          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            https://staging-vnext.muchenai.com/ops)" = "401"
-          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            https://staging-vnext.muchenai.com/review)" = "401"
-          content_headers="$RUNNER_TEMP/wp08-content-entry-headers"
-          test "$(curl --silent --show-error --dump-header "$content_headers" \
-            --output /dev/null --write-out '%{http_code}' \
-            https://staging-vnext.muchenai.com/content)" = "303"
-          grep -Eiq '^location: /content/login\r?$' "$content_headers"
-          grep -Eiq '^cache-control: .*no-store' "$content_headers"
-          curl --fail --silent --show-error \
-            https://staging-vnext.muchenai.com/content/login | grep -Fq '使用飞书进入'
+          origin=https://staging-vnext.muchenai.com
+          expected_release="${{ inputs.candidate }}"
+          curl_args=(
+            --silent
+            --show-error
+            --http1.1
+            --no-keepalive
+            --connect-timeout 2
+            --max-time 3
+          )
+
+          verify_surface() {
+            local attempt=$1
+            local failed=0
+            local result
+            local root_code health_code health_status health_release
+            local ops_code review_code content_code login_code
+            local content_location content_cache login_cta
+            local health_body="$RUNNER_TEMP/wp08-health-body"
+            local content_headers="$RUNNER_TEMP/wp08-content-entry-headers"
+            local login_body="$RUNNER_TEMP/wp08-content-login-body"
+
+            : >"$health_body"
+            : >"$content_headers"
+            : >"$login_body"
+
+            root_code=$(curl "${curl_args[@]}" --output /dev/null \
+              --write-out '%{http_code}' "$origin/" || true)
+            root_code=${root_code:-000}
+            result=PASS
+            test "$root_code" = "200" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=root status=%s expected=200 result=%s\n' \
+              "$attempt" "$root_code" "$result"
+
+            health_code=$(curl "${curl_args[@]}" --output "$health_body" \
+              --write-out '%{http_code}' "$origin/health/ready" || true)
+            health_code=${health_code:-000}
+            health_status=$(jq -r 'if type == "object" then .status // "" else "" end' \
+              "$health_body" 2>/dev/null | tr -cd 'A-Za-z0-9_-')
+            health_release=$(jq -r 'if type == "object" then .release // "" else "" end' \
+              "$health_body" 2>/dev/null | tr -cd '0-9a-f')
+            result=PASS
+            if ! test "$health_code" = "200" || \
+              ! test "$health_status" = "ready" || \
+              ! test "$health_release" = "$expected_release"; then
+              result=FAIL
+              failed=1
+            fi
+            printf 'WP08_SURFACE_CHECK attempt=%s check=readiness status=%s ready=%s release=%s expected_release=%s result=%s\n' \
+              "$attempt" "$health_code" "${health_status:-missing}" \
+              "${health_release:-missing}" "$expected_release" "$result"
+
+            ops_code=$(curl "${curl_args[@]}" --output /dev/null \
+              --write-out '%{http_code}' "$origin/ops" || true)
+            ops_code=${ops_code:-000}
+            result=PASS
+            test "$ops_code" = "401" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=ops_denied status=%s expected=401 result=%s\n' \
+              "$attempt" "$ops_code" "$result"
+
+            review_code=$(curl "${curl_args[@]}" --output /dev/null \
+              --write-out '%{http_code}' "$origin/review" || true)
+            review_code=${review_code:-000}
+            result=PASS
+            test "$review_code" = "401" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_denied status=%s expected=401 result=%s\n' \
+              "$attempt" "$review_code" "$result"
+
+            content_code=$(curl "${curl_args[@]}" --dump-header "$content_headers" \
+              --output /dev/null --write-out '%{http_code}' "$origin/content" || true)
+            content_code=${content_code:-000}
+            result=PASS
+            test "$content_code" = "303" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=content_redirect status=%s expected=303 result=%s\n' \
+              "$attempt" "$content_code" "$result"
+
+            content_location=$(sed -n 's/^[Ll]ocation: *//p' "$content_headers" | tr -d '\r')
+            result=PASS
+            test "$content_location" = "/content/login" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=content_location expected=/content/login result=%s\n' \
+              "$attempt" "$result"
+
+            content_cache=missing
+            if grep -Eiq '^cache-control: .*no-store' "$content_headers"; then
+              content_cache=no-store
+            else
+              failed=1
+            fi
+            printf 'WP08_SURFACE_CHECK attempt=%s check=content_cache expected=no-store actual=%s result=%s\n' \
+              "$attempt" "$content_cache" "$([[ "$content_cache" == no-store ]] && echo PASS || echo FAIL)"
+
+            login_code=$(curl "${curl_args[@]}" --output "$login_body" \
+              --write-out '%{http_code}' "$origin/content/login" || true)
+            login_code=${login_code:-000}
+            result=PASS
+            test "$login_code" = "200" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=content_login status=%s expected=200 result=%s\n' \
+              "$attempt" "$login_code" "$result"
+
+            login_cta=missing
+            if grep -Fq '使用飞书进入' "$login_body"; then
+              login_cta=present
+            else
+              failed=1
+            fi
+            printf 'WP08_SURFACE_CHECK attempt=%s check=content_login_cta expected=present actual=%s result=%s\n' \
+              "$attempt" "$login_cta" "$([[ "$login_cta" == present ]] && echo PASS || echo FAIL)"
+
+            rm -f "$health_body" "$content_headers" "$login_body"
+            test "$failed" = "0"
+          }
+
+          attempts=12
+          for attempt in $(seq 1 "$attempts"); do
+            if verify_surface "$attempt"; then
+              printf 'WP08_SURFACE_ATTEMPT=%s result=PASS\n' "$attempt"
+              exit 0
+            fi
+            if test "$attempt" = "$attempts"; then
+              printf 'WP08_SURFACE_ATTEMPT=%s result=FAIL retries_exhausted=true\n' "$attempt" >&2
+              exit 1
+            fi
+            printf 'WP08_SURFACE_ATTEMPT=%s result=RETRY next_in_seconds=5\n' "$attempt"
+            sleep 5
+          done
       - name: Close SSH ingress
         if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''
         run: |
