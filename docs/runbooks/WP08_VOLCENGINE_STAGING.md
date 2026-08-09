@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`STAGING_API_WEB_WORKER_3445B57_DEPLOYED / JOURNEY_V3_PUBLISHED / OBSERVABLE_SURFACE_GATE_CANDIDATE_BOUND / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。当前 staging 运行候选 `3445b5784d735fad2af4cd9a3568221b4aef7e19`、migration=`0019_wp30_invitation_control`。Operator 已从唯一正式内容源发布八个不可变 TaskVersion 并组装 Journey V3。PR #162 将部署后的九项外部合同改为逐项、PII-free 可观测输出，并增加最多 12 轮、间隔 5 秒、单请求 2 秒连接/3 秒总时限的有界重试；合入主线 `ff53052847a268d025bceb93c3eab37986d50219` 后 Mainline Candidate Gate `31340959377` 已完成三镜像、SBOM、GHCR push 与摘要复验。新候选尚未部署；production 继续 `NO_GO`。
+状态：`STAGING_API_WEB_WORKER_FF53052_DEPLOYED / JOURNEY_V3_PUBLISHED / OBSERVABLE_SURFACE_GATE_ACCEPTED / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。当前 staging 运行候选 `ff53052847a268d025bceb93c3eab37986d50219`、migration=`0019_wp30_invitation_control`。Operator 已从唯一正式内容源发布八个不可变 TaskVersion 并组装 Journey V3。PR #162 将部署后的九项外部合同改为逐项、PII-free 可观测输出，并增加最多 12 轮、间隔 5 秒、单请求 2 秒连接/3 秒总时限的有界重试；候选 Gate run `31340959377` 完成三镜像、SBOM、GHCR push 与摘要复验。唯一 deploy run `31342063864` 已成功，九项表面检查均在第 1 轮通过；随后只读 inventory run `31342539916` 确认 API/Web/Worker/Edge 唯一容器、三应用 release、Worker heartbeat、部署标记与候选完全一致，两次临时 SSH 均已关闭。production 继续 `NO_GO`。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -29,6 +29,7 @@
 - Content Editor OAuth 回调修复候选：`c0765eb625fc3c99205dc3d05abf9fad0475d81d`；PR #154 把 `/content` 加入 Web callback 的精确同源安全入口，并增加 cookie 响应转发合同。Mainline Candidate Gate `31171640166` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration head 保持 `0019_wp30_invitation_control`；候选尚未部署；
 - Content Editor 无会话重新进入候选：`3b7d7573cd70b72868e427b523ff630b732f0603`；PR #156 为匿名 `/content` 增加同源 `/content/login` 与“使用飞书进入”，保持 `/ops`、`/review` 匿名 401；PR #157 仅固定 `nanoid 3.3.17` 以关闭候选门禁公告。Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与摘要复验，migration head 保持 `0019_wp30_invitation_control`；唯一 staging run `31261406217` 已完成部署并关闭 SSH，随后 exact public contract 立即且连续三次通过；
 - Journey V3 邀请标签修复候选：`3445b5784d735fad2af4cd9a3568221b4aef7e19`；PR #160 只在邀请下拉框标题已含版本时停止追加重复版本，并增加 Web 回归。Mainline Candidate Gate `31317525199` 完成候选验证；唯一 deploy run `31325490856` 已替换 API/Web/Worker/Edge 并关闭临时 SSH，但部署后外部核验发生短暂竞态而最终标红。后续只读核对证明 exact release、migration、受保护路由与 Journey V3 标签均正确；该候选已消费，不得再次部署；
+- 当前已消费 staging 候选：`ff53052847a268d025bceb93c3eab37986d50219`；PR #162 增加九项 PII-free 可观测表面检查与有界重试，PR #163 完成不可变 staging 绑定。唯一 deploy run `31342063864` 成功且未重试；九项检查全部在 attempt 1 通过。只读 inventory run `31342539916` 复验 API/Web/Worker release 与 Worker heartbeat 均等于该候选、migration=`0019_wp30_invitation_control`、Compose 四服务均为单例、Edge staging/production 上游分离，SSH 已关闭。该候选已消费，不得重新部署；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
