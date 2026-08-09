@@ -1,6 +1,6 @@
 # WP-08 火山引擎独立 Staging 运维手册
 
-状态：`STAGING_API_WEB_WORKER_3B7D757_DEPLOYED / CONTENT_SOURCE_FROZEN / JOURNEY_V3_NOT_PUBLISHED / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。Mainline Candidate Gate `31259643008` 已完成候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 的三镜像生成、SBOM、GHCR push 与远端 digest 复验；唯一 staging run `31261406217` 已部署 API/Web/Worker、保持 migration=`0019_wp30_invitation_control` 并关闭 SSH。工作流末尾外部验证竞态的原始失败保留，随后 exact public contract 立即且连续三次通过。当前不需要再次部署；Journey V3 尚未发布，不创建邀请、不发送消息，production 继续 `NO_GO`。
+状态：`STAGING_API_WEB_WORKER_3B7D757_DEPLOYED / JOURNEY_V3_PUBLISHED / V3_LABEL_FIX_CANDIDATE_BOUND_PENDING_AUTHORIZATION / PRODUCTION_NO_GO`。本文仍是 Greenfield vNext 唯一 staging 资源与部署入口；不复用旧 P1 脚本。Provision 已收敛并冻结。当前 staging 仍运行候选 `3b7d7573cd70b72868e427b523ff630b732f0603`、migration=`0019_wp30_invitation_control`。Operator 已从唯一正式内容源发布八个不可变 TaskVersion 并组装 Journey V3；机器读回确认 `formal_journey.v3_published=SUCCESS`、八站可选且邀请数量未变化。PR #160 只修复新邀请下拉框重复显示 `V3 · V3`，合入主线 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 后 Mainline Candidate Gate `31317525199` 已完成三镜像、SBOM、GHCR push 与摘要复验；新候选尚未部署，也未创建 Journey V3 邀请或发送消息。production 继续 `NO_GO`。
 
 2026-07-30 本地隔离诊断复现默认 15 连接池的约 `0.750s` checkout wait p95，并完成 API `20+5`、Worker `2+1` 的有界修复及 submission 两次冗余 flush 删除。候选已部署并完成唯一 WP-12B；原 1 秒性能结果保持 FAIL，隔离、事实审计和强制退役 PASS，DEC-020 仅建立 WP-13 Alpha 条件入口。
 
@@ -28,6 +28,7 @@
 - Content Editor 历史身份迁移候选：`2223fc1589d772e5397e43357fc5682f27c1c3a8`；Mainline Candidate Gate `31137770622` 与唯一 staging deploy run `31147474464` 均成功，migration head 保持 `0019_wp30_invitation_control`，临时 SSH 已关闭。Operator 随后完成受控迁移和新链接生成，账号持有人本人完成 OAuth，机器读回确认 Content Editor 为 `LINKED`；该候选已经消费，不得再次部署；
 - Content Editor OAuth 回调修复候选：`c0765eb625fc3c99205dc3d05abf9fad0475d81d`；PR #154 把 `/content` 加入 Web callback 的精确同源安全入口，并增加 cookie 响应转发合同。Mainline Candidate Gate `31171640166` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration head 保持 `0019_wp30_invitation_control`；候选尚未部署；
 - Content Editor 无会话重新进入候选：`3b7d7573cd70b72868e427b523ff630b732f0603`；PR #156 为匿名 `/content` 增加同源 `/content/login` 与“使用飞书进入”，保持 `/ops`、`/review` 匿名 401；PR #157 仅固定 `nanoid 3.3.17` 以关闭候选门禁公告。Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与摘要复验，migration head 保持 `0019_wp30_invitation_control`；唯一 staging run `31261406217` 已完成部署并关闭 SSH，随后 exact public contract 立即且连续三次通过；
+- Journey V3 邀请标签修复候选：`3445b5784d735fad2af4cd9a3568221b4aef7e19`；PR #160 只在邀请下拉框标题已含版本时停止追加重复版本，并增加 Web 回归。Mainline Candidate Gate `31317525199` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与摘要复验，migration head 保持 `0019_wp30_invitation_control`；候选尚未部署，Journey V3 首条邀请尚未创建；
 - 入口：`https://staging-vnext.muchenai.com`；
 - 资源：独立 IAM 项目/CI 子用户、VPC、子网、安全组、ECS、RDS PostgreSQL、TOS、委派 DNS 子区与 TLS；
 - Owner：Liu Mowen。上述授权不包含 production、旧系统变更、真实飞书消息、真人 UAT 或将月预算扩大到 ¥800 以上。
@@ -97,11 +98,11 @@ make wp08-staging-apply-check
 
 唯一 Terraform 写路径执行 fail-closed 顺序：生成 saved plan → `terraform show -json` 直接管道到 `scripts/wp08_plan_guard.py` → 仅在没有任何 `delete` action 时 apply 同一个 saved plan。`delete/create` 与 `create/delete` 都视为 replacement 并拒绝；不得把 plan JSON 保存为 artifact、提交到 Git 或打印其中的敏感值。ECS 另有 `prevent_destroy`，不得为了通过计划而关闭。deploy 的 SSH 开关不再经过 Terraform/CloudControl；`scripts/wp08_security_group.py` 只允许一个公网 IPv4 `/32`，请求不得包含 `PrefixListId` 或 `SourceGroupId`，并在每次开关后只读确认精确规则数量。
 
-当前 workflow/config 原子绑定 Content Editor 无会话重新进入候选 `3b7d757…`、Mainline run `31259643008`、API `sha256:009be6c7…b9a`、Web `sha256:b8073419…2e5`、Worker `sha256:9796479e…323`、artifact name 和唯一确认词。该部署合同已由唯一 run `31261406217` 消费；部署步骤成功，临时 SSH 已关闭，末尾外部验证竞态保留为原始失败，随后运行态 exact public contract 立即且连续三次通过。真人输入与签署仍须真实完成，任何前置门禁失败都停止后续步骤。workflow 已从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名 401、`/content` 匿名 303 同源登录恢复、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、OAuth callback 安全入口与 cookie 响应转发、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
+当前 workflow/config 原子绑定 Journey V3 邀请标签修复候选 `3445b57…`、Mainline run `31317525199`、API `sha256:2b67a095…ca8b`、Web `sha256:0e1cbd1b…777d`、Worker `sha256:ce63089b…b447`、artifact name 和唯一确认词。绑定只建立新的冻结基础设施部署合同，不授予部署，不创建邀请，也不修改已经发布的 Journey V3 或既有 Enrollment。当前 staging 运行态仍为 `3b7d757…`；任何前置门禁失败都必须在业务写入前停止。workflow 从 Git 历史核验候选源码本身包含 readiness、Compose 探针、`/ops`/`/review` 匿名 401、`/content` 匿名 303 同源登录恢复、Journey V3 邀请标签去重、请求 CSP nonce 传播、动态渲染、root-relative OAuth redirect、OAuth callback 安全入口与 cookie 响应转发、真实 standalone 失效会话响应测试、WP-11 通知/可观测接线合同、WP-12B 合成多租户工具，以及 API `20+5`/Worker `2+1` 连接池环境：
 
 1. 仅在基础设施确有审查过的变更时运行 `phase=provision`；现有 Alpha 资源已冻结，不得为候选升级重复 provision；
 2. 复验 GitHub staging Environment 中的 `WP08_RDS_CA_PEM_B64` 仍对应现有 RDS；只有实例或 CA 发生受审轮换时才重新下载，不从旧服务器复制；
-3. 本候选的确认词 `DEPLOY_3B7D757_TO_VOLCENGINE_STAGING` 已由 run `31261406217` 消费，禁止复用或把工作流红色结论当作再次部署授权。后续内容/TaskVersion/JourneyVersion 操作必须走各自的 Operator 合同，不得退化为 provision、Web-only、runtime-repair 或修改运行基线。
+3. 所有历史确认词均不得复用；本候选只接受 `DEPLOY_3445B57_TO_VOLCENGINE_STAGING`。绑定 PR 合入且 required check 通过仍不等于部署授权；只有 Owner 再明确授权完整候选 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 和绑定 PR 的合入后主线 SHA，才能消费一次冻结基础设施 staging 部署，失败不重试。部署成功并核对新标签前不得创建 Journey V3 首条邀请。
 
 这条 workflow 仍是唯一写入口；两阶段不改变候选、预算或环境授权边界，本地个人机器不执行 `terraform apply` 或直连部署。
 

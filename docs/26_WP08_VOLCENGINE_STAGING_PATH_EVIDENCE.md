@@ -371,3 +371,11 @@
 - 唯一 run [`31261406217`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31261406217) 完成候选校验、既有 `0019_wp30_invitation_control` migration 核对、API/Web/Worker/Edge 替换和临时 SSH 关闭。没有 Terraform、DNS、云资源、WP-12B、Journey V3、邀请、消息、身份或业务事实变更，也没有重试；
 - 工作流末尾外部验证发生竞态并使 run 最终状态为失败，原始失败保持不变；随后同一运行态 exact public contract 立即通过且连续三次通过：根页 `200`、readiness 精确返回 `3b7d757…`、匿名 `/ops` 和 `/review` 为 `401`、匿名 `/content` 为 `303` 且只转向 `/content/login`、登录页展示“使用飞书进入”；
 - 因部署授权已消费且运行态合同稳定通过，不允许以工作流红色结论为由再次部署。当前下一项是八个不可变 TaskVersion 与 Journey V3 的受控业务发布准备，production 继续 `NO_GO`。
+
+## 2026-08-09 Journey V3 邀请标签修复候选绑定
+
+- Operator 已从唯一正式内容源发布八个不可变 TaskVersion，并以独立 Reviewer 与复核记录组装 Journey V3。机器读回确认 `formal_journey.v3_published=SUCCESS`、固定旅程列表新增 V3、八站顺序正确，发布前后邀请均为 4 条；没有创建 V3 邀请、发送消息或修改 production；
+- 机器读回同时发现邀请下拉框把已含 `V3` 的标题再次追加版本，显示为 `V3 · V3 · 8 站`。PR #160 只在标题末尾已包含对应版本时停止重复追加，并增加回归测试；V1/V2 显示合同不变；
+- PR #160 合入主线 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 后，Mainline Candidate Gate [`31317525199`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31317525199) 完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端摘要复验。artifact 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
+- 新候选固定 API `sha256:2b67a095…ca8b`、Web `sha256:0e1cbd1b…777d`、Worker `sha256:ce63089b…b447`。本绑定只更新候选、artifact run、三镜像摘要、唯一确认词与回归合同；不执行 staging 部署，不创建邀请，不修改 Journey V3、Enrollment、身份或消息事实；
+- 只有绑定 PR 合入并取得完整候选 `3445b5784d735fad2af4cd9a3568221b4aef7e19` 与合入后主线 SHA 的新精确授权，才允许执行一次冻结基础设施 staging 部署。部署成功且标签机器读回正确后，仍需单独授权创建首条 Journey V3 受控邀请；production 继续 `NO_GO`。
