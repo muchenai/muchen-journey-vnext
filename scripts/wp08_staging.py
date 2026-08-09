@@ -715,6 +715,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '["/ops", "/review"]',
         "isContentRoute && !isContentLogin && !hasSession",
         'git show "$candidate:apps/web/src/app/content/login/page.tsx"',
+        'git show "$candidate:apps/web/src/app/ops/invite-management-panel.tsx"',
+        "formatJourneyOptionLabel(journey)",
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
         "INSPECT_RUNTIME_3B7D757_STAGING",
@@ -758,7 +760,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
-        or workflow.count('git show "$candidate:') != 16
+        or workflow.count('git show "$candidate:') != 17
     ):
         raise StagingError(
             "deploy must verify the Web, bounded database pool, WP-11, and WP-12B contracts "

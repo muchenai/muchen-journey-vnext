@@ -463,6 +463,8 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git show "$candidate:apps/web/src/proxy.ts" | grep -Fq \'isContentRoute && !isContentLogin && !hasSession\'',
             'git show "$candidate:apps/web/src/app/content/login/page.tsx"',
             "使用飞书进入",
+            'git show "$candidate:apps/web/src/app/ops/invite-management-panel.tsx"',
+            "formatJourneyOptionLabel(journey)",
             'git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts"',
             'git show "$candidate:scripts/wp08_web_runtime_check.py"',
             'git show "$candidate:scripts/wp08_web_runtime_check.py"',
@@ -559,6 +561,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
     staging.validate_workflow(workflow)
 
     workflow.write_text(source.replace("expired_reviewer=explicit-relogin", "missing-expiry-contract"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("formatJourneyOptionLabel(journey)", "missing-journey-label-contract"))
     with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
         staging.validate_workflow(workflow)
 

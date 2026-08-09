@@ -36,9 +36,9 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == '3b7d7573cd70b72868e427b523ff630b732f0603' &&
+      inputs.candidate == '3445b5784d735fad2af4cd9a3568221b4aef7e19' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_3B7D757_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_3445B57_TO_VOLCENGINE_STAGING') ||
       (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_3B7D757_STAGING') ||
       (inputs.phase == 'diagnose-publication' && inputs.confirmation == 'DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING') ||
       (inputs.phase == 'repair-edge-route' && inputs.confirmation == 'REPAIR_EDGE_ROUTE_EF0A512_STAGING') ||
@@ -90,10 +90,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-3b7d7573cd70b72868e427b523ff630b732f0603
+          name: wp07-candidate-3445b5784d735fad2af4cd9a3568221b4aef7e19
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 31259643008
+          run-id: 31317525199
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main
@@ -110,6 +110,8 @@ jobs:
               grep -Fq 'isContentRoute && !isContentLogin && !hasSession'
             git show "$candidate:apps/web/src/app/content/login/page.tsx" | \
               grep -Fq '使用飞书进入'
+            git show "$candidate:apps/web/src/app/ops/invite-management-panel.tsx" | \
+              grep -Fq 'formatJourneyOptionLabel(journey)'
             git show "$candidate:apps/web/src/lib/server/oauth-proxy.ts" | \
               grep -Fq "sameOriginIdentityRedirect"
             git show "$candidate:scripts/wp08_web_runtime_check.py" | \
