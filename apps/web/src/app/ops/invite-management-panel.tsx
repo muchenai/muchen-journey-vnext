@@ -35,6 +35,17 @@ const STATUS_LABELS: Record<OpsInvite["status"], string> = {
   REVOKED: "已撤销",
 };
 
+function formatJourneyOptionLabel(journey: OpsFormalJourney): string {
+  const title = journey.title.trim();
+  const versionLabel = `V${journey.version}`;
+  const titleAlreadyIncludesVersion = new RegExp(
+    `(?:^|[·｜\\s])${versionLabel}$`,
+    "i",
+  ).test(title);
+
+  return `${title}${titleAlreadyIncludesVersion ? "" : ` · ${versionLabel}`} · ${journey.stages.length} 站`;
+}
+
 function CreateInviteForm({
   reviewers,
   tasks,
@@ -112,7 +123,7 @@ function CreateInviteForm({
           <select name="journey_version_id" required defaultValue={journeys[0].id}>
             {journeys.map((journey) => (
               <option key={journey.id} value={journey.id}>
-                {journey.title} · V{journey.version} · {journey.stages.length} 站
+                {formatJourneyOptionLabel(journey)}
               </option>
             ))}
           </select>
