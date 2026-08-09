@@ -541,17 +541,25 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
             "      - name: Verify external TLS and release surface",
             "if: inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime'",
-            "https://staging-vnext.muchenai.com/health/ready",
-            "https://staging-vnext.muchenai.com/ops",
-            "https://staging-vnext.muchenai.com/review",
-            "https://staging-vnext.muchenai.com/content",
-            "https://staging-vnext.muchenai.com/content/login",
+            "origin=https://staging-vnext.muchenai.com",
+            '"$origin/health/ready"',
+            '"$origin/ops"',
+            '"$origin/review"',
+            '"$origin/content"',
+            '"$origin/content/login"',
             "'%{http_code}'",
             '= "401"',
             '= "303"',
-            "^location: /content/login",
+            'test "$content_location" = "/content/login"',
             "^cache-control: .*no-store",
             "使用飞书进入",
+            "WP08_SURFACE_CHECK",
+            "WP08_SURFACE_ATTEMPT",
+            "attempts=12",
+            'for attempt in $(seq 1 "$attempts")',
+            "next_in_seconds=5",
+            "--connect-timeout 2",
+            "--max-time 3",
             "      - name: Close SSH ingress",
             "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
             "python3 -m scripts.wp08_security_group close",
@@ -565,6 +573,10 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
         staging.validate_workflow(workflow)
 
     workflow.write_text(source.replace("formatJourneyOptionLabel(journey)", "missing-journey-label-contract"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("WP08_SURFACE_ATTEMPT", "missing-surface-attempt-contract"))
     with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
         staging.validate_workflow(workflow)
 
