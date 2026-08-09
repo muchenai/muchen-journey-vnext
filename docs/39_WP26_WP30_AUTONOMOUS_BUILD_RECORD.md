@@ -1,10 +1,10 @@
 # 39｜WP-26～WP-30 本地构建记录与待授权账本
 
-状态：`CONTENT_EDITOR_LINKED / ANONYMOUS_ENTRY_CANDIDATE_BINDING / HUMAN_GATES_NOT_RUN / PRODUCTION_NO_GO`
+状态：`STAGING_CANDIDATE_DEPLOYED / CONTENT_SOURCE_FROZEN / REVIEWER_REVIEW_OWNER_REPORTED / JOURNEY_V3_NOT_PUBLISHED / PRODUCTION_NO_GO`
 
-版本：V0.3
+版本：V0.4
 
-日期：2026-08-08
+日期：2026-08-09
 
 依据：DEC-026、REQ-BR-016..018、AT-WP26-001..005、AT-WP27-001..005、AT-WP28-001..005、AT-WP29-001..005、AT-WP30-001..006
 
@@ -18,7 +18,7 @@ WP-26～WP-30 已完成可在本地诚实验证的产品与发布控制实现，
 - WP-29 已形成只接受固定候选、固定 V3、真人名册、真人签署和零 P0 blocker 的 fail-closed RC 验证器；验证器不能运行或伪造 UAT；
 - WP-30 已形成受控上线 preflight、PII-free 每日指标与停止判定，并实现组织级新邀请冻结/恢复；冻结只阻止新邀请，不删除已有 Enrollment、提交、评审或重新进入事实。
 
-当前没有发布 Journey V3、没有部署 production、没有创建 Journey V3 真人邀请、没有写入新云资源，也没有产生 `P0_RC_SIGNED` 或 `P0_LIVE_CONTROLLED`。staging 最近一次成功部署证据为候选 `2223fc1…` 的 run `31147474464`；这不替代真人材料、复核或签署。正式 production gate 继续为 `NO_GO`。
+当前没有发布 Journey V3、没有部署 production、没有创建 Journey V3 真人邀请、没有写入新云资源，也没有产生 `P0_RC_SIGNED` 或 `P0_LIVE_CONTROLLED`。staging 已在唯一 run `31261406217` 部署候选 `3b7d7573cd70b72868e427b523ff630b732f0603`；部署步骤成功，工作流末尾的外部验证发生竞态并使 run 标红，但随后同一公开合同立即通过且连续三次通过：根页 `200`、readiness 精确返回候选、匿名 `/ops` 与 `/review` 拒绝、匿名 `/content` 安全转入登录页。该事实不替代真人材料、复核或签署，正式 production gate 继续为 `NO_GO`。
 
 ## 2. 数据与 API 变化
 
@@ -51,13 +51,15 @@ Migration head：`0019_wp30_invitation_control`。
 
 Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录为 `NOT_RUN_NETWORK_FAILURE`；不得把网络失败写成无漏洞，形成 PR 后仍需复验。以上机器证据不能替代真人内容、体验或签署。
 
+2026-08-09 Journey V3 发布准备文档变更再次执行本地 Fast Gate：traceability、isolation、staging workflow、WP-29/WP-30 fail-closed 合同、gitleaks 和 Web dependency audit 均通过；完整 API 为 `306 passed / 2 skipped`，OpenAPI 与仓库合同一致，数据生命周期检查无写入，Web 为 `22/22`。Python `pip-audit` 已安装但访问外部漏洞索引持续无响应，超过有界等待后终止，记为 `NOT_RUN_NETWORK_TIMEOUT`；其余通过项不得被用来推断该项通过。
+
 ## 4. 真人门禁账本
 
 | 工作包 | 仍需真人完成 | 当前状态 |
 | --- | --- | --- |
-| WP-26 | Content Editor 导入一个真实宝藏材料；2 名 Learner 完成学习→小任务→修订/恢复；独立 Reviewer 复核 | `NOT_RUN / CONTENT_INPUT_REQUIRED` |
-| WP-27 | 四宝藏真实材料全部批准；目标 Learner 验证路线理解、文字预算与无死路；Operator 只发布精确 V3 | `NOT_RUN / JOURNEY_V3_NOT_PUBLISHED` |
-| WP-28 | 2 名独立 Reviewer 校准三题；至少 1 名 Learner 完成真实修订；Operator 作出人工准入 | `NOT_RUN` |
+| WP-26 | Content Editor 在产品内导入并提交一个真实宝藏；2 名 Learner 完成学习→小任务→修订/恢复；独立 Reviewer 复核 | `SOURCE_FROZEN / PRODUCT_IMPORT_NOT_READ_BACK / HUMAN_LOOP_NOT_RUN` |
+| WP-27 | Operator 发布八个精确 TaskVersion 和 Journey V3；目标 Learner 验证路线理解、文字预算与无死路 | `SOURCE_FROZEN / JOURNEY_V3_NOT_PUBLISHED / HUMAN_ROUTE_NOT_RUN` |
+| WP-28 | 2 名独立 Reviewer 校准三题；至少 1 名 Learner 完成真实修订；Operator 作出人工准入 | `REVIEWER_REVIEW_OWNER_REPORTED / RESULT_COPY_DRAFTED / HUMAN_LOOP_NOT_RUN` |
 | WP-29 | 1 Content Editor、1 Operator、≥3 Learner、2 Reviewer、1 QA Recorder 完成 10:00–19:00 固定候选 UAT 与六方签署 | `HUMAN_UAT_NOT_RUN / UNSIGNED` |
 | WP-30 | 正式域名 readback、名单正负测、回退/维护演练、首批 cohort 与真实观察窗 | `NOT_STARTED / AUTHORIZATION_REQUIRED` |
 
@@ -69,12 +71,13 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 
 1. 审阅并合入本地 PR；合入本身不部署。`DONE`：PR #148 已通过 Fast Gate 并合入主线 `a2312b269b1806cd3d5ce7d26fbc693466399035`。
 2. 在 staging 创建/绑定真实 Content Editor；不读取通讯录，不扩大其他身份。`IDENTITY_LINKED / ANONYMOUS_ENTRY_RECOVERY_CANDIDATE_READY`：受控历史身份迁移、新链接和本人 OAuth 已完成，机器读回确认身份为 `LINKED`；PR #154 已修复 `/content` callback cookie 转发，PR #156 又为匿名 `/content` 增加同源登录入口，当前等待候选绑定与新的部署授权。
-3. 由 Content Editor 导入并提交批准材料，由独立 Reviewer 线下复核，Operator 精确发布八个 TaskVersion。
-4. 生成唯一候选并申请一次 staging 部署；核对 Web/API/Worker digest、migration `0019`、readiness、匿名拒绝和邀请控制默认状态。`IDENTITY_TRANSFER_DEPLOYED / ANONYMOUS_ENTRY_CANDIDATE_READY / NEW_DEPLOY_AUTHORIZATION_REQUIRED`：run `31147474464` 已成功部署候选 `2223fc1…` 并关闭 SSH；身份迁移与本人 OAuth 已完成。PR #156/#157 已合入新主线 `3b7d757…`，Mainline Candidate Gate `31259643008` 已生成并远端复验三镜像，migration 保持 `0019`。当前候选尚未部署，必须在新的绑定 PR 合入后，以完整候选和合入后主线 SHA 另行取得精确授权。
-5. Operator 单独发布 Journey V3；不迁移 V1/V2 Enrollment，不自动创建邀请。
-6. 依次执行 WP-26、WP-27、WP-28 真人门禁；失败保留原证据，只修 P0 blocker。
-7. 固定候选与 V3 后执行 WP-29 整日 UAT；只有私密证据通过验证器并完成六方签署，才可形成 `P0_RC_SIGNED`。
-8. 另行授权 production deploy、DNS/TLS/OAuth readback、V3 发布、私密邀请和回退演练；每项授权单独消费，不打包推定。
+3. `SOURCE_FROZEN / REVIEWER_REVIEW_OWNER_REPORTED`：唯一正式内容源已固定为 38 号文档第 2 节的飞书表格，Owner 已声明 Reviewer 完成复核，三类结果文案 V0.1 已写入施工文档。产品内导入、Operator 确认和不可变版本读回尚未执行。
+4. `STAGING_DEPLOYED / PUBLIC_CONTRACT_VERIFIED`：Mainline Candidate Gate `31259643008` 已生成候选 `3b7d757…`；唯一 staging run `31261406217` 完成部署并关闭 SSH。末尾外部验证竞态保留为原始失败；随后 exact public contract 立即及连续三次通过。没有重试、Terraform、DNS、云资源、WP-12B、消息、邀请或 Journey V3 发布。
+5. 下一单一 WIP 是：Content Editor/Operator 仅从唯一正式内容源形成八个新 TaskVersion，逐项只读核对 stable key、版本、required materials 和摘要；不得把表格 `DAY-1` 误建为第九站，不得修改 V1/V2 或在途事实。
+6. 八个 TaskVersion 读回无误后，另行取得一次精确授权，由 Operator 组合并发布 Journey V3；不迁移 V1/V2 Enrollment，不自动创建邀请。发布后只读读取 JourneyVersion 版本、八站顺序、TaskVersion ID 摘要、Reviewer 和复核记录。
+7. 依次执行 WP-26、WP-27、WP-28 真人门禁；失败保留原证据，只修 P0 blocker。
+8. 固定候选与 V3 后执行 WP-29 整日 UAT；只有私密证据通过验证器并完成六方签署，才可形成 `P0_RC_SIGNED`。
+9. 另行授权 production deploy、DNS/TLS/OAuth readback、私密邀请和回退演练；每项授权单独消费，不打包推定。
 
 ## 6. 上线停止条件
 
@@ -96,4 +99,12 @@ Python `pip-audit` 因临时 PyPI TLS EOF 未能安装审计器，诚实记录�
 
 本地复验：API `308 passed`；Web 合同 `19 passed` 且 Next.js production build 通过；OpenAPI readback、隔离检查、traceability 与 gitleaks 均通过。
 
-PR #152/#153 已完成受控身份迁移实现、候选绑定和唯一 staging 部署；Operator 随后完成迁移和新链接，本人 OAuth 的机器读回确认身份为 `LINKED`。PR #154 修复 `/content` OAuth callback；PR #156 增加匿名 `/content` 的同源登录恢复与真实浏览器合同；PR #157 仅固定 `nanoid 3.3.17` 以关闭新出现的安全公告。新主线 `3b7d7573cd70b72868e427b523ff630b732f0603` 的 Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration 保持 `0019_wp30_invitation_control`。当前新候选尚未部署；必须先合入候选绑定 PR，再以完整候选 `3b7d7573cd70b72868e427b523ff630b732f0603` 与合入后主线 SHA 取得精确 staging 部署授权。
+PR #152/#153 已完成受控身份迁移实现、候选绑定和唯一 staging 部署；Operator 随后完成迁移和新链接，本人 OAuth 的机器读回确认身份为 `LINKED`。PR #154 修复 `/content` OAuth callback；PR #156 增加匿名 `/content` 的同源登录恢复与真实浏览器合同；PR #157 仅固定 `nanoid 3.3.17` 以关闭新出现的安全公告。新主线 `3b7d7573cd70b72868e427b523ff630b732f0603` 的 Mainline Candidate Gate `31259643008` 已完成完整 CI、SBOM、候选 manifest、三镜像 GHCR push 与远端 digest 复验，migration 保持 `0019_wp30_invitation_control`。唯一 staging deploy run `31261406217` 已部署该候选并关闭 SSH；末尾外部断言竞态导致 run 标红，但运行态 exact public contract 随即及连续三次通过。当前不需要再次部署；下一项是内容版本与 Journey V3 发布准备。
+
+## 8. Journey V3 发布准备冻结
+
+- 唯一正式内容源、八站/十六材料映射和三类结果文案见 38 号文档第 2 节；旧 Base、Wiki、PDF 或本地 seed 只可用于差异说明，不得成为第二内容源。
+- Journey V3 只能绑定以下顺序：`DAY-0`、`TRE-001-COMPANY-VALUES`、`TRE-002-AI-DATA-BASICS`、`TRE-003-PROJECT-AWARENESS`、`TRE-004-DELIVERY-FIT`、`ASM-001-RULE-BREAKDOWN`、`ASM-002-MODEL-JUDGEMENT`、`ASM-003-DATA-CONSTRUCTION`。
+- 每个站点必须选择一个同组织、已发布、至少含一项 required material 的不可变 TaskVersion；八个 ID 必须唯一，顺序错误或缺材料必须 fail closed。
+- Reviewer 复核目前只有 Owner 陈述；发布动作必须再次显式选择真实独立 Reviewer、填写不少于 20 字的复核记录并勾选确认。该机器事实成功后才可写为 `REVIEW_BOUND`。
+- 施工文档完成不授权发布。下一次外部写入必须精确限定为“发布八个 TaskVersion”或“组合发布 Journey V3”其中一项；不创建邀请、不发送消息、不改变 production。
