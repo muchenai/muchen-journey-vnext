@@ -321,6 +321,33 @@ jobs:
           ssh "${opts[@]}" root@"$PUBLIC_IP" \
             "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && \
             BACKUP_RUN_ID='${{ inputs.backup_run_id }}' ./wartime_deploy.sh"
+      - name: Route production to maintenance or live runtime
+        if: inputs.phase == 'maintenance' || inputs.phase == 'live'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          mode="${{ inputs.phase }}"
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          remote="/run/wp15-wartime-edge-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "install -d -m 0700 '$remote'"
+          scp "${opts[@]}" deploy/production/wartime_edge_route.sh \
+            root@"$PUBLIC_IP":"$remote/wartime_edge_route.sh"
+          if [[ "$mode" == maintenance ]]; then
+            scp "${opts[@]}" deploy/production/Caddyfile.maintenance \
+              root@"$PUBLIC_IP":"$remote/Caddyfile.maintenance"
+            source="$remote/Caddyfile.maintenance"
+          else
+            scp "${opts[@]}" deploy/staging/Caddyfile \
+              root@"$PUBLIC_IP":"$remote/Caddyfile.live"
+            source="$remote/Caddyfile.live"
+          fi
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "chmod 0600 '$remote/wartime_edge_route.sh' && \
+            WP15_EDGE_MODE='$mode' WP15_EDGE_SOURCE='$source' \
+            bash '$remote/wartime_edge_route.sh'"
       - name: Verify observable public production surface with bounded retry
         if: inputs.phase == 'preflight' || inputs.phase == 'deploy' || inputs.phase == 'inspect' || inputs.phase == 'live'
         run: |
@@ -382,33 +409,6 @@ jobs:
             echo "WP15_ROLLBACK_SURFACE_ATTEMPT=$attempt result=RETRY next_in_seconds=5"
             sleep 5
           done
-      - name: Route production to maintenance or live runtime
-        if: inputs.phase == 'maintenance' || inputs.phase == 'live'
-        env:
-          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
-        run: |
-          set -euo pipefail
-          mode="${{ inputs.phase }}"
-          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=accept-new \
-            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
-          remote="/run/wp15-wartime-edge-$GITHUB_RUN_ID"
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "install -d -m 0700 '$remote'"
-          scp "${opts[@]}" deploy/production/wartime_edge_route.sh \
-            root@"$PUBLIC_IP":"$remote/wartime_edge_route.sh"
-          if [[ "$mode" == maintenance ]]; then
-            scp "${opts[@]}" deploy/production/Caddyfile.maintenance \
-              root@"$PUBLIC_IP":"$remote/Caddyfile.maintenance"
-            source="$remote/Caddyfile.maintenance"
-          else
-            scp "${opts[@]}" deploy/staging/Caddyfile \
-              root@"$PUBLIC_IP":"$remote/Caddyfile.live"
-            source="$remote/Caddyfile.live"
-          fi
-          ssh "${opts[@]}" root@"$PUBLIC_IP" \
-            "chmod 0600 '$remote/wartime_edge_route.sh' && \
-            WP15_EDGE_MODE='$mode' WP15_EDGE_SOURCE='$source' \
-            bash '$remote/wartime_edge_route.sh'"
       - name: Roll back automatically after failed deployment acceptance
         id: automatic_rollback
         if: failure() && inputs.phase == 'deploy' && steps.deploy_runtime.outputs.started == 'true'

@@ -33,6 +33,15 @@ def require(source: str, marker: str, label: str) -> None:
         raise WartimeCutoverError(f"{label} is missing reviewed marker: {marker}")
 
 
+def validate_live_route_order(workflow: str) -> None:
+    live_route = "- name: Route production to maintenance or live runtime"
+    public_acceptance = "- name: Verify observable public production surface with bounded retry"
+    if workflow.count(live_route) != 1 or workflow.count(public_acceptance) != 1:
+        raise WartimeCutoverError("wartime live route and public acceptance steps must be unique")
+    if workflow.index(live_route) > workflow.index(public_acceptance):
+        raise WartimeCutoverError("wartime live route must precede public acceptance")
+
+
 def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     try:
         value = json.loads(path.read_text())
@@ -131,6 +140,7 @@ def validate_files() -> None:
         )
     if "chmod 0755 '$remote/wartime_edge_route.sh'" in workflow:
         raise WartimeCutoverError("edge route script must not require executable permissions")
+    validate_live_route_order(workflow)
     if "output -raw rds_instance_id" in workflow:
         raise WartimeCutoverError("RDS instance ID must come from the frozen state resource")
     forbidden = (
