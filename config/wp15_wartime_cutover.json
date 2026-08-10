@@ -37,7 +37,7 @@
     "restore_target_must_be_empty": true,
     "source_database_is_never_modified": true,
     "active_notification_recipients_must_be_zero": true,
-    "encrypted_off_host_target": "private-tos"
+    "encrypted_off_host_target": "github-actions-artifact"
   },
   "rollback": {
     "application": "ONE_CLICK_PREVIOUS_RELEASE_AND_DATABASE",

@@ -18,10 +18,11 @@
 ## 唯一允许的顺序
 
 1. `phase=preflight`：只读核对当前生产回退基线、staging 源候选和公开生产表面。
-2. `phase=backup-restore`：仅创建白名单内的新空逻辑库；从 staging 生成自定义格式备份，恢复到新库，比较 PII-free 摘要，加密并复制到私有 TOS。
-3. `phase=deploy`：必须引用第 2 步成功的 run ID；再次核对备份 HMAC、恢复摘要和零通知接收人，然后部署冻结候选。
-4. 部署内置 12 次、每次间隔 5 秒的九项公开验收；成功后再执行容器、镜像、版本、migration、数据库、Worker heartbeat、Caddy 上游和通知状态 inventory。
-5. 真实飞书 Operator 登录由当前 Operator 在同一浏览器完成；之后只创建受控小名单邀请。
+2. `phase=backup-restore`：仅创建白名单内的新空逻辑库；从 staging 生成自定义格式备份，恢复到新库，比较 PII-free 摘要并加密。run `31346697068` 已完成这一数据库证明，但现有 TOS 桶策略拒绝新前缀；不得重做恢复或清空已验证新库。
+3. `phase=archive-backup`：只读取 run `31346697068` 的密文、HMAC manifest 与 PII-free 源/目标摘要，证明无明文、密文摘要一致、源/目标摘要一致后归档为 30 天 GitHub Actions 加密工件；不连接业务表正文、不修改数据库、不上传 TOS。
+4. `phase=deploy`：必须同时引用恢复 run ID 与成功归档 run ID；下载并复验离机工件，再核对服务器 HMAC、当前恢复摘要和零通知接收人，然后部署冻结候选。
+5. 部署内置 12 次、每次间隔 5 秒的九项公开验收；成功后再执行容器、镜像、版本、migration、数据库、Worker heartbeat、Caddy 上游和通知状态 inventory。
+6. 真实飞书 Operator 登录由当前 Operator 在同一浏览器完成；之后只创建受控小名单邀请。
 
 任一步失败即停止，不自动重新执行工作流。部署脚本内部或公开验收失败时，只执行确定性的旧应用+旧数据库回退；若回退也失败，自动切维护页。
 
@@ -29,6 +30,7 @@
 
 - `preflight`: `PREFLIGHT_FF53052_WARTIME_PRODUCTION`
 - `backup-restore`: `BACKUP_RESTORE_FF53052_WARTIME_PRODUCTION`
+- `archive-backup`: `ARCHIVE_BACKUP_31346697068_WARTIME_PRODUCTION`
 - `deploy`: `DEPLOY_FF53052_WARTIME_PRODUCTION`
 - `inspect`: `INSPECT_FF53052_WARTIME_PRODUCTION`
 - `rollback`: `ROLLBACK_FF53052_TO_CONTROLLED_ALPHA_BASELINE`

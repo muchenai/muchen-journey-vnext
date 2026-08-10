@@ -18,6 +18,7 @@ DEPLOY = ROOT / "deploy" / "production" / "wartime_deploy.sh"
 ROLLBACK = ROOT / "deploy" / "production" / "wartime_rollback.sh"
 INVENTORY = ROOT / "scripts" / "wp15_production_inventory.py"
 SURFACE = ROOT / "scripts" / "wp15_public_surface.py"
+ARCHIVE = ROOT / "scripts" / "wp15_archive_wartime_proof.py"
 EDGE = ROOT / "deploy" / "production" / "wartime_edge_route.sh"
 MAINTENANCE = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
 
@@ -75,6 +76,8 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         )
     ):
         raise WartimeCutoverError("wartime backup safety contract differs")
+    if backup.get("encrypted_off_host_target") != "github-actions-artifact":
+        raise WartimeCutoverError("wartime off-host backup target differs")
     rollback = value.get("rollback")
     if not isinstance(rollback, dict) or rollback.get("dns_mutation_required") is not False:
         raise WartimeCutoverError("wartime rollback must not depend on DNS mutation")
@@ -89,12 +92,14 @@ def validate_files() -> None:
     rollback = ROLLBACK.read_text()
     inventory = INVENTORY.read_text()
     surface = SURFACE.read_text()
+    archive = ARCHIVE.read_text()
     edge = EDGE.read_text()
     maintenance = MAINTENANCE.read_text()
 
     for phase in (
         "preflight",
         "backup-restore",
+        "archive-backup",
         "deploy",
         "inspect",
         "rollback",
@@ -109,7 +114,9 @@ def validate_files() -> None:
         "attempts=12",
         "scripts/wp15_public_surface.py",
         "WP15_WARTIME_SSH_INGRESS=CLOSED",
-        "WP15_WARTIME_OFF_HOST_BACKUP=PASS",
+        "ARCHIVE_BACKUP_31346697068_WARTIME_PRODUCTION",
+        "scripts/wp15_archive_wartime_proof.py",
+        "inputs.archive_run_id",
         "Roll back automatically after failed deployment acceptance",
         'select(.address == "volcenginecc_rdspostgresql_instance.staging")',
         "steps.frozen.outputs.rds_instance_id",
@@ -187,6 +194,13 @@ def validate_files() -> None:
         "/auth/feishu/callback",
     ):
         require(surface, marker, "wartime public surface")
+    for marker in (
+        "WP15_ARCHIVE_WARTIME_PROOF=PASS",
+        "manifest HMAC is invalid",
+        "source and target PII-free facts differ",
+        "plaintext dump is present",
+    ):
+        require(archive, marker, "wartime archive proof")
     require(edge, "WP15_WARTIME_EDGE_ROLLBACK=ATTEMPTED", "wartime edge route")
     require(maintenance, "reverse_proxy journey-next-staging-web-1:3000", "maintenance Caddyfile")
     require(maintenance, "503", "maintenance Caddyfile")
