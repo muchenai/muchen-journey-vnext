@@ -1,0 +1,428 @@
+name: WP-15 Wartime Controlled Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Exact bounded production operation
+        required: true
+        type: choice
+        options:
+          - preflight
+          - backup-restore
+          - deploy
+          - inspect
+          - rollback
+          - maintenance
+          - live
+      candidate:
+        description: Exact frozen candidate SHA
+        required: true
+        type: string
+      backup_run_id:
+        description: Successful backup-restore workflow run required by deploy
+        required: false
+        default: ""
+        type: string
+      confirmation:
+        description: Exact reviewed confirmation phrase
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: wp15-wartime-controlled-production
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    if: >-
+      inputs.candidate == 'ff53052847a268d025bceb93c3eab37986d50219' &&
+      ((inputs.phase == 'preflight' && inputs.confirmation == 'PREFLIGHT_FF53052_WARTIME_PRODUCTION') ||
+      (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_FF53052_WARTIME_PRODUCTION') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_FF53052_WARTIME_PRODUCTION') ||
+      (inputs.phase == 'inspect' && inputs.confirmation == 'INSPECT_FF53052_WARTIME_PRODUCTION') ||
+      (inputs.phase == 'rollback' && inputs.confirmation == 'ROLLBACK_FF53052_TO_CONTROLLED_ALPHA_BASELINE') ||
+      (inputs.phase == 'maintenance' && inputs.confirmation == 'MAINTENANCE_JOURNEY_PRODUCTION') ||
+      (inputs.phase == 'live' && inputs.confirmation == 'LIVE_JOURNEY_PRODUCTION'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+      WP08_TOS_BUCKET_NAME: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+      WP08_MIGRATION_DB_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      WP08_RUNTIME_DB_PASSWORD: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      WP09_IDENTITY_SUBJECT_SECRET: ${{ secrets.WP09_IDENTITY_SUBJECT_SECRET }}
+      WP09_FEISHU_APP_ID: ${{ secrets.WP09_FEISHU_APP_ID }}
+      WP09_FEISHU_APP_SECRET: ${{ secrets.WP09_FEISHU_APP_SECRET }}
+      WP11_NOTIFICATION_RECIPIENT_KEY: ${{ secrets.WP11_NOTIFICATION_RECIPIENT_KEY }}
+      WP11_FEISHU_APP_ID: ${{ secrets.WP11_FEISHU_APP_ID }}
+      WP11_FEISHU_APP_SECRET: ${{ secrets.WP11_FEISHU_APP_SECRET }}
+      WP08_RDS_CA_PEM_B64: ${{ secrets.WP08_RDS_CA_PEM_B64 }}
+      WP15_SESSION_SECRET: ${{ secrets.WP15_SESSION_SECRET }}
+      WP15_INVITE_SECRET: ${{ secrets.WP15_INVITE_SECRET }}
+      WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
+      WP15_BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Download exact frozen candidate evidence
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp07-candidate-ff53052847a268d025bceb93c3eab37986d50219
+          path: artifacts/wp07-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 31340959377
+      - name: Verify immutable wartime contract
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "${{ inputs.candidate }}" = "$(jq -r .candidate_sha config/wp15_wartime_cutover.json)"
+          manifest=artifacts/wp07-candidate/release-manifest.json
+          test "$(jq -r .candidate.commit_sha "$manifest")" = "${{ inputs.candidate }}"
+          test "$(jq -r .migration.head "$manifest")" = 0019_wp30_invitation_control
+          test "$(jq -r .config_schema_version "$manifest")" = 3
+          for service in api web worker; do
+            expected=$(jq -r ".images.$service" config/wp15_wartime_cutover.json)
+            digest=$(jq -r ".images.$service.registry_digest" "$manifest")
+            test "$expected" = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-$service@$digest"
+          done
+          if [[ "${{ inputs.phase }}" == deploy ]]; then
+            [[ "${{ inputs.backup_run_id }}" =~ ^[1-9][0-9]{5,19}$ ]]
+          else
+            test -z "${{ inputs.backup_run_id }}"
+          fi
+          make wp15-wartime-cutover-check
+      - name: Initialize frozen shared state read-only
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen infrastructure without changing it
+        id: frozen
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          rds_host=$(terraform output -raw rds_private_host)
+          rds_port=$(terraform output -raw rds_private_port)
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port"; do
+            test -n "$value"
+            echo "::add-mask::$value"
+          done
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+          echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
+          echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+      - name: Create only the exact empty cutover database
+        if: inputs.phase == 'backup-restore'
+        run: |
+          set -euo pipefail
+          instance_id=$(terraform -chdir=infra/staging output -raw rds_instance_id)
+          echo "::add-mask::$instance_id"
+          python3 -m scripts.wp15_rds_database \
+            --instance-id "$instance_id" \
+            --database journey_next_cutover_20260810
+          python3 -m scripts.wp15_rds_schema_owner \
+            --instance-id "$instance_id" \
+            --database journey_next_cutover_20260810
+      - name: Open bounded SSH ingress
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP15_WARTIME_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+            --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' \
+            >"$RUNNER_TEMP/wp15-wartime-key"
+          chmod 0600 "$RUNNER_TEMP/wp15-wartime-key"
+      - name: Prepare exact owner-only bundle
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'deploy'
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/wp15-wartime-bundle"
+          python3 scripts/wp15_prepare_wartime.py \
+            --output "$bundle" \
+            --rds-host "${{ steps.frozen.outputs.rds_host }}" \
+            --rds-port "${{ steps.frozen.outputs.rds_port }}"
+          cp deploy/production/compose.yaml deploy/production/compose.migrate.yaml "$bundle/"
+          cp deploy/production/wartime_grant_runtime.py "$bundle/grant_runtime.py"
+          cp deploy/production/wartime_backup_restore.sh "$bundle/"
+          cp deploy/production/wartime_deploy.sh "$bundle/"
+          cp deploy/production/wartime_rollback.sh "$bundle/"
+          cp deploy/production/db_facts.py "$bundle/"
+          chmod 0755 "$bundle"/*.sh
+      - name: Verify exact rollback baseline and frozen staging source
+        if: inputs.phase == 'preflight'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile baseline" \
+            <scripts/wp15_production_inventory.py
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "python3 - --candidate '${{ inputs.candidate }}'" \
+            <scripts/wp08_runtime_inventory.py
+      - name: Execute one isolated backup and restore proof
+        if: inputs.phase == 'backup-restore'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          remote="/srv/journey-next-production/restore-runs/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "test ! -e '$remote' && install -d -m 0700 '$remote'"
+          tar -C "$RUNNER_TEMP/wp15-wartime-bundle" -czf - . | \
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "cd '$remote' && set -a && . ./secrets/backup.env && set +a && \
+            WP15_RUN_ID='$GITHUB_RUN_ID' ./wartime_backup_restore.sh"
+          mkdir -p "$RUNNER_TEMP/wp15-wartime-evidence"
+          scp "${opts[@]}" root@"$PUBLIC_IP":"/srv/journey-next-production/backups/$GITHUB_RUN_ID/backup-manifest.json" \
+            "$RUNNER_TEMP/wp15-wartime-evidence/backup-manifest.json"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "cat '/srv/journey-next-production/backups/$GITHUB_RUN_ID/journey-next.dump.enc'" | \
+            aws s3 cp - "s3://$WP08_TOS_BUCKET_NAME/wp15-wartime/$GITHUB_RUN_ID/journey-next.dump.enc" \
+              --sse AES256 --only-show-errors
+          aws s3 cp "$RUNNER_TEMP/wp15-wartime-evidence/backup-manifest.json" \
+            "s3://$WP08_TOS_BUCKET_NAME/wp15-wartime/$GITHUB_RUN_ID/backup-manifest.json" \
+            --sse AES256 --only-show-errors
+          aws s3api head-object --bucket "$WP08_TOS_BUCKET_NAME" \
+            --key "wp15-wartime/$GITHUB_RUN_ID/journey-next.dump.enc" >/dev/null
+          echo "WP15_WARTIME_OFF_HOST_BACKUP=PASS target=private-tos encrypted=true"
+      - name: Upload PII-free backup evidence
+        if: inputs.phase == 'backup-restore'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp15-wartime-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp15-wartime-evidence/backup-manifest.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Deploy exact candidate against verified isolated restore
+        id: deploy_runtime
+        if: inputs.phase == 'deploy'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          release="/srv/journey-next-production/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
+          echo "release=$release" >>"$GITHUB_OUTPUT"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp15-wartime-bundle" -czf - . | \
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          echo "started=true" >>"$GITHUB_OUTPUT"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && \
+            BACKUP_RUN_ID='${{ inputs.backup_run_id }}' ./wartime_deploy.sh"
+      - name: Verify observable public production surface with bounded retry
+        if: inputs.phase == 'preflight' || inputs.phase == 'deploy' || inputs.phase == 'inspect' || inputs.phase == 'live'
+        run: |
+          set -euo pipefail
+          profile=cutover
+          if [[ "${{ inputs.phase }}" == preflight ]]; then profile=baseline; fi
+          attempts=12
+          for attempt in $(seq 1 "$attempts"); do
+            if python3 scripts/wp15_public_surface.py --profile "$profile" --attempt "$attempt"; then
+              echo "WP15_SURFACE_ATTEMPT=$attempt result=PASS profile=$profile"
+              exit 0
+            fi
+            if [[ "$attempt" == "$attempts" ]]; then
+              echo "WP15_SURFACE_ATTEMPT=$attempt result=FAIL retries_exhausted=true profile=$profile" >&2
+              exit 1
+            fi
+            echo "WP15_SURFACE_ATTEMPT=$attempt result=RETRY next_in_seconds=5 profile=$profile"
+            sleep 5
+          done
+      - name: Verify exact cutover runtime inventory
+        if: success() && (inputs.phase == 'deploy' || inputs.phase == 'inspect' || inputs.phase == 'live')
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" \
+            <scripts/wp15_production_inventory.py
+      - name: Execute one-click rollback
+        if: inputs.phase == 'rollback'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          remote="/run/wp15-wartime-rollback-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "install -d -m 0700 '$remote'"
+          scp "${opts[@]}" deploy/production/wartime_rollback.sh \
+            root@"$PUBLIC_IP":"$remote/wartime_rollback.sh"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "chmod 0755 '$remote/wartime_rollback.sh' && '$remote/wartime_rollback.sh'"
+      - name: Verify rollback public surface with bounded retry
+        if: inputs.phase == 'rollback'
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if python3 scripts/wp15_public_surface.py --profile baseline --attempt "$attempt"; then
+              echo "WP15_ROLLBACK_SURFACE_ATTEMPT=$attempt result=PASS"
+              exit 0
+            fi
+            if [[ "$attempt" == 12 ]]; then
+              echo "WP15_ROLLBACK_SURFACE_ATTEMPT=$attempt result=FAIL retries_exhausted=true" >&2
+              exit 1
+            fi
+            echo "WP15_ROLLBACK_SURFACE_ATTEMPT=$attempt result=RETRY next_in_seconds=5"
+            sleep 5
+          done
+      - name: Route production to maintenance or live runtime
+        if: inputs.phase == 'maintenance' || inputs.phase == 'live'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          mode="${{ inputs.phase }}"
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          remote="/run/wp15-wartime-edge-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "install -d -m 0700 '$remote'"
+          scp "${opts[@]}" deploy/production/wartime_edge_route.sh \
+            root@"$PUBLIC_IP":"$remote/wartime_edge_route.sh"
+          if [[ "$mode" == maintenance ]]; then
+            scp "${opts[@]}" deploy/production/Caddyfile.maintenance \
+              root@"$PUBLIC_IP":"$remote/Caddyfile.maintenance"
+            source="$remote/Caddyfile.maintenance"
+          else
+            scp "${opts[@]}" deploy/staging/Caddyfile \
+              root@"$PUBLIC_IP":"$remote/Caddyfile.live"
+            source="$remote/Caddyfile.live"
+          fi
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "chmod 0755 '$remote/wartime_edge_route.sh' && \
+            WP15_EDGE_MODE='$mode' WP15_EDGE_SOURCE='$source' '$remote/wartime_edge_route.sh'"
+      - name: Roll back automatically after failed deployment acceptance
+        id: automatic_rollback
+        if: failure() && inputs.phase == 'deploy' && steps.deploy_runtime.outputs.started == 'true'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          release='${{ steps.deploy_runtime.outputs.release }}'
+          if ssh "${opts[@]}" root@"$PUBLIC_IP" "'$release/wartime_rollback.sh'"; then
+            echo "result=pass" >>"$GITHUB_OUTPUT"
+            ssh "${opts[@]}" root@"$PUBLIC_IP" \
+              "test \"\$(readlink -f /srv/journey-next-production/current)\" != '$release' && rm -rf -- '$release'"
+            echo "WP15_AUTOMATIC_ROLLBACK=PASS failed_release_removed=true"
+          else
+            echo "result=failed" >>"$GITHUB_OUTPUT"
+            echo "WP15_AUTOMATIC_ROLLBACK=FAILED maintenance_required=true" >&2
+          fi
+      - name: Route to maintenance when automatic rollback also fails
+        if: steps.automatic_rollback.outputs.result == 'failed'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+          remote="/run/wp15-wartime-edge-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "install -d -m 0700 '$remote'"
+          scp "${opts[@]}" deploy/production/wartime_edge_route.sh \
+            root@"$PUBLIC_IP":"$remote/wartime_edge_route.sh"
+          scp "${opts[@]}" deploy/production/Caddyfile.maintenance \
+            root@"$PUBLIC_IP":"$remote/Caddyfile.maintenance"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" \
+            "chmod 0755 '$remote/wartime_edge_route.sh' && \
+            WP15_EDGE_MODE=maintenance \
+            WP15_EDGE_SOURCE='$remote/Caddyfile.maintenance' '$remote/wartime_edge_route.sh'"
+      - name: Remove owner-only temporary bundles and registry session
+        if: always()
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          if [[ -f "$RUNNER_TEMP/wp15-wartime-key" && -n "${PUBLIC_IP:-}" ]]; then
+            opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
+            ssh "${opts[@]}" root@"$PUBLIC_IP" \
+              "release='/srv/journey-next-production/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID'; \
+              current=\$(readlink -f /srv/journey-next-production/current 2>/dev/null || true); \
+              if test -d \"\$release\" && test \"\$current\" != \"\$release\"; then \
+                rm -rf -- \"\$release\"; \
+              fi; \
+              rm -rf -- '/srv/journey-next-production/restore-runs/$GITHUB_RUN_ID' \
+                '/run/wp15-wartime-rollback-$GITHUB_RUN_ID' \
+                '/run/wp15-wartime-edge-$GITHUB_RUN_ID'; \
+              docker logout ghcr.io >/dev/null 2>&1 || true" || true
+          fi
+      - name: Close temporary SSH ingress
+        if: always() && steps.frozen.outputs.security_group_id != ''
+        run: |
+          if [[ -n "${WP15_WARTIME_RUNNER_CIDR:-}" ]]; then
+            python3 -m scripts.wp08_security_group close \
+              --security-group-id "${{ steps.frozen.outputs.security_group_id }}" \
+              --cidr "$WP15_WARTIME_RUNNER_CIDR"
+            echo "WP15_WARTIME_SSH_INGRESS=CLOSED"
+          fi
