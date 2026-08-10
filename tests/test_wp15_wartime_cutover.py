@@ -62,3 +62,13 @@ def test_bash_can_read_edge_route_script_without_execute_permission(tmp_path: Pa
         text=True,
     )
     assert result.stdout == "EDGE_ROUTE_READ_BY_BASH=PASS\n"
+
+
+def test_wartime_edge_env_path_matches_staging_compose() -> None:
+    if not cutover.EDGE.exists() or not cutover.STAGING_COMPOSE.exists():
+        pytest.skip("runtime image intentionally excludes deployment files")
+    edge = cutover.EDGE.read_text()
+    compose = cutover.STAGING_COMPOSE.read_text()
+    assert "- secrets/edge.env" in compose
+    assert edge.count("secrets/edge.env") == 3
+    assert "./edge.env" not in edge

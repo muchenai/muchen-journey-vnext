@@ -19,7 +19,7 @@ release=$(readlink -f "$release")
 [[ "$release" =~ ^/srv/journey-next-staging/releases/[0-9a-f]{40}-[1-9][0-9]*$ ]] || \
   fail "staging current release is invalid"
 cd "$release"
-for path in compose.yaml Caddyfile edge.env .deployment.env; do
+for path in compose.yaml Caddyfile secrets/edge.env .deployment.env; do
   [[ -f "$path" && ! -L "$path" ]] || fail "edge input is missing: $path"
 done
 
@@ -33,7 +33,7 @@ rollback() {
   if [[ "$changed" -eq 1 ]]; then
     cp "$backup" Caddyfile
     set -a
-    . ./edge.env
+    . ./secrets/edge.env
     . ./.deployment.env
     set +a
     docker compose run --rm --no-deps edge caddy validate --config /etc/caddy/Caddyfile || true
@@ -48,7 +48,7 @@ trap rollback ERR
 install -m 0600 "$WP15_EDGE_SOURCE" Caddyfile
 changed=1
 set -a
-. ./edge.env
+. ./secrets/edge.env
 . ./.deployment.env
 set +a
 docker compose run --rm --no-deps edge caddy validate --config /etc/caddy/Caddyfile
