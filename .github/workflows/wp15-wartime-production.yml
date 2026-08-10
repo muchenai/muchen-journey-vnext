@@ -406,8 +406,9 @@ jobs:
             source="$remote/Caddyfile.live"
           fi
           ssh "${opts[@]}" root@"$PUBLIC_IP" \
-            "chmod 0755 '$remote/wartime_edge_route.sh' && \
-            WP15_EDGE_MODE='$mode' WP15_EDGE_SOURCE='$source' '$remote/wartime_edge_route.sh'"
+            "chmod 0600 '$remote/wartime_edge_route.sh' && \
+            WP15_EDGE_MODE='$mode' WP15_EDGE_SOURCE='$source' \
+            bash '$remote/wartime_edge_route.sh'"
       - name: Roll back automatically after failed deployment acceptance
         id: automatic_rollback
         if: failure() && inputs.phase == 'deploy' && steps.deploy_runtime.outputs.started == 'true'
@@ -443,9 +444,10 @@ jobs:
           scp "${opts[@]}" deploy/production/Caddyfile.maintenance \
             root@"$PUBLIC_IP":"$remote/Caddyfile.maintenance"
           ssh "${opts[@]}" root@"$PUBLIC_IP" \
-            "chmod 0755 '$remote/wartime_edge_route.sh' && \
+            "chmod 0600 '$remote/wartime_edge_route.sh' && \
             WP15_EDGE_MODE=maintenance \
-            WP15_EDGE_SOURCE='$remote/Caddyfile.maintenance' '$remote/wartime_edge_route.sh'"
+            WP15_EDGE_SOURCE='$remote/Caddyfile.maintenance' \
+            bash '$remote/wartime_edge_route.sh'"
       - name: Remove owner-only temporary bundles and registry session
         if: always()
         env:
