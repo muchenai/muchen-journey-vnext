@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -35,3 +36,29 @@ def test_reviewed_wartime_files_are_fail_closed_and_non_mutating_at_check_time()
         "production_go": False,
         "production_mutation_executed": False,
     }
+
+
+def test_wartime_workflow_invokes_both_edge_routes_through_bash() -> None:
+    if not cutover.WORKFLOW.exists():
+        pytest.skip("runtime image intentionally excludes GitHub workflow files")
+    workflow = cutover.WORKFLOW.read_text()
+    invocation = "bash '$remote/wartime_edge_route.sh'"
+    assert workflow.count(invocation) == 2
+    assert "chmod 0755 '$remote/wartime_edge_route.sh'" not in workflow
+
+
+def test_bash_can_read_edge_route_script_without_execute_permission(tmp_path: Path) -> None:
+    script = tmp_path / "wartime_edge_route.sh"
+    script.write_text("#!/usr/bin/env bash\nset -euo pipefail\nprintf 'EDGE_ROUTE_READ_BY_BASH=PASS\\n'\n")
+    script.chmod(0o600)
+
+    with pytest.raises(PermissionError):
+        subprocess.run([str(script)], check=True)
+
+    result = subprocess.run(
+        ["bash", str(script)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout == "EDGE_ROUTE_READ_BY_BASH=PASS\n"

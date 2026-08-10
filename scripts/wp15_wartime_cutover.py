@@ -122,6 +122,13 @@ def validate_files() -> None:
         "steps.frozen.outputs.rds_instance_id",
     ):
         require(workflow, marker, "wartime workflow")
+    edge_bash_invocation = "bash '$remote/wartime_edge_route.sh'"
+    if workflow.count(edge_bash_invocation) != 2:
+        raise WartimeCutoverError(
+            "both edge routes must invoke the owner-only script through bash for noexec /run"
+        )
+    if "chmod 0755 '$remote/wartime_edge_route.sh'" in workflow:
+        raise WartimeCutoverError("edge route script must not require executable permissions")
     if "output -raw rds_instance_id" in workflow:
         raise WartimeCutoverError("RDS instance ID must come from the frozen state resource")
     forbidden = (
