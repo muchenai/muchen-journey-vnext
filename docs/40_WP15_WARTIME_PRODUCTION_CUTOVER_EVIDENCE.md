@@ -15,7 +15,7 @@
 ## 本 PR 增加的受控能力
 
 - 新鲜 staging 备份恢复到 `journey_next_cutover_20260810`。
-- 加密备份、HMAC manifest、PII-free 源/目标摘要一致性和私有 TOS 归档。
+- 加密备份、HMAC manifest、PII-free 源/目标摘要一致性和 GitHub Actions 加密工件离机归档。
 - 生产 API/Web/Worker/heartbeat/migration/database/image/Compose/Caddy/notification inventory。
 - 九项逐条可观测公开检查和最多 12 次、每次 5 秒的有界重试。
 - 部署失败或验收失败时自动回到旧应用+旧数据库；回退失败时进入维护页。
@@ -25,9 +25,9 @@
 
 以下字段只能在对应单次工作流成功后填写：
 
-- production preflight run：`PENDING`
-- backup/isolated restore run：`PENDING`
-- encrypted private TOS archive：`PENDING`
+- production preflight run：`31346327113`，`PASS`；旧应用/旧库基线、staging 候选和公开表面一致，SSH 已关闭。
+- backup/isolated restore run：`31346697068`，数据库备份、隔离恢复、摘要、加密解密和零接收人均 `PASS`；随后仅在 TOS 新前缀归档被 `InvalidPathAccess` 拒绝，部署未开始，SSH 已关闭。
+- encrypted GitHub Actions archive：`PENDING`；只允许归档 run `31346697068` 的现有密文证明，不重做恢复。
 - production deploy run：`PENDING`
 - production post-deploy inventory run：`PENDING`
 - production Feishu Operator login：`PENDING`

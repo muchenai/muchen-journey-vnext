@@ -10,6 +10,7 @@ on:
         options:
           - preflight
           - backup-restore
+          - archive-backup
           - deploy
           - inspect
           - rollback
@@ -20,7 +21,12 @@ on:
         required: true
         type: string
       backup_run_id:
-        description: Successful backup-restore workflow run required by deploy
+        description: Exact database restore proof run required by archive/deploy
+        required: false
+        default: ""
+        type: string
+      archive_run_id:
+        description: Successful off-host archive workflow run required by deploy
         required: false
         default: ""
         type: string
@@ -44,6 +50,7 @@ jobs:
       inputs.candidate == 'ff53052847a268d025bceb93c3eab37986d50219' &&
       ((inputs.phase == 'preflight' && inputs.confirmation == 'PREFLIGHT_FF53052_WARTIME_PRODUCTION') ||
       (inputs.phase == 'backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_FF53052_WARTIME_PRODUCTION') ||
+      (inputs.phase == 'archive-backup' && inputs.confirmation == 'ARCHIVE_BACKUP_31346697068_WARTIME_PRODUCTION') ||
       (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_FF53052_WARTIME_PRODUCTION') ||
       (inputs.phase == 'inspect' && inputs.confirmation == 'INSPECT_FF53052_WARTIME_PRODUCTION') ||
       (inputs.phase == 'rollback' && inputs.confirmation == 'ROLLBACK_FF53052_TO_CONTROLLED_ALPHA_BASELINE') ||
@@ -72,7 +79,6 @@ jobs:
       TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
       TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
       TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
-      WP08_TOS_BUCKET_NAME: ${{ secrets.WP08_TOS_BUCKET_NAME }}
       WP08_MIGRATION_DB_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
       WP08_RUNTIME_DB_PASSWORD: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
       WP09_IDENTITY_SUBJECT_SECRET: ${{ secrets.WP09_IDENTITY_SUBJECT_SECRET }}
@@ -117,10 +123,29 @@ jobs:
           done
           if [[ "${{ inputs.phase }}" == deploy ]]; then
             [[ "${{ inputs.backup_run_id }}" =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ "${{ inputs.archive_run_id }}" =~ ^[1-9][0-9]{5,19}$ ]]
+          elif [[ "${{ inputs.phase }}" == archive-backup ]]; then
+            test "${{ inputs.backup_run_id }}" = 31346697068
+            test -z "${{ inputs.archive_run_id }}"
           else
             test -z "${{ inputs.backup_run_id }}"
+            test -z "${{ inputs.archive_run_id }}"
           fi
           make wp15-wartime-cutover-check
+      - name: Download exact off-host backup proof
+        if: inputs.phase == 'deploy'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp15-wartime-backup-${{ inputs.archive_run_id }}
+          path: artifacts/wp15-wartime-backup
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.archive_run_id }}
+      - name: Verify downloaded off-host backup proof
+        if: inputs.phase == 'deploy'
+        run: |
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp15_archive_wartime_proof.py \
+            --directory artifacts/wp15-wartime-backup \
+            --run-id '${{ inputs.backup_run_id }}'
       - name: Initialize frozen shared state read-only
         working-directory: infra/staging
         run: |
@@ -233,25 +258,44 @@ jobs:
           ssh "${opts[@]}" root@"$PUBLIC_IP" \
             "cd '$remote' && set -a && . ./secrets/backup.env && set +a && \
             WP15_RUN_ID='$GITHUB_RUN_ID' ./wartime_backup_restore.sh"
-          mkdir -p "$RUNNER_TEMP/wp15-wartime-evidence"
-          scp "${opts[@]}" root@"$PUBLIC_IP":"/srv/journey-next-production/backups/$GITHUB_RUN_ID/backup-manifest.json" \
-            "$RUNNER_TEMP/wp15-wartime-evidence/backup-manifest.json"
+      - name: Collect and validate exact encrypted restore proof
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'archive-backup'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          source_run="$GITHUB_RUN_ID"
+          if [[ "${{ inputs.phase }}" == archive-backup ]]; then
+            source_run='${{ inputs.backup_run_id }}'
+          fi
+          source="/srv/journey-next-production/backups/$source_run"
+          opts=(-i "$RUNNER_TEMP/wp15-wartime-key" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile="$RUNNER_TEMP/wp15-wartime-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" \
-            "cat '/srv/journey-next-production/backups/$GITHUB_RUN_ID/journey-next.dump.enc'" | \
-            aws s3 cp - "s3://$WP08_TOS_BUCKET_NAME/wp15-wartime/$GITHUB_RUN_ID/journey-next.dump.enc" \
-              --sse AES256 --only-show-errors
-          aws s3 cp "$RUNNER_TEMP/wp15-wartime-evidence/backup-manifest.json" \
-            "s3://$WP08_TOS_BUCKET_NAME/wp15-wartime/$GITHUB_RUN_ID/backup-manifest.json" \
-            --sse AES256 --only-show-errors
-          aws s3api head-object --bucket "$WP08_TOS_BUCKET_NAME" \
-            --key "wp15-wartime/$GITHUB_RUN_ID/journey-next.dump.enc" >/dev/null
-          echo "WP15_WARTIME_OFF_HOST_BACKUP=PASS target=private-tos encrypted=true"
-      - name: Upload PII-free backup evidence
-        if: inputs.phase == 'backup-restore'
+            "set -e; test -d '$source' && test ! -L '$source'; \
+            for name in journey-next.dump.enc backup-manifest.json source-facts.json target-facts.json; do \
+              test -f '$source/'\"\$name\" && test ! -L '$source/'\"\$name\"; \
+            done; \
+            test ! -e '$source/journey-next.dump'; \
+            test ! -e '$source/journey-next.verify.dump'"
+          destination="$RUNNER_TEMP/wp15-wartime-evidence"
+          install -d -m 0700 "$destination"
+          for name in journey-next.dump.enc backup-manifest.json source-facts.json target-facts.json; do
+            scp "${opts[@]}" root@"$PUBLIC_IP":"$source/$name" "$destination/$name"
+          done
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp15_archive_wartime_proof.py \
+            --directory "$destination" --run-id "$source_run"
+      - name: Upload exact encrypted off-host backup proof
+        if: inputs.phase == 'backup-restore' || inputs.phase == 'archive-backup'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp15-wartime-backup-${{ github.run_id }}
-          path: ${{ runner.temp }}/wp15-wartime-evidence/backup-manifest.json
+          path: |
+            ${{ runner.temp }}/wp15-wartime-evidence/journey-next.dump.enc
+            ${{ runner.temp }}/wp15-wartime-evidence/backup-manifest.json
+            ${{ runner.temp }}/wp15-wartime-evidence/source-facts.json
+            ${{ runner.temp }}/wp15-wartime-evidence/target-facts.json
           if-no-files-found: error
           retention-days: 30
       - name: Deploy exact candidate against verified isolated restore
@@ -422,6 +466,11 @@ jobs:
                 '/run/wp15-wartime-edge-$GITHUB_RUN_ID'; \
               docker logout ghcr.io >/dev/null 2>&1 || true" || true
           fi
+      - name: Remove local encrypted backup proof
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/wp15-wartime-evidence"
+          echo "WP15_WARTIME_LOCAL_BACKUP_PROOF=CLEANED"
       - name: Close temporary SSH ingress
         if: always() && steps.frozen.outputs.security_group_id != ''
         run: |
