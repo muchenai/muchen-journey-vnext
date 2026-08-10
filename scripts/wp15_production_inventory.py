@@ -19,6 +19,7 @@ CONTAINERS = {
 EDGE = "journey-next-staging-edge-1"
 COMPOSE_PROJECT = "journey-next-production"
 RELEASE_ROOT = Path("/srv/journey-next-production/releases")
+CURRENT_RELEASE = Path("/srv/journey-next-production/current")
 DEPLOYED_CANDIDATE = Path("/srv/journey-next-production/DEPLOYED_CANDIDATE")
 DEPLOYED_WEB_CANDIDATE = Path("/srv/journey-next-production/DEPLOYED_WEB_CANDIDATE")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -109,7 +110,13 @@ def _inspect_container(service: str, expected_digest: str) -> dict[str, object]:
     working_dir_raw = labels.get("com.docker.compose.project.working_dir")
     if not isinstance(working_dir_raw, str):
         raise ProductionInventoryError("Compose working directory is missing")
-    working_dir = Path(working_dir_raw)
+    working_dir_source = Path(working_dir_raw)
+    if working_dir_source != CURRENT_RELEASE and working_dir_source.parent != RELEASE_ROOT:
+        raise ProductionInventoryError("Compose working directory is outside production releases")
+    try:
+        working_dir = working_dir_source.resolve(strict=True)
+    except OSError as exc:
+        raise ProductionInventoryError("Compose working directory cannot be resolved") from exc
     if working_dir.parent != RELEASE_ROOT or not RELEASE_DIRECTORY.fullmatch(working_dir.name):
         raise ProductionInventoryError("Compose working directory is outside production releases")
     networks = value.get("NetworkSettings", {}).get("Networks")

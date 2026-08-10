@@ -5,6 +5,91 @@ import pytest
 from scripts import wp15_production_inventory as inventory
 
 
+def test_container_inventory_accepts_only_current_symlink_to_exact_release(
+    monkeypatch, tmp_path: Path
+) -> None:
+    release_root = tmp_path / "releases"
+    release = release_root / f"{inventory.PROFILES['cutover']['marker']}-31342063864"
+    release.mkdir(parents=True)
+    current = tmp_path / "current"
+    current.symlink_to(release)
+    monkeypatch.setattr(inventory, "RELEASE_ROOT", release_root)
+    monkeypatch.setattr(inventory, "CURRENT_RELEASE", current)
+    monkeypatch.setattr(
+        inventory,
+        "_run",
+        lambda *_args: __import__("json").dumps(
+            [
+                {
+                    "Name": "/journey-next-production-api-1",
+                    "State": {"Running": True},
+                    "Config": {
+                        "Image": (
+                            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@"
+                            + inventory.PROFILES["cutover"]["images"]["api"]
+                        ),
+                        "Labels": {
+                            "com.docker.compose.project": inventory.COMPOSE_PROJECT,
+                            "com.docker.compose.service": "api",
+                            "com.docker.compose.project.working_dir": str(current),
+                        },
+                    },
+                    "NetworkSettings": {
+                        "Networks": {"edge": {"Aliases": ["production-api"]}}
+                    },
+                }
+            ]
+        ),
+    )
+    result = inventory._inspect_container(
+        "api", inventory.PROFILES["cutover"]["images"]["api"]
+    )
+    assert result["compose_release_directory"] == release.name
+
+
+def test_container_inventory_rejects_current_symlink_outside_release_root(
+    monkeypatch, tmp_path: Path
+) -> None:
+    release_root = tmp_path / "releases"
+    release_root.mkdir()
+    outside = tmp_path / f"{inventory.PROFILES['cutover']['marker']}-31342063864"
+    outside.mkdir()
+    current = tmp_path / "current"
+    current.symlink_to(outside)
+    monkeypatch.setattr(inventory, "RELEASE_ROOT", release_root)
+    monkeypatch.setattr(inventory, "CURRENT_RELEASE", current)
+    monkeypatch.setattr(
+        inventory,
+        "_run",
+        lambda *_args: __import__("json").dumps(
+            [
+                {
+                    "Name": "/journey-next-production-api-1",
+                    "State": {"Running": True},
+                    "Config": {
+                        "Image": (
+                            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@"
+                            + inventory.PROFILES["cutover"]["images"]["api"]
+                        ),
+                        "Labels": {
+                            "com.docker.compose.project": inventory.COMPOSE_PROJECT,
+                            "com.docker.compose.service": "api",
+                            "com.docker.compose.project.working_dir": str(current),
+                        },
+                    },
+                    "NetworkSettings": {
+                        "Networks": {"edge": {"Aliases": ["production-api"]}}
+                    },
+                }
+            ]
+        ),
+    )
+    with pytest.raises(inventory.ProductionInventoryError, match="outside"):
+        inventory._inspect_container(
+            "api", inventory.PROFILES["cutover"]["images"]["api"]
+        )
+
+
 def test_cutover_inventory_outputs_only_pii_free_runtime_facts(monkeypatch, tmp_path: Path) -> None:
     profile = inventory.PROFILES["cutover"]
     marker = tmp_path / "DEPLOYED_CANDIDATE"
