@@ -21,6 +21,7 @@ SURFACE = ROOT / "scripts" / "wp15_public_surface.py"
 ARCHIVE = ROOT / "scripts" / "wp15_archive_wartime_proof.py"
 EDGE = ROOT / "deploy" / "production" / "wartime_edge_route.sh"
 MAINTENANCE = ROOT / "deploy" / "production" / "Caddyfile.maintenance"
+STAGING_COMPOSE = ROOT / "deploy" / "staging" / "compose.yaml"
 
 
 class WartimeCutoverError(RuntimeError):
@@ -95,6 +96,7 @@ def validate_files() -> None:
     archive = ARCHIVE.read_text()
     edge = EDGE.read_text()
     maintenance = MAINTENANCE.read_text()
+    staging_compose = STAGING_COMPOSE.read_text()
 
     for phase in (
         "preflight",
@@ -209,6 +211,9 @@ def validate_files() -> None:
     ):
         require(archive, marker, "wartime archive proof")
     require(edge, "WP15_WARTIME_EDGE_ROLLBACK=ATTEMPTED", "wartime edge route")
+    if edge.count("secrets/edge.env") != 3 or "./edge.env" in edge:
+        raise WartimeCutoverError("wartime edge env path differs from staging Compose")
+    require(staging_compose, "- secrets/edge.env", "staging Compose edge env")
     require(maintenance, "reverse_proxy journey-next-staging-web-1:3000", "maintenance Caddyfile")
     require(maintenance, "503", "maintenance Caddyfile")
 
