@@ -142,7 +142,13 @@ jobs:
           security_group_id=$(terraform output -raw staging_security_group_id)
           rds_host=$(terraform output -raw rds_private_host)
           rds_port=$(terraform output -raw rds_private_port)
-          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port"; do
+          rds_instance_id=$(terraform show -json | jq -er '
+            [.values.root_module.resources[]
+              | select(.address == "volcenginecc_rdspostgresql_instance.staging")
+              | .values.instance_id]
+            | if length == 1 then .[0] else error("expected one frozen RDS instance") end
+          ')
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$rds_instance_id"; do
             test -n "$value"
             echo "::add-mask::$value"
           done
@@ -150,17 +156,16 @@ jobs:
           echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+          echo "rds_instance_id=$rds_instance_id" >>"$GITHUB_OUTPUT"
       - name: Create only the exact empty cutover database
         if: inputs.phase == 'backup-restore'
         run: |
           set -euo pipefail
-          instance_id=$(terraform -chdir=infra/staging output -raw rds_instance_id)
-          echo "::add-mask::$instance_id"
           python3 -m scripts.wp15_rds_database \
-            --instance-id "$instance_id" \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' \
             --database journey_next_cutover_20260810
           python3 -m scripts.wp15_rds_schema_owner \
-            --instance-id "$instance_id" \
+            --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' \
             --database journey_next_cutover_20260810
       - name: Open bounded SSH ingress
         run: |

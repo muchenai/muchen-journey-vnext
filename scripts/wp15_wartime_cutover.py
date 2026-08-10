@@ -111,8 +111,12 @@ def validate_files() -> None:
         "WP15_WARTIME_SSH_INGRESS=CLOSED",
         "WP15_WARTIME_OFF_HOST_BACKUP=PASS",
         "Roll back automatically after failed deployment acceptance",
+        'select(.address == "volcenginecc_rdspostgresql_instance.staging")',
+        "steps.frozen.outputs.rds_instance_id",
     ):
         require(workflow, marker, "wartime workflow")
+    if "output -raw rds_instance_id" in workflow:
+        raise WartimeCutoverError("RDS instance ID must come from the frozen state resource")
     forbidden = (
         "terraform plan",
         "terraform apply",
