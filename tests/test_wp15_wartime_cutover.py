@@ -47,6 +47,19 @@ def test_wartime_workflow_invokes_both_edge_routes_through_bash() -> None:
     assert "chmod 0755 '$remote/wartime_edge_route.sh'" not in workflow
 
 
+def test_live_route_precedes_public_acceptance() -> None:
+    live_route = "- name: Route production to maintenance or live runtime"
+    public_acceptance = "- name: Verify observable public production surface with bounded retry"
+    cutover.validate_live_route_order(f"{live_route}\n{public_acceptance}\n")
+
+
+def test_public_acceptance_before_live_route_is_rejected() -> None:
+    live_route = "- name: Route production to maintenance or live runtime"
+    public_acceptance = "- name: Verify observable public production surface with bounded retry"
+    with pytest.raises(cutover.WartimeCutoverError, match="must precede public acceptance"):
+        cutover.validate_live_route_order(f"{public_acceptance}\n{live_route}\n")
+
+
 def test_bash_can_read_edge_route_script_without_execute_permission(tmp_path: Path) -> None:
     script = tmp_path / "wartime_edge_route.sh"
     script.write_text("#!/usr/bin/env bash\nset -euo pipefail\nprintf 'EDGE_ROUTE_READ_BY_BASH=PASS\\n'\n")
