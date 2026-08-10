@@ -88,3 +88,15 @@ def test_create_allows_only_exact_temporary_restore_database() -> None:
         module.create_and_verify(
             "postgres-12345678", "access", "secret", database_name="unreviewed"
         )
+
+
+def test_create_allows_exact_wartime_cutover_database() -> None:
+    database = exact_database()
+    database["DBName"] = module.WARTIME_DATABASE_NAME
+    with patch.object(module, "_request", return_value={"Databases": [database]}):
+        assert module.create_and_verify(
+            "postgres-12345678",
+            "access",
+            "secret",
+            database_name=module.WARTIME_DATABASE_NAME,
+        ) == "EXACT_DATABASE_ALREADY_PRESENT"

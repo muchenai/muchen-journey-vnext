@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "status": "CONTROLLED_ALPHA_CUTOVER",
+  "candidate_sha": "ff53052847a268d025bceb93c3eab37986d50219",
+  "candidate_gate_run_id": "31340959377",
+  "region": "cn-beijing",
+  "production_host": "journey.muchenai.com",
+  "staging_host": "staging-vnext.muchenai.com",
+  "staging_database": "journey_next_staging",
+  "production_database": "journey_next_cutover_20260810",
+  "rollback_database": "journey_next_restore_20260803",
+  "preserved_failed_restore_database": "journey_next_production",
+  "production_compose_project": "journey-next-production",
+  "shared_edge_network": "journey-next-staging_default",
+  "migration": "0019_wp30_invitation_control",
+  "config_schema_version": 3,
+  "images": {
+    "api": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:2a053bad89bea8c06daba6e929af49a4804cc06a2321e49e93858f1f4fda6a6c",
+    "web": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:a3335542f74d09f4bc394119cee81ba7b866edc6ef041f3f4444949d271e2aee",
+    "worker": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:2ef3cd1b05c545810929a3136ac8259042f6b6c586ccb8c59af90c579bfd9f38"
+  },
+  "rollback_runtime": {
+    "marker_candidate": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
+    "backend_release": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
+    "worker_release": "8f77ceec570e2ec5e9c52861fcdc27748d7bb44a",
+    "web_release": "8e56e759152efcbf17f4373f2132e02a8762af81",
+    "migration": "0014_wp12_data_lifecycle",
+    "api_image": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:553055d921f75bc7f7df0e176d5176f0546ee7f75f37e9757a0be09edf3520ff",
+    "web_image": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:c86b4a443ecdc9160c5cb59b742c5c7882ea46aaf401e0a487d3bdad11d86d6f",
+    "worker_image": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:16bf2c7515d68fab164704438b23f691917213c8946a8c3dff8a4116fb3df0c7"
+  },
+  "database_tool": {
+    "source": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9",
+    "expected_digest": "sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
+  },
+  "backup": {
+    "restore_target_must_be_empty": true,
+    "source_database_is_never_modified": true,
+    "active_notification_recipients_must_be_zero": true,
+    "encrypted_off_host_target": "private-tos"
+  },
+  "rollback": {
+    "application": "ONE_CLICK_PREVIOUS_RELEASE_AND_DATABASE",
+    "maintenance": "ONE_CLICK_EDGE_ROUTE",
+    "staging_remains_online": true,
+    "dns_mutation_required": false
+  },
+  "deferred": [
+    "full_production_go",
+    "external_log_collection",
+    "real_notifications",
+    "disaster_recovery_fault_domain",
+    "broad_invitation"
+  ]
+}

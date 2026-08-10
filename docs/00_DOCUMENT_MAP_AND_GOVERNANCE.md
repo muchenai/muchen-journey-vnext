@@ -1,8 +1,8 @@
 # 00｜文档地图与治理规则
 
 状态：`APPROVED_FOR_BUILD`  
-版本：V0.14
-日期：2026-08-05
+版本：V0.15
+日期：2026-08-10
 适用阶段：立项至 G0 开工门禁  
 权威性：本目录是 vNext 开发前唯一文档事实源；旧版 DOCX、旧仓库 README、会议纪要和聊天记录均不是 vNext 实施权威。
 
@@ -55,7 +55,9 @@
 | 37 | [WP-25～WP-30 探索营 P0 真人体验与受控上线工作包](37_WP25_WP30_LEARNING_PRODUCTIZATION_WORK_PACKAGES.md) | 如何把真实内容、完整体验、单宝藏纵向切片和每包真人验证接成可受控上线的探索营？ | `DEC-026` 已批准并启动 WP-25 内容/原型/真人验证；产品代码、WP-26 及全部外部动作仍未授权 |
 | 38 | [WP-25 P0 Experience & Content Freeze 执行包](38_WP25_P0_EXPERIENCE_CONTENT_FREEZE.md) | WP-25 已核对哪些正式内容、页面状态和真人验收，哪些材料仍需负责人提供？ | 原型三视口/路线/完整点击路径机器通过；当前 `PROTOTYPE_MACHINE_VERIFIED / HUMAN_GATES_NOT_RUN / CONTENT_INPUT_REQUIRED`，不得以原型或工程草稿冒充已批准内容 |
 | 39 | [WP-26～WP-30 本地构建记录与待授权账本](39_WP26_WP30_AUTONOMOUS_BUILD_RECORD.md) | 夜间自主开发完成了哪些机器合同，哪些真人/外部动作仍必须另行授权？ | WP-26～30 本地机器能力已实现；真人内容/UAT、V3 发布、部署、正式域名和 cohort 仍 `NOT_RUN`/`NO_GO`，按顺序授权 |
+| 40 | [WP-15 上线战时模式生产切换证据](40_WP15_WARTIME_PRODUCTION_CUTOVER_EVIDENCE.md) | 如何把已验收 staging 候选用新鲜恢复库切到正式域名，同时保留旧应用＋旧库的一键回退？ | 候选、staging 与当前生产基线已只读核验；生产 preflight、备份恢复、部署、真人飞书登录和维护/回退演练必须按单次工作流补齐，完整 production GO 继续延期 |
 | RB-15 | [受控 Alpha 正式域名切换手册](runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md) | 如何在不丢失 staging 和新业务事实的前提下备份恢复、切换正式域名并一键止血？ | 受保护主线唯一入口；锁定候选、空库恢复、加密异机备份、双 host、OAuth/TLS、维护页与旧站入口回退边界 |
+| RB-15W | [上线战时模式受控生产切换手册](runbooks/WP15_WARTIME_PRODUCTION_CUTOVER.md) | 如何用最短可恢复路径完成新鲜备份、隔离恢复、冻结候选验收和小范围正式使用？ | 不改 DNS/基础设施；只接受 `ff530528…`，任一步失败即停；旧应用＋旧库保持可执行回退，成功也只记 `CONTROLLED_ALPHA_LIVE` |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |
 
 ## 3. 权威顺序

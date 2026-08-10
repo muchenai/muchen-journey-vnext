@@ -91,3 +91,24 @@ def test_repairs_exact_temporary_restore_database(monkeypatch):
         sleeper=lambda _seconds: None,
     ) == "OWNER_REPAIRED_AND_VERIFIED"
     assert calls[1][1]["SchemaInfo"][0]["DBName"] == database
+
+
+def test_repairs_exact_wartime_cutover_database(monkeypatch):
+    database = schema_owner.WARTIME_DATABASE_NAME
+    results = iter([
+        {"Schemas": [{"DBName": database, "SchemaName": "public", "Owner": schema_owner.EXPECTED_PREVIOUS_OWNER}]},
+        {},
+        {"Schemas": [{"DBName": database, "SchemaName": "public", "Owner": schema_owner.OWNER}]},
+    ])
+    monkeypatch.setattr(
+        schema_owner,
+        "_request",
+        lambda *_args, **_kwargs: next(results),
+    )
+    assert schema_owner.repair_and_verify(
+        "postgres-1bf539167c33",
+        "ak",
+        "sk",
+        database_name=database,
+        sleeper=lambda _seconds: None,
+    ) == "OWNER_REPAIRED_AND_VERIFIED"
