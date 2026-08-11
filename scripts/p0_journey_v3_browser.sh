@@ -106,14 +106,37 @@ complete_stage() {
       await page.waitForURL('**/app/tasks/**');
       await page.waitForLoadState('networkidle');
       if ($stage_no === 1) {
+        for (const viewport of [
+          {name: 'desktop', width: 1280, height: 900},
+          {name: 'tablet', width: 768, height: 1024},
+          {name: 'mobile', width: 390, height: 844},
+        ]) {
+          await page.setViewportSize({width: viewport.width, height: viewport.height});
+          if (await page.locator('.learning-material-card[open]').count() !== 1) {
+            throw new Error(viewport.name + ': current material is not the only expanded card');
+          }
+          if (await page.locator('.task-workspace').count() !== 0) {
+            throw new Error(viewport.name + ': response workspace appeared before learning input');
+          }
+          if (await page.locator('.button.primary:visible').count() !== 1) {
+            throw new Error(viewport.name + ': task page does not have one primary next action');
+          }
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (overflow) throw new Error(viewport.name + ': task page has horizontal overflow');
+          await page.screenshot({
+            path: '$evidence_dir/02-first-task-' + viewport.name + '.png',
+            fullPage: true,
+          });
+        }
+        await page.setViewportSize({width: 1280, height: 900});
         const link = page.getByRole('link', {name: '打开学习材料'});
         if (await link.count() !== 1) throw new Error('frozen text URL is not clickable');
         const href = await link.getAttribute('href');
         if (!href || !href.startsWith('https://')) throw new Error('learning link is not HTTPS');
       }
-      while (await page.getByRole('button', {name: '完成本材料'}).count()) {
+      while (await page.getByRole('button', {name: '完成并继续'}).count()) {
         const completed = page.waitForURL('**?material=completed');
-        await page.getByRole('button', {name: '完成本材料'}).first().evaluate((element) => element.click());
+        await page.getByRole('button', {name: '完成并继续'}).first().evaluate((element) => element.click());
         await completed;
         await page.waitForLoadState('networkidle');
       }

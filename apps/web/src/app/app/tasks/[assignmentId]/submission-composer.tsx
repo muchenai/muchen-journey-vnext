@@ -74,8 +74,6 @@ export function SubmissionComposer({
         value={body}
         onChange={(event) => setBody(event.target.value)}
       />
-      <p className="status-meta">草稿会安全保存；提交后保留原始版本。</p>
-
       {attachments.length > 0 ? (
         <fieldset>
           <legend>本次使用的 READY 附件</legend>

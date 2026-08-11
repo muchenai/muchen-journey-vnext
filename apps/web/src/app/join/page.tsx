@@ -71,7 +71,7 @@ export default async function JoinPage({
               </>
             ) : (
               <p className="status-meta">
-                只恢复原有 Learner 会话与进度，不会创建新人、Enrollment、Assignment 或新提交。
+                从上次离开的地方继续。
               </p>
             )}
             <label className="consent-row">

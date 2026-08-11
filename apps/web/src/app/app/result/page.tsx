@@ -56,9 +56,6 @@ export default async function ResultPage() {
         <p className="result-kicker"><span aria-hidden="true">✓</span> 已完成</p>
         <h1>这段旅程，走完了。</h1>
         <p className="lede">{result.summary}</p>
-        <p className="status-meta">
-          结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
-        </p>
       </header>
 
       <section className="panel result-section" aria-labelledby="decision-layers-title">
@@ -68,7 +65,6 @@ export default async function ResultPage() {
           <article>
             <span className="material-status complete">学习完成</span>
             <strong>{result.learning_completion.completed_stages} / {result.learning_completion.total_stages} 站</strong>
-            <p>八站学习与提交证据已完整保存。</p>
           </article>
           <article>
             <span className="material-status complete">Reviewer 结论</span>
@@ -82,7 +78,6 @@ export default async function ResultPage() {
                 ? `${result.system_recommendation.recommendation_tier} 档 · ${admissionLabels[result.system_recommendation.recommended_decision ?? ""] ?? "—"}`
                 : "等待 Operator 录入人工观察"}
             </strong>
-            <p>系统只整理固定证据，不替代人的准入判断。</p>
           </article>
           <article>
             <span className={`material-status ${result.operator_admission.status === "DECIDED" ? "complete" : ""}`}>Operator 人工准入</span>
@@ -143,10 +138,6 @@ export default async function ResultPage() {
             </ul>
           </>
         )}
-        <aside className="ai-note" aria-label="AI 摘要状态">
-          <strong>人工评价原文</strong>
-          <span>页面不使用 AI 改写 Reviewer 结论。</span>
-        </aside>
       </section>
 
       <section className="panel result-section" aria-labelledby="handoff-title">
@@ -159,43 +150,43 @@ export default async function ResultPage() {
           </div>
           <p>{result.handoff.instructions}</p>
         </div>
+      </section>
+
+      <details className="panel result-section result-proof">
+        <summary>查看通知与过程记录</summary>
         <p className="status-meta">
-          交接事实生成于 <time dateTime={result.handoff.created_at}>{formatDate.format(new Date(result.handoff.created_at))}</time>；刷新或重放不会新建下一步。
+          结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
         </p>
-      </section>
-
-      <section className="panel result-section" aria-labelledby="notification-title">
-        <p className="section-label">04 · 通知状态</p>
-        <h2 id="notification-title">核心结果不依赖通知</h2>
-        <div className={`notification-state notification-${result.notification.status.toLowerCase()}`}>
-          <strong>{result.notification.status}</strong>
-          <p>{result.notification.display_status}</p>
-        </div>
-        <p className="notification-disclaimer">
-          {notificationEvidence}
-          {result.notification.attempt_count > 0 ? ` 已记录 ${result.notification.attempt_count} 次投递尝试。` : ""}
-        </p>
-      </section>
-
-      <section className="panel result-section" aria-labelledby="timeline-title">
-        <p className="section-label">05 · 不可变时间线</p>
-        <h2 id="timeline-title">从提交到交接</h2>
-        <ol className="result-timeline">
-          {timeline.items.map((item) => {
-            const detail = timelineDetail(item.event_type, item.details);
-            return (
-              <li key={item.item_id}>
-                <span className="timeline-dot" aria-hidden="true" />
-                <div>
-                  <time dateTime={item.occurred_at}>{formatDate.format(new Date(item.occurred_at))}</time>
-                  <h3>{item.title}</h3>
-                  {detail ? <p>{detail}</p> : null}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+        <section aria-labelledby="notification-title">
+          <h2 id="notification-title">通知状态</h2>
+          <div className={`notification-state notification-${result.notification.status.toLowerCase()}`}>
+            <strong>{result.notification.status}</strong>
+            <p>{result.notification.display_status}</p>
+          </div>
+          <p className="notification-disclaimer">
+            {notificationEvidence}
+            {result.notification.attempt_count > 0 ? ` 已记录 ${result.notification.attempt_count} 次投递尝试。` : ""}
+          </p>
+        </section>
+        <section aria-labelledby="timeline-title">
+          <h2 id="timeline-title">过程记录</h2>
+          <ol className="result-timeline">
+            {timeline.items.map((item) => {
+              const detail = timelineDetail(item.event_type, item.details);
+              return (
+                <li key={item.item_id}>
+                  <span className="timeline-dot" aria-hidden="true" />
+                  <div>
+                    <time dateTime={item.occurred_at}>{formatDate.format(new Date(item.occurred_at))}</time>
+                    <h3>{item.title}</h3>
+                    {detail ? <p>{detail}</p> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      </details>
     </article>
   );
 }

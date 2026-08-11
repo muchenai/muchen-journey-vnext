@@ -32,7 +32,8 @@ test("learner reentry is explicit and restores the existing journey", () => {
 test("https links embedded in frozen text materials remain clickable without unsafe html", () => {
   assert.match(taskPage, /function textWithSafeLinks/);
   assert.match(taskPage, /part\.startsWith\("https:\/\/"\)/);
-  assert.match(taskPage, /target="_blank" rel="noreferrer">打开学习材料/);
+  assert.match(taskPage, /target="_blank" rel="noreferrer" aria-label="打开学习材料"/);
+  assert.match(taskPage, /new URL\(href\)\.hostname/);
   assert.doesNotMatch(taskPage, /dangerouslySetInnerHTML/);
 });
 
