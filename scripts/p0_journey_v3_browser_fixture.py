@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import argparse
+from http.cookiejar import CookieJar
 import json
 import sys
 import uuid
 from urllib.error import HTTPError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 
 STAGES = (
@@ -43,12 +44,7 @@ def request_json(base_url: str, path: str, *, method: str = "GET", payload=None)
 
 
 def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
-    material_body = (
-        "浏览器黄金路径材料。请打开 https://example.com/journey-v3-learning，"
-        "然后返回当前页面完成材料。"
-        if stable_key == "DAY-0"
-        else "浏览器黄金路径使用的隔离合成材料；它不包含公司事实、用户信息或正式评价结论。"
-    )
+    material_url = f"https://example.com/journey-v3-learning/{stable_key.lower()}"
     return {
         "expected_revision": revision,
         "title": f"{title} · P0 浏览器验证",
@@ -67,13 +63,14 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
             {
                 "key": f"material-{stable_key.lower()}",
                 "title": f"{title}学习输入",
-                "kind": "TEXT",
+                "kind": "HTTPS_LINK",
                 "source_label": "P0 隔离浏览器夹具",
-                "body": material_body,
+                "url": material_url,
                 "estimated_duration_minutes": 1,
                 "required": True,
             }
         ],
+        "verified_material_urls": [material_url],
         "estimated_duration_minutes": 5,
         "rubric": {
             "version": 1,
@@ -98,14 +95,89 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
     }
 
 
+def create_invite(
+    base_url: str,
+    *,
+    purpose: str,
+    reviewer_id: str,
+    journey_version_id: str,
+) -> dict[str, object]:
+    return request_json(
+        base_url,
+        "/api/v1/ops/invites",
+        method="POST",
+        payload={
+            "purpose": purpose,
+            "expires_in_hours": 1,
+            "role": "LEARNER",
+            "reviewer_id": reviewer_id,
+            "journey_version_id": journey_version_id,
+            "target_user_id": None,
+        },
+    )
+
+
+def exchange_without_confirmation(base_url: str, token: str) -> None:
+    opener = build_opener(HTTPCookieProcessor(CookieJar()))
+    request = Request(
+        f"{base_url}/api/v1/join/exchange",
+        data=json.dumps({"token": token, "return_to": "/app"}).encode("utf-8"),
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=10) as response:
+            result = json.load(response)["data"]
+    except HTTPError as error:
+        message = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"fixture API failed while preparing pending invite: HTTP {error.code}: {message}"
+        ) from error
+    if result.get("status") != "PENDING_IDENTITY":
+        raise RuntimeError("fixture pending invite did not stop before identity confirmation")
+
+
+def create_reentry(base_url: str, learner_display_name: str) -> str:
+    enrollments = request_json(base_url, "/api/v1/ops/enrollments")["items"]
+    matches = [
+        item
+        for item in enrollments
+        if item["learner_display_name"] == learner_display_name
+        and item["status"] == "ACTIVE"
+        and "create_learner_reentry" in item["allowed_commands"]
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "fixture requires exactly one active learner enrollment eligible for reentry"
+        )
+    enrollment = matches[0]
+    result = request_json(
+        base_url,
+        f"/api/v1/ops/enrollments/{enrollment['id']}/learner-reentry",
+        method="POST",
+        payload={
+            "expected_revision": enrollment["revision"],
+            "expires_in_minutes": 30,
+            "reason": "P0 浏览器验证模拟浏览器中断后安全继续既有旅程",
+        },
+    )
+    return str(result["invite_token"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--create-reentry", action="store_true")
+    parser.add_argument("--learner-display-name", default="P0 Browser Learner")
     args = parser.parse_args()
     parsed = urlparse(args.base_url)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}:
         raise SystemExit("P0 browser fixture is restricted to a loopback HTTP API")
     base_url = args.base_url.rstrip("/")
+
+    if args.create_reentry:
+        sys.stdout.write(create_reentry(base_url, args.learner_display_name))
+        return 0
 
     identity_items = request_json(base_url, "/api/v1/ops/identity-access")["items"]
     reviewer_id = next(item["user_id"] for item in identity_items if item["role"] == "REVIEWER")
@@ -145,19 +217,25 @@ def main() -> int:
             "review_acknowledged": True,
         },
     )
-    invite = request_json(
+    invite = create_invite(
         base_url,
-        "/api/v1/ops/invites",
-        method="POST",
-        payload={
-            "purpose": "完成 P0 Journey V3 隔离浏览器黄金路径",
-            "expires_in_hours": 1,
-            "role": "LEARNER",
-            "reviewer_id": reviewer_id,
-            "journey_version_id": journey["id"],
-            "target_user_id": None,
-        },
+        purpose="P0_BROWSER_PRIMARY",
+        reviewer_id=reviewer_id,
+        journey_version_id=journey["id"],
     )
+    pending_invite = create_invite(
+        base_url,
+        purpose="P0_BROWSER_PENDING",
+        reviewer_id=reviewer_id,
+        journey_version_id=journey["id"],
+    )
+    create_invite(
+        base_url,
+        purpose="P0_BROWSER_UNUSED",
+        reviewer_id=reviewer_id,
+        journey_version_id=journey["id"],
+    )
+    exchange_without_confirmation(base_url, str(pending_invite["invite_token"]))
     sys.stdout.write(invite["invite_token"])
     return 0
 

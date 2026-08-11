@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Create a disposable reviewer session inside an isolated local browser fixture."""
+"""Create a disposable privileged session inside an isolated local browser fixture."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import uuid
@@ -17,9 +18,18 @@ from journey_api.models import IdentitySession, Role, RoleAssignment, User, User
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--role",
+        choices=(Role.REVIEWER.value, Role.OPERATOR.value),
+        default=Role.REVIEWER.value,
+    )
+    args = parser.parse_args()
+    requested_role = Role(args.role)
+
     settings = get_settings()
     if settings.app_env not in {"local", "test"} or not settings.allow_fixture_identity:
-        raise SystemExit("reviewer browser fixture is disabled outside local/test")
+        raise SystemExit("privileged browser fixture is disabled outside local/test")
 
     with SessionLocal() as session:
         reviewer = session.scalar(
@@ -27,11 +37,11 @@ def main() -> int:
             .join(RoleAssignment, RoleAssignment.user_id == User.id)
             .where(
                 User.status == UserStatus.ACTIVE,
-                RoleAssignment.role == Role.REVIEWER,
+                RoleAssignment.role == requested_role,
             )
         )
         if reviewer is None:
-            raise SystemExit("reviewer browser fixture identity is unavailable")
+            raise SystemExit(f"{requested_role.value.lower()} browser fixture identity is unavailable")
 
         session_token = random_token()
         csrf_token = random_token()
@@ -40,7 +50,7 @@ def main() -> int:
                 id=uuid.uuid4(),
                 organization_id=reviewer.organization_id,
                 user_id=reviewer.id,
-                role=Role.REVIEWER,
+                role=requested_role,
                 token_hash=credential_hash(
                     settings.session_secret, "session", session_token
                 ),
@@ -50,7 +60,10 @@ def main() -> int:
         )
         session.commit()
 
-    json.dump({"session": session_token, "csrf": csrf_token}, sys.stdout)
+    json.dump(
+        {"session": session_token, "csrf": csrf_token, "role": requested_role.value},
+        sys.stdout,
+    )
     return 0
 
 

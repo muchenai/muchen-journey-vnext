@@ -1,7 +1,7 @@
 # 41｜P0 产品闭环修复与真实反馈计划
 
-文档状态：`IMPLEMENTED_LOCALLY / MACHINE_VERIFIED / NOT_DEPLOYED / HUMAN_UAT_PENDING`  
-日期：2026-08-11  
+文档状态：`IMPLEMENTED_LOCALLY / MACHINE_VERIFIED / NOT_DEPLOYED / HUMAN_UAT_PENDING`
+日期：2026-08-12
 Owner：Product + Tech + QA/UAT
 
 ## 1. 结论先行
@@ -48,20 +48,21 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 5. 固定 TEXT 学习材料中的绝对 HTTPS URL 被安全渲染为可点击链接；不使用任意 HTML 注入。
 6. production 页面显示明确的 production 环境提示，不再落入 local/test 文案。
 7. 修正移动端路线提示导致的横向溢出，并阻止首页 Reviewer OAuth 链接被浏览器预取。
-8. 新增一次性 Journey V3 浏览器黄金路径：接受邀请、八站学习与提交、Reviewer 要求修订、Learner 再提交、Reviewer 通过、剩余评测和最终结果页。
+8. 新增一次性合成 Journey V3 浏览器黄金路径：接受邀请、八站学习与提交、Reviewer 要求修订、Learner 使用新浏览器安全重新进入、再次提交、Reviewer 通过、剩余评测和最终结果页；该路径只能证明交互机制，不能命名为真实 Journey V3 验收。
 
 ## 4. 机器证据与边界
 
 本地隔离证据：
 
-- Web contract：31/31 通过；
-- API：326 通过、5 跳过；
+- Web contract：32/32 通过；
+- API：331 通过、5 跳过；
 - TypeScript、ESLint、OpenAPI、迁移静态检查、隔离检查、追溯检查通过；
 - 桌面/平板/手机 browser smoke 通过；
-- Journey V3 浏览器黄金路径通过：`invite=one_step / stages=8 / revision=resubmitted / reviewer=complete`；
-- 浏览器测试使用一次性数据库、PII-free 合成任务和临时 Learner/Reviewer 会话；结束后删除容器与卷，不保留令牌。
+- 2026-08-12 使用仓库固定 Chromium revision `1232` 完成更新后的完整隔离浏览器重跑；一次测试实现缺陷修正后，正式重跑结果为 `PASS`，临时数据库、容器和卷均在结束时删除；
+- 更新后的浏览器合同实际通过 `invite=one_step / invite_statuses=3 / material_links=8 / reentry=new_browser / old_session=revoked / stages=8 / revision=resubmitted / reviewer=complete`；固定输出同时声明 `fixture=synthetic / external_access=not_proven / human_uat=not_run`；
+- 浏览器测试使用一次性数据库、PII-free 合成任务和临时 Learner/Reviewer/Operator 会话；结束后删除容器与卷，不保留令牌。
 
-该证据只证明产品链路在隔离浏览器中可完成，不证明真实新人理解内容，也不构成 production 部署、真人 UAT 或 cohort 成功。
+即使更新后的浏览器测试重跑通过，也只证明合成交互链路在隔离浏览器中可完成，不证明已发布 Journey V3 的正式内容、飞书材料权限或真实新人理解度，也不构成 production 部署、真人 UAT 或 cohort 成功。
 
 ## 5. 接下来的唯一产品节奏
 
@@ -116,8 +117,20 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_PENDING / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `8840bdbc7d96328b3726df8a7a4df44019272109`，候选 Gate `31521124145`，migration 保持 `0019_wp30_invitation_control`。该候选新增已发布 TaskVersion 材料链接只读回读、统一 URL 边界解析和发布时逐项确认门禁；部署合同合入和一次 staging 部署验收完成前，不修改 Journey V3 业务事实，也不邀请真人开始本轮测试。
+当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_MERGED / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `8840bdbc7d96328b3726df8a7a4df44019272109`，候选 Gate `31521124145`，绑定主线 `04e70530d36a1a0904da694c2bcae77057cbf9da`，migration 保持 `0019_wp30_invitation_control`。该候选新增已发布 TaskVersion 材料链接只读回读、统一 URL 边界解析和发布时逐项确认门禁；一次 staging 部署验收完成前，不修改 Journey V3 业务事实，也不邀请真人开始本轮测试。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 
 以下任一情况立即停止，不扩大 cohort：身份越权或无法重新进入、正式材料不可打开、业务事实重复或丢失、无法提交、Reviewer 无法要求修订、Learner 无法再次提交、Reviewer 无法通过、结果页无法到达。首名 Learner 独立闭环且无 P0 blocker 后，才扩大至 3–5 人；5 人仍无 blocker，才把本轮 P0 记为真人验证通过。
+
+## 9. 2026-08-12 浏览器合同纠偏
+
+本次纠偏只修复“机器证据与真实完成混淆”，不部署、不修改 staging/production 业务事实：
+
+1. 八站合成夹具分别绑定一个结构化 HTTPS 材料，浏览器逐站验证当前材料存在可点击 HTTPS 链接；它不访问正式飞书材料，因此不会伪造 `100% 可打开`。
+2. Operator 浏览器直接核对三条隔离邀请在 `/ops` 分别显示“待使用 / 已兑换，待确认身份 / 已使用”。
+3. Reviewer 要求修订后，Operator 为既有 Enrollment 创建有界重新进入链接；新的 Learner 浏览器恢复原 Assignment 与反馈，原浏览器会话必须失效。
+4. 浏览器结果固定包含 `fixture=synthetic / external_access=not_proven / human_uat=not_run`，任何自动化、候选或部署摘要都不得删去这三个边界。
+5. 全量 API `331 passed / 5 skipped`、Web contract `32/32`、ESLint、TypeScript、Python/shell 静态检查通过；固定 Chromium revision `1232` 的完整合成浏览器路径已重跑通过。
+
+真实 Journey V3 验收仍必须使用已发布不可变版本、一条受控真实邀请、首次接触项目的 Learner 飞书身份和独立 Reviewer；逐项打开正式材料、经历至少一次新浏览器安全续接，并记录 3 分钟进入第一站与全天闭环事实。合成夹具不能关闭该门禁。
