@@ -10,7 +10,7 @@ fail() {
 }
 
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "ad6d9b6c7b9a4c53753f666f6c5b22777ed2ed3f" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
@@ -20,10 +20,10 @@ for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${WEB_IMAGE#*@}" == "sha256:e901492d359f637edfa44f26bcd3d0092646b1327b4d30a1dec2a61708966588" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:09206e6870b7bcb8b93a3d8da5f30f20d1b63159ea179059ed65728c7bbce62f" ]] || fail "Web digest differs from candidate manifest"
 if [[ "$DEPLOY_MODE" == "full" ]]; then
-  [[ "${API_IMAGE#*@}" == "sha256:cb7cdfdcb780abe7971549c8e54cb4aeeb0ff12644da084d1a10415f0c43d909" ]] || fail "API digest differs from candidate manifest"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:50c7754629b96fc96fdeee3ac487793cc29f21e683fb04de35137e8aa479de32" ]] || fail "Worker digest differs from candidate manifest"
+  [[ "${API_IMAGE#*@}" == "sha256:c28e66a848e934d90b7b470423128a66f360f41c781f3ad1bd0e1a4a72f9c085" ]] || fail "API digest differs from candidate manifest"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:2d4fe10f636da7c54102e49e9a2ab486dbe610b84ad2a359b57e5958e52e3642" ]] || fail "Worker digest differs from candidate manifest"
 else
   [[ "${API_IMAGE#*@}" == "sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0" ]] || fail "API digest differs from the Web-only baseline"
   [[ "${WORKER_IMAGE#*@}" == "sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22" ]] || fail "Worker digest differs from the Web-only baseline"
