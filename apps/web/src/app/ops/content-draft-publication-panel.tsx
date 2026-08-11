@@ -5,6 +5,25 @@ import type {
   OpsTaskDefinition,
 } from "@/lib/server/api";
 
+const HTTPS_URL = /https:\/\/[^\s<>"']+/gu;
+const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
+
+function reviewableMaterialLinks(draft: ContentDraft) {
+  const links = draft.content.learning_materials.flatMap((material) => {
+    if (material.kind === "HTTPS_LINK" && material.url) {
+      return [{ title: material.title, href: material.url }];
+    }
+    if (material.kind !== "TEXT" || !material.body) return [];
+    return [...material.body.matchAll(HTTPS_URL)].map((match, index) => ({
+      title: `${material.title} · 链接 ${index + 1}`,
+      href: match[0].replace(TRAILING_URL_PUNCTUATION, ""),
+    }));
+  });
+  return links.filter(
+    (link, index) => links.findIndex((candidate) => candidate.href === link.href) === index,
+  );
+}
+
 export function ContentDraftPublicationPanel({
   drafts,
   definitions,
@@ -23,6 +42,7 @@ export function ContentDraftPublicationPanel({
       {drafts.map((draft) => {
         const definition = definitions.find((item) => item.id === draft.task_definition_id);
         if (!definition) return null;
+        const materialLinks = reviewableMaterialLinks(draft);
         return (
           <li key={draft.id} className="ops-enrollment">
             <div>
@@ -44,9 +64,29 @@ export function ContentDraftPublicationPanel({
                   ))}
                 </select>
               </label>
+              {materialLinks.length > 0 ? (
+                <fieldset className="content-link-review">
+                  <legend>逐项打开材料链接</legend>
+                  <p className="status-meta">
+                    必须在当前浏览器实际打开并确认可访问；只看 URL 文本不算完成。
+                  </p>
+                  {materialLinks.map((link, index) => (
+                    <label className="checkbox-row" key={link.href}>
+                      <input
+                        name={`material_link_verified_${index}`}
+                        type="checkbox"
+                        required
+                      />
+                      <a href={link.href} target="_blank" rel="noreferrer">
+                        {link.title} · {new URL(link.href).hostname}
+                      </a>
+                    </label>
+                  ))}
+                </fieldset>
+              ) : null}
               <label className="checkbox-row">
                 <input type="checkbox" name="review_acknowledged" required />
-                我确认 Reviewer 已复核材料来源、任务边界和 Rubric；发布后正文不可原地修改
+                我确认 Reviewer 已复核材料来源、任务边界和 Rubric，且上列链接均已实际打开；发布后正文不可原地修改
               </label>
               <button className="button primary compact" type="submit">发布精确快照</button>
             </form>

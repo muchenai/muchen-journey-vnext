@@ -12,6 +12,10 @@ const taskPage = await readFile(
   "utf8",
 );
 const opsPage = await readFile(new URL("../src/app/ops/page.tsx", import.meta.url), "utf8");
+const contentPublicationPanel = await readFile(
+  new URL("../src/app/ops/content-draft-publication-panel.tsx", import.meta.url),
+  "utf8",
+);
 
 test("a fresh invite completes exchange and identity confirmation in one learner action", () => {
   assert.match(actions, /export async function acceptInvite/);
@@ -41,4 +45,14 @@ test("operations shows an explicit production environment notice", () => {
   assert.match(opsPage, /production: "当前为 production/);
   assert.match(opsPage, /staging: "当前为 Alpha staging/);
   assert.doesNotMatch(opsPage, /const isStaging/);
+});
+
+test("content publication requires every embedded and external material link to be opened", () => {
+  assert.match(contentPublicationPanel, /material\.kind === "HTTPS_LINK"/);
+  assert.match(contentPublicationPanel, /material\.body\.matchAll\(HTTPS_URL\)/);
+  assert.match(contentPublicationPanel, /name=\{`material_link_verified_\$\{index\}`\}/);
+  assert.match(contentPublicationPanel, /type="checkbox"/);
+  assert.match(contentPublicationPanel, /required/);
+  assert.match(contentPublicationPanel, /target="_blank" rel="noreferrer"/);
+  assert.match(contentPublicationPanel, /必须在当前浏览器实际打开并确认可访问/);
 });
