@@ -404,3 +404,10 @@
 - staging 合同固定 API `sha256:bf815ca2…d5cdc`、Web `sha256:5de1511a…f7f6`、Worker `sha256:fe889286…df53`，并同步 workflow 候选守卫、artifact run、Terraform candidate、部署脚本和准备脚本；唯一部署确认词为 `DEPLOY_1D228F7_TO_VOLCENGINE_STAGING`；
 - 本绑定 PR 只建立候选与 staging 部署合同，不执行部署、不修改数据库、身份、Journey、邀请、消息、DNS、Terraform 或云资源。只有绑定 PR 合入并取得合入后的精确主线 SHA，再由 Owner 明确授权该候选基于该主线执行一次冻结基础设施 staging 部署，才允许派发；失败不重试且必须关闭临时 SSH；
 - 自动化浏览器已证明八站、要求修订、重新提交与 Reviewer 完成在隔离环境可执行，但这不是 1 名真实新人 UAT。staging 成功后仍必须先观察 1 名未接触项目的新人独立完成，再决定是否扩大至 3–5 人。
+
+## 2026-08-11 P0 材料链接发布门禁候选绑定
+
+- production 首站材料核对确认：失效 URL 来自易混淆字符的人工抄写，正式源使用数字 `0` 与大写 `I`；旧 TaskVersion/JourneyVersion 不允许原地修改，现有 Enrollment、提交与评审事实继续保留；
+- PR #176 为 Operator 发布页增加逐项材料链接清单：正文内 HTTPS URL 与独立外链均被提取、去重并显示为可打开链接，未逐项确认时浏览器不能提交不可变 TaskVersion；该门禁不修改 API、迁移、身份或业务状态机；
+- 新候选源码 `feb741e58bb4d83a84fd3466b5a1423bdc99174c` 的 Mainline Candidate Gate [`31502092323`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31502092323) 成功；manifest 标记 registry push verified、deployment not run，migration 仍为 `0019_wp30_invitation_control`；
+- staging 合同固定 API `sha256:98262e67…b7f5e`、Web `sha256:49184266…b5b9d9`、Worker `sha256:eb352750…fd9c`，唯一部署确认词为 `DEPLOY_FEB741E_TO_VOLCENGINE_STAGING`；本绑定不部署、不修改内容或其他外部事实。
