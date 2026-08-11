@@ -30,7 +30,8 @@ test("operator creates a bounded reentry link for the existing enrollment", () =
 
 test("reentry confirmation does not collect a new display name or claim new business facts", () => {
   assert.match(join, /summary\?\.flow === "REENTRY"/);
-  assert.match(join, /只恢复原有 Learner 会话/);
-  assert.match(join, /不会创建新人、Enrollment、Assignment 或新提交/);
+  assert.match(join, /\{!isReentry \? \([\s\S]*name="display_name"/);
+  assert.match(join, /从上次离开的地方继续/);
+  assert.doesNotMatch(join, /Enrollment|Assignment/);
   assert.match(join, /继续旅程/);
 });

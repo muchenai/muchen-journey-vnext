@@ -65,7 +65,7 @@ export default async function Home({
         </div>
       ) : null}
       <p className="landing-footnote">
-        首次进入使用专属邀请 · <Link href="/auth/feishu?return_to=%2Freview">Reviewer</Link>
+        首次进入使用专属邀请 · <Link prefetch={false} href="/auth/feishu?return_to=%2Freview">Reviewer</Link>
       </p>
     </section>
   );

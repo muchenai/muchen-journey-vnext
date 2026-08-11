@@ -2,16 +2,19 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { exchangeInvite } from "@/app/actions";
+import { acceptInvite } from "@/app/actions";
 
 let capturedToken = "";
+let capturedFlow = "";
 
-function readFragmentToken(): string {
+function readFragmentState(): string {
   if (typeof window !== "undefined") {
-    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const fragmentToken = fragment.get("token") ?? "";
     if (fragmentToken) capturedToken = fragmentToken;
+    if (fragment.get("flow") === "reentry") capturedFlow = "reentry";
   }
-  return capturedToken;
+  return `${capturedToken}\n${capturedFlow}`;
 }
 
 function subscribeToFragment(onChange: () => void): () => void {
@@ -25,7 +28,9 @@ function subscribeToFragment(onChange: () => void): () => void {
 }
 
 export function InviteTokenExchangeForm() {
-  const token = useSyncExternalStore(subscribeToFragment, readFragmentToken, () => "");
+  const fragmentState = useSyncExternalStore(subscribeToFragment, readFragmentState, () => "\n");
+  const [token, flow] = fragmentState.split("\n");
+  const isReentry = flow === "reentry";
 
   useEffect(() => {
     if (token) {
@@ -33,6 +38,7 @@ export function InviteTokenExchangeForm() {
     }
     return () => {
       capturedToken = "";
+      capturedFlow = "";
     };
   }, [token]);
 
@@ -41,10 +47,25 @@ export function InviteTokenExchangeForm() {
   }
 
   return (
-    <form action={exchangeInvite}>
+    <form action={acceptInvite} className="join-pass">
       <input type="hidden" name="token" value={token} />
-      <p className="status-meta">通行证已安全读取。</p>
-      <button className="button primary" type="submit">打开通行证</button>
+      <span className="join-pass-label">Muchen Journey · 邀请</span>
+      <h2>{isReentry ? "继续未完成的旅程" : "准备好，从第一站开始"}</h2>
+      {!isReentry ? (
+        <>
+          <label htmlFor="display-name">你希望显示的称呼</label>
+          <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
+        </>
+      ) : (
+        <p className="status-meta">恢复原有进度，不会创建新的学习记录。</p>
+      )}
+      <label className="consent-row">
+        <input type="checkbox" name="accepted_purpose" value="yes" required />
+        我确认这是我的邀请
+      </label>
+      <button className="button primary" type="submit">
+        {isReentry ? "继续旅程" : "开启旅程"}
+      </button>
     </form>
   );
 }

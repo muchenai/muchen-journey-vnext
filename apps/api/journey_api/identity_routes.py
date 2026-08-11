@@ -111,9 +111,17 @@ def ensure_revision(actual: int, expected: int) -> None:
         )
 
 
-def visible_invite_status(invite: Invite) -> str:
+def visible_invite_status(
+    invite: Invite, pending_invite_ids: set[uuid.UUID] | None = None
+) -> str:
     if invite.status == InviteStatus.ACTIVE and invite.expires_at <= utc_now():
         return InviteStatus.EXPIRED.value
+    if (
+        invite.status == InviteStatus.ACTIVE
+        and pending_invite_ids is not None
+        and invite.id in pending_invite_ids
+    ):
+        return "EXCHANGED_PENDING_CONFIRMATION"
     return invite.status.value
 
 
@@ -351,6 +359,15 @@ def list_invites(
         .order_by(Invite.created_at.desc())
         .limit(100)
     ).all()
+    invite_ids = [invite.id for invite in invites]
+    pending_invite_ids = set(
+        session.scalars(
+            select(JoinContext.invite_id).where(
+                JoinContext.invite_id.in_(invite_ids),
+                JoinContext.status == JoinContextStatus.PENDING,
+            )
+        ).all()
+    ) if invite_ids else set()
     return envelope(
         request,
         InviteListOut(
@@ -359,7 +376,7 @@ def list_invites(
                     id=invite.id,
                     purpose=invite.purpose,
                     role="LEARNER",
-                    status=visible_invite_status(invite),
+                    status=visible_invite_status(invite, pending_invite_ids),
                     expires_at=invite.expires_at,
                     revision=invite.revision,
                     journey_version_id=invite.journey_version_id,
@@ -1022,7 +1039,7 @@ def confirm_identity(
 
     session_token = random_token()
     session_csrf_token = random_token()
-    expires_at = now + timedelta(hours=settings.session_ttl_hours)
+    expires_at = now + timedelta(hours=settings.learner_session_ttl_hours)
     identity_session = IdentitySession(
         id=uuid.uuid4(),
         organization_id=invite.organization_id,
@@ -1057,7 +1074,7 @@ def confirm_identity(
         response,
         session_token,
         session_csrf_token,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=settings.learner_session_ttl_hours * 3600,
     )
     return envelope(
         request,

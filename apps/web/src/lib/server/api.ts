@@ -449,7 +449,7 @@ export type OpsInvite = {
   id: string;
   purpose: string;
   role: "LEARNER";
-  status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "REVOKED";
+  status: "ACTIVE" | "EXCHANGED_PENDING_CONFIRMATION" | "CONSUMED" | "EXPIRED" | "REVOKED";
   expires_at: string;
   revision: number;
   journey_version_id: string | null;

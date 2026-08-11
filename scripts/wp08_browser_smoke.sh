@@ -61,7 +61,7 @@ page_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encod
 protected_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["protected_path"])' "$spec_path")
 pwcli open "${BROWSER_BASE_URL%/}${page_path}" --config "$runtime_config"
 pwcli snapshot >snapshot-initial.txt
-pwcli --raw eval "() => fetch('${protected_path}', {redirect: 'manual'}).then(response => response.status)" >protected-status.txt
+pwcli --raw run-code "async (page) => (await page.context().request.get('${BROWSER_BASE_URL%/}${protected_path}', {maxRedirects: 0})).status()" >protected-status.txt
 grep -Eq '(^|[^0-9])401([^0-9]|$)' protected-status.txt
 
 pwcli tab-new "${BROWSER_BASE_URL%/}/content"

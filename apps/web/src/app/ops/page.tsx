@@ -85,7 +85,12 @@ export default async function OpsPage({
       "OPERATOR",
     ),
   ]);
-  const isStaging = runtime.environment === "staging";
+  const environmentNotice = {
+    production: "当前为 production；仅已发布的固定旅程和受控邀请对真实用户生效，staging 继续用于后续验证。",
+    staging: "当前为 Alpha staging；用于真人验证与后续修复，不代表 production 当前运行状态。",
+    test: "当前为测试环境；这里的身份、邀请和业务事实不代表真实运营数据。",
+    local: "当前为本地环境；这里的身份、邀请和业务事实不代表真实运营数据。",
+  }[runtime.environment] ?? "当前环境标识异常，请停止写入并联系工程支持。";
 
   return (
     <section className="ops-page">
@@ -95,9 +100,7 @@ export default async function OpsPage({
         这里没有通用状态编辑器。所有写入都绑定组织、对象、角色、expected revision、幂等键与理由。
       </p>
       <p className="notice">
-        {isStaging
-          ? "当前为 Alpha staging；真人身份/UAT、真实通知、物理 ACL 证据、异机恢复与发布签署未闭环前，production 仍必须 NO_GO。"
-          : "当前为本地/测试环境；真人 UAT、真实通知与发布签署不在此环境中成立，发布判定必须 NO_GO。"}
+        {environmentNotice}
       </p>
       {query.updated ? <p className="success-text" role="status">受控命令已写入并记录审计。</p> : null}
 

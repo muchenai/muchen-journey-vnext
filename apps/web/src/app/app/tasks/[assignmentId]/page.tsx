@@ -11,6 +11,25 @@ import { SubmissionComposer } from "./submission-composer";
 
 export const dynamic = "force-dynamic";
 
+const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
+
+function textWithSafeLinks(value: string | null) {
+  if (!value) return null;
+  return value.split(/(https:\/\/[^\s<>"']+)/gu).map((part, index) => {
+    if (!part.startsWith("https://")) return part;
+    const trailing = part.match(TRAILING_URL_PUNCTUATION)?.[0] ?? "";
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <span key={`${href}-${index}`}>
+        <a href={href} target="_blank" rel="noreferrer" aria-label="打开学习材料">
+          {new URL(href).hostname}
+        </a>
+        {trailing}
+      </span>
+    );
+  });
+}
+
 export default async function TaskPage({
   params,
   searchParams,
@@ -36,6 +55,9 @@ export default async function TaskPage({
     : null;
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
+  const activeMaterialIndex = assignment.learning_materials.findIndex(
+    (material) => material.completed_at === null,
+  );
 
   return (
     <article className="learner-task-page">
@@ -69,42 +91,73 @@ export default async function TaskPage({
             </strong>
           </div>
           {query.material === "completed" ? (
-            <p className="success-text" role="status">完成事实已保存，可在重新登录后恢复。</p>
+            <p className="success-text" role="status">已完成，下一项已解锁。</p>
           ) : null}
           <ol className="learning-material-list">
-            {assignment.learning_materials.map((material, index) => (
-              <li className={material.completed_at ? "is-complete" : ""} key={material.key}>
-                <div className="learning-material-order" aria-hidden="true">
-                  {material.completed_at ? "✓" : String(index + 1).padStart(2, "0")}
-                </div>
-                <article>
-                  <p>
+            {assignment.learning_materials.map((material, index) => {
+              const isComplete = material.completed_at !== null;
+              const isActive = index === activeMaterialIndex;
+              const isLocked = !isComplete && !isActive;
+              const itemClass = isComplete ? "is-complete" : isActive ? "is-active" : "is-locked";
+              const heading = (
+                <>
+                  <span>
                     {material.source_label} · {material.estimated_duration_minutes} min
                     {material.required ? " · 必读" : " · 选读"}
-                  </p>
-                  <h3>{material.title}</h3>
-                  {material.kind === "TEXT" ? <div>{material.body}</div> : (
-                    <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
-                      打开 {new URL(material.url ?? "https://invalid.example").hostname}
-                    </a>
-                  )}
-                  {material.completed_at ? (
-                    <span className="material-complete-label">已完成</span>
+                  </span>
+                  <strong>{material.title}</strong>
+                </>
+              );
+
+              return (
+                <li className={itemClass} key={material.key}>
+                  <div className="learning-material-order" aria-hidden="true">
+                    {isComplete ? "✓" : String(index + 1).padStart(2, "0")}
+                  </div>
+                  {isLocked ? (
+                    <div className="learning-material-locked">
+                      {heading}
+                      <small>完成上一项后解锁</small>
+                    </div>
                   ) : (
-                    <form action={completeLearningMaterial}>
-                      <input type="hidden" name="assignment_id" value={assignment.id} />
-                      <input type="hidden" name="task_version" value={assignment.task_version} />
-                      <input type="hidden" name="material_key" value={material.key} />
-                      <input type="hidden" name="idempotency_key" value={randomUUID()} />
-                      <button className="button primary compact" type="submit">
-                        完成本材料
-                      </button>
-                    </form>
+                    <details className="learning-material-card" open={isActive}>
+                      <summary>{heading}</summary>
+                      <div className="learning-material-content">
+                        {material.kind === "TEXT" ? (
+                          <div className="material-body">{textWithSafeLinks(material.body)}</div>
+                        ) : (
+                          <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
+                            打开 {new URL(material.url ?? "https://invalid.example").hostname}
+                          </a>
+                        )}
+                        {isComplete ? (
+                          <span className="material-complete-label">已完成</span>
+                        ) : (
+                          <form action={completeLearningMaterial}>
+                            <input type="hidden" name="assignment_id" value={assignment.id} />
+                            <input type="hidden" name="task_version" value={assignment.task_version} />
+                            <input type="hidden" name="material_key" value={material.key} />
+                            <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                            <button
+                              className={`button ${material.required ? "primary" : "secondary"} compact`}
+                              type="submit"
+                            >
+                              完成并继续
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </details>
                   )}
-                </article>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
+          {!materialsReady ? (
+            <p className="task-locked-message" role="status">
+              小任务将在必读材料完成后出现。
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -140,20 +193,18 @@ export default async function TaskPage({
             <p className="learning-break">完成后 · {experience.schedule.break_after}</p>
           ) : null}
         </section>
-      ) : (
-        <section className="task-moves" aria-labelledby="task-moves-title">
-          <p className="section-label">这一站</p>
-          <h2 id="task-moves-title">沿着动作前进</h2>
-          <ol>
-            {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
-          </ol>
-        </section>
-      )}
+      ) : null}
 
       <details className="task-contract">
-        <summary>完成边界</summary>
+        <summary>查看任务要求</summary>
         <p>{assignment.learner_outcome}</p>
         <div className="task-contract-columns">
+          <div>
+            <h3>如何完成</h3>
+            <ol className="checklist">
+              {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+          </div>
           <div>
             <h3>完成标准</h3>
             <ul className="checklist">
@@ -174,7 +225,7 @@ export default async function TaskPage({
         ) : null}
       </details>
 
-      <section className="task-workspace" aria-labelledby="task-workspace-title">
+      {materialsReady ? <section className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">完成本阶段</p>
       <h2 id="task-workspace-title">
         {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "提交你的作答" : "留下学习证据"}
@@ -194,17 +245,10 @@ export default async function TaskPage({
         <section className="feedback-callout" aria-labelledby="revision-feedback-title">
           <h3 id="revision-feedback-title">主管要求修订</h3>
           <p>{assignment.latest_revision_feedback}</p>
-          <p className="status-meta">旧版本和旧评审保持只读，本次提交会追加新版本。</p>
         </section>
       ) : null}
 
-      {!materialsReady ? (
-        <p className="task-locked-message" role="status">
-          完成全部必读材料后，小任务会在这里解锁。
-        </p>
-      ) : null}
-
-      {canStart && materialsReady ? (
+      {canStart ? (
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
@@ -212,7 +256,7 @@ export default async function TaskPage({
         </form>
       ) : null}
 
-      {submitCommand && materialsReady ? (
+      {submitCommand ? (
         <>
           {assignment.allowed_attachment_types.length > 0 ? (
             <section className="attachment-workspace" aria-labelledby="attachment-title">
@@ -242,9 +286,7 @@ export default async function TaskPage({
                 <p className="status-meta">暂无 READY 附件；纯文本提交仍可继续。</p>
               )}
             </section>
-          ) : (
-            <p className="status-meta">当前固定任务版本不接收附件，可直接提交结构化文本。</p>
-          )}
+          ) : null}
           <SubmissionComposer
             assignmentId={assignment.id}
             assignmentRevision={assignment.revision}
@@ -265,11 +307,11 @@ export default async function TaskPage({
       {assignment.allowed_commands.length === 0 ? (
         <p className="notice">这一站暂时没有可执行动作。</p>
       ) : null}
-      </section>
+      </section> : null}
 
       {assignment.submission ? (
-        <section className="submission-history" aria-labelledby="submission-history-title">
-          <h2 id="submission-history-title">提交历史</h2>
+        <details className="submission-history">
+          <summary>查看提交历史</summary>
           <p className="status-meta">
             当前为 Version {assignment.submission.current_version_no}；历史版本和评审引用永久只读。
           </p>
@@ -293,7 +335,7 @@ export default async function TaskPage({
               ) : null}
             </article>
           ))}
-        </section>
+        </details>
       ) : null}
 
       {assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
