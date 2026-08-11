@@ -50,7 +50,10 @@ test("operations shows an explicit production environment notice", () => {
 test("content publication requires every embedded and external material link to be opened", () => {
   assert.match(contentPublicationPanel, /material\.kind === "HTTPS_LINK"/);
   assert.match(contentPublicationPanel, /material\.body\.matchAll\(HTTPS_URL\)/);
-  assert.match(contentPublicationPanel, /name=\{`material_link_verified_\$\{index\}`\}/);
+  assert.match(contentPublicationPanel, /name="verified_material_url"/);
+  assert.match(actions, /data\.getAll\("verified_material_url"\)/);
+  assert.match(opsPage, /version\.material_links\.map/);
+  assert.doesNotMatch(contentPublicationPanel, /material_link_verified_/);
   assert.match(contentPublicationPanel, /type="checkbox"/);
   assert.match(contentPublicationPanel, /required/);
   assert.match(contentPublicationPanel, /target="_blank" rel="noreferrer"/);

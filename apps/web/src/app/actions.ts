@@ -1108,6 +1108,12 @@ export async function publishContentDraft(data: FormData) {
   if (data.get("review_acknowledged") !== "on") {
     throw new Error("发布前必须确认复核已完成。近似确认不能替代真实复核。");
   }
+  const verifiedMaterialUrls = data.getAll("verified_material_url").map((value) => {
+    if (typeof value !== "string" || !value.startsWith("https://") || value.length > 2_000) {
+      throw new Error("材料链接确认值无效，请刷新页面重新逐项打开。");
+    }
+    return value;
+  });
   await apiRequest(`/api/v1/ops/content-drafts/${draftId}/publish`, "OPERATOR", {
     method: "POST",
     headers: commandHeaders(),
@@ -1116,6 +1122,7 @@ export async function publishContentDraft(data: FormData) {
       expected_definition_revision: definitionRevision,
       reviewed_by: reviewerId,
       review_acknowledged: true,
+      verified_material_urls: verifiedMaterialUrls,
     }),
   });
   revalidatePath("/ops");

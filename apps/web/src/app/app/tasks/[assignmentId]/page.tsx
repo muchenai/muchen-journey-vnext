@@ -12,10 +12,11 @@ import { SubmissionComposer } from "./submission-composer";
 export const dynamic = "force-dynamic";
 
 const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
+const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
 
 function textWithSafeLinks(value: string | null) {
   if (!value) return null;
-  return value.split(/(https:\/\/[^\s<>"']+)/gu).map((part, index) => {
+  return value.split(HTTPS_URL).map((part, index) => {
     if (!part.startsWith("https://")) return part;
     const trailing = part.match(TRAILING_URL_PUNCTUATION)?.[0] ?? "";
     const href = trailing ? part.slice(0, -trailing.length) : part;

@@ -152,7 +152,22 @@ export default async function OpsPage({
           {tasks.items.map((task) => (
             <li key={task.id}>
               <div><strong>{task.stable_key}</strong><span>{task.status} · definition revision {task.revision}</span></div>
-              <span>{task.versions.map((version) => `V${version.version} ${version.title}`).join(" · ") || "尚未发布"}</span>
+              {task.versions.length > 0 ? task.versions.map((version) => (
+                <details key={version.id} className="published-material-audit">
+                  <summary>V{version.version} {version.title} · {version.material_links.length} 个材料链接</summary>
+                  {version.material_links.length > 0 ? (
+                    <ul>
+                      {version.material_links.map((link) => (
+                        <li key={link.url}>
+                          <a href={link.url} target="_blank" rel="noreferrer">
+                            {link.title} · {new URL(link.url).hostname}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="status-meta">该版本没有外部材料链接。</p>}
+                </details>
+              )) : <span>尚未发布</span>}
             </li>
           ))}
         </ul>
