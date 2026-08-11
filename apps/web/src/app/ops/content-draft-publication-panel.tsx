@@ -5,7 +5,7 @@ import type {
   OpsTaskDefinition,
 } from "@/lib/server/api";
 
-const HTTPS_URL = /https:\/\/[^\s<>"']+/gu;
+const HTTPS_URL = /https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+/gu;
 const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
 
 function reviewableMaterialLinks(draft: ContentDraft) {
@@ -70,10 +70,11 @@ export function ContentDraftPublicationPanel({
                   <p className="status-meta">
                     必须在当前浏览器实际打开并确认可访问；只看 URL 文本不算完成。
                   </p>
-                  {materialLinks.map((link, index) => (
+                  {materialLinks.map((link) => (
                     <label className="checkbox-row" key={link.href}>
                       <input
-                        name={`material_link_verified_${index}`}
+                        name="verified_material_url"
+                        value={link.href}
                         type="checkbox"
                         required
                       />

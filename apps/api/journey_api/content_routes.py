@@ -11,6 +11,7 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
 from journey_api.identity import add_audit, utc_now
+from journey_api.learning_materials import reviewable_material_links
 from journey_api.models import (
     ContentDraft,
     ContentDraftStatus,
@@ -158,6 +159,7 @@ def definition_out(session: Session, definition: TaskDefinition) -> TaskDefiniti
                 version=version.version,
                 title=version.title,
                 published_at=version.published_at,
+                material_links=reviewable_material_links(version.learning_materials),
             )
             for version in versions
         ],
@@ -593,6 +595,20 @@ def publish_content_draft(
     if reviewer is None:
         raise ApiError(422, "VALIDATION_FAILED", "内容复核人必须是同组织有效 Reviewer。")
     content = TaskContentInput.model_validate(draft.content)
+    expected_material_links = reviewable_material_links(
+        [item.model_dump(mode="json") for item in content.learning_materials]
+    )
+    expected_material_urls = [item["url"] for item in expected_material_links]
+    if command.verified_material_urls != expected_material_urls:
+        raise ApiError(
+            422,
+            "MATERIAL_LINK_VERIFICATION_REQUIRED",
+            "必须逐项打开并确认当前草稿中的全部材料链接。",
+            details={
+                "expected_count": len(expected_material_urls),
+                "verified_count": len(command.verified_material_urls),
+            },
+        )
     next_version = (
         session.scalar(
             select(func.max(TaskVersion.version)).where(
@@ -679,6 +695,7 @@ def publish_content_draft(
             "drafted_by": str(draft.owner_id),
             "reviewed_by": str(command.reviewed_by),
             "material_count": len(content.learning_materials),
+            "verified_material_link_count": len(expected_material_urls),
         },
     )
     session.commit()

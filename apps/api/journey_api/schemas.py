@@ -359,6 +359,16 @@ class TaskContentInput(StrictModel):
 class PublishTaskVersionCommand(TaskContentInput):
     expected_revision: int = Field(ge=1)
     reviewed_by: UUID
+    verified_material_urls: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("verified_material_urls")
+    @classmethod
+    def validate_verified_material_urls(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("Verified material URLs must be unique")
+        if any(not value.startswith("https://") or len(value) > 2_000 for value in values):
+            raise ValueError("Verified material URLs must use HTTPS")
+        return values
 
 
 class CreateContentDraftCommand(StrictModel):
@@ -392,6 +402,16 @@ class PublishContentDraftCommand(RevisionCommand):
     expected_definition_revision: int = Field(ge=1)
     reviewed_by: UUID
     review_acknowledged: Literal[True]
+    verified_material_urls: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("verified_material_urls")
+    @classmethod
+    def validate_verified_material_urls(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("Verified material URLs must be unique")
+        if any(not value.startswith("https://") or len(value) > 2_000 for value in values):
+            raise ValueError("Verified material URLs must use HTTPS")
+        return values
 
 
 class LearningMaterialOut(StrictModel):
@@ -797,11 +817,17 @@ class ContentDraftListResponse(StrictModel):
     request_id: str
 
 
+class PublishedMaterialLinkOut(StrictModel):
+    title: str
+    url: str
+
+
 class TaskVersionSummaryOut(StrictModel):
     id: UUID
     version: int
     title: str
     published_at: datetime
+    material_links: list[PublishedMaterialLinkOut] = Field(default_factory=list)
 
 
 class TaskDefinitionOut(StrictModel):

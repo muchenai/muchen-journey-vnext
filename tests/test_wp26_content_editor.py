@@ -73,6 +73,33 @@ def payload(title: str = "宝藏一：公司认知") -> dict[str, object]:
     }
 
 
+def link_payload() -> dict[str, object]:
+    content = payload("宝藏一：公司认知（链接复核）")
+    content["learning_materials"] = [
+        {
+            "key": "company-intro-link",
+            "title": "公司介绍",
+            "kind": "HTTPS_LINK",
+            "source_label": "WP-26 测试链接",
+            "body": None,
+            "url": "https://example.com/company-intro",
+            "estimated_duration_minutes": 5,
+            "required": True,
+        },
+        {
+            "key": "company-intro-text",
+            "title": "补充说明",
+            "kind": "TEXT",
+            "source_label": "WP-26 测试正文",
+            "body": "请继续打开 https://example.com/company-video，完成后返回当前页面。",
+            "url": None,
+            "estimated_duration_minutes": 5,
+            "required": True,
+        },
+    ]
+    return content
+
+
 def request(method: str, path: str, body: dict, role: dict[str, str]):
     return client.request(
         method,
@@ -215,3 +242,82 @@ def test_content_editor_can_submit_but_only_operator_can_publish_exact_snapshot(
         assert session.scalar(
             select(ContentDraft.id).where(ContentDraft.id == stored.id)
         )
+
+
+def test_publish_requires_exact_server_verified_material_url_list():
+    definition = data(
+        request(
+            "POST",
+            "/api/v1/ops/task-definitions",
+            {"stable_key": f"WP26-LINKS-{uuid.uuid4().hex[:8].upper()}"},
+            OPERATOR,
+        )
+    )
+    draft = data(
+        request(
+            "POST",
+            f"/api/v1/content/task-definitions/{definition['id']}/drafts",
+            {"content": link_payload()},
+            EDITOR,
+        )
+    )
+    submitted = data(
+        request(
+            "POST",
+            f"/api/v1/content/drafts/{draft['id']}/submit",
+            {
+                "expected_revision": draft["revision"],
+                "review_note": "两条测试材料链接已经完成独立复核，等待精确发布。",
+            },
+            EDITOR,
+        )
+    )
+    missing = request(
+        "POST",
+        f"/api/v1/ops/content-drafts/{draft['id']}/publish",
+        {
+            "expected_revision": submitted["revision"],
+            "expected_definition_revision": definition["revision"],
+            "reviewed_by": str(REVIEWER_ID),
+            "review_acknowledged": True,
+            "verified_material_urls": ["https://example.com/company-intro"],
+        },
+        OPERATOR,
+    )
+    assert missing.status_code == 422
+    assert missing.json()["error"]["code"] == "MATERIAL_LINK_VERIFICATION_REQUIRED"
+    assert missing.json()["error"]["details"] == {
+        "expected_count": 2,
+        "verified_count": 1,
+    }
+
+    published = data(
+        request(
+            "POST",
+            f"/api/v1/ops/content-drafts/{draft['id']}/publish",
+            {
+                "expected_revision": submitted["revision"],
+                "expected_definition_revision": definition["revision"],
+                "reviewed_by": str(REVIEWER_ID),
+                "review_acknowledged": True,
+                "verified_material_urls": [
+                    "https://example.com/company-intro",
+                    "https://example.com/company-video",
+                ],
+            },
+            OPERATOR,
+        )
+    )
+    assert published["version"] == 1
+
+    listed = data(client.get("/api/v1/ops/task-definitions", headers=OPERATOR))
+    listed_definition = next(
+        item for item in listed["items"] if item["id"] == definition["id"]
+    )
+    assert listed_definition["versions"][0]["material_links"] == [
+        {"title": "公司介绍", "url": "https://example.com/company-intro"},
+        {
+            "title": "补充说明 · 链接 1",
+            "url": "https://example.com/company-video",
+        },
+    ]

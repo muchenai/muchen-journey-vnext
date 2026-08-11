@@ -8377,6 +8377,14 @@
             "type": "boolean",
             "const": true,
             "title": "Review Acknowledged"
+          },
+          "verified_material_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Verified Material Urls"
           }
         },
         "additionalProperties": false,
@@ -8581,6 +8589,14 @@
             "type": "string",
             "format": "uuid",
             "title": "Reviewed By"
+          },
+          "verified_material_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Verified Material Urls"
           }
         },
         "additionalProperties": false,
@@ -8602,6 +8618,25 @@
           "reviewed_by"
         ],
         "title": "PublishTaskVersionCommand"
+      },
+      "PublishedMaterialLinkOut": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "PublishedMaterialLinkOut"
       },
       "RedriveNotificationCommand": {
         "properties": {
@@ -11050,6 +11085,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Published At"
+          },
+          "material_links": {
+            "items": {
+              "$ref": "#/components/schemas/PublishedMaterialLinkOut"
+            },
+            "type": "array",
+            "title": "Material Links"
           }
         },
         "additionalProperties": false,

@@ -335,7 +335,13 @@ export type OpsTaskDefinition = {
   status: string;
   revision: number;
   content_owner_id: string;
-  versions: Array<{ id: string; version: number; title: string; published_at: string }>;
+  versions: Array<{
+    id: string;
+    version: number;
+    title: string;
+    published_at: string;
+    material_links: Array<{ title: string; url: string }>;
+  }>;
 };
 
 export type LearningMaterialInput = {

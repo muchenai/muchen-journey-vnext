@@ -85,6 +85,9 @@ def publish_one_treasure(operator: TestClient) -> dict:
                         "required": True,
                     },
                 ],
+                "verified_material_urls": [
+                    "https://example.com/wp26-evidence-guide"
+                ],
                 "estimated_duration_minutes": 20,
                 "rubric": {
                     "version": 1,
