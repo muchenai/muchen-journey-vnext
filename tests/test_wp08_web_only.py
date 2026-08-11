@@ -31,7 +31,7 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
     assert contract["status"] == "RETIRED"
     assert (
         contract["superseded_by_candidate"]
-        == "8840bdbc7d96328b3726df8a7a4df44019272109"
+        == "cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94"
     )
     candidate_openapi = b'{"openapi":"historical-candidate"}\n'
     baseline = contract["runtime_baseline"]

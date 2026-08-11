@@ -117,7 +117,7 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_MERGED / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `8840bdbc7d96328b3726df8a7a4df44019272109`，候选 Gate `31521124145`，绑定主线 `04e70530d36a1a0904da694c2bcae77057cbf9da`，migration 保持 `0019_wp30_invitation_control`。该候选新增已发布 TaskVersion 材料链接只读回读、统一 URL 边界解析和发布时逐项确认门禁；一次 staging 部署验收完成前，不修改 Journey V3 业务事实，也不邀请真人开始本轮测试。
+当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_PENDING / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94`，候选 Gate `31527526481`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁，以及邀请三态、八站材料和新浏览器安全续接的完整隔离浏览器证据；部署合同合入和一次 staging 部署验收完成前，不修改 Journey V3 业务事实，也不邀请真人开始本轮测试。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 
