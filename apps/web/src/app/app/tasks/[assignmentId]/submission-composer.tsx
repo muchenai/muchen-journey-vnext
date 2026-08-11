@@ -56,12 +56,12 @@ export function SubmissionComposer({
       />
       <input type="hidden" name="draft_idempotency_key" value={draftIdempotencyKey} />
       {responseSections.length > 0 ? (
-        <div className="response-map" aria-labelledby="response-map-title">
-          <strong id="response-map-title">输出结构</strong>
+        <details className="response-map">
+          <summary>查看作答结构</summary>
           <ol>
             {responseSections.map((section) => <li key={section}>{section}</li>)}
           </ol>
-        </div>
+        </details>
       ) : null}
       <label htmlFor="submission-body">{requiresReview ? "你的作答" : "你的学习记录"}</label>
       <textarea

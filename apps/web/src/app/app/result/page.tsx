@@ -58,90 +58,8 @@ export default async function ResultPage() {
         <p className="lede">{result.summary}</p>
       </header>
 
-      <section className="panel result-section" aria-labelledby="decision-layers-title">
-        <p className="section-label">01 · 结论分层</p>
-        <h2 id="decision-layers-title">完成不等于自动准入</h2>
-        <div className="decision-layer-grid">
-          <article>
-            <span className="material-status complete">学习完成</span>
-            <strong>{result.learning_completion.completed_stages} / {result.learning_completion.total_stages} 站</strong>
-          </article>
-          <article>
-            <span className="material-status complete">Reviewer 结论</span>
-            <strong>探索营通过</strong>
-            <p>{result.reviewer_conclusion.overall_feedback}</p>
-          </article>
-          <article>
-            <span className="material-status">系统建议 · 非决定</span>
-            <strong>
-              {result.system_recommendation.status === "RECORDED"
-                ? `${result.system_recommendation.recommendation_tier} 档 · ${admissionLabels[result.system_recommendation.recommended_decision ?? ""] ?? "—"}`
-                : "等待 Operator 录入人工观察"}
-            </strong>
-          </article>
-          <article>
-            <span className={`material-status ${result.operator_admission.status === "DECIDED" ? "complete" : ""}`}>Operator 人工准入</span>
-            <strong>
-              {result.operator_admission.status === "DECIDED"
-                ? admissionLabels[result.operator_admission.decision ?? ""]
-                : "尚未作出"}
-            </strong>
-            <p>{result.operator_admission.decision_reason ?? "完成探索营后，由 Operator 独立作出不可变结论。"}</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="panel result-section" aria-labelledby="feedback-title">
-        <p className="section-label">02 · 三项能力证据</p>
-        <h2 id="feedback-title">你留下的判断</h2>
-        {result.journey_evaluations.length > 0 ? (
-          <div className="ability-results">
-            {result.journey_evaluations.map((evaluation, index) => (
-              <article key={evaluation.id}>
-                <span>0{index + 1}</span>
-                <h3>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</h3>
-                <p>{evaluation.overall_feedback}</p>
-                <details>
-                  <summary>展开评审证据</summary>
-                  <ul className="result-rubric">
-                    {evaluation.rubric_feedback.map((item) => (
-                      <li key={item.dimension_key}>
-                        <div className="result-rubric-heading">
-                          <h3>{item.title}</h3>
-                          <span className="material-status complete">
-                            {ratingLabels[item.rating] ?? item.rating}
-                          </span>
-                        </div>
-                        <p>{item.feedback ?? "该维度没有补充文字反馈。"}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <>
-            <p className="feedback-summary">{result.evaluation.overall_feedback}</p>
-            <ul className="result-rubric">
-              {result.evaluation.rubric_feedback.map((item) => (
-                <li key={item.dimension_key}>
-                  <div className="result-rubric-heading">
-                    <h3>{item.title}</h3>
-                    <span className="material-status complete">
-                      {ratingLabels[item.rating] ?? item.rating}
-                    </span>
-                  </div>
-                  <p>{item.feedback ?? "该历史评价未记录维度级反馈。"}</p>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-
       <section className="panel result-section" aria-labelledby="handoff-title">
-        <p className="section-label">03 · 唯一下一步</p>
+        <p className="section-label">下一步</p>
         <h2 id="handoff-title">{result.handoff.next_step_title}</h2>
         <div className="handoff-card">
           <div>
@@ -151,6 +69,90 @@ export default async function ResultPage() {
           <p>{result.handoff.instructions}</p>
         </div>
       </section>
+
+      <details className="panel result-section result-details">
+        <summary>查看评审与准入详情</summary>
+        <section aria-labelledby="decision-layers-title">
+          <p className="section-label">结论分层</p>
+          <h2 id="decision-layers-title">完成不等于自动准入</h2>
+          <div className="decision-layer-grid">
+            <article>
+              <span className="material-status complete">学习完成</span>
+              <strong>{result.learning_completion.completed_stages} / {result.learning_completion.total_stages} 站</strong>
+            </article>
+            <article>
+              <span className="material-status complete">Reviewer 结论</span>
+              <strong>探索营通过</strong>
+              <p>{result.reviewer_conclusion.overall_feedback}</p>
+            </article>
+            <article>
+              <span className="material-status">系统建议 · 非决定</span>
+              <strong>
+                {result.system_recommendation.status === "RECORDED"
+                  ? `${result.system_recommendation.recommendation_tier} 档 · ${admissionLabels[result.system_recommendation.recommended_decision ?? ""] ?? "—"}`
+                  : "等待 Operator 录入人工观察"}
+              </strong>
+            </article>
+            <article>
+              <span className={`material-status ${result.operator_admission.status === "DECIDED" ? "complete" : ""}`}>Operator 人工准入</span>
+              <strong>
+                {result.operator_admission.status === "DECIDED"
+                  ? admissionLabels[result.operator_admission.decision ?? ""]
+                  : "尚未作出"}
+              </strong>
+              <p>{result.operator_admission.decision_reason ?? "完成探索营后，由 Operator 独立作出不可变结论。"}</p>
+            </article>
+          </div>
+        </section>
+        <section aria-labelledby="feedback-title">
+          <p className="section-label">三项能力证据</p>
+          <h2 id="feedback-title">你留下的判断</h2>
+          {result.journey_evaluations.length > 0 ? (
+            <div className="ability-results">
+              {result.journey_evaluations.map((evaluation, index) => (
+                <article key={evaluation.id}>
+                  <span>0{index + 1}</span>
+                  <h3>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</h3>
+                  <p>{evaluation.overall_feedback}</p>
+                  <details>
+                    <summary>展开评审证据</summary>
+                    <ul className="result-rubric">
+                      {evaluation.rubric_feedback.map((item) => (
+                        <li key={item.dimension_key}>
+                          <div className="result-rubric-heading">
+                            <h3>{item.title}</h3>
+                            <span className="material-status complete">
+                              {ratingLabels[item.rating] ?? item.rating}
+                            </span>
+                          </div>
+                          <p>{item.feedback ?? "该维度没有补充文字反馈。"}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <>
+              <p className="feedback-summary">{result.evaluation.overall_feedback}</p>
+              <ul className="result-rubric">
+                {result.evaluation.rubric_feedback.map((item) => (
+                  <li key={item.dimension_key}>
+                    <div className="result-rubric-heading">
+                      <h3>{item.title}</h3>
+                      <span className="material-status complete">
+                        {ratingLabels[item.rating] ?? item.rating}
+                      </span>
+                    </div>
+                    <p>{item.feedback ?? "该历史评价未记录维度级反馈。"}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      </details>
 
       <details className="panel result-section result-proof">
         <summary>查看通知与过程记录</summary>

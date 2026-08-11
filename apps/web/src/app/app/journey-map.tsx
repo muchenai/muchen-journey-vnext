@@ -31,8 +31,8 @@ const ROUTE_POINTS = {
     [630, 195], [785, 125], [940, 165], [1070, 95],
   ],
   narrow: [
-    [90, 70], [255, 170], [90, 270], [255, 370],
-    [90, 470], [255, 570], [90, 670], [255, 770],
+    [55, 55], [180, 105], [300, 60], [270, 185],
+    [145, 220], [55, 305], [175, 380], [300, 330],
   ],
 } as const;
 
@@ -47,7 +47,7 @@ function RouteMapSvg({
   points: readonly RoutePoint[];
   variant: "wide" | "narrow";
 }) {
-  const viewBox = variant === "wide" ? "0 0 1120 320" : "0 0 360 880";
+  const viewBox = variant === "wide" ? "0 0 1120 320" : "0 0 360 450";
 
   return (
     <svg

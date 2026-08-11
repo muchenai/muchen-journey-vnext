@@ -265,6 +265,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .landing-copy { align-self: center; }
 .landing-copy h1 { max-width: 9ch; font-size: clamp(52px, 8vw, 94px); }
 .landing-cta { gap: 32px; min-width: 196px; border-radius: 999px; }
+.landing-entry-note { display: grid; gap: 2px; margin: 28px 0 0; color: var(--text-secondary); }
+.landing-entry-note strong { color: #19445e; font-size: 18px; }
+.landing-entry-note span { font-size: 13px; }
 .landing-route {
   position: relative;
   display: grid;
@@ -332,8 +335,6 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   opacity: 1;
   transform: translate(-50%, 0);
 }
-.landing-footnote { grid-column: 1 / -1; margin: -28px 0 0; color: var(--text-muted); font-size: 13px; }
-.landing-footnote a { color: var(--action-primary); }
 
 .learner-join { max-width: 720px; margin: 0 auto; }
 .learner-join > h1 { max-width: 11ch; }
@@ -375,9 +376,10 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .current-stage-card .stage-pulse { grid-row: 1 / 4; align-self: center; width: 10px; height: 10px; background: #efb43e; border-radius: 50%; box-shadow: 0 0 0 7px #fdf1d2; }
 .current-stage-card .eyebrow { margin: 0; font-size: 12px; }
 .current-stage-card h2 { margin: 2px 0; }
-.current-stage-card p:last-child { margin-bottom: 0; color: var(--text-secondary); }
 .waiting-mark { color: #20877f; font-size: 34px; letter-spacing: .14em; }
 .journey-support { margin: -10px 18px 0; color: var(--text-muted); font-size: 13px; }
+.journey-support summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 700; }
+.journey-support p { max-width: 64ch; margin: 10px 0 0; }
 .quiet-exit { margin-top: 18px; opacity: .7; }
 
 .learner-task-page { display: grid; gap: 24px; max-width: 900px; margin: 0 auto; }
@@ -431,12 +433,20 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-card[open] summary::after { content: "收起"; justify-self: end; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .learning-material-content { display: grid; justify-items: start; gap: 18px; color: var(--text-secondary); line-height: 1.75; }
 .learning-material-content .material-body { white-space: pre-wrap; }
+.material-link-actions { display: grid; gap: 10px; }
+.material-open-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; text-align: left; }
+.material-open-link small { overflow: hidden; color: var(--text-muted); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.material-open-link i { font-style: normal; }
+.material-notes { width: 100%; }
+.material-notes summary { width: max-content; cursor: pointer; color: #20877f; font-size: 13px; font-weight: 700; }
+.material-notes[open] .material-body { margin-top: 12px; }
 .learning-material-locked { display: grid; gap: 2px; }
 .learning-material-locked small { margin-top: 10px; }
 .learning-material-list form { margin: 0; }
 .material-complete-label { display: inline-block; color: #18794e; font-size: 14px; font-weight: 800; }
 .task-locked-message { margin: 20px 0 0; padding: 18px; color: #19445e; background: #edf5ff; border-radius: 14px; font-weight: 700; }
-.response-map { margin: 16px 0 20px; padding: 18px 20px; background: #edf5ff; border-radius: 14px; }
+.response-map { margin: 16px 0 20px; padding: 14px 18px; background: #edf5ff; border-radius: 14px; }
+.response-map summary { cursor: pointer; color: #19445e; font-weight: 750; }
 .response-map ol { margin-bottom: 0; }
 .admission-form { margin-top: 18px; padding: 18px; background: #f4f8f7; border-radius: 14px; }
 .admission-score-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -460,6 +470,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .decision-layer-grid > article > p { margin: 0; color: var(--text-secondary); line-height: 1.65; }
 .result-proof summary { cursor: pointer; color: #20877f; font-weight: 750; }
 .result-proof[open] summary { margin-bottom: 24px; }
+.result-details > summary { cursor: pointer; color: #20877f; font-weight: 750; }
+.result-details[open] > summary { margin-bottom: 24px; }
+.result-details > section + section { margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--border-default); }
 .result-proof section + section { margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--border-default); }
 .result-proof h2 { margin-bottom: 16px; }
 
@@ -504,13 +517,12 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .landing-route li:nth-child(4n) .landing-route-node:focus-visible::after {
     transform: translate(0, 0);
   }
-  .landing-footnote { margin: 0; }
   .journey-map { padding: 26px 18px; border-radius: 28px; }
   .journey-map-heading { flex-direction: column; }
-  .journey-route-canvas { aspect-ratio: 360 / 880; min-height: 680px; }
+  .journey-route-canvas { aspect-ratio: 360 / 450; min-height: 360px; }
   .journey-route-map-wide { display: none; }
   .journey-route-map-narrow { display: block; }
-  .current-stage-card { align-items: stretch; flex-direction: column; }
+  .current-stage-card { order: -1; align-items: stretch; flex-direction: column; }
   .task-hero-card { min-height: 320px; border-radius: 28px; }
   .task-hero-card h1 { margin-top: 40px; }
   .task-contract-columns { grid-template-columns: 1fr; }

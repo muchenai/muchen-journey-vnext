@@ -24,7 +24,6 @@ export default async function LearnerHome() {
           <span className="stage-pulse" aria-hidden="true" />
           <p className="eyebrow">{action.stage}</p>
           <h2>{action.title}</h2>
-          <p>{action.reason}</p>
         </div>
         {opensTask || opensResult ? (
           <Link
@@ -38,9 +37,11 @@ export default async function LearnerHome() {
         )}
       </article>
       {!action.journey ? null : (
-        <p className="journey-support">
-          {action.responsible_party} · {action.feedback_expectation}
-        </p>
+        <details className="journey-support">
+          <summary>为什么是这一步</summary>
+          <p>{action.reason}</p>
+          <p>{action.responsible_party} · {action.feedback_expectation}</p>
+        </details>
       )}
       {hasSession ? (
         <form action={logoutSession} className="quiet-exit">

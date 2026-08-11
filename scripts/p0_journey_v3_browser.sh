@@ -121,6 +121,22 @@ pw_learner run-code "async (page) => {
   await page.waitForLoadState('networkidle');
   const progress = (await page.locator('[aria-label^="已完成"]').getAttribute('aria-label')) ?? '';
   if (!/已完成\s+0\s*\/\s*8\s+站/.test(progress)) throw new Error('Journey V3 progress missing');
+  await page.setViewportSize({width: 390, height: 844});
+  const currentStage = await page.locator('.current-stage-card').boundingBox();
+  const routeMap = await page.locator('.journey-map').boundingBox();
+  if (!currentStage || !routeMap || currentStage.y >= routeMap.y) {
+    throw new Error('mobile route does not put the current action before the map');
+  }
+  if (await page.locator('.button.primary:visible').count() !== 1) {
+    throw new Error('mobile route does not have one primary next action');
+  }
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  if (overflow) throw new Error('mobile route has horizontal overflow');
+  await page.screenshot({
+    path: '$evidence_dir/01-first-station-mobile.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({width: 1280, height: 900});
 }"
 pw_learner screenshot --filename "$evidence_dir/01-first-station.png" --full-page
 
@@ -187,8 +203,8 @@ complete_stage() {
         await completed;
         await page.waitForLoadState('networkidle');
       }
-      if (await page.getByRole('button', {name: '开始这一站'}).count()) {
-        await page.getByRole('button', {name: '开始这一站'}).click();
+      if (await page.getByRole('button', {name: '开始小任务'}).count()) {
+        await page.getByRole('button', {name: '开始小任务'}).click();
         await page.waitForLoadState('networkidle');
       }
       await page.locator('#submission-body').fill('第 ${stage_no} 站浏览器验证：我完成了固定输入，记录当前判断、可定位依据、风险边界以及下一步行动。');
@@ -303,12 +319,20 @@ pw_learner run-code "async (page) => {
   await page.getByRole('link', {name: '打开旅程结果'}).evaluate((element) => element.click());
   await resultPage;
   await page.waitForLoadState('networkidle');
-  const body = await page.locator('body').innerText();
-  if (!body.includes('这段旅程，走完了。') || !body.includes('探索营通过')) {
-    throw new Error('final journey result missing');
+  const visibleBody = await page.locator('body').innerText();
+  if (!visibleBody.includes('这段旅程，走完了。') || !visibleBody.includes('下一步')) {
+    throw new Error('final journey summary or handoff missing');
   }
 }"
 pw_learner screenshot --filename "$evidence_dir/03-journey-complete.png" --full-page
+pw_learner run-code "async (page) => {
+  await page.getByText('查看评审与准入详情', {exact: true}).click();
+  const expandedBody = await page.locator('body').innerText();
+  if (!expandedBody.includes('探索营通过')) {
+    throw new Error('final reviewer conclusion missing after disclosure');
+  }
+}"
+pw_learner screenshot --filename "$evidence_dir/03-journey-details.png" --full-page
 
 pw_learner console error
 pw_reviewer console error
