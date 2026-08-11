@@ -32,7 +32,8 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
   assert.match(actions, /task_version_id: taskVersionId/);
   assert.match(actions, /journey_version_id: journeyVersionId/);
   assert.match(actions, /target_user_id: null/);
-  assert.match(actions, /`\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
+  assert.match(actions, /createLearnerInvite[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
+  assert.match(actions, /createLearnerReentry[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}&flow=reentry`/);
   assert.match(panel, /new URL\(state\.joinPath, window\.location\.origin\)\.href/);
   assert.doesNotMatch(actions, /\/join\?token=/);
 });
@@ -48,10 +49,11 @@ test("formal journey publication requires an explicit offline review attestation
   assert.match(actions, /export async function publishFormalJourney\([\s\S]*?return submissionError\(error\)/);
 });
 
-test("active invites can be revoked without persisted token display", () => {
+test("unused and exchanged invites can be distinguished and revoked without persisted token display", () => {
   assert.match(actions, /export async function revokeLearnerInvite/);
   assert.match(actions, /expected_revision: requiredRevision\(data\)/);
-  assert.match(panel, /invite\.status === "ACTIVE"/);
+  assert.match(panel, /EXCHANGED_PENDING_CONFIRMATION: "已兑换，待确认身份"/);
+  assert.match(panel, /\["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"\]\.includes\(invite\.status\)/);
   assert.doesNotMatch(panel, /invite_token/);
 });
 

@@ -229,6 +229,7 @@ def test_real_invite_creates_internal_identity_session_and_csrf_protected_assign
             )
         )
         assert stored_session is not None and stored_session.token_hash != session_token
+        assert stored_session.expires_at - utc_now() > timedelta(hours=23)
         event_types = set(
             session.scalars(
                 select(OutboxEvent.event_type).where(
@@ -332,6 +333,31 @@ def test_concurrent_invite_exchange_has_one_winner_and_revoke_cleans_pending_enr
         assert context is not None
         enrollment = session.get(Enrollment, context.enrollment_id)
         assert enrollment is not None and enrollment.status == EnrollmentStatus.CANCELLED
+
+
+def test_ops_distinguishes_unused_exchanged_and_consumed_invites():
+    unused, _ = create_invite()
+    exchanged, _ = create_invite()
+    exchanged_client = client_for("pending-confirmation-status")
+    assert_ok(
+        exchanged_client.post(
+            "/api/v1/join/exchange",
+            json={"token": exchanged["invite_token"], "return_to": "/app"},
+        )
+    )
+    consumed, _ = create_invite()
+    exchange_and_confirm(str(consumed["invite_token"]), "consumed-status")
+
+    items = assert_ok(
+        client_for("operator-invite-statuses").get(
+            "/api/v1/ops/invites",
+            headers=operator_headers,
+        )
+    )["items"]
+    statuses = {item["id"]: item["status"] for item in items}
+    assert statuses[str(unused["id"])] == "ACTIVE"
+    assert statuses[str(exchanged["id"])] == "EXCHANGED_PENDING_CONFIRMATION"
+    assert statuses[str(consumed["id"])] == "CONSUMED"
 
 
 def test_existing_identity_is_reused_and_disabled_identity_is_rejected():

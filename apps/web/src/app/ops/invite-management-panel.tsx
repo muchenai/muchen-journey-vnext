@@ -30,6 +30,7 @@ function formatTime(value: string): string {
 
 const STATUS_LABELS: Record<OpsInvite["status"], string> = {
   ACTIVE: "待使用",
+  EXCHANGED_PENDING_CONFIRMATION: "已兑换，待确认身份",
   CONSUMED: "已使用",
   EXPIRED: "已过期",
   REVOKED: "已撤销",
@@ -290,11 +291,11 @@ export function InviteManagementPanel({
                 <strong>{invite.purpose}</strong>
                 <span>到期 {formatTime(invite.expires_at)} · revision {invite.revision}</span>
               </div>
-              <span className={`material-status ${invite.status === "ACTIVE" ? "complete" : "incomplete"}`}>
+              <span className={`material-status ${["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"].includes(invite.status) ? "complete" : "incomplete"}`}>
                 {STATUS_LABELS[invite.status]}
               </span>
             </div>
-            {invite.status === "ACTIVE" ? (
+            {["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"].includes(invite.status) ? (
               <form action={revokeLearnerInvite} className="ops-command-form">
                 <input type="hidden" name="invite_id" value={invite.id} />
                 <input type="hidden" name="revision" value={invite.revision} />

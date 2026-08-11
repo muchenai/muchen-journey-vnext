@@ -226,6 +226,106 @@ export async function exchangeInvite(data: FormData) {
   redirect("/join");
 }
 
+export async function acceptInvite(data: FormData) {
+  const token = data.get("token");
+  const displayName = data.get("display_name");
+  const acceptedPurpose = data.get("accepted_purpose") === "yes";
+  if (typeof token !== "string" || token.length < 32 || token.length > 256) {
+    redirect("/join?code=INVITE_EXPIRED_OR_REVOKED");
+  }
+  if (
+    displayName !== null
+    && (typeof displayName !== "string" || !displayName.trim() || displayName.length > 120)
+  ) {
+    redirect("/join?code=VALIDATION_FAILED");
+  }
+  if (!acceptedPurpose) redirect("/join?code=PURPOSE_NOT_ACCEPTED");
+
+  let exchange: {
+    data: {
+      flow: "JOIN" | "REENTRY";
+      purpose: string;
+      expires_at: string;
+      csrf_token: string;
+    };
+    setCookies: string[];
+  };
+  try {
+    exchange = await anonymousApiRequest("/api/v1/join/exchange", {
+      method: "POST",
+      body: JSON.stringify({ token, return_to: "/app" }),
+    });
+  } catch (error) {
+    safeJoinError(error);
+  }
+
+  const joinToken = cookieValue(exchange.setCookies, JOIN_COOKIE);
+  if (!joinToken) throw new Error("API 未返回安全加入上下文。");
+  const cookieStore = await cookies();
+  const joinMaxAge = Math.max(
+    1,
+    Math.floor((new Date(exchange.data.expires_at).getTime() - Date.now()) / 1000),
+  );
+  const joinOptions = {
+    path: "/",
+    sameSite: "lax" as const,
+    secure: cookieSecure(),
+    maxAge: joinMaxAge,
+  };
+  cookieStore.set(JOIN_COOKIE, joinToken, { ...joinOptions, httpOnly: true });
+  cookieStore.set(CSRF_COOKIE, exchange.data.csrf_token, { ...joinOptions, httpOnly: false });
+  cookieStore.set(
+    JOIN_SUMMARY_COOKIE,
+    Buffer.from(JSON.stringify(exchange.data)).toString("base64url"),
+    { ...joinOptions, httpOnly: true },
+  );
+
+  let confirmation: {
+    data: { expires_at: string; csrf_token: string };
+    setCookies: string[];
+  };
+  try {
+    confirmation = await anonymousApiRequest("/api/v1/identity/confirm", {
+      method: "POST",
+      headers: {
+        Cookie: `${JOIN_COOKIE}=${joinToken}; ${CSRF_COOKIE}=${exchange.data.csrf_token}`,
+        "X-CSRF-Token": exchange.data.csrf_token,
+      },
+      body: JSON.stringify({
+        display_name: exchange.data.flow === "JOIN" && typeof displayName === "string"
+          ? displayName.trim()
+          : null,
+        accepted_purpose: true,
+        return_to: "/app",
+      }),
+    });
+  } catch (error) {
+    safeJoinError(error);
+  }
+
+  const sessionToken = cookieValue(confirmation.setCookies, SESSION_COOKIE);
+  if (!sessionToken) throw new Error("API 未返回安全 vNext 会话。");
+  const sessionMaxAge = Math.max(
+    1,
+    Math.floor((new Date(confirmation.data.expires_at).getTime() - Date.now()) / 1000),
+  );
+  const sessionOptions = {
+    path: "/",
+    sameSite: "lax" as const,
+    secure: cookieSecure(),
+    maxAge: sessionMaxAge,
+  };
+  cookieStore.set(SESSION_COOKIE, sessionToken, { ...sessionOptions, httpOnly: true });
+  cookieStore.set(CSRF_COOKIE, confirmation.data.csrf_token, {
+    ...sessionOptions,
+    httpOnly: false,
+  });
+  cookieStore.delete(JOIN_COOKIE);
+  cookieStore.delete(JOIN_SUMMARY_COOKIE);
+  revalidatePath("/app");
+  redirect("/app");
+}
+
 export async function confirmIdentity(data: FormData) {
   const displayName = data.get("display_name");
   const acceptedPurpose = data.get("accepted_purpose") === "yes";
@@ -883,7 +983,7 @@ export async function createLearnerReentry(
     );
     revalidatePath("/ops");
     return {
-      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}`,
+      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}&flow=reentry`,
       expiresAt: result.expires_at,
     };
   } catch (error) {

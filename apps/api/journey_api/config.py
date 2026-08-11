@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     invite_secret: str = "journey-next-local-invite-secret-change-me"
     import_signing_key: str = "journey-next-local-import-signing-key-change-me"
     session_ttl_hours: int = 8
+    learner_session_ttl_hours: int = 24
     join_context_ttl_minutes: int = 15
     invite_exchange_limit: int = 10
     oauth_attempt_limit: int = 20
@@ -124,6 +125,8 @@ class Settings(BaseSettings):
             raise ValueError("vNext identity and import secrets must be independent")
         if not 1 <= self.session_ttl_hours <= 24:
             raise ValueError("SESSION_TTL_HOURS must be between 1 and 24")
+        if not 8 <= self.learner_session_ttl_hours <= 24:
+            raise ValueError("LEARNER_SESSION_TTL_HOURS must be between 8 and 24")
         if not 5 <= self.join_context_ttl_minutes <= 30:
             raise ValueError("JOIN_CONTEXT_TTL_MINUTES must be between 5 and 30")
         if not 3 <= self.invite_exchange_limit <= 100:

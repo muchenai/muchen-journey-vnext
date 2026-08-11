@@ -26,6 +26,14 @@ def test_fixture_identity_configuration_fails_closed_outside_local_test():
         Settings(app_env="production", allow_fixture_identity=True)
 
 
+def test_learner_session_supports_one_day_journey_without_extending_staff_sessions():
+    configured = Settings()
+    assert configured.session_ttl_hours == 8
+    assert configured.learner_session_ttl_hours == 24
+    with pytest.raises(ValidationError, match="LEARNER_SESSION_TTL_HOURS"):
+        Settings(learner_session_ttl_hours=25)
+
+
 def test_nonlocal_identity_requires_distinct_vnext_secrets():
     with pytest.raises(ValidationError, match="independently configured"):
         Settings(app_env="production", allow_fixture_identity=False)

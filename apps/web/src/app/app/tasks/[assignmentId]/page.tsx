@@ -11,6 +11,23 @@ import { SubmissionComposer } from "./submission-composer";
 
 export const dynamic = "force-dynamic";
 
+const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
+
+function textWithSafeLinks(value: string | null) {
+  if (!value) return null;
+  return value.split(/(https:\/\/[^\s<>"']+)/gu).map((part, index) => {
+    if (!part.startsWith("https://")) return part;
+    const trailing = part.match(TRAILING_URL_PUNCTUATION)?.[0] ?? "";
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <span key={`${href}-${index}`}>
+        <a href={href} target="_blank" rel="noreferrer">打开学习材料</a>
+        {trailing}
+      </span>
+    );
+  });
+}
+
 export default async function TaskPage({
   params,
   searchParams,
@@ -83,7 +100,9 @@ export default async function TaskPage({
                     {material.required ? " · 必读" : " · 选读"}
                   </p>
                   <h3>{material.title}</h3>
-                  {material.kind === "TEXT" ? <div>{material.body}</div> : (
+                  {material.kind === "TEXT" ? (
+                    <div className="material-body">{textWithSafeLinks(material.body)}</div>
+                  ) : (
                     <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
                       打开 {new URL(material.url ?? "https://invalid.example").hostname}
                     </a>

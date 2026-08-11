@@ -474,6 +474,24 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .landing-route { min-height: 300px; grid-template-columns: repeat(4, 1fr); gap: 42px 12px; padding: 28px 18px; border-radius: 28px; }
   .landing-route::before { display: none; }
   .landing-route li:nth-child(n) { transform: none; }
+  .landing-route-node::after { width: min(180px, 55vw); max-width: none; white-space: normal; }
+  .landing-route li:nth-child(4n + 1) .landing-route-node::after {
+    left: 0;
+    transform: translate(0, 8px);
+  }
+  .landing-route li:nth-child(4n + 1) .landing-route-node:hover::after,
+  .landing-route li:nth-child(4n + 1) .landing-route-node:focus-visible::after {
+    transform: translate(0, 0);
+  }
+  .landing-route li:nth-child(4n) .landing-route-node::after {
+    right: 0;
+    left: auto;
+    transform: translate(0, 8px);
+  }
+  .landing-route li:nth-child(4n) .landing-route-node:hover::after,
+  .landing-route li:nth-child(4n) .landing-route-node:focus-visible::after {
+    transform: translate(0, 0);
+  }
   .landing-footnote { margin: 0; }
   .journey-map { padding: 26px 18px; border-radius: 28px; }
   .journey-map-heading { flex-direction: column; }
