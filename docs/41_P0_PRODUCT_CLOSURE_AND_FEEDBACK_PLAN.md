@@ -117,9 +117,7 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-浏览器闭环基线状态为 `CANDIDATE_BUILT / STAGING_BINDING_MERGED / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94`，候选 Gate `31527526481`，绑定 PR `#181`，绑定主线 `fb69575421ca5e944ab56141fb2ac99dadf31827`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁，以及邀请三态、八站材料和新浏览器安全续接的完整隔离浏览器证据。
-
-本节之后的 Learner 信息层级收敛继续修改 Web 与浏览器合同，因此 `cc4a7f1d…` 不再单独部署后立即被替换；应先将本轮 UX 变更合入、生成一个新的完整候选，再绑定并只申请一次 staging 部署。该节奏减少无效发布，但不把未部署、未访问正式材料或未执行真人 UAT 写成完成。
+当前最新候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_IN_REVIEW / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `ad6d9b6c7b9a4c53753f666f6c5b22777ed2ed3f`，候选 Gate `31532212663`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁、邀请三态、安全续接，以及 Learner 单目标/单动作信息层级收敛和更新后的完整隔离浏览器证据。绑定 PR 本身不部署、不访问正式材料、不创建邀请，也不修改 Journey V3 业务事实。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 
