@@ -396,3 +396,11 @@
 - 独立公开接口复验确认 staging readiness release=`ff530528…`，同时 production readiness 仍为 `8e56e759152efcbf17f4373f2132e02a8762af81`；本次 staging 不影响 production。Operator 页可见固定旅程标签 `Muchen Journey 新人启航探索营 · V3 · 8 站`；
 - 部署后只读 inventory run [`31342539916`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31342539916) 直接从 ECS 运行容器核对：deployed marker、API readiness/config release、Web release、Worker env/heartbeat release 全部精确为 `ff53052847a268d025bceb93c3eab37986d50219`，Worker 不 stale，migration=`0019_wp30_invitation_control`，config schema=3；API/Web/Worker/Edge 各且仅一个运行容器，镜像摘要与候选 manifest 完全一致，staging/production Caddy 上游仍隔离；
 - deploy 与 inventory 两个 run 都记录 `WP08_SSH_INGRESS=CLOSED`。现有 Operator 浏览器标签中的“运行快照”仍保留部署前 `3445b578…` 文本；鉴于公开 readiness 与 ECS 容器内独立 inventory 均一致证明实际运行态已是 `ff530528…`，该观察记为现有标签页的陈旧页面快照，不视为运行态回退。候选的一次部署验收结论为 `PASS`；候选已消费，不得重新部署，production 仍为 `NO_GO`。
+
+## 2026-08-11 P0 真实旅程闭环候选绑定
+
+- P0 邀请、会话连续性、学习材料、修订闭环与 Learner Experience 收敛通过 PR #174 合入主线，候选源码 SHA 为 `1d228f752853728f594245ae9e9904dc5820215e`；
+- Mainline Candidate Gate [`31496334555`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31496334555) 成功生成不可变 artifact，并完成完整 CI、SBOM、三镜像 GHCR push 与远端摘要复验。manifest 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 保持 `0019_wp30_invitation_control`；
+- staging 合同固定 API `sha256:bf815ca2…d5cdc`、Web `sha256:5de1511a…f7f6`、Worker `sha256:fe889286…df53`，并同步 workflow 候选守卫、artifact run、Terraform candidate、部署脚本和准备脚本；唯一部署确认词为 `DEPLOY_1D228F7_TO_VOLCENGINE_STAGING`；
+- 本绑定 PR 只建立候选与 staging 部署合同，不执行部署、不修改数据库、身份、Journey、邀请、消息、DNS、Terraform 或云资源。只有绑定 PR 合入并取得合入后的精确主线 SHA，再由 Owner 明确授权该候选基于该主线执行一次冻结基础设施 staging 部署，才允许派发；失败不重试且必须关闭临时 SSH；
+- 自动化浏览器已证明八站、要求修订、重新提交与 Reviewer 完成在隔离环境可执行，但这不是 1 名真实新人 UAT。staging 成功后仍必须先观察 1 名未接触项目的新人独立完成，再决定是否扩大至 3–5 人。

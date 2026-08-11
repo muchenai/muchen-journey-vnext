@@ -113,3 +113,11 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 - 截图与浏览器日志保存在本地 `output/playwright/`，不纳入产品源码，也不构成真人 UAT。
 
 该批次当前仍为 `IMPLEMENTED_LOCALLY / MACHINE_VERIFIED / NOT_DEPLOYED / HUMAN_UAT_PENDING`。下一门禁仍是先由 1 名未接触项目的真实新人独立完成，再扩大至 3–5 人；机器浏览器不能代替理解度、参与感和一天完成体验的真人结论。
+
+## 8. 候选与真人验证执行卡
+
+当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_PENDING / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `1d228f752853728f594245ae9e9904dc5820215e`，候选 Gate `31496334555`，migration 保持 `0019_wp30_invitation_control`。部署合同合入和一次 staging 部署验收完成前，不邀请真人开始本轮测试。
+
+首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
+
+以下任一情况立即停止，不扩大 cohort：身份越权或无法重新进入、正式材料不可打开、业务事实重复或丢失、无法提交、Reviewer 无法要求修订、Learner 无法再次提交、Reviewer 无法通过、结果页无法到达。首名 Learner 独立闭环且无 P0 blocker 后，才扩大至 3–5 人；5 人仍无 blocker，才把本轮 P0 记为真人验证通过。
