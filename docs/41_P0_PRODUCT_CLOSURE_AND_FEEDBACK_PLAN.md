@@ -117,7 +117,9 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-当前候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_PENDING / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94`，候选 Gate `31527526481`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁，以及邀请三态、八站材料和新浏览器安全续接的完整隔离浏览器证据；部署合同合入和一次 staging 部署验收完成前，不修改 Journey V3 业务事实，也不邀请真人开始本轮测试。
+浏览器闭环基线状态为 `CANDIDATE_BUILT / STAGING_BINDING_MERGED / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `cc4a7f1dc27e32bd4bc1756b1293f743a2aa3e94`，候选 Gate `31527526481`，绑定 PR `#181`，绑定主线 `fb69575421ca5e944ab56141fb2ac99dadf31827`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁，以及邀请三态、八站材料和新浏览器安全续接的完整隔离浏览器证据。
+
+本节之后的 Learner 信息层级收敛继续修改 Web 与浏览器合同，因此 `cc4a7f1d…` 不再单独部署后立即被替换；应先将本轮 UX 变更合入、生成一个新的完整候选，再绑定并只申请一次 staging 部署。该节奏减少无效发布，但不把未部署、未访问正式材料或未执行真人 UAT 写成完成。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 
@@ -134,3 +136,21 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 5. 全量 API `331 passed / 5 skipped`、Web contract `32/32`、ESLint、TypeScript、Python/shell 静态检查通过；固定 Chromium revision `1232` 的完整合成浏览器路径已重跑通过。
 
 真实 Journey V3 验收仍必须使用已发布不可变版本、一条受控真实邀请、首次接触项目的 Learner 飞书身份和独立 Reviewer；逐项打开正式材料、经历至少一次新浏览器安全续接，并记录 3 分钟进入第一站与全天闭环事实。合成夹具不能关闭该门禁。
+
+## 10. 2026-08-12 Learner 单目标/单动作收敛
+
+本轮仅改变 Learner 信息层级与浏览器证据，不改 API、migration、权限、Journey V3 内容或既有业务事实：
+
+1. 匿名首页不再暴露 Reviewer/Operator 入口；未持有 Learner 会话时只告知“从专属邀请开始”，不伪造一个可绕过邀请的公开主操作。
+2. `/app` 当前行动卡仅保留阶段、标题和唯一主按钮；责任人、原因和处理预期移入“为什么是这一步”。在 `390×844` 下当前行动必须位于路线图之前。
+3. 学习材料首层仅显示标题、时长、来源和“打开学习材料”；源文说明改为按需展开。必读材料未完成时不呈现作答区，完成后立即告知下一份材料或解锁小任务。
+4. 小任务的作答结构不再长驻，只在 Learner 选择“查看作答结构”时展开；完整任务要求仍保留为按需信息。
+5. 结果页默认只显示完成结论、交接责任人和唯一下一步；评审/准入详情与通知/过程记录分别按需展开。
+
+最新完整合成浏览器重跑结果为 `PASS`：`invite=one_step / invite_statuses=3 / reentry=new_browser / old_session=revoked / material_links=8 / stages=8 / revision=resubmitted / reviewer=complete`。额外实测并留存：
+
+- 移动端首站“当前行动先于地图 / 仅一个主按钮 / 无横向溢出”；
+- 第一站 `1280×900 / 768×1024 / 390×844` 只展开当前材料，作答区未提前出现；
+- 结果页先保存默认折叠截图 `03-journey-complete.png`，再展开并单独保存 `03-journey-details.png`，避免用展开态误代默认体验。
+
+该重跑仍固定声明 `fixture=synthetic / external_access=not_proven / human_uat=not_run`。当前只证明本地完整机制可完成，不证明正式飞书材料 100% 可打开、真实新人三分钟进入或一天完成。

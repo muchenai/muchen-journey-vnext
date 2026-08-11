@@ -31,6 +31,45 @@ function textWithSafeLinks(value: string | null) {
   });
 }
 
+function materialLinks(value: string | null): string[] {
+  if (!value) return [];
+  const links = Array.from(value.matchAll(HTTPS_URL), ([match]) =>
+    match.replace(TRAILING_URL_PUNCTUATION, ""),
+  );
+  return Array.from(new Set(links));
+}
+
+function LearningMaterialBody({ value }: { value: string | null }) {
+  const links = materialLinks(value);
+  if (links.length === 0) {
+    return <div className="material-body">{textWithSafeLinks(value)}</div>;
+  }
+  return (
+    <>
+      <div className="material-link-actions">
+        {links.map((href) => (
+          <a
+            className="button secondary compact material-open-link"
+            href={href}
+            key={href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="打开学习材料"
+          >
+            <span>打开学习材料</span>
+            <small>{new URL(href).hostname}</small>
+            <i aria-hidden="true">↗</i>
+          </a>
+        ))}
+      </div>
+      <details className="material-notes">
+        <summary>查看材料说明</summary>
+        <div className="material-body">{textWithSafeLinks(value)}</div>
+      </details>
+    </>
+  );
+}
+
 export default async function TaskPage({
   params,
   searchParams,
@@ -92,7 +131,9 @@ export default async function TaskPage({
             </strong>
           </div>
           {query.material === "completed" ? (
-            <p className="success-text" role="status">已完成，下一项已解锁。</p>
+            <p className="success-text" role="status">
+              {materialsReady ? "材料已完成，继续小任务。" : "完成一项，下一份材料已展开。"}
+            </p>
           ) : null}
           <ol className="learning-material-list">
             {assignment.learning_materials.map((material, index) => {
@@ -125,10 +166,18 @@ export default async function TaskPage({
                       <summary>{heading}</summary>
                       <div className="learning-material-content">
                         {material.kind === "TEXT" ? (
-                          <div className="material-body">{textWithSafeLinks(material.body)}</div>
+                          <LearningMaterialBody value={material.body} />
                         ) : (
-                          <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
-                            打开 {new URL(material.url ?? "https://invalid.example").hostname}
+                          <a
+                            className="button secondary compact material-open-link"
+                            href={material.url ?? "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="打开学习材料"
+                          >
+                            <span>打开学习材料</span>
+                            <small>{new URL(material.url ?? "https://invalid.example").hostname}</small>
+                            <i aria-hidden="true">↗</i>
                           </a>
                         )}
                         {isComplete ? (
@@ -156,7 +205,7 @@ export default async function TaskPage({
           </ol>
           {!materialsReady ? (
             <p className="task-locked-message" role="status">
-              小任务将在必读材料完成后出现。
+              完成当前材料后，小任务会自动出现。
             </p>
           ) : null}
         </section>
@@ -253,7 +302,7 @@ export default async function TaskPage({
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
-          <button className="button primary" type="submit">开始这一站</button>
+          <button className="button primary" type="submit">开始小任务</button>
         </form>
       ) : null}
 

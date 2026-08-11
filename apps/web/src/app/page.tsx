@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { hasVNextSession } from "@/lib/server/api";
+
 const AUTH_ERRORS: Record<string, string> = {
   IDENTITY_NOT_LINKED: "该飞书身份尚未获得访问权限，请联系运营获取一次性绑定链接。",
   IDENTITY_REVOKED: "该飞书身份已撤销，请联系运营确认权限。",
@@ -26,7 +28,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string; return_to?: string }>;
 }) {
-  const query = await searchParams;
+  const [query, hasSession] = await Promise.all([searchParams, hasVNextSession()]);
   const authError = query.auth_error;
   const returnTo = query.return_to && IDENTITY_RETURN_PATHS.has(query.return_to)
     ? query.return_to
@@ -36,9 +38,16 @@ export default async function Home({
       <div className="landing-copy">
         <p className="journey-whisper">It&apos;s a long game.</p>
         <h1>这里，没有标准答案。</h1>
-        <Link className="button primary landing-cta" href="/app">
-          继续旅程 <span aria-hidden="true">→</span>
-        </Link>
+        {hasSession ? (
+          <Link className="button primary landing-cta" href="/app">
+            继续旅程 <span aria-hidden="true">→</span>
+          </Link>
+        ) : (
+          <p className="landing-entry-note">
+            <strong>从专属邀请开始</strong>
+            <span>打开你收到的邀请链接</span>
+          </p>
+        )}
       </div>
       <ol className="landing-route" aria-label="探索营路线预览">
         {ROUTE_PREVIEW.map(([title, hint], index) => (
@@ -64,9 +73,6 @@ export default async function Home({
           ) : null}
         </div>
       ) : null}
-      <p className="landing-footnote">
-        首次进入使用专属邀请 · <Link prefetch={false} href="/auth/feishu?return_to=%2Freview">Reviewer</Link>
-      </p>
     </section>
   );
 }
