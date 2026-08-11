@@ -4,8 +4,11 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 evidence_dir="$repo_root/output/playwright/p0-journey-v3"
 project_name="journey-next-p0-browser-$$"
-learner_session="p0-v3-learner-$$"
+initial_learner_session="p0-v3-learner-$$"
+learner_reentry_session="p0-v3-learner-reentry-$$"
+learner_session="$initial_learner_session"
 reviewer_session="p0-v3-reviewer-$$"
+operator_session="p0-v3-operator-$$"
 db_port=${MJ_DB_PORT:-35542}
 api_port=${MJ_API_PORT:-38110}
 web_port=${MJ_WEB_PORT:-33210}
@@ -14,8 +17,10 @@ api_url="http://127.0.0.1:$api_port"
 runtime_config="$evidence_dir/cli.config.json"
 
 cleanup() {
-    bash "$PLAYWRIGHT_CLI" -s="$learner_session" close >/dev/null 2>&1 || true
+    bash "$PLAYWRIGHT_CLI" -s="$initial_learner_session" close >/dev/null 2>&1 || true
+    bash "$PLAYWRIGHT_CLI" -s="$learner_reentry_session" close >/dev/null 2>&1 || true
     bash "$PLAYWRIGHT_CLI" -s="$reviewer_session" close >/dev/null 2>&1 || true
+    bash "$PLAYWRIGHT_CLI" -s="$operator_session" close >/dev/null 2>&1 || true
     docker compose --project-directory "$repo_root" -p "$project_name" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -40,6 +45,12 @@ reviewer_token=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["se
 reviewer_csrf=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["csrf"])' "$reviewer_credentials")
 unset reviewer_credentials
 
+operator_credentials=$(docker compose --project-directory "$repo_root" -p "$project_name" \
+    exec -T api python scripts/p0_browser_reviewer_session.py --role OPERATOR)
+operator_token=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["session"])' "$operator_credentials")
+operator_csrf=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["csrf"])' "$operator_credentials")
+unset operator_credentials
+
 python3 - "$runtime_config" "$PLAYWRIGHT_CHROMIUM_EXECUTABLE" <<'PY'
 import json
 import sys
@@ -62,11 +73,15 @@ PY
 
 learner_log="$evidence_dir/learner-cli.log"
 reviewer_log="$evidence_dir/reviewer-cli.log"
+operator_log="$evidence_dir/operator-cli.log"
 pw_learner() {
     bash "$PLAYWRIGHT_CLI" -s="$learner_session" "$@" >>"$learner_log" 2>&1
 }
 pw_reviewer() {
     bash "$PLAYWRIGHT_CLI" -s="$reviewer_session" "$@" >>"$reviewer_log" 2>&1
+}
+pw_operator() {
+    bash "$PLAYWRIGHT_CLI" -s="$operator_session" "$@" >>"$operator_log" 2>&1
 }
 
 # The credential is intentionally neither printed nor retained in evidence.
@@ -84,6 +99,16 @@ bash "$PLAYWRIGHT_CLI" -s="$reviewer_session" run-code "async (page) => {
 }" >/dev/null 2>&1
 unset reviewer_token reviewer_csrf
 
+bash "$PLAYWRIGHT_CLI" -s="$operator_session" open \
+    "about:blank" --config "$runtime_config" >/dev/null 2>&1
+bash "$PLAYWRIGHT_CLI" -s="$operator_session" run-code "async (page) => {
+  await page.context().addCookies([
+    {name: 'journey_next_session', value: '$operator_token', url: '$base_url', httpOnly: true, sameSite: 'Lax'},
+    {name: 'journey_next_csrf', value: '$operator_csrf', url: '$base_url', sameSite: 'Lax'},
+  ]);
+}" >/dev/null 2>&1
+unset operator_token operator_csrf
+
 pw_learner run-code "async (page) => {
   await page.waitForLoadState('networkidle');
   if (await page.getByRole('button', {name: '打开通行证'}).count()) throw new Error('two-step invite still visible');
@@ -98,6 +123,24 @@ pw_learner run-code "async (page) => {
   if (!/已完成\s+0\s*\/\s*8\s+站/.test(progress)) throw new Error('Journey V3 progress missing');
 }"
 pw_learner screenshot --filename "$evidence_dir/01-first-station.png" --full-page
+
+pw_operator goto "$base_url/ops#learner-invites"
+pw_operator run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  const expected = [
+    ['P0_BROWSER_PRIMARY', '已使用'],
+    ['P0_BROWSER_PENDING', '已兑换，待确认身份'],
+    ['P0_BROWSER_UNUSED', '待使用'],
+  ];
+  for (const [purpose, status] of expected) {
+    const item = page.locator('.invite-list > li').filter({hasText: purpose});
+    if (await item.count() !== 1) throw new Error('invite row missing: ' + purpose);
+    if (!(await item.innerText()).includes(status)) {
+      throw new Error('invite status mismatch: ' + purpose + ' expected=' + status);
+    }
+  }
+}"
+pw_operator screenshot --filename "$evidence_dir/01-invite-statuses.png" --full-page
 
 complete_stage() {
     stage_no=$1
@@ -129,10 +172,14 @@ complete_stage() {
           });
         }
         await page.setViewportSize({width: 1280, height: 900});
-        const link = page.getByRole('link', {name: '打开学习材料'});
-        if (await link.count() !== 1) throw new Error('frozen text URL is not clickable');
-        const href = await link.getAttribute('href');
-        if (!href || !href.startsWith('https://')) throw new Error('learning link is not HTTPS');
+      }
+      const links = page.locator('.learning-material-content a');
+      if (await links.count() < 1) throw new Error('stage $stage_no has no clickable HTTPS material');
+      for (let index = 0; index < await links.count(); index += 1) {
+        const href = await links.nth(index).getAttribute('href');
+        if (!href || !href.startsWith('https://')) {
+          throw new Error('stage $stage_no material is not HTTPS');
+        }
       }
       while (await page.getByRole('button', {name: '完成并继续'}).count()) {
         const completed = page.waitForURL('**?material=completed');
@@ -200,10 +247,44 @@ complete_stage 3
 complete_stage 4
 complete_stage 5
 
-# First assessment proves revision and safe same-session resubmission.
+# First assessment proves revision and safe new-browser reentry.
 complete_stage 6
 complete_review revision
-pw_learner reload
+
+reentry_token=$(python3 "$repo_root/scripts/p0_journey_v3_browser_fixture.py" \
+    --base-url "$api_url" --create-reentry --learner-display-name "P0 Browser Learner")
+if [ "${#reentry_token}" -lt 32 ]; then
+    printf '%s\n' "P0_BROWSER_ERROR=reentry_invite_missing" >&2
+    exit 2
+fi
+bash "$PLAYWRIGHT_CLI" -s="$learner_reentry_session" open \
+    "$base_url/join#token=$reentry_token&flow=reentry" --config "$runtime_config" >/dev/null 2>&1
+unset reentry_token
+bash "$PLAYWRIGHT_CLI" -s="$learner_reentry_session" run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  if (await page.locator('#display-name').count()) throw new Error('reentry asks for a new learner identity');
+  if (!(await page.locator('body').innerText()).includes('继续未完成的旅程')) {
+    throw new Error('reentry purpose is not visible');
+  }
+  await page.getByRole('checkbox').check();
+  await Promise.all([
+    page.waitForURL('**/app'),
+    page.getByRole('button', {name: '继续旅程'}).click(),
+  ]);
+  await page.waitForLoadState('networkidle');
+  if (!(await page.locator('body').innerText()).includes('根据反馈修订任务')) {
+    throw new Error('reentry did not restore the revision action');
+  }
+}" >>"$learner_log" 2>&1
+
+pw_learner goto "$base_url/app"
+pw_learner run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  if (!page.url().includes('auth_error=LEARNER_SESSION_EXPIRED')) {
+    throw new Error('old learner session was not rotated after reentry');
+  }
+}"
+learner_session="$learner_reentry_session"
 pw_learner screenshot --filename "$evidence_dir/02-revision-required.png" --full-page
 complete_revision
 complete_review approve
@@ -231,9 +312,10 @@ pw_learner screenshot --filename "$evidence_dir/03-journey-complete.png" --full-
 
 pw_learner console error
 pw_reviewer console error
-if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$reviewer_log"; then
+pw_operator console error
+if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$reviewer_log" "$operator_log"; then
     printf '%s\n' "P0_BROWSER_ERROR=console_error" >&2
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS invite=one_step stages=8 revision=resubmitted reviewer=complete"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 reentry=new_browser old_session=revoked material_links=8 stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
