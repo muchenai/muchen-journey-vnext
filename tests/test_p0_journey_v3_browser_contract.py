@@ -87,9 +87,9 @@ def test_browser_result_cannot_be_misreported_as_real_journey_uat() -> None:
         "reentry=new_browser",
         "old_session=revoked",
         "material_links=8",
+        "visible_task_brief=3_viewports",
         "fixture=synthetic",
         "external_access=not_proven",
         "human_uat=not_run",
     ):
         assert required in script
-

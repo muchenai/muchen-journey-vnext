@@ -245,35 +245,45 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      <details className="task-contract">
-        <summary>查看任务要求</summary>
-        <p>{assignment.learner_outcome}</p>
-        <div className="task-contract-columns">
-          <div>
-            <h3>如何完成</h3>
-            <ol className="checklist">
-              {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
-            </ol>
-          </div>
-          <div>
-            <h3>完成标准</h3>
-            <ul className="checklist">
-              {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
-            </ul>
-          </div>
-          <div>
-            <h3>交付内容</h3>
+      {materialsReady ? (
+        <section className="task-brief" aria-labelledby="task-brief-title">
+          <p className="section-label">这一站要完成</p>
+          <h2 id="task-brief-title">{assignment.learner_outcome}</h2>
+
+          <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
+            <h3 id="task-deliverables-title">需要提交</h3>
             <ul className="checklist">
               {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
-        </div>
-        {assignment.reference_materials.length > 0 ? (
-          <ul className="checklist">
-            {assignment.reference_materials.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        ) : null}
-      </details>
+
+          <details className="task-supporting-rules">
+            <summary>需要时查看方法与完成标准</summary>
+            <div className="task-contract-columns">
+              <div>
+                <h3>如何完成</h3>
+                <ol className="checklist">
+                  {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
+                </ol>
+              </div>
+              <div>
+                <h3>完成标准</h3>
+                <ul className="checklist">
+                  {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              {assignment.reference_materials.length > 0 ? (
+                <div>
+                  <h3>参考资料</h3>
+                  <ul className="checklist">
+                    {assignment.reference_materials.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       {materialsReady ? <section className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">完成本阶段</p>

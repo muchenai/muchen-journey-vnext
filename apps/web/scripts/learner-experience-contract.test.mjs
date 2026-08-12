@@ -26,7 +26,7 @@ test("the task page reveals one learning material at a time", () => {
 test("the response workspace stays hidden until required input is complete", () => {
   assert.match(
     taskPage,
-    /\{materialsReady \? <section className="task-workspace"[\s\S]*<SubmissionComposer/,
+    /\{materialsReady \? \([\s\S]*className="task-brief"[\s\S]*\{materialsReady \? <section className="task-workspace"[\s\S]*<SubmissionComposer/,
   );
   assert.match(taskPage, /完成当前材料后，小任务会自动出现/);
   assert.match(taskPage, /开始小任务/);
@@ -34,10 +34,19 @@ test("the response workspace stays hidden until required input is complete", () 
   assert.doesNotMatch(taskPage, /当前固定任务版本不接收附件/);
 });
 
-test("rules and historical evidence are available on demand instead of competing with the next action", () => {
-  assert.match(taskPage, /<summary>查看任务要求<\/summary>/);
+test("the required goal and deliverables are visible before the response workspace", () => {
+  assert.match(taskPage, /<section className="task-brief"/);
+  assert.match(taskPage, /<h2 id="task-brief-title">\{assignment\.learner_outcome\}<\/h2>/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">需要提交<\/h3>/);
+  assert.match(taskPage, /assignment\.required_deliverables\.map/);
+  assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
+  assert.ok(taskPage.indexOf("assignment.required_deliverables.map") < taskPage.indexOf("task-supporting-rules"));
+  assert.doesNotMatch(taskPage, /<summary>查看任务要求<\/summary>/);
+});
+
+test("supporting rules and historical evidence stay available on demand", () => {
+  assert.match(taskPage, /<summary>需要时查看方法与完成标准<\/summary>/);
   assert.match(taskPage, /<summary>查看提交历史<\/summary>/);
-  assert.ok(taskPage.indexOf("查看任务要求") < taskPage.indexOf("task-workspace"));
 });
 
 test("join and result pages keep operational explanations below the primary experience", () => {
