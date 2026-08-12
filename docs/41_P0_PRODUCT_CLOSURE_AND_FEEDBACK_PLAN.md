@@ -117,7 +117,7 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-当前最新候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_IN_REVIEW / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `ad6d9b6c7b9a4c53753f666f6c5b22777ed2ed3f`，候选 Gate `31532212663`，migration 保持 `0019_wp30_invitation_control`。该候选包含已发布 TaskVersion 材料链接只读回读、发布时逐项确认门禁、邀请三态、安全续接，以及 Learner 单目标/单动作信息层级收敛和更新后的完整隔离浏览器证据。绑定 PR 本身不部署、不访问正式材料、不创建邀请，也不修改 Journey V3 业务事实。
+当前最新候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_IN_REVIEW / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `65057e8db306b2dd9830e5047e77376899dcc652`，候选 Gate `31566262399`，migration 保持 `0019_wp30_invitation_control`。该候选在上一版邀请三态、安全续接、材料链接审计与 Learner 单目标/单动作收敛基础上，修正了“新人完成材料后，任务目标与交付内容仍被默认折叠”的 P0 理解阻断：目标与交付现在先于输入区直接可见，只有方法、详细标准和参考资料按需展开。完整隔离 Journey V3 浏览器闭环及桌面、平板、手机三档可见性回归已通过，但正式材料权限与真人 UAT 仍未证明。绑定 PR 本身不部署、不访问正式材料、不创建邀请，也不修改 Journey V3 业务事实。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 
