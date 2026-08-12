@@ -409,5 +409,5 @@
 
 - production 首站材料核对确认：失效 URL 来自易混淆字符的人工抄写，正式源使用数字 `0` 与大写 `I`；旧 TaskVersion/JourneyVersion 不允许原地修改，现有 Enrollment、提交与评审事实继续保留；
 - PR #176 为 Operator 发布页增加逐项材料链接清单：正文内 HTTPS URL 与独立外链均被提取、去重并显示为可打开链接，未逐项确认时浏览器不能提交不可变 TaskVersion；该门禁不修改 API、迁移、身份或业务状态机；
-- 最新候选源码 `ad6d9b6c7b9a4c53753f666f6c5b22777ed2ed3f` 的 Mainline Candidate Gate [`31532212663`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31532212663) 成功；manifest 标记 registry push verified、deployment not run，migration 仍为 `0019_wp30_invitation_control`；
-- staging 合同固定 API `sha256:c28e66a8…9c085`、Web `sha256:09206e68…ce62f`、Worker `sha256:2d4fe10f…e3642`，唯一部署确认词为 `DEPLOY_AD6D9B6_TO_VOLCENGINE_STAGING`；本绑定不部署、不修改内容或其他外部事实。该候选同时包含材料链接审计、邀请三态、安全续接和 Learner 单目标/单动作信息层级收敛；本地完整合成浏览器路径通过，但正式飞书材料权限和真人 UAT 仍未证明。
+- 最新候选源码 `65057e8db306b2dd9830e5047e77376899dcc652` 的 Mainline Candidate Gate [`31566262399`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31566262399) 成功；manifest 标记 registry push verified、deployment not run，migration 仍为 `0019_wp30_invitation_control`；
+- staging 合同固定 API `sha256:1d4b8311…a5d3`、Web `sha256:11655ff4…b4c`、Worker `sha256:c7a640d5…4010`，唯一部署确认词为 `DEPLOY_65057E8_TO_VOLCENGINE_STAGING`；本绑定不部署、不修改内容或其他外部事实。该候选同时包含材料链接审计、邀请三态、安全续接、Learner 单目标/单动作信息层级收敛，以及任务目标与交付默认可见的 P0 修复；完整隔离浏览器路径及三档视口回归通过，但正式飞书材料权限和真人 UAT 仍未证明。
