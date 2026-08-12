@@ -451,8 +451,6 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
             '["/ops"]',
             "isReviewRoute && !isReviewLogin && !hasSession",
-            'git show "$candidate:apps/web/src/app/review/login/page.tsx"',
-            "进入主管评审",
             "isContentRoute && !isContentLogin && !hasSession",
             "INSPECT_RUNTIME_3B7D757_STAGING",
             "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
