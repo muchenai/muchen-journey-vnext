@@ -93,3 +93,13 @@ SSH。修复后的 run `30181942549` 通过：两个 Compose 调用均隔离 std
 - 真人截图仅以 SHA-256 `b4f0cb1687a7b86324c58731d4db28d7437823e64322844872d0ec353b77a193` 引用，不复制进 Public Git，不记录姓名、飞书 subject、cookie、链接 token 或业务正文。该证据关闭 `WAITING_FOR_HUMAN_UAT`，WP-09 记为 `IDENTITY_AND_ACCESS_VERIFIED / HUMAN_SESSION_UX_PASS`；不外推 WP-13 全量真人 UAT 或发布 GO。
 
 创建应用、写 secret、生成真实绑定链接和使用真实账号都会改变外部状态或处理真人身份，必须取得对应 Owner 的精确授权。当前不得为已经撤销的 Reviewer 再创建链接来制造重复证据。整体发布保持 `NO_GO`。
+
+## 8. 2026-08-12｜Content Editor 兼任 Reviewer 与待评审移交
+
+Owner 已确认由已绑定的 Content Editor 郑田源兼任 Reviewer。实现坚持角色、身份与业务事实分离：
+
+- 不创建第二个飞书身份、不恢复历史已撤销身份，也不覆盖 Content Editor 角色；Operator 只可为同组织、有效且已绑定飞书的 Content Editor 增加一条独立、幂等、可审计的 Reviewer `RoleAssignment`；
+- 已提交且仍为 `ASSIGNED` 的 Review 不改写原 `reviewer_id`。Operator 通过独立命令建立不可更新、不可删除的 `ReviewDelegation`，同时只更新 Enrollment 的未来 Reviewer；Review 已进入 `IN_REVIEW` 或 `FINALIZED` 后拒绝移交；
+- 委派 Reviewer 可看到、开始并完成该 Review。Evaluation 继续用原 `reviewer_id` 保留指派责任，同时用非空 `executor_id` 和 `created_by` 记录实际执行人；
+- 新迁移 head 为 `0020_wp09_reviewer_delegation`。干净数据库全量 API 回归 `335 passed, 5 skipped`，Reviewer 双角色/委派专项 `24 passed`，Web lint、typecheck 与 `33` 项回归通过；OpenAPI、隔离、secret scan 与 Web 依赖审计通过；完整 `ci-fast` 仅在既有 Python 依赖审计因上游索引无法解析已锁定的 `cryptography==50.0.0` 而停止，该失败与本次变更无关，未放宽门禁；
+- 本节只记录候选实现和机器证据。staging 尚未部署迁移，尚未授予真实角色，也尚未移交当前待评审事实；这些动作必须在 PR 合入、新候选和冻结基础设施部署完成后，由当前 Operator 在 `/ops` 分别确认执行。

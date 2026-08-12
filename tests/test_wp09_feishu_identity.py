@@ -127,6 +127,81 @@ def create_role_user(role: Role) -> uuid.UUID:
     return user_id
 
 
+def test_linked_content_editor_can_receive_separately_audited_reviewer_role(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    with SessionLocal.begin() as session:
+        session.add(
+            ExternalIdentity(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=editor_id,
+                provider="FEISHU",
+                subject=uuid.uuid4().hex + uuid.uuid4().hex,
+                verified_at=utc_now(),
+                revision=1,
+            )
+        )
+    operator = client_for("operator-grant-reviewer-role")
+    key = f"grant-reviewer-{uuid.uuid4()}"
+    payload = {
+        "expected_absent": True,
+        "reason": "郑田源在保留内容编辑职责的同时兼任本次真人评审",
+    }
+    granted = assert_ok(
+        operator.post(
+            f"/api/v1/ops/users/{editor_id}/reviewer-role",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    replay = assert_ok(
+        operator.post(
+            f"/api/v1/ops/users/{editor_id}/reviewer-role",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    assert granted["status"] == "ACTIVE"
+    assert replay["resource_id"] == granted["resource_id"]
+    assert replay["idempotency_replay"] is True
+    with SessionLocal() as session:
+        roles = set(
+            session.scalars(
+                select(RoleAssignment.role).where(RoleAssignment.user_id == editor_id)
+            ).all()
+        )
+        assert roles == {Role.CONTENT_EDITOR, Role.REVIEWER}
+        audit = session.scalar(
+            select(AuditEntry).where(
+                AuditEntry.action == "reviewer_role.granted",
+                AuditEntry.resource_id == uuid.UUID(granted["resource_id"]),
+            )
+        )
+        assert audit is not None
+        assert audit.details["role"] == "REVIEWER"
+
+
+def test_reviewer_role_grant_rejects_unlinked_content_editor(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    response = client_for("operator-grant-unlinked-reviewer").post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"grant-unlinked-{uuid.uuid4()}",
+        },
+        json={
+            "expected_absent": True,
+            "reason": "未绑定身份的内容编辑不能直接获得评审权限",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "IDENTITY_NOT_LINKED"
+
+
 def begin_oauth(client: TestClient, return_to: str, link_token: str | None = None) -> str:
     body = {"return_to": return_to, "link_token": link_token}
     response = client.post(

@@ -721,6 +721,27 @@ export async function assignEnrollmentReviewer(data: FormData) {
   redirect("/ops?updated=reviewer");
 }
 
+export async function handoffAssignedReview(data: FormData) {
+  const enrollmentId = requiredUuid(data, "enrollment_id");
+  const reviewerId = requiredUuid(data, "reviewer_id");
+  const reviewRevision = Number(data.get("review_revision"));
+  if (!Number.isSafeInteger(reviewRevision) || reviewRevision < 1) {
+    throw new Error("待评审版本信息无效。请刷新页面后重试。");
+  }
+  await apiRequest(`/api/v1/ops/enrollments/${enrollmentId}/assigned-review/handoff`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      review_revision: reviewRevision,
+      reviewer_id: reviewerId,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=assigned-review-handoff#admission-decisions");
+}
+
 export async function cancelEnrollment(data: FormData) {
   const enrollmentId = requiredUuid(data, "enrollment_id");
   const expectedRevision = requiredRevision(data);
@@ -1138,6 +1159,20 @@ export async function createContentEditor(data: FormData) {
   });
   revalidatePath("/ops");
   redirect("/ops?updated=content-editor-created#identity-access");
+}
+
+export async function grantReviewerRole(data: FormData) {
+  const userId = requiredUuid(data, "user_id");
+  await apiRequest(`/api/v1/ops/users/${userId}/reviewer-role`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_absent: true,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=reviewer-role-granted#identity-access");
 }
 
 export async function assembleFormalJourneyV3(data: FormData) {

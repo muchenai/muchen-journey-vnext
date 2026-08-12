@@ -2720,6 +2720,81 @@
         }
       }
     },
+    "/api/v1/ops/enrollments/{enrollment_id}/assigned-review/handoff": {
+      "post": {
+        "summary": "Handoff Assigned Review",
+        "operationId": "handoff_assigned_review_api_v1_ops_enrollments__enrollment_id__assigned_review_handoff_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Enrollment Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffAssignedReviewCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ops/enrollments/{enrollment_id}/cancel": {
       "post": {
         "summary": "Cancel Enrollment",
@@ -3363,6 +3438,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IdentityAccessListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/users/{user_id}/reviewer-role": {
+      "post": {
+        "summary": "Grant Reviewer Role",
+        "description": "Grant an existing, verified Content Editor a separately audited Reviewer role.",
+        "operationId": "grant_reviewer_role_api_v1_ops_users__user_id__reviewer_role_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantReviewerRoleCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -5966,6 +6117,17 @@
             ],
             "title": "Open Review Status"
           },
+          "open_review_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Review Revision"
+          },
           "admission_decision_id": {
             "anyOf": [
               {
@@ -6043,6 +6205,7 @@
           "journey_version_id",
           "assignment_statuses",
           "open_review_status",
+          "open_review_revision",
           "admission_decision_id",
           "admission_total_score",
           "admission_tier",
@@ -6576,6 +6739,28 @@
         ],
         "title": "FormalJourneyVersionResponse"
       },
+      "GrantReviewerRoleCommand": {
+        "properties": {
+          "expected_absent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Expected Absent"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_absent",
+          "reason"
+        ],
+        "title": "GrantReviewerRoleCommand"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -6588,6 +6773,40 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HandoffAssignedReviewCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "review_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Review Revision"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "review_revision",
+          "reviewer_id",
+          "reason"
+        ],
+        "title": "HandoffAssignedReviewCommand"
       },
       "HandoffOut": {
         "properties": {
@@ -6831,7 +7050,8 @@
               "enum": [
                 "create_identity_link",
                 "revoke_identity_link",
-                "revoke_external_identity"
+                "revoke_external_identity",
+                "grant_reviewer_role"
               ]
             },
             "type": "array",

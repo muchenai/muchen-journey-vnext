@@ -3,6 +3,7 @@ import {
   cancelEnrollment,
   configureNotificationEndpoint,
   createContentEditor,
+  handoffAssignedReview,
   redriveNotificationDelivery,
   revokeNotificationEndpoint,
 } from "@/app/actions";
@@ -211,7 +212,9 @@ export default async function OpsPage({
                 <span className="badge">主管：{enrollment.reviewer_display_name}</span>
               </div>
               {enrollment.open_review_status ? (
-                <p className="inline-error">已有 {enrollment.open_review_status} Review；Reviewer 重分配与 Enrollment 取消均被状态机阻断。</p>
+                <p className="inline-error">
+                  已有 {enrollment.open_review_status} Review；仅尚未开始的 ASSIGNED 评审允许受控移交，其他状态继续阻断。
+                </p>
               ) : null}
               {enrollment.admission_decision ? (
                 <div className="admission-preview">
@@ -241,6 +244,29 @@ export default async function OpsPage({
                     <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
                   </label>
                   <button className="button secondary compact" type="submit">受控分配 Reviewer</button>
+                </form>
+              ) : null}
+              {enrollment.allowed_commands.includes("handoff_assigned_review") && enrollment.open_review_revision ? (
+                <form action={handoffAssignedReview} className="ops-command-form">
+                  <input type="hidden" name="enrollment_id" value={enrollment.id} />
+                  <input type="hidden" name="revision" value={enrollment.revision} />
+                  <input type="hidden" name="review_revision" value={enrollment.open_review_revision} />
+                  <label>
+                    移交给已绑定 Reviewer
+                    <select name="reviewer_id" required defaultValue="">
+                      <option value="" disabled>选择 Reviewer</option>
+                      {identityAccess.items
+                        .filter((item) => item.role === "REVIEWER"
+                          && item.identity_status === "LINKED"
+                          && item.user_id !== enrollment.reviewer_id)
+                        .map((item) => <option key={item.user_id} value={item.user_id}>{item.display_name}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    移交理由
+                    <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                  </label>
+                  <button className="button secondary compact" type="submit">移交未开始评审</button>
                 </form>
               ) : null}
               {enrollment.allowed_commands.includes("cancel_enrollment") ? (

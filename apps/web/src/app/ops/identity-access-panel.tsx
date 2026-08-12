@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import {
   createIdentityLink,
+  grantReviewerRole,
   IdentityLinkActionState,
   revokeExternalIdentity,
   revokeIdentityLink,
@@ -146,6 +147,20 @@ function IdentityAccessItem({
       {item.allowed_commands.includes("create_identity_link") ? <CreateLinkForm item={item} /> : null}
 
       <RevokedIdentityTransferForms item={item} candidates={revokedCandidates} />
+
+      {item.allowed_commands.includes("grant_reviewer_role") ? (
+        <form action={grantReviewerRole} className="ops-command-form">
+          <input type="hidden" name="user_id" value={item.user_id} />
+          <label>
+            兼任理由
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <button className="button secondary compact" type="submit">
+            授予兼任 Reviewer
+          </button>
+          <p className="status-meta">保留 Content Editor；飞书身份不变。提交后写入独立角色审计。</p>
+        </form>
+      ) : null}
 
       {item.allowed_commands.includes("revoke_identity_link") && item.link_id && item.link_revision ? (
         <form action={revokeIdentityLink} className="ops-command-form">
