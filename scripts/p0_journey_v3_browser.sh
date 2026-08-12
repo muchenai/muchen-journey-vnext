@@ -203,6 +203,38 @@ complete_stage() {
         await completed;
         await page.waitForLoadState('networkidle');
       }
+      if ($stage_no === 1) {
+        for (const viewport of [
+          {name: 'desktop', width: 1280, height: 900},
+          {name: 'tablet', width: 768, height: 1024},
+          {name: 'mobile', width: 390, height: 844},
+        ]) {
+          await page.setViewportSize({width: viewport.width, height: viewport.height});
+          const brief = page.locator('.task-brief');
+          const workspace = page.locator('.task-workspace');
+          if (await brief.count() !== 1 || await workspace.count() !== 1) {
+            throw new Error(viewport.name + ': visible task brief or response workspace missing after learning input');
+          }
+          if (!(await brief.innerText()).includes('需要提交')) {
+            throw new Error(viewport.name + ': required deliverables are not visible before response');
+          }
+          if (await brief.locator('.task-supporting-rules[open]').count() !== 0) {
+            throw new Error(viewport.name + ': supporting rules should remain folded by default');
+          }
+          const briefBox = await brief.boundingBox();
+          const workspaceBox = await workspace.boundingBox();
+          if (!briefBox || !workspaceBox || briefBox.y >= workspaceBox.y) {
+            throw new Error(viewport.name + ': task goal and deliverables do not precede the response workspace');
+          }
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (overflow) throw new Error(viewport.name + ': visible task brief has horizontal overflow');
+          await page.screenshot({
+            path: '$evidence_dir/03-visible-task-brief-' + viewport.name + '.png',
+            fullPage: true,
+          });
+        }
+        await page.setViewportSize({width: 1280, height: 900});
+      }
       if (await page.getByRole('button', {name: '开始小任务'}).count()) {
         await page.getByRole('button', {name: '开始小任务'}).click();
         await page.waitForLoadState('networkidle');
@@ -342,4 +374,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$re
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 reentry=new_browser old_session=revoked material_links=8 stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
