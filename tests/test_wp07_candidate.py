@@ -297,4 +297,37 @@ def test_remote_manifest_digest_rejects_immutable_mismatch(monkeypatch):
     monkeypatch.setattr(candidate, "run_bytes", lambda arguments: next(responses))
 
     with pytest.raises(CandidateError, match="digest verification failed"):
-        candidate.remote_manifest_digest("ghcr.io/example/image:tag")
+        candidate.remote_manifest_digest("ghcr.io/example/image:tag", attempts=1)
+
+
+def test_remote_manifest_digest_retries_transient_registry_failure(monkeypatch):
+    raw = b'{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}'
+    expected = "sha256:" + candidate.hashlib.sha256(raw).hexdigest()
+    responses = iter(
+        [
+            CandidateError("temporary registry response"),
+            raw,
+            raw,
+        ]
+    )
+    sleeps = []
+
+    def inspect(_arguments):
+        result = next(responses)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(candidate, "run_bytes", inspect)
+
+    assert candidate.remote_manifest_digest(
+        "ghcr.io/example/image:tag",
+        delay_seconds=2,
+        sleeper=sleeps.append,
+    ) == expected
+    assert sleeps == [2]
+
+
+def test_remote_manifest_digest_rejects_unbounded_retries():
+    with pytest.raises(CandidateError, match="attempts must be between 1 and 3"):
+        candidate.remote_manifest_digest("ghcr.io/example/image:tag", attempts=4)

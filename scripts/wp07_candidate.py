@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -198,6 +199,7 @@ def source_check() -> dict[str, Any]:
         "docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121",
         "password: ${{ secrets.GITHUB_TOKEN }}",
         "make candidate-registry-push",
+        "always() && hashFiles('artifacts/wp07-candidate/release-manifest.json') != ''",
     )
     if any(item not in mainline for item in required_mainline) or ":latest" in mainline:
         raise CandidateError("mainline GHCR workflow contract is invalid")
@@ -342,20 +344,70 @@ def registry_mapping(commit: str, values: Iterable[str]) -> dict[str, str]:
     return references
 
 
-def remote_manifest_digest(reference: str) -> str:
-    raw = run_bytes(("docker", "buildx", "imagetools", "inspect", "--raw", reference))
-    manifest = json.loads(raw)
-    if manifest.get("schemaVersion") != 2:
-        raise CandidateError(f"remote registry returned an invalid image manifest: {reference}")
-    digest = "sha256:" + hashlib.sha256(raw).hexdigest()
-    repository = reference.rsplit(":", 1)[0]
-    immutable = f"{repository}@{digest}"
-    immutable_raw = run_bytes(
-        ("docker", "buildx", "imagetools", "inspect", "--raw", immutable)
+def remote_manifest_digest(
+    reference: str,
+    *,
+    attempts: int = 3,
+    delay_seconds: int = 3,
+    sleeper=time.sleep,
+) -> str:
+    if attempts < 1 or attempts > 3:
+        raise CandidateError("registry verification attempts must be between 1 and 3")
+    component = next(
+        (item for item in COMPONENTS if f"-{item}:" in reference),
+        "unknown",
     )
-    if "sha256:" + hashlib.sha256(immutable_raw).hexdigest() != digest:
-        raise CandidateError(f"remote registry digest verification failed: {reference}")
-    return digest
+    for attempt in range(1, attempts + 1):
+        print(
+            f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+            "result=START",
+            file=sys.stderr,
+        )
+        try:
+            raw = run_bytes(
+                ("docker", "buildx", "imagetools", "inspect", "--raw", reference)
+            )
+            manifest = json.loads(raw)
+            if manifest.get("schemaVersion") != 2:
+                raise CandidateError(
+                    f"remote registry returned an invalid image manifest: {reference}"
+                )
+            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+            repository = reference.rsplit(":", 1)[0]
+            immutable = f"{repository}@{digest}"
+            immutable_raw = run_bytes(
+                ("docker", "buildx", "imagetools", "inspect", "--raw", immutable)
+            )
+            if "sha256:" + hashlib.sha256(immutable_raw).hexdigest() != digest:
+                raise CandidateError(
+                    f"remote registry digest verification failed: {reference}"
+                )
+        except (CandidateError, json.JSONDecodeError) as error:
+            if attempt == attempts:
+                print(
+                    f"WP07_REGISTRY_VERIFY component={component} "
+                    f"attempt={attempt}/{attempts} result=FAIL retries_exhausted=true",
+                    file=sys.stderr,
+                )
+                if isinstance(error, CandidateError):
+                    raise
+                raise CandidateError(
+                    f"remote registry returned invalid JSON: {reference}"
+                ) from error
+            print(
+                f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+                f"result=RETRY next_in_seconds={delay_seconds}",
+                file=sys.stderr,
+            )
+            sleeper(delay_seconds)
+            continue
+        print(
+            f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+            "result=PASS",
+            file=sys.stderr,
+        )
+        return digest
+    raise AssertionError("bounded registry verification loop did not terminate")
 
 
 def registry_check(commit: str, registry_args: Iterable[str]) -> dict[str, Any]:
