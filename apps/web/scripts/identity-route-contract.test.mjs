@@ -7,14 +7,36 @@ const contentLoginSource = readFileSync(
   new URL("../src/app/content/login/page.tsx", import.meta.url),
   "utf8",
 );
+const reviewLoginSource = readFileSync(
+  new URL("../src/app/review/login/page.tsx", import.meta.url),
+  "utf8",
+);
+const apiSource = readFileSync(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
-test("ops and review still reject anonymous requests before rendering", () => {
+test("ops still rejects anonymous requests before rendering", () => {
   assert.match(
     proxySource,
-    /\["\/ops", "\/review"\]\.some\(/,
+    /\["\/ops"\]\.some\(/,
   );
   assert.match(proxySource, /code: "AUTH_REQUIRED"/);
   assert.match(proxySource, /\{ status: 401 \}/);
+});
+
+test("anonymous and wrong-role review entry recover through a dedicated login page", () => {
+  assert.match(proxySource, /const isReviewLogin = pathname === "\/review\/login";/);
+  assert.match(proxySource, /if \(isReviewRoute && !isReviewLogin && !hasSession\)/);
+  assert.match(
+    proxySource,
+    /NextResponse\.redirect\(new URL\("\/review\/login", request\.url\), 303\)/,
+  );
+  assert.match(reviewLoginSource, />\s*进入主管评审\s*</);
+  assert.match(reviewLoginSource, />\s*使用飞书进入\s*</);
+  assert.match(
+    reviewLoginSource,
+    /href="\/auth\/feishu\?return_to=%2Freview"/,
+  );
+  assert.match(apiSource, /redirect\("\/review\/login\?auth_error=FORBIDDEN"\)/);
+  assert.match(apiSource, /redirect\("\/review\/login\?auth_error=SESSION_EXPIRED"\)/);
 });
 
 test("anonymous content routes recover through the dedicated same-origin login page", () => {

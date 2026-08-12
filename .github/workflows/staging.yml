@@ -105,7 +105,11 @@ jobs:
               grep -Fq "http://localhost:3000/health/ready"
             git show "$candidate:apps/web/src/proxy.ts" | grep -Fq 'code: "AUTH_REQUIRED"'
             git show "$candidate:apps/web/src/proxy.ts" | \
-              grep -Fq '["/ops", "/review"]'
+              grep -Fq '["/ops"]'
+            git show "$candidate:apps/web/src/proxy.ts" | \
+              grep -Fq 'isReviewRoute && !isReviewLogin && !hasSession'
+            git show "$candidate:apps/web/src/app/review/login/page.tsx" | \
+              grep -Fq '进入主管评审'
             git show "$candidate:apps/web/src/proxy.ts" | \
               grep -Fq 'isContentRoute && !isContentLogin && !hasSession'
             git show "$candidate:apps/web/src/app/content/login/page.tsx" | \
@@ -305,6 +309,15 @@ jobs:
             test "$(curl --silent --show-error --http1.1 --no-keepalive \
               --output /dev/null --write-out '%{http_code}' "$url")" = "401"
           }
+          verify_review_entry() {
+            local url=$1
+            local headers="$RUNNER_TEMP/wp08-edge-review-headers"
+            test "$(curl --silent --show-error --http1.1 --no-keepalive \
+              --dump-header "$headers" --output /dev/null \
+              --write-out '%{http_code}' "$url")" = "303"
+            grep -Eiq '^location: /review/login\r?$' "$headers"
+            rm -f "$headers"
+          }
           curl --fail --silent --show-error --http1.1 --no-keepalive \
             --retry 15 --retry-delay 2 --retry-all-errors \
             https://staging-vnext.muchenai.com/ >/dev/null
@@ -323,7 +336,7 @@ jobs:
             curl --fail --silent --show-error --http1.1 --no-keepalive \
               https://journey.muchenai.com/ >/dev/null
             verify_denied https://staging-vnext.muchenai.com/ops
-            verify_denied https://staging-vnext.muchenai.com/review
+            verify_review_entry https://staging-vnext.muchenai.com/review
             sleep 2
           done
       - name: Roll back Edge route after failed verification
@@ -431,13 +444,18 @@ jobs:
             local failed=0
             local result
             local root_code health_code health_status health_release
-            local ops_code review_code content_code login_code
+            local ops_code review_code review_login_code content_code login_code
+            local review_location review_cache review_login_cta
             local content_location content_cache login_cta
             local health_body="$RUNNER_TEMP/wp08-health-body"
+            local review_headers="$RUNNER_TEMP/wp08-review-entry-headers"
+            local review_login_body="$RUNNER_TEMP/wp08-review-login-body"
             local content_headers="$RUNNER_TEMP/wp08-content-entry-headers"
             local login_body="$RUNNER_TEMP/wp08-content-login-body"
 
             : >"$health_body"
+            : >"$review_headers"
+            : >"$review_login_body"
             : >"$content_headers"
             : >"$login_body"
 
@@ -475,13 +493,46 @@ jobs:
             printf 'WP08_SURFACE_CHECK attempt=%s check=ops_denied status=%s expected=401 result=%s\n' \
               "$attempt" "$ops_code" "$result"
 
-            review_code=$(curl "${curl_args[@]}" --output /dev/null \
+            review_code=$(curl "${curl_args[@]}" --dump-header "$review_headers" \
+              --output /dev/null \
               --write-out '%{http_code}' "$origin/review" || true)
             review_code=${review_code:-000}
             result=PASS
-            test "$review_code" = "401" || { result=FAIL; failed=1; }
-            printf 'WP08_SURFACE_CHECK attempt=%s check=review_denied status=%s expected=401 result=%s\n' \
+            test "$review_code" = "303" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_redirect status=%s expected=303 result=%s\n' \
               "$attempt" "$review_code" "$result"
+
+            review_location=$(sed -n 's/^[Ll]ocation: *//p' "$review_headers" | tr -d '\r')
+            result=PASS
+            test "$review_location" = "/review/login" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_location expected=/review/login result=%s\n' \
+              "$attempt" "$result"
+
+            review_cache=missing
+            if grep -Eiq '^cache-control: .*no-store' "$review_headers"; then
+              review_cache=no-store
+            else
+              failed=1
+            fi
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_cache expected=no-store actual=%s result=%s\n' \
+              "$attempt" "$review_cache" "$([[ "$review_cache" == no-store ]] && echo PASS || echo FAIL)"
+
+            review_login_code=$(curl "${curl_args[@]}" --output "$review_login_body" \
+              --write-out '%{http_code}' "$origin/review/login" || true)
+            review_login_code=${review_login_code:-000}
+            result=PASS
+            test "$review_login_code" = "200" || { result=FAIL; failed=1; }
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_login status=%s expected=200 result=%s\n' \
+              "$attempt" "$review_login_code" "$result"
+
+            review_login_cta=missing
+            if grep -Fq '使用飞书进入' "$review_login_body"; then
+              review_login_cta=present
+            else
+              failed=1
+            fi
+            printf 'WP08_SURFACE_CHECK attempt=%s check=review_login_cta expected=present actual=%s result=%s\n' \
+              "$attempt" "$review_login_cta" "$([[ "$review_login_cta" == present ]] && echo PASS || echo FAIL)"
 
             content_code=$(curl "${curl_args[@]}" --dump-header "$content_headers" \
               --output /dev/null --write-out '%{http_code}' "$origin/content" || true)
@@ -523,7 +574,8 @@ jobs:
             printf 'WP08_SURFACE_CHECK attempt=%s check=content_login_cta expected=present actual=%s result=%s\n' \
               "$attempt" "$login_cta" "$([[ "$login_cta" == present ]] && echo PASS || echo FAIL)"
 
-            rm -f "$health_body" "$content_headers" "$login_body"
+            rm -f "$health_body" "$review_headers" "$review_login_body" \
+              "$content_headers" "$login_body"
             test "$failed" = "0"
           }
 

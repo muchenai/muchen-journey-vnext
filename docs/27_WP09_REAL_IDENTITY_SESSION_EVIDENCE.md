@@ -103,3 +103,20 @@ Owner 已确认由已绑定的 Content Editor 郑田源兼任 Reviewer。实现�
 - 委派 Reviewer 可看到、开始并完成该 Review。Evaluation 继续用原 `reviewer_id` 保留指派责任，同时用非空 `executor_id` 和 `created_by` 记录实际执行人；
 - 新迁移 head 为 `0020_wp09_reviewer_delegation`。干净数据库全量 API 回归 `335 passed, 5 skipped`，Reviewer 双角色/委派专项 `24 passed`，Web lint、typecheck 与 `33` 项回归通过；OpenAPI、隔离、secret scan 与 Web 依赖审计通过；完整 `ci-fast` 仅在既有 Python 依赖审计因上游索引无法解析已锁定的 `cryptography==50.0.0` 而停止，该失败与本次变更无关，未放宽门禁；
 - 本节只记录候选实现和机器证据。staging 尚未部署迁移，尚未授予真实角色，也尚未移交当前待评审事实；这些动作必须在 PR 合入、新候选和冻结基础设施部署完成后，由当前 Operator 在 `/ops` 分别确认执行。
+
+## 9. 2026-08-12｜Reviewer 安全重新进入合同
+
+真实试点再次暴露入口缺陷：未持有 Reviewer 会话时直接打开 `/review` 会看到原始
+`AUTH_REQUIRED` JSON；已持有 Content Editor 等其他角色会话时，飞书 OAuth 虽正确拒绝
+Reviewer 入口，却只回到泛化错误页。权限拒绝本身正确，但用户无法知道安全下一步。
+
+本次修复不放宽 API、组织或对象权限：匿名 `/review` 只以不可缓存的 `303` 转到同源
+`/review/login`；专用页面只提供“使用飞书进入”并固定 `return_to=/review`。失效 Reviewer
+session 与有效的错误角色 session 也分别落到该页的 `SESSION_EXPIRED` / `FORBIDDEN`
+提示；`/ops` 对匿名访问继续返回不可缓存的 `401`。API callback 仍必须找到同组织、有效用户
+和独立 Reviewer RoleAssignment，才能签发 Reviewer session。
+
+机器证据包括 Web `34/34`、ESLint、TypeScript/production build、standalone runtime，以及固定
+Chromium `1232` 的真实浏览器烟测；浏览器实测 `/review → /review/login`、页面标题和飞书入口
+均精确通过，三视口无横向溢出且 console 无 error。本证据不代表郑田源已经获得 Reviewer
+角色，也不代表 staging 已部署或真人评审闭环完成。

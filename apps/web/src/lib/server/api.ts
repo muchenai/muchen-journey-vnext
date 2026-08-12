@@ -626,12 +626,18 @@ export async function identityPageRequest<T>(
   try {
     return await apiRequest<T>(path, role);
   } catch (error) {
+    if (
+      role === "REVIEWER"
+      && error instanceof ApiRequestError
+      && error.status === 403
+    ) {
+      redirect("/review/login?auth_error=FORBIDDEN");
+    }
     if (error instanceof ApiRequestError && error.status === 401) {
-      const returnTo = role === "REVIEWER"
-        ? "/review"
-        : role === "CONTENT_EDITOR"
-          ? "/content"
-          : "/ops";
+      if (role === "REVIEWER") {
+        redirect("/review/login?auth_error=SESSION_EXPIRED");
+      }
+      const returnTo = role === "CONTENT_EDITOR" ? "/content" : "/ops";
       const query = new URLSearchParams({
         auth_error: "SESSION_EXPIRED",
         return_to: returnTo,

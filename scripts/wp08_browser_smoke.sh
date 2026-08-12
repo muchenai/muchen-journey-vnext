@@ -90,6 +90,32 @@ pwcli screenshot --filename "wp08-content-login.png" --full-page
 pwcli tab-close
 pwcli tab-select 0
 
+pwcli tab-new "${BROWSER_BASE_URL%/}/review"
+pwcli snapshot >snapshot-review-login.txt
+pwcli --raw eval "() => JSON.stringify({pathname: window.location.pathname, title: document.querySelector('h1')?.textContent?.trim(), action: Array.from(document.querySelectorAll('a')).find((link) => link.textContent?.trim() === '使用飞书进入')?.getAttribute('href') ?? null})" >review-entry.json
+python3 - "review-entry.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw = path.read_text(encoding="utf-8").strip()
+try:
+    result = json.loads(json.loads(raw) if raw.startswith('"') else raw)
+except json.JSONDecodeError as error:
+    raise SystemExit(f"invalid Reviewer browser result: {raw!r}: {error}")
+expected = {
+    "pathname": "/review/login",
+    "title": "进入主管评审",
+    "action": "/auth/feishu?return_to=%2Freview",
+}
+if result != expected:
+    raise SystemExit(f"anonymous Reviewer recovery mismatch: {result}")
+PY
+pwcli screenshot --filename "wp08-review-login.png" --full-page
+pwcli tab-close
+pwcli tab-select 0
+
 python3 - "$spec_path" <<'PY' | while IFS=' ' read -r name width height; do
 import json
 import sys
@@ -132,4 +158,5 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' console-errors.txt;
     exit 2
 fi
 
-printf '%s\n' "WP08_BROWSER_SMOKE=PASS anonymous_content_reentry=same-origin-login"
+printf '%s\n' \
+    "WP08_BROWSER_SMOKE=PASS anonymous_content_reentry=same-origin-login anonymous_reviewer_reentry=same-origin-login"
