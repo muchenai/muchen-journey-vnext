@@ -42,6 +42,7 @@ jobs:
         env:
           WP07_REGISTRY_PUSH: "1"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ always() && hashFiles('artifacts/wp07-candidate/release-manifest.json') != '' }}
         with:
           name: wp07-candidate-${{ github.sha }}
           path: |

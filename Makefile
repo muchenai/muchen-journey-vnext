@@ -183,9 +183,9 @@ candidate-registry-push: candidate-registry-check
 	docker tag $(WP07_API_IMAGE) $(WP07_API_GHCR_IMAGE)
 	docker tag $(WP07_WEB_IMAGE) $(WP07_WEB_GHCR_IMAGE)
 	docker tag $(WP07_WORKER_IMAGE) $(WP07_WORKER_GHCR_IMAGE)
-	docker push $(WP07_API_GHCR_IMAGE)
-	docker push $(WP07_WEB_GHCR_IMAGE)
-	docker push $(WP07_WORKER_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component api --reference $(WP07_API_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component web --reference $(WP07_WEB_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component worker --reference $(WP07_WORKER_GHCR_IMAGE)
 	python3 scripts/wp07_candidate.py registry --manifest $(WP07_ARTIFACT_DIR)/release-manifest.json --registry-image api=$(WP07_API_GHCR_IMAGE) --registry-image web=$(WP07_WEB_GHCR_IMAGE) --registry-image worker=$(WP07_WORKER_GHCR_IMAGE)
 
 http-negative-check:
