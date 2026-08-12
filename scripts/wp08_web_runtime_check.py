@@ -32,7 +32,7 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if self.path == "/api/v1/auth/feishu/start":
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length))
-            if payload != {"return_to": "/content"}:
+            if payload not in ({"return_to": "/content"}, {"return_to": "/review"}):
                 self.send_error(400)
                 return
             body = json.dumps(
@@ -82,16 +82,23 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if self.path != "/api/v1/reviews":
             self.send_error(404)
             return
+        wrong_role = "journey_next_session=wrong-role-runtime-only" in self.headers.get(
+            "Cookie", ""
+        )
         body = json.dumps(
             {
                 "error": {
-                    "code": "UNAUTHENTICATED",
-                    "message": "vNext session is no longer valid.",
+                    "code": "FORBIDDEN" if wrong_role else "UNAUTHENTICATED",
+                    "message": (
+                        "Current role cannot enter Reviewer."
+                        if wrong_role
+                        else "vNext session is no longer valid."
+                    ),
                 },
                 "request_id": "runtime-redacted-request",
             }
         ).encode()
-        self.send_response(401)
+        self.send_response(403 if wrong_role else 401)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -219,11 +226,26 @@ def main() -> None:
         if "no-store" not in ops_headers.get("cache-control", ""):
             raise RuntimeError("anonymous /ops denial is cacheable")
 
-        review_status, _, review_headers = request(f"{base_url}/review")
-        if review_status != 401:
-            raise RuntimeError(f"anonymous /review returned HTTP {review_status}")
+        review_status, _, review_headers = request_without_redirect(
+            f"{base_url}/review", {}
+        )
+        if review_status != 303 or review_headers.get("location") != "/review/login":
+            raise RuntimeError(
+                "anonymous /review did not redirect to the dedicated login page: "
+                f"status={review_status} location={review_headers.get('location')!r}"
+            )
         if "no-store" not in review_headers.get("cache-control", ""):
-            raise RuntimeError("anonymous /review denial is cacheable")
+            raise RuntimeError("anonymous /review redirect is cacheable")
+
+        review_login_status, review_login_body, _ = request(
+            f"{base_url}/review/login"
+        )
+        if review_login_status != 200:
+            raise RuntimeError(
+                f"Reviewer login page returned HTTP {review_login_status}"
+            )
+        if "使用飞书进入".encode() not in review_login_body:
+            raise RuntimeError("Reviewer login page has no Feishu entry action")
 
         content_status, _, content_headers = request_without_redirect(
             f"{base_url}/content", {}
@@ -263,12 +285,36 @@ def main() -> None:
         ):
             raise RuntimeError("Content Editor OAuth start did not preserve browser context")
 
+        reviewer_oauth_status, _, reviewer_oauth_headers = request_without_redirect(
+            f"{base_url}/auth/feishu?return_to=%2Freview", proxy_headers,
+        )
+        if reviewer_oauth_status != 303:
+            raise RuntimeError(
+                f"Reviewer OAuth start returned HTTP {reviewer_oauth_status}"
+            )
+        if not reviewer_oauth_headers.get("location", "").startswith(
+            "https://accounts.feishu.cn/open-apis/authen/v1/authorize?"
+        ):
+            raise RuntimeError("Reviewer OAuth start left the approved Feishu host")
+
+        wrong_role_status, _, wrong_role_headers = request_without_redirect(
+            f"{base_url}/review",
+            {"Cookie": "journey_next_session=wrong-role-runtime-only"},
+        )
+        if wrong_role_status not in {303, 307} or wrong_role_headers.get("location") != (
+            "/review/login?auth_error=FORBIDDEN"
+        ):
+            raise RuntimeError(
+                "wrong-role Reviewer session did not reach the role login path: "
+                f"status={wrong_role_status} location={wrong_role_headers.get('location')!r}"
+            )
+
         expired_status, _, expired_headers = request_without_redirect(
             f"{base_url}/review",
             {"Cookie": "journey_next_session=revoked-runtime-only"},
         )
         if expired_status not in {303, 307} or expired_headers.get("location") != (
-            "/?auth_error=SESSION_EXPIRED&return_to=%2Freview"
+            "/review/login?auth_error=SESSION_EXPIRED"
         ):
             raise RuntimeError(
                 "expired Reviewer session did not return to the explicit re-login path: "
@@ -336,7 +382,7 @@ def main() -> None:
         identity_api_thread.join(timeout=5)
 
     print(
-        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401 anonymous_review=401"
+        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401 anonymous_review=login-page"
         " anonymous_content=login-page expired_reviewer=explicit-relogin"
         " root=200 csp_nonce=per-request oauth_redirect=root-relative-content"
     )

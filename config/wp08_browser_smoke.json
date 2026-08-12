@@ -16,6 +16,7 @@
     "horizontal_overflow",
     "focus_keyboard",
     "anonymous_protected_status",
-    "anonymous_content_reentry"
+    "anonymous_content_reentry",
+    "anonymous_reviewer_reentry"
   ]
 }

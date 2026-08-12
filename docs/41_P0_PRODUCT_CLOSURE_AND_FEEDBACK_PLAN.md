@@ -152,3 +152,16 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 - 结果页先保存默认折叠截图 `03-journey-complete.png`，再展开并单独保存 `03-journey-details.png`，避免用展开态误代默认体验。
 
 该重跑仍固定声明 `fixture=synthetic / external_access=not_proven / human_uat=not_run`。当前只证明本地完整机制可完成，不证明正式飞书材料 100% 可打开、真实新人三分钟进入或一天完成。
+
+## 11. 2026-08-12 Reviewer 入口阻断修复
+
+在 Reviewer 双角色/委派候选进入 staging 前，主任务对真实入口重新做黑盒核对，确认匿名
+`/review` 仍返回原始 `401` JSON；这会让郑田源即使随后被受控授予 Reviewer，也无法在没有
+既有 Reviewer cookie 时自行完成角色登录。修复将 Reviewer 入口补成与 Content Editor 一致的
+同源安全恢复路径，并覆盖匿名、会话失效和错误角色三种状态；不改变 `/ops` 匿名拒绝、API
+角色校验、已发布 Journey 或任何业务事实。
+
+本地结果为 Web contract `34/34`、production build、standalone runtime、staging workflow
+合同和固定 Chromium `1232` 真实浏览器 smoke 全部通过。由于候选内容已经变化，先前
+`83bc974…` 的 staging 绑定不再用于部署；必须从本修复合入后的新主线重新生成候选和精确绑定，
+再单独取得一次 staging 部署授权。真人 Reviewer 授权、待评审移交和评审结论仍为未执行。

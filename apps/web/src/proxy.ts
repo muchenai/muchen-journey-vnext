@@ -34,6 +34,14 @@ export function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const isReviewLogin = pathname === "/review/login";
+  const isReviewRoute = pathname === "/review" || pathname.startsWith("/review/");
+  if (isReviewRoute && !isReviewLogin && !hasSession) {
+    const response = NextResponse.redirect(new URL("/review/login", request.url), 303);
+    response.headers.set("Cache-Control", "no-store");
+    return withContentSecurityPolicy(response, policy);
+  }
+
   const isContentLogin = pathname === "/content/login";
   const isContentRoute = pathname === "/content" || pathname.startsWith("/content/");
   if (isContentRoute && !isContentLogin && !hasSession) {
@@ -42,7 +50,7 @@ export function proxy(request: NextRequest) {
     return withContentSecurityPolicy(response, policy);
   }
 
-  const isIdentityRoute = ["/ops", "/review"].some(
+  const isIdentityRoute = ["/ops"].some(
     (prefix) => request.nextUrl.pathname === prefix
       || request.nextUrl.pathname.startsWith(`${prefix}/`),
   );
