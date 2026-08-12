@@ -117,7 +117,7 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 ## 8. 候选与真人验证执行卡
 
-当前最新候选状态为 `STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`：源码 `65057e8db306b2dd9830e5047e77376899dcc652`，候选 Gate `31566262399`，唯一 deploy run `31570449604`，migration 保持 `0019_wp30_invitation_control`。该候选在上一版邀请三态、安全续接、材料链接审计与 Learner 单目标/单动作收敛基础上，修正了“新人完成材料后，任务目标与交付内容仍被默认折叠”的 P0 理解阻断：目标与交付现在先于输入区直接可见，只有方法、详细标准和参考资料按需展开。外部 root/readiness、匿名 `/ops`/`/review`、Content Editor 安全重新进入和临时 SSH 关闭均通过；完整隔离 Journey V3 浏览器闭环及桌面、平板、手机三档可见性回归也已通过，但正式材料权限与真人 UAT 仍未证明。该候选的一次部署授权已经消费，不得重跑。
+当前运行中的 staging 基线仍为已验证候选 `65057e8db306b2dd9830e5047e77376899dcc652`；它的唯一 deploy run `31570449604` 已消费，不得重跑。新候选 `83bc974e580395c52a36bf242efd18b58f9461de` 的 Gate `31603792594` 已完成三镜像不可变摘要核验，migration 为 `0020_wp09_reviewer_delegation`，状态为 `CANDIDATE_BUILT / STAGING_BINDING_IN_REVIEW / NOT_DEPLOYED / HUMAN_UAT_PENDING`。新候选增加受控 Reviewer 委派和 Operator+Reviewer 双角色访问，但在精确 staging 部署、郑田源受控角色授予、现有待评审任务交接与真实浏览器评审闭环完成前，不得宣称本轮阻断已关闭。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "status": "RETIRED",
-  "superseded_by_candidate": "65057e8db306b2dd9830e5047e77376899dcc652",
+  "superseded_by_candidate": "83bc974e580395c52a36bf242efd18b58f9461de",
   "target_environment": "staging",
   "region_id": "cn-beijing",
   "candidate_commit": "222096db506e95db887a8705b22ca4a439d0545d",
