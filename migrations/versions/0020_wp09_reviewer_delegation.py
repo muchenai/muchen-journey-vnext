@@ -71,7 +71,15 @@ def upgrade() -> None:
         """
     )
     op.add_column("evaluations", sa.Column("executor_id", sa.Uuid(), nullable=True))
+    op.execute("DROP TRIGGER trg_reject_evaluation_mutation ON evaluations")
     op.execute("UPDATE evaluations SET executor_id = created_by")
+    op.execute(
+        """
+        CREATE TRIGGER trg_reject_evaluation_mutation
+        BEFORE UPDATE OR DELETE ON evaluations
+        FOR EACH ROW EXECUTE FUNCTION reject_evaluation_mutation()
+        """
+    )
     op.alter_column("evaluations", "executor_id", nullable=False)
     op.create_foreign_key(
         "fk_evaluations_executor",
@@ -94,4 +102,31 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError("WP-09 Reviewer delegation records are immutable and cannot be downgraded")
+    delegation_exists = op.get_bind().execute(
+        sa.text("SELECT EXISTS (SELECT 1 FROM review_delegations LIMIT 1)")
+    ).scalar_one()
+    if delegation_exists:
+        raise RuntimeError(
+            "WP-09 Reviewer delegation records exist and cannot be downgraded"
+        )
+
+    op.drop_constraint(
+        "ck_evaluations_executor_is_actor",
+        "evaluations",
+        type_="check",
+    )
+    op.create_check_constraint(
+        "ck_evaluations_reviewer_is_actor",
+        "evaluations",
+        "created_by = reviewer_id",
+    )
+    op.drop_index("ix_evaluations_executor_id", table_name="evaluations")
+    op.drop_constraint(
+        "fk_evaluations_executor",
+        "evaluations",
+        type_="foreignkey",
+    )
+    op.drop_column("evaluations", "executor_id")
+    op.execute("DROP TRIGGER trg_review_delegations_immutable ON review_delegations")
+    op.execute("DROP FUNCTION reject_review_delegation_mutation()")
+    op.drop_table("review_delegations")
