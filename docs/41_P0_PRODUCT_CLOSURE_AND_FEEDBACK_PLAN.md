@@ -163,5 +163,7 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 
 本地结果为 Web contract `34/34`、production build、standalone runtime、staging workflow
 合同和固定 Chromium `1232` 真实浏览器 smoke 全部通过。由于候选内容已经变化，先前
-`83bc974…` 的 staging 绑定不再用于部署；必须从本修复合入后的新主线重新生成候选和精确绑定，
-再单独取得一次 staging 部署授权。真人 Reviewer 授权、待评审移交和评审结论仍为未执行。
+`83bc974…` 的 staging 绑定不再用于部署。修复已通过 PR #191 合入新主线
+`74fe8555410a95fa502ae606a694a30083928462`，Mainline Candidate Gate `31609899992`
+完成完整 CI、候选包、三镜像推送及远端摘要复验；精确 staging 绑定正在独立 PR 中复验，之后仍须
+单独取得一次部署授权。真人 Reviewer 授权、待评审移交和评审结论仍为未执行。

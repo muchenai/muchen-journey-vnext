@@ -423,4 +423,10 @@
 - PR #187、#188 分别补齐受控 Reviewer 委派/双角色访问与 migration 0020 既有评审历史升级、空表安全降级；PR #189 为三镜像 GHCR push 和远端摘要复验增加最多三次的逐次可观测重试，失败仍保留已构建的 PII-free artifact；
 - 主线 `83bc974e580395c52a36bf242efd18b58f9461de` 的 Mainline Candidate Gate [`31603792594`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31603792594) 成功；API、Web、Worker 均在首次推送与首次远端不可变摘要复验通过，manifest 标记 `registry_push=VERIFIED`、`deployment=NOT_RUN`，migration head 为 `0020_wp09_reviewer_delegation`；
 - staging 合同固定 API `sha256:f3e78192…ce148`、Web `sha256:305d2099…665f6`、Worker `sha256:b812333b…da0c1`，唯一部署确认词为 `DEPLOY_83BC974_TO_VOLCENGINE_STAGING`；本绑定不部署、不授予角色、不转移待评审任务，也不修改 Journey、邀请、消息或其他业务事实。
+
+### 2026-08-12｜Reviewer 安全入口新候选绑定
+
+- `83bc974…` 未部署即被 Reviewer 安全重新进入修复取代；不得再消费其部署确认词；
+- 主线 `74fe8555410a95fa502ae606a694a30083928462` 的 Mainline Candidate Gate [`31609899992`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31609899992) 成功，完整 CI、候选包、三镜像推送与远端摘要复验均通过，migration head 仍为 `0020_wp09_reviewer_delegation`；
+- 新绑定固定 API `sha256:893569e5…8576d`、Web `sha256:cd4845f0…bceaa`、Worker `sha256:542941d4…66ed9`，唯一部署确认词为 `DEPLOY_74FE855_TO_VOLCENGINE_STAGING`。本绑定只更新不可变发布合同，不部署、不授予角色、不移交 Review，也不修改 Journey、邀请、消息或其他业务事实。
 - workflow 的 `Deploy bounded staging release`、`Verify external TLS and release surface` 与 `Close SSH ingress` 三项均为 `success`。候选的一次 staging 部署授权已经消费，不得重跑；当前结论仅为 `STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`，不证明正式飞书材料对新人可访问，也不证明真实新人能理解并完成 Journey V3。
