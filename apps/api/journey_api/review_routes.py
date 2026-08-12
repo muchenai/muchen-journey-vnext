@@ -30,6 +30,7 @@ from journey_api.models import (
     OutboxEvent,
     OutboxStatus,
     Review,
+    ReviewDelegation,
     ReviewStatus,
     Role,
     Submission,
@@ -124,10 +125,11 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
+        .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.id == review_id,
             Review.organization_id == actor.organization_id,
-            Review.reviewer_id == actor.id,
+            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
             Assignment.organization_id == actor.organization_id,
             Submission.organization_id == actor.organization_id,
             Enrollment.organization_id == actor.organization_id,
@@ -324,9 +326,10 @@ def review_queue(
         .join(User, User.id == Enrollment.learner_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.organization_id == actor.organization_id,
-            Review.reviewer_id == actor.id,
+            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
             Assignment.organization_id == actor.organization_id,
             Submission.organization_id == actor.organization_id,
@@ -545,6 +548,7 @@ def finalize_review(
         submission_id=context.review.submission_id,
         submission_version_id=context.review.submission_version_id,
         reviewer_id=context.review.reviewer_id,
+        executor_id=actor.id,
         review_revision=command.expected_revision,
         decision=decision,
         rubric_scores={

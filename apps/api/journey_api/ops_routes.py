@@ -21,6 +21,7 @@ from journey_api.models import (
     DataRightsRequestType,
     Enrollment,
     EnrollmentStatus,
+    ExternalIdentity,
     Invite,
     InviteStatus,
     JoinContext,
@@ -36,6 +37,7 @@ from journey_api.models import (
     OutboxEvent,
     OutboxStatus,
     Review,
+    ReviewDelegation,
     ReviewStatus,
     Role,
     RoleAssignment,
@@ -60,6 +62,7 @@ from journey_api.schemas import (
     EnrollmentOpsListOut,
     EnrollmentOpsListResponse,
     EnrollmentOpsOut,
+    HandoffAssignedReviewCommand,
     NotificationEndpointListOut,
     NotificationEndpointListResponse,
     NotificationEndpointOut,
@@ -576,6 +579,8 @@ def list_enrollments(
         if enrollment.status in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
+            elif open_review.status == ReviewStatus.ASSIGNED:
+                allowed = ["handoff_assigned_review"]
         if enrollment.status == EnrollmentStatus.ACTIVE:
             allowed.append("create_learner_reentry")
         if enrollment.status == EnrollmentStatus.COMPLETED and is_formal_v2 and admission is None:
@@ -592,6 +597,7 @@ def list_enrollments(
                 journey_version_id=enrollment.journey_version_id,
                 assignment_statuses=[item.status.value for item in assignments],
                 open_review_status=open_review.status.value if open_review else None,
+                open_review_revision=open_review.revision if open_review else None,
                 admission_decision_id=admission.id if admission else None,
                 admission_total_score=admission.total_score if admission else None,
                 admission_tier=admission.recommendation_tier if admission else None,
@@ -665,6 +671,96 @@ def assign_reviewer(
             "reviewer_id": str(command.reviewer_id),
             "reason": command.reason,
             "review_replaced": False,
+        },
+    )
+    session.commit()
+    return envelope(request, EnrollmentMutationOut(**result))
+
+
+@router.post(
+    "/enrollments/{enrollment_id}/assigned-review/handoff",
+    response_model=EnrollmentMutationResponse,
+)
+def handoff_assigned_review(
+    enrollment_id: uuid.UUID,
+    command: HandoffAssignedReviewCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    payload = {**command.model_dump(mode="json"), "enrollment_id": str(enrollment_id)}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="review.handoff_assigned",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, EnrollmentMutationOut(**replay))
+    enrollment = scoped_enrollment(session, actor, enrollment_id, for_update=True)
+    ensure_revision(enrollment.revision, command.expected_revision)
+    review = open_review_for_enrollment(session, enrollment, for_update=True)
+    if review is None or review.status != ReviewStatus.ASSIGNED:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "仅允许移交尚未开始的待评审记录。")
+    ensure_revision(review.revision, command.review_revision)
+    if enrollment.reviewer_id == command.reviewer_id or review.reviewer_id == command.reviewer_id:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "新 Reviewer 必须与当前 Reviewer 不同。")
+    reviewer_in_scope(session, actor, command.reviewer_id)
+    linked_identity = session.scalar(
+        select(ExternalIdentity.id).where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id == command.reviewer_id,
+            ExternalIdentity.provider == "FEISHU",
+            ExternalIdentity.revoked_at.is_(None),
+        )
+    )
+    if linked_identity is None:
+        raise ApiError(409, "IDENTITY_NOT_LINKED", "新 Reviewer 尚未绑定有效飞书身份。")
+    previous_reviewer_id = review.reviewer_id
+    enrollment.reviewer_id = command.reviewer_id
+    enrollment.revision += 1
+    delegation = ReviewDelegation(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        review_id=review.id,
+        reviewer_id=command.reviewer_id,
+        delegated_by=actor.id,
+        reason=command.reason,
+        revision=1,
+    )
+    session.add(delegation)
+    result = {
+        "resource_id": str(enrollment.id),
+        "status": enrollment.status.value,
+        "revision": enrollment.revision,
+        "reviewer_id": str(command.reviewer_id),
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="review.handoff_assigned",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_ops_facts(
+        session,
+        request=request,
+        actor=actor,
+        action="review.assigned_handoff",
+        event_type="review.assigned_handoff.v1",
+        resource_id=enrollment.id,
+        details={
+            "previous_reviewer_id": str(previous_reviewer_id),
+            "reviewer_id": str(command.reviewer_id),
+            "review_id": str(review.id),
+            "reason": command.reason,
+            "review_status": review.status.value,
+            "delegation_id": str(delegation.id),
         },
     )
     session.commit()

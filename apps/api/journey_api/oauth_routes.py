@@ -44,6 +44,7 @@ from journey_api.schemas import (
     CommandOut,
     CommandResponse,
     CreateIdentityLinkCommand,
+    GrantReviewerRoleCommand,
     IdentityAccessListOut,
     IdentityAccessListResponse,
     IdentityAccessOut,
@@ -171,6 +172,9 @@ def list_identity_access(
             links_by_user_role[key] = link
 
     now = utc_now()
+    reviewer_user_ids = {
+        user.id for user, role in role_rows if role == Role.REVIEWER
+    }
     items: list[IdentityAccessOut] = []
     for user, role in role_rows:
         identity = identities_by_user.get(user.id)
@@ -186,6 +190,8 @@ def list_identity_access(
             allowed_commands = (
                 [] if user.id == actor.id else ["revoke_external_identity"]
             )
+            if role == Role.CONTENT_EDITOR and user.id not in reviewer_user_ids:
+                allowed_commands.append("grant_reviewer_role")
         elif active_link:
             identity_status = "REVOKED" if identity is not None else "UNLINKED"
             allowed_commands = ["revoke_identity_link"]
@@ -288,6 +294,97 @@ def list_identity_access(
             revoked_transfer_candidates=revoked_transfer_candidates,
         ),
     )
+
+
+@router.post("/ops/users/{user_id}/reviewer-role", response_model=CommandResponse)
+def grant_reviewer_role(
+    user_id: uuid.UUID,
+    command: GrantReviewerRoleCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Grant an existing, verified Content Editor a separately audited Reviewer role."""
+    require_role(actor, Role.OPERATOR)
+    payload = {"user_id": str(user_id), **command.model_dump(mode="json")}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.grant",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    user = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == user_id,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.CONTENT_EDITOR,
+        )
+        .with_for_update()
+    )
+    if user is None:
+        raise ApiError(422, "VALIDATION_FAILED", "目标必须是同组织的有效 Content Editor。")
+    identity = session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id == user.id,
+            ExternalIdentity.provider == PROVIDER,
+            ExternalIdentity.revoked_at.is_(None),
+        )
+    )
+    if identity is None:
+        raise ApiError(409, "IDENTITY_NOT_LINKED", "目标 Content Editor 尚未绑定有效飞书身份。")
+    existing = session.scalar(
+        select(RoleAssignment).where(
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.user_id == user.id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+    )
+    if existing is not None:
+        raise ApiError(409, "ROLE_ALREADY_ASSIGNED", "目标已经具备 Reviewer 角色。")
+    assignment = RoleAssignment(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        user_id=user.id,
+        role=Role.REVIEWER,
+    )
+    session.add(assignment)
+    result = {
+        "resource_id": str(assignment.id),
+        "status": "ACTIVE",
+        "revision": 1,
+        "idempotency_replay": False,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.grant",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action="reviewer_role.granted",
+        resource_type="role_assignment",
+        resource_id=assignment.id,
+        result="SUCCESS",
+        details={"role": Role.REVIEWER.value, "status": "ACTIVE", "reason": command.reason},
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
 
 
 @router.post("/ops/identity-links", response_model=IdentityLinkResponse)

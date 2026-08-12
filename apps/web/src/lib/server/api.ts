@@ -416,6 +416,7 @@ export type OpsEnrollment = {
   journey_version_id: string | null;
   assignment_statuses: string[];
   open_review_status: string | null;
+  open_review_revision: number | null;
   admission_decision_id: string | null;
   admission_total_score: number | null;
   admission_tier: "A" | "B" | "C" | "D" | null;
@@ -437,7 +438,7 @@ export type OpsIdentityAccess = {
   link_revision: number | null;
   link_expires_at: string | null;
   allowed_commands: Array<
-    "create_identity_link" | "revoke_identity_link" | "revoke_external_identity"
+    "create_identity_link" | "revoke_identity_link" | "revoke_external_identity" | "grant_reviewer_role"
   >;
 };
 

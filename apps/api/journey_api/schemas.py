@@ -148,6 +148,17 @@ class AssignEnrollmentReviewerCommand(RevisionCommand):
         return value.strip()
 
 
+class HandoffAssignedReviewCommand(RevisionCommand):
+    review_revision: int = Field(ge=1)
+    reviewer_id: UUID
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_handoff_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class CancelEnrollmentCommand(RevisionCommand):
     reason: str = Field(min_length=10, max_length=500)
 
@@ -385,6 +396,16 @@ class CreateContentEditorCommand(StrictModel):
         return value.strip()
 
 
+class GrantReviewerRoleCommand(StrictModel):
+    expected_absent: Literal[True]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_grant_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class UpdateContentDraftCommand(RevisionCommand):
     content: TaskContentInput
 
@@ -563,6 +584,7 @@ class IdentityAccessOut(StrictModel):
             "create_identity_link",
             "revoke_identity_link",
             "revoke_external_identity",
+            "grant_reviewer_role",
         ]
     ]
 
@@ -943,6 +965,7 @@ class EnrollmentOpsOut(StrictModel):
     journey_version_id: UUID | None
     assignment_statuses: list[str]
     open_review_status: str | None
+    open_review_revision: int | None
     admission_decision_id: UUID | None
     admission_total_score: int | None
     admission_tier: Literal["A", "B", "C", "D"] | None
