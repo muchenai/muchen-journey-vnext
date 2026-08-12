@@ -1,6 +1,6 @@
 # 41｜P0 产品闭环修复与真实反馈计划
 
-文档状态：`IMPLEMENTED_LOCALLY / MACHINE_VERIFIED / NOT_DEPLOYED / HUMAN_UAT_PENDING`
+文档状态：`STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`
 日期：2026-08-12
 Owner：Product + Tech + QA/UAT
 
@@ -113,11 +113,11 @@ local fixture、staging 飞书身份、production 飞书身份、Learner 邀请�
 - 公开入口三视口 smoke 通过，匿名受保护路由和 Content Editor 安全重新进入合同保持不变；
 - 截图与浏览器日志保存在本地 `output/playwright/`，不纳入产品源码，也不构成真人 UAT。
 
-该批次当前仍为 `IMPLEMENTED_LOCALLY / MACHINE_VERIFIED / NOT_DEPLOYED / HUMAN_UAT_PENDING`。下一门禁仍是先由 1 名未接触项目的真实新人独立完成，再扩大至 3–5 人；机器浏览器不能代替理解度、参与感和一天完成体验的真人结论。
+该批次已随候选 `65057e8db306b2dd9830e5047e77376899dcc652` 部署 staging，当前为 `STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`。下一门禁仍是先由 1 名未接触项目的真实新人独立完成，再扩大至 3–5 人；机器浏览器不能代替理解度、参与感和一天完成体验的真人结论。
 
 ## 8. 候选与真人验证执行卡
 
-当前最新候选状态为 `CANDIDATE_BUILT / STAGING_BINDING_IN_REVIEW / NOT_DEPLOYED / HUMAN_UAT_PENDING`：源码 `65057e8db306b2dd9830e5047e77376899dcc652`，候选 Gate `31566262399`，migration 保持 `0019_wp30_invitation_control`。该候选在上一版邀请三态、安全续接、材料链接审计与 Learner 单目标/单动作收敛基础上，修正了“新人完成材料后，任务目标与交付内容仍被默认折叠”的 P0 理解阻断：目标与交付现在先于输入区直接可见，只有方法、详细标准和参考资料按需展开。完整隔离 Journey V3 浏览器闭环及桌面、平板、手机三档可见性回归已通过，但正式材料权限与真人 UAT 仍未证明。绑定 PR 本身不部署、不访问正式材料、不创建邀请，也不修改 Journey V3 业务事实。
+当前最新候选状态为 `STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`：源码 `65057e8db306b2dd9830e5047e77376899dcc652`，候选 Gate `31566262399`，唯一 deploy run `31570449604`，migration 保持 `0019_wp30_invitation_control`。该候选在上一版邀请三态、安全续接、材料链接审计与 Learner 单目标/单动作收敛基础上，修正了“新人完成材料后，任务目标与交付内容仍被默认折叠”的 P0 理解阻断：目标与交付现在先于输入区直接可见，只有方法、详细标准和参考资料按需展开。外部 root/readiness、匿名 `/ops`/`/review`、Content Editor 安全重新进入和临时 SSH 关闭均通过；完整隔离 Journey V3 浏览器闭环及桌面、平板、手机三档可见性回归也已通过，但正式材料权限与真人 UAT 仍未证明。该候选的一次部署授权已经消费，不得重跑。
 
 首名 Learner 必须未参与本项目设计或开发。观察者只计时和记录阻断，不解释邀请、会话、状态或下一步；只记录进入第一站耗时、打不开的材料、停顿位置、Learner 自己的表述和是否需要人工提示，不把姓名、飞书标识或作答正文写入仓库。
 

@@ -411,3 +411,10 @@
 - PR #176 为 Operator 发布页增加逐项材料链接清单：正文内 HTTPS URL 与独立外链均被提取、去重并显示为可打开链接，未逐项确认时浏览器不能提交不可变 TaskVersion；该门禁不修改 API、迁移、身份或业务状态机；
 - 最新候选源码 `65057e8db306b2dd9830e5047e77376899dcc652` 的 Mainline Candidate Gate [`31566262399`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31566262399) 成功；manifest 标记 registry push verified、deployment not run，migration 仍为 `0019_wp30_invitation_control`；
 - staging 合同固定 API `sha256:1d4b8311…a5d3`、Web `sha256:11655ff4…b4c`、Worker `sha256:c7a640d5…4010`，唯一部署确认词为 `DEPLOY_65057E8_TO_VOLCENGINE_STAGING`；本绑定不部署、不修改内容或其他外部事实。该候选同时包含材料链接审计、邀请三态、安全续接、Learner 单目标/单动作信息层级收敛，以及任务目标与交付默认可见的 P0 修复；完整隔离浏览器路径及三档视口回归通过，但正式飞书材料权限和真人 UAT 仍未证明。
+
+## 2026-08-12 P0 任务要求默认可见候选部署验收
+
+- Owner 精确授权候选 `65057e8db306b2dd9830e5047e77376899dcc652` 基于主线 `0d8130be3d99807bf21b7dd26552ecf27a08548f`，在华北2（北京）的现有冻结 staging 基础设施执行一次 `phase=deploy`；派发前本地、远端主线 SHA 一致，工作区干净且无排队或运行中的 staging workflow；
+- 唯一 deploy run [`31570449604`](https://github.com/muchenai2024-creator/muchen-journey-vnext/actions/runs/31570449604) 成功完成候选 manifest 校验、冻结 state 只读输出、三服务部署、外部表面复验和临时 SSH 关闭。Terraform plan/apply/import、DNS、云资源、WP-12B、邀请、消息、Journey、身份及其他业务事实写入均未执行；没有重试；
+- 部署合同保持 migration `0019_wp30_invitation_control`。公开只读复验确认根页 `200`，readiness=`ready` 且 release 精确为 `65057e8db306b2dd9830e5047e77376899dcc652`，匿名 `/ops` 与 `/review` 均为 `401`，匿名 `/content` 为 `303`、`Location: /content/login`、`Cache-Control: no-store`，登录页 `200` 并展示“使用飞书进入”；
+- workflow 的 `Deploy bounded staging release`、`Verify external TLS and release surface` 与 `Close SSH ingress` 三项均为 `success`。候选的一次 staging 部署授权已经消费，不得重跑；当前结论仅为 `STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`，不证明正式飞书材料对新人可访问，也不证明真实新人能理解并完成 Journey V3。
