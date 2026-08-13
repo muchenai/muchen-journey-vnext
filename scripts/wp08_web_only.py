@@ -59,7 +59,6 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     required = {
         "schema_version",
         "status",
-        "superseded_by_candidate",
         "target_environment",
         "region_id",
         "candidate_commit",
@@ -74,11 +73,10 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     }
     if set(data) != required:
         raise WebOnlyError("Web-only contract keys differ from the reviewed schema")
-    if data["schema_version"] != 2:
-        raise WebOnlyError("Web-only contract schema must be 2")
-    if data["status"] != "RETIRED":
-        raise WebOnlyError("Web-only contract must remain retired")
-    _require_full_sha(data["superseded_by_candidate"], "superseded_by_candidate")
+    if data["schema_version"] != 3:
+        raise WebOnlyError("Web-only contract schema must be 3")
+    if data["status"] != "ACTIVE":
+        raise WebOnlyError("Web-only contract must be active")
     if data["target_environment"] != "staging" or data["region_id"] != "cn-beijing":
         raise WebOnlyError("Web-only target must be cn-beijing staging")
     _require_full_sha(data["candidate_commit"], "candidate_commit")
@@ -101,8 +99,8 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     _require_full_sha(baseline["candidate_commit"], "runtime baseline candidate")
     _require_digest(baseline["api_image_digest"], "runtime baseline API digest")
     _require_digest(baseline["worker_image_digest"], "runtime baseline Worker digest")
-    if baseline["migration_revision"] != "0014_wp12_data_lifecycle":
-        raise WebOnlyError("runtime baseline migration must remain 0014")
+    if baseline["migration_revision"] != "0021_p0_identity_principal":
+        raise WebOnlyError("runtime baseline migration must remain 0021")
     if baseline["config_schema_version"] != 3:
         raise WebOnlyError("runtime baseline config schema must remain 3")
     if not re.fullmatch(r"[0-9a-f]{64}", str(baseline["openapi_sha256"])):
@@ -111,10 +109,14 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     allowed = data["candidate_commit_allowed_paths"]
     compatibility = data["baseline_compatibility_paths"]
     if not isinstance(allowed, list) or set(allowed) != {
-        "Makefile",
         "apps/web/",
+        "docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md",
+        "docs/10_DELIVERY_PLAN_AND_ENGINEERING_RULES.md",
         "docs/13_REQUIREMENTS_TRACEABILITY_MATRIX.md",
-        "docs/31_WP13_WP15_EXECUTION_GATE_KIT.md",
+        "docs/43_P0_P1_P2_EXECUTION_MASTER_PLAN.md",
+        "docs/44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md",
+        "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md",
+        "scripts/p0_journey_v3_browser.sh",
     }:
         raise WebOnlyError("candidate allowed paths differ from the reviewed set")
     if not isinstance(compatibility, list) or set(compatibility) != {
@@ -237,11 +239,8 @@ def check_repository(data: dict[str, object]) -> None:
         raise WebOnlyError("candidate OpenAPI differs from the reviewed baseline")
 
     wp08 = json.loads(WP08_CONTRACT.read_text())
-    superseded_by = str(data["superseded_by_candidate"])
-    if wp08.get("candidate_commit") != superseded_by:
-        raise WebOnlyError("retired Web-only contract superseder differs from WP-08")
-    if superseded_by == candidate:
-        raise WebOnlyError("retired Web-only candidate must not remain deployable")
+    if wp08.get("candidate_commit") != candidate:
+        raise WebOnlyError("active Web-only candidate differs from WP-08")
 
 
 def verify_runtime(data: dict[str, object], evidence: dict[str, object]) -> None:
@@ -352,11 +351,10 @@ def main() -> None:
             assert isinstance(baseline, dict)
             print(
                 "WP08_WEB_ONLY_CONTRACT=PASS"
-                " status=RETIRED"
+                " status=ACTIVE"
                 f" candidate={data['candidate_commit']}"
-                f" superseded_by={data['superseded_by_candidate']}"
                 f" baseline={baseline['candidate_commit']}"
-                " modes=historical-validation-only"
+                " modes=staging-web-only"
             )
         elif args.command == "verify-runtime":
             verify_runtime(data, _read_evidence(args.evidence))
