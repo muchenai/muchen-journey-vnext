@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`MAINLINE_CANDIDATE_READY / STAGING_NOT_DEPLOYED / HUMAN_FEISHU_NOT_RUN`
+状态：`NO_SEED_CANDIDATE_BOUND / STAGING_NOT_DEPLOYED / HUMAN_FEISHU_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -44,8 +44,8 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 
 ## 4. 主线候选与 staging 绑定
 
-- P0-1 实现已通过 PR #193 合入主线，主线 SHA 与候选均为 `ecd90cc06114ad11289a10a710cac258715f77b7`；
-- Mainline Candidate Gate `31669191186` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
+- P0-1 实现已通过 PR #193 合入；移除 staging fixture seed 的修复已通过 PR #195 合入，新候选为 `d96268d1a423bdbde7e94a29654d37cc9ed3ba72`；
+- Mainline Candidate Gate `31672408071` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
 - 候选工件声明 migration head 为 `0021_p0_identity_principal`，source tree clean；
 - `config/wp08_staging.json` 与 staging workflow 已绑定该候选、工件 Run 和 registry digest；
 - 本节只建立不可变部署合同，不代表 staging 已部署，也不授权运行部署 workflow。
@@ -67,3 +67,5 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 候选 `ecd90cc06114ad11289a10a710cac258715f77b7` 的首次 staging 部署授权在派发前安全停止：只读 preflight 发现正式 `phase=deploy` 仍固定执行 fixture seed，而 seed 可创建 Organization、User、RoleAssignment、Enrollment、Assignment 与 TaskVersion，超出“不得修改身份、角色、Journey 或其他业务事实”的授权边界。该次没有派发 workflow、没有打开 SSH、没有修改 staging，授权按“失败不重试”关闭。
 
 后续修复只从既有部署路径移除 fixture seed，并在 `scripts/wp08_staging.py` 与专项测试中增加 fail-closed 禁令；migration、runtime grant、不可变镜像、回滚、公开表面核验与 SSH 关闭合同保持不变。修复合入后必须重新生成候选并重新绑定，不复用已经关闭的候选部署授权。
+
+无 fixture seed 修复已通过 PR #195 合入，形成新候选 `d96268d1a423bdbde7e94a29654d37cc9ed3ba72`。Mainline Candidate Gate `31672408071` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验和工件上传均为 `PASS`；清单声明 migration head 为 `0021_p0_identity_principal`。当前 staging 合同只绑定该新候选与不可变 registry digest，仍未执行部署，也没有复用已关闭的旧授权。
