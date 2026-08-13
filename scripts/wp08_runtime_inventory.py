@@ -20,6 +20,8 @@ CONTAINERS = {
 COMPOSE_PROJECT = "journey-next-staging"
 RELEASE_ROOT = Path("/srv/journey-next-staging/releases")
 DEPLOYED_CANDIDATE = Path("/srv/journey-next-staging/DEPLOYED_CANDIDATE")
+DEPLOYED_WEB_CANDIDATE = Path("/srv/journey-next-staging/DEPLOYED_WEB_CANDIDATE")
+DEPLOYED_COMPONENTS = Path("/srv/journey-next-staging/DEPLOYED_COMPONENTS.json")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 MIGRATION_REVISION = re.compile(r"^\d{4}_[a-z0-9_]+$")
@@ -208,13 +210,34 @@ def _require_release(value: object, label: str) -> str:
     return value
 
 
+def _component_markers(candidate: str) -> dict[str, str]:
+    deployed = _require_release(
+        DEPLOYED_CANDIDATE.read_text().strip(), "deployed runtime candidate marker"
+    )
+    web = _require_release(
+        DEPLOYED_WEB_CANDIDATE.read_text().strip(), "deployed Web candidate marker"
+    )
+    try:
+        raw = json.loads(DEPLOYED_COMPONENTS.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise InventoryError("deployed component marker is unavailable") from error
+    if not isinstance(raw, dict) or set(raw) != {"web", "api", "worker"}:
+        raise InventoryError("deployed component marker is invalid")
+    components = {
+        service: _require_release(raw.get(service), f"deployed {service} marker")
+        for service in ("web", "api", "worker")
+    }
+    if web != candidate or components["web"] != candidate:
+        raise InventoryError("deployed Web candidate differs from authorized candidate")
+    if deployed != components["api"] or deployed != components["worker"]:
+        raise InventoryError("deployed runtime marker differs from API/Worker markers")
+    return components
+
+
 def collect(candidate: str) -> dict[str, object]:
     if not FULL_SHA.fullmatch(candidate):
         raise InventoryError("candidate must be a full release SHA")
-    deployed = DEPLOYED_CANDIDATE.read_text().strip()
-    _require_release(deployed, "deployed candidate marker")
-    if deployed != candidate:
-        raise InventoryError("deployed candidate differs from authorized candidate")
+    components = _component_markers(candidate)
 
     containers = {
         service: _inspect_running_container(container, service)
@@ -293,7 +316,7 @@ print(json.dumps({
         "compose_service_counts": service_counts,
         "compose_singleton_services": all(count == 1 for count in service_counts.values()),
         "caddy_upstreams": caddy_upstreams,
-        "deployed_candidate": deployed,
+        "deployed_components": components,
         "heartbeat_release": _require_release(
             worker.get("heartbeat_release"), "heartbeat release"
         ),
@@ -317,6 +340,16 @@ print(json.dumps({
         raise InventoryError("migration revision is invalid")
     if not isinstance(result["worker_stale"], bool):
         raise InventoryError("worker heartbeat freshness is unavailable")
+    marker_matches = {
+        "api": result["api_release"] == components["api"],
+        "web": result["web_release"] == components["web"],
+        "worker": (
+            result["worker_release"] == components["worker"]
+            and result["heartbeat_release"] == components["worker"]
+        ),
+    }
+    result["component_marker_matches"] = marker_matches
+    result["component_markers_match_runtime"] = all(marker_matches.values())
     return result
 
 

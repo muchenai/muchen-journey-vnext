@@ -547,7 +547,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             '["/ops"]',
             "isReviewRoute && !isReviewLogin && !hasSession",
             "isContentRoute && !isContentLogin && !hasSession",
-            "INSPECT_RUNTIME_3B7D757_STAGING",
+            "INSPECT_RUNTIME_E064590_STAGING",
             "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
             "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
             "id: terraform_init",

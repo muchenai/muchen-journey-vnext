@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`CLOSED / STAGING_MACHINE_PASS / HUMAN_FEISHU_PASS`
+状态：`HUMAN_FEISHU_PASS / STAGING_RUNTIME_TRUTH_RECONCILIATION_IN_PROGRESS`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -64,6 +64,8 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 2026-08-13，已绑定 Content Editor 本人使用同一飞书身份在 staging 完成真人复验并报告：`/content = 正常`、`/review = 正常`。结合本文件第 3 节的机器证据，`AT-P0-101..106` 已关闭。该陈述只证明 P0-1 双角色访问，不替代 P0-3 Journey 真人闭环或完整 release UAT。
 
 唯一 WIP 已切换为 P0-2 Learner 一站式任务页。
+
+2026-08-13 后续只读核验发现运行证据冲突：两个真实入口均已通过，但刷新后的 `/ops` 运行快照仍报告 API/Worker `74fe855...`、migration `0020_wp09_reviewer_delegation`，与本节记录的 `e927c1...`、`0021_p0_identity_principal` 不一致。该冲突不能解释为页面缓存，也不能以先前 workflow 成功覆盖。P0-1 的真人产品结果保留，但 staging 机器关闭状态暂时重新打开；在 PII-free inventory 证明实际容器、Compose、网络与 Edge 路由前，不再声称 `STAGING_MACHINE_PASS`。
 
 ## 7. 首次部署授权的安全停止与修复
 
