@@ -1175,6 +1175,20 @@ export async function grantReviewerRole(data: FormData) {
   redirect("/ops?updated=reviewer-role-granted#identity-access");
 }
 
+export async function revokeReviewerRole(data: FormData) {
+  const userId = requiredUuid(data, "user_id");
+  await apiRequest(`/api/v1/ops/users/${userId}/reviewer-role/revoke`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_present: true,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=reviewer-role-revoked#identity-access");
+}
+
 export async function assembleFormalJourneyV3(data: FormData) {
   const reviewerId = requiredUuid(data, "reviewer_id");
   const expectedCurrentVersion = Number(data.get("expected_current_version"));

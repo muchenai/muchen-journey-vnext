@@ -300,6 +300,7 @@ class IdentitySession(Base):
     external_identity_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("external_identities.id"), nullable=True, index=True
     )
+    external_identity_revision: Mapped[int | None] = mapped_column(nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     csrf_token_hash: Mapped[str] = mapped_column(String(64))

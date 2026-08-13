@@ -8,6 +8,7 @@ import {
   IdentityLinkActionState,
   revokeExternalIdentity,
   revokeIdentityLink,
+  revokeReviewerRole,
   transferRevokedExternalIdentity,
 } from "@/app/actions";
 import {
@@ -159,6 +160,20 @@ function IdentityAccessItem({
             授予兼任 Reviewer
           </button>
           <p className="status-meta">保留 Content Editor；飞书身份不变。提交后写入独立角色审计。</p>
+        </form>
+      ) : null}
+
+      {item.allowed_commands.includes("revoke_reviewer_role") ? (
+        <form action={revokeReviewerRole} className="ops-command-form">
+          <input type="hidden" name="user_id" value={item.user_id} />
+          <label>
+            撤销兼任理由
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <button className="button secondary compact" type="submit">
+            撤销兼任 Reviewer
+          </button>
+          <p className="status-meta">仅移除 Reviewer；保留 Content Editor、飞书身份和现有内容事实。</p>
         </form>
       ) : null}
 

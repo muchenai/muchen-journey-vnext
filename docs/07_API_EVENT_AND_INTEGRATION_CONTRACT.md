@@ -1,10 +1,14 @@
 # 07｜API、事件与集成合同
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Tech Lead  
 合同目标：P0 开工前冻结资源、命令、状态、错误、幂等和外部集成边界；实现以 OpenAPI/JSON Schema 为机器事实源。
+
+## 0. 第一性原理修订
+
+会话 API 返回“当前用户、组织、有效 capabilities 和允许工作台”，不再返回一个可被前端当作身份的唯一 role。OAuth callback 不接受业务角色作为身份真相；`/content`、`/review`、`/ops` 由服务端授权。无会话返回 `AUTH_REQUIRED` 并提供安全登录入口；已认证但无能力返回 `FORBIDDEN`；身份撤销返回 `IDENTITY_REVOKED`；scope 不匹配使用不泄露资源存在性的拒绝。Web 必须把这些代码渲染为可恢复页面。
 
 ## 1. 通用约定
 
@@ -25,8 +29,10 @@
 | --- | --- | --- |
 | POST | `/join/exchange` | 验证一次性邀请并建立最小加入上下文 |
 | POST | `/identity/confirm` | 确认/绑定 vNext 内部身份 |
-| GET | `/session` | 返回当前用户、角色、scope 和安全入口 |
+| GET | `/session` | 返回当前用户、组织、active capabilities、允许工作台、identity/authorization revision 和安全入口 |
 | POST | `/session/logout` | 撤销当前会话 |
+
+兼容期内若响应仍包含 `role`，只能是弃用展示字段，授权代码和导航不得使用它。新增/撤销 RoleAssignment 后，下一次受保护请求必须在规定失效窗口内反映新 capabilities。
 
 非本地会话使用 Secure、HttpOnly、SameSite cookie。身份方案按 `DEC-006` 使用邀请建立 vNext 内部身份，并为 Reviewer/Operator 绑定独立飞书身份；接口只返回内部 user id，不向业务域传播第三方 token。
 

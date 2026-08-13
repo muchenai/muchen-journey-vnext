@@ -1,10 +1,16 @@
 # 08｜安全、隐私与权限模型
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Security/Privacy Owner + Tech Lead  
 批准基线：邀请身份 + 后续飞书绑定；独立对象存储与密钥命名空间；保留期限按 DEC-008；物理生产配置在 G4 验证。
+
+## 0. 第一性原理修订
+
+身份、角色、会话分离：ExternalIdentity 证明“是谁”，RoleAssignment 证明“能做什么”，Session 证明“本次请求属于哪个 User/组织”。一个 User 可以有多个角色，不能为了兼任 Reviewer 创建第二身份或第二用户。授权每次基于有效角色、scope 和资源；角色撤销只移除对应能力，身份撤销/用户停用才失效全部相关会话。
+
+角色恢复、授予和迁移必须走有意图、有二次确认、有审计的运营命令。禁止直接改库、删除撤销历史、无证据地恢复 ExternalIdentity 或通过扩大会话 TTL 规避授权错误。
 
 ## 1. 保护目标
 

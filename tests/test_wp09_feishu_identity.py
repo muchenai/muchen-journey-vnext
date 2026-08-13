@@ -202,6 +202,81 @@ def test_reviewer_role_grant_rejects_unlinked_content_editor(
     assert response.json()["error"]["code"] == "IDENTITY_NOT_LINKED"
 
 
+def test_existing_content_editor_session_uses_live_roles_without_rebinding_identity(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    link = create_link(Role.CONTENT_EDITOR, editor_id)
+    raw_subject = f"ou_multi_role_{uuid.uuid4().hex}"
+    oauth_provider.subjects["multi-role-content-code"] = raw_subject
+    editor = client_for("wp09-multi-role-content-editor")
+    state = begin_oauth(editor, "/content", str(link["link_token"]))
+    assert_ok(callback(editor, "multi-role-content-code", state))
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    assert editor.get("/api/v1/reviews").status_code == 403
+
+    operator = client_for("wp09-multi-role-operator")
+    granted = operator.post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"grant-live-session-{uuid.uuid4()}",
+        },
+        json={
+            "expected_absent": True,
+            "reason": "验证同一真实身份的角色授权无需重新绑定或重新登录",
+        },
+    )
+    assert assert_ok(granted)["status"] == "ACTIVE"
+
+    session_view = assert_ok(editor.get("/api/v1/session"))
+    assert session_view["roles"] == ["CONTENT_EDITOR", "REVIEWER"]
+    assert session_view["allowed_workspaces"] == ["content", "review"]
+    assert session_view["capabilities"] == [
+        "content:manage",
+        "review:decide",
+        "review:read",
+    ]
+    assert session_view["safe_entry"] == "/content"
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    assert editor.get("/api/v1/reviews").status_code == 200
+
+    revoked = operator.post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role/revoke",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"revoke-live-session-{uuid.uuid4()}",
+        },
+        json={
+            "expected_present": True,
+            "reason": "验证撤销评审能力不会影响内容编辑身份和现有会话",
+        },
+    )
+    assert assert_ok(revoked)["status"] == "REVOKED"
+    assert editor.get("/api/v1/reviews").status_code == 403
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    after = assert_ok(editor.get("/api/v1/session"))
+    assert after["roles"] == ["CONTENT_EDITOR"]
+    assert after["allowed_workspaces"] == ["content"]
+
+    with SessionLocal() as session:
+        identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == editor_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        active_session = session.scalar(
+            select(IdentitySession).where(
+                IdentitySession.user_id == editor_id,
+                IdentitySession.revoked_at.is_(None),
+            )
+        )
+        assert identity is not None
+        assert active_session is not None
+        assert active_session.role == Role.CONTENT_EDITOR
+
+
 def begin_oauth(client: TestClient, return_to: str, link_token: str | None = None) -> str:
     body = {"return_to": return_to, "link_token": link_token}
     response = client.post(
@@ -384,6 +459,30 @@ def test_external_identity_revocation_immediately_invalidates_session(
         },
     )
     assert assert_ok(revoked)["status"] == "REVOKED"
+    assert reviewer.get("/api/v1/session").status_code == 401
+
+
+def test_external_identity_revision_change_invalidates_older_session(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    reviewer_id = create_role_user(Role.REVIEWER)
+    link = create_link(Role.REVIEWER, reviewer_id)
+    oauth_provider.subjects["identity-revision-code"] = f"ou_{uuid.uuid4().hex}"
+    reviewer = client_for("wp09-identity-revision-reviewer")
+    state = begin_oauth(reviewer, "/review", str(link["link_token"]))
+    assert_ok(callback(reviewer, "identity-revision-code", state))
+    assert reviewer.get("/api/v1/session").status_code == 200
+
+    with SessionLocal.begin() as session:
+        identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == reviewer_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        assert identity is not None
+        identity.revision += 1
+
     assert reviewer.get("/api/v1/session").status_code == 401
 
 
@@ -613,6 +712,7 @@ def test_revoked_identity_transfer_fails_closed_on_sessions_and_stale_link(
                 organization_id=ORGANIZATION_ID,
                 user_id=reviewer_id,
                 external_identity_id=identity_id,
+                external_identity_revision=1,
                 role=Role.REVIEWER,
                 token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
                 csrf_token_hash=uuid.uuid4().hex + uuid.uuid4().hex,

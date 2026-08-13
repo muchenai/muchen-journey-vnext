@@ -1,9 +1,15 @@
 # 14｜UI Foundations 与正式组件合同
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Design Owner + Frontend Owner  
+
+## 0. 第一性原理修订
+
+视觉组件不以“设计系统完整”作为 P0 目标，而以减少用户不确定性为目标。Learner 页遵循视觉先行、文字补充；Reviewer/Operator/Content Editor 保持专业工具界面。
+
+P0 新硬规则：任务要求首次进入默认展开；外部材料必须是清晰可点击动作；同一区块不得重复标题/描述/按钮含义；一屏只有一个主 CTA；路线节点与线共享坐标源；错误状态必须有恢复动作；受保护路由不得向最终用户裸显 JSON。任何高保真稿只有在真实内容、七类页面状态和三视口中验证后才算设计完成。
 批准基线：`DEC-015` 已批准；P0 使用系统字体、蓝色主操作、4px 网格、WCAG 2.2 AA 和下列固定 token。
 
 ## 1. 目标
