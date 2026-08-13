@@ -396,7 +396,7 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     compose_check = (
         "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet"
     )
-    image_pull = "docker compose pull"
+    image_pull = "pull_with_bounded_retry full-release docker compose pull"
     container_ca_check = (
         "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
     )
@@ -419,6 +419,29 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
             "staging deploy must validate Compose, pull all images, and verify "
             "container CA readability before database migration"
         )
+    bounded_pull_contract = (
+        "pull_with_bounded_retry()",
+        "for attempt in 1 2 3",
+        "timeout --signal=TERM --kill-after=30s 8m",
+        "TRANSIENT_NETWORK",
+        "COMMAND_TIMEOUT",
+        "NON_RETRYABLE",
+        "WP08_IMAGE_PULL",
+        "pull_with_bounded_retry web-only docker pull",
+        "pull_with_bounded_retry runtime-api docker pull",
+        "pull_with_bounded_retry runtime-worker docker pull",
+    )
+    if any(marker not in script for marker in bounded_pull_contract):
+        raise StagingError(
+            "staging image pulls must use the observable three-attempt bounded retry contract"
+        )
+    loop_match = re.search(r"for attempt in ([^;\n]+)", script)
+    if loop_match is None or loop_match.group(1).split() != ["1", "2", "3"]:
+        raise StagingError(
+            "staging image pulls must use the observable three-attempt bounded retry contract"
+        )
+    if "timeout --signal=TERM --kill-after=30s 8m docker pull" in script:
+        raise StagingError("staging image pulls must not bypass the bounded retry helper")
     first_release_cleanup = (
         "WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE",
         "docker compose down --remove-orphans",
@@ -429,8 +452,8 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
         "verify_web_only_runtime",
         "verify_runtime_repair_prestate",
-        'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
-        'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+        'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
         'alembic upgrade 0014_wp12_data_lifecycle',
         "docker compose up -d --no-deps --wait --wait-timeout 180 web",
         "WP08_WEB_ONLY_ROLLBACK=START",
@@ -449,8 +472,8 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     repair = script[repair_start:repair_end]
     repair_required = (
         "verify_runtime_repair_prestate",
-        'docker pull "$API_IMAGE"',
-        'docker pull "$WORKER_IMAGE"',
+        'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+        'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
         "alembic upgrade 0014_wp12_data_lifecycle",
         "python /tmp/grant_runtime.py",
         "--wait-timeout 180 api",
@@ -461,7 +484,7 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     if any(marker not in repair for marker in repair_required):
         raise StagingError("runtime repair branch is incomplete")
     repair_forbidden = (
-        'docker pull "$WEB_IMAGE"',
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
         "--wait-timeout 180 web",
         "journey_api.seed",
         "terraform ",

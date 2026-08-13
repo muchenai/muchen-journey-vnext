@@ -1,9 +1,77 @@
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 import scripts.wp08_staging as staging
+
+
+def pull_helper_source() -> str:
+    script = staging.DEPLOY_SCRIPT.read_text()
+    start = script.index("pull_with_bounded_retry() {")
+    end = script.index('\n\n[[ "${EUID}"', start)
+    return script[start:end]
+
+
+def test_image_pull_retries_only_transient_failures_and_redacts_raw_error(tmp_path: Path):
+    attempt_file = tmp_path / "attempts"
+    fake_pull = tmp_path / "fake-pull"
+    fake_pull.write_text(
+        "#!/usr/bin/env bash\n"
+        "count=0\n"
+        '[[ ! -f "$ATTEMPT_FILE" ]] || count=$(cat "$ATTEMPT_FILE")\n'
+        "count=$((count + 1))\n"
+        'printf \'%s\' "$count" > "$ATTEMPT_FILE"\n'
+        'if [[ "$count" -lt 3 ]]; then\n'
+        "  printf 'TLS handshake timeout https://signed.example.invalid/?secret=must-not-leak\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+    )
+    fake_pull.chmod(0o755)
+    command = f"""
+set -euo pipefail
+{pull_helper_source()}
+pull_with_bounded_retry api {fake_pull!s}
+"""
+    env = os.environ.copy()
+    env["ATTEMPT_FILE"] = str(attempt_file)
+    result = subprocess.run(
+        ["bash", "-c", command], capture_output=True, text=True, check=False, env=env
+    )
+    assert result.returncode == 0
+    assert attempt_file.read_text() == "3"
+    assert result.stdout.count("result=RETRY") == 2
+    assert "attempt=3 max_attempts=3 result=PASS" in result.stdout
+    assert "signed.example.invalid" not in result.stdout + result.stderr
+
+
+def test_image_pull_does_not_retry_non_transient_failure_or_leak_log(tmp_path: Path):
+    attempt_file = tmp_path / "attempts"
+    fake_pull = tmp_path / "fake-pull"
+    fake_pull.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf \'1\' > "$ATTEMPT_FILE"\n'
+        "printf 'manifest unknown https://signed.example.invalid/?secret=must-not-leak\\n' >&2\n"
+        "exit 7\n"
+    )
+    fake_pull.chmod(0o755)
+    command = f"""
+set -euo pipefail
+{pull_helper_source()}
+pull_with_bounded_retry api {fake_pull!s}
+"""
+    env = os.environ.copy()
+    env["ATTEMPT_FILE"] = str(attempt_file)
+    result = subprocess.run(
+        ["bash", "-c", command], capture_output=True, text=True, check=False, env=env
+    )
+    assert result.returncode == 7
+    assert attempt_file.read_text() == "1"
+    assert "category=NON_RETRYABLE result=FAIL" in result.stderr
+    assert "result=RETRY" not in result.stdout + result.stderr
+    assert "signed.example.invalid" not in result.stdout + result.stderr
 
 
 def contract(tmp_path: Path, *, estimate=None) -> Path:
@@ -220,9 +288,16 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     valid = (
         "\n".join(
             (
+                "pull_with_bounded_retry()",
+                "for attempt in 1 2 3",
+                "timeout --signal=TERM --kill-after=30s 8m",
+                "TRANSIENT_NETWORK",
+                "COMMAND_TIMEOUT",
+                "NON_RETRYABLE",
+                "WP08_IMAGE_PULL",
                 'SECRETS="$PWD/secrets"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet",
-                "docker compose pull",
+                "pull_with_bounded_retry full-release docker compose pull",
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api python -c \"from pathlib import Path; "
                 "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -233,8 +308,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
                 "verify_web_only_runtime",
                 "verify_runtime_repair_prestate",
-                'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
-                'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+                'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
                 "alembic upgrade 0014_wp12_data_lifecycle",
                 "docker compose up -d --no-deps --wait --wait-timeout 180 web",
                 "WP08_WEB_ONLY_ROLLBACK=START",
@@ -245,8 +321,8 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_WEB_ONLY_DEPLOY=PASS",
                 'if [[ "$DEPLOY_MODE" == "runtime-repair" ]]',
                 "verify_runtime_repair_prestate",
-                'docker pull "$API_IMAGE"',
-                'docker pull "$WORKER_IMAGE"',
+                'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
                 "alembic upgrade 0014_wp12_data_lifecycle",
                 "python /tmp/grant_runtime.py",
                 "docker compose up -d --no-deps --wait --wait-timeout 180 api",
@@ -262,6 +338,19 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text(valid + "\npython -m journey_api.seed\n")
     with pytest.raises(staging.StagingError, match="must not seed fixture business facts"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(valid.replace("for attempt in 1 2 3", "for attempt in 1 2 3 4"))
+    with pytest.raises(staging.StagingError, match="three-attempt bounded retry"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+            'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
+        )
+    )
+    with pytest.raises(staging.StagingError, match="bounded retry"):
         staging.validate_deploy_script(script)
 
     script.write_text('SECRETS="$ROOT/secrets"\n')
@@ -280,7 +369,7 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text(
         valid.replace(
-            "docker compose pull\n"
+            "pull_with_bounded_retry full-release docker compose pull\n"
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n"
@@ -288,7 +377,7 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
             "run --rm --no-deps api alembic upgrade head",
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head\n"
-            "docker compose pull\n"
+            "pull_with_bounded_retry full-release docker compose pull\n"
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
