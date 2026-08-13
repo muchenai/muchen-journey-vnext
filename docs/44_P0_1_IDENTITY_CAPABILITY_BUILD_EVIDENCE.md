@@ -44,8 +44,8 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 
 ## 4. 主线候选与 staging 绑定
 
-- P0-1 实现已通过 PR #193 合入；移除 staging fixture seed 的修复已通过 PR #195 合入，新候选为 `d96268d1a423bdbde7e94a29654d37cc9ed3ba72`；
-- Mainline Candidate Gate `31672408071` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
+- P0-1 实现已通过 PR #193 合入；移除 staging fixture seed 的修复已通过 PR #195 合入；有界镜像拉取修复已通过 PR #197 合入，新候选为 `2cb6c054f889845570994d984ab564a0e92aa141`；
+- Mainline Candidate Gate `31679605396` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
 - 候选工件声明 migration head 为 `0021_p0_identity_principal`，source tree clean；
 - `config/wp08_staging.json` 与 staging workflow 已绑定该候选、工件 Run 和 registry digest；
 - 本节只建立不可变部署合同，不代表 staging 已部署，也不授权运行部署 workflow。
@@ -70,4 +70,6 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 
 无 fixture seed 修复已通过 PR #195 合入，形成新候选 `d96268d1a423bdbde7e94a29654d37cc9ed3ba72`。Mainline Candidate Gate `31672408071` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验和工件上传均为 `PASS`；清单声明 migration head 为 `0021_p0_identity_principal`。当前 staging 合同只绑定该新候选与不可变 registry digest，仍未执行部署，也没有复用已关闭的旧授权。
 
-该候选的唯一 staging deploy run `31676946822` 在 migration 前拉取 GHCR 镜像层时遇到 `TLS handshake timeout` 并失败关闭；`0021`、runtime grant、应用替换与公开表面验收均未执行，旧候选继续运行，临时 SSH 已关闭。后续修复仅在 migration 前增加三次有界 pull：只重试明确瞬时网络错误，非瞬时错误立即停止，并避免把带临时签名参数的下载 URL写入公开日志。该失败 Run 不取消、不重派，新的部署仍需新候选、新绑定和单独授权。
+该候选的唯一 staging deploy run `31676946822` 在 migration 前拉取 GHCR 镜像层时遇到 `TLS handshake timeout` 并失败关闭；`0021`、runtime grant、应用替换与公开表面验收均未执行，旧候选继续运行，临时 SSH 已关闭。后续修复仅在 migration 前增加三次有界 pull：只重试明确瞬时网络错误，非瞬时错误立即停止，并避免把带临时签名参数的下载 URL写入公开日志。该失败 Run 不取消、不重派。
+
+有界拉取修复经 PR #197 与 Mainline Candidate Gate `31679605396` 形成候选 `2cb6c054f889845570994d984ab564a0e92aa141`，migration head 仍为 `0021_p0_identity_principal`。当前 PR 只把 staging 合同绑定到该候选、工件 Run 和三项 registry digest；没有部署、没有 fixture seed、没有创建或修改任何业务事实。新的 staging 部署必须使用新的精确授权，不复用 Run `31676946822` 已消耗的授权。
