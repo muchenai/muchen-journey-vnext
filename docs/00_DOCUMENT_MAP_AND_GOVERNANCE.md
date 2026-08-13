@@ -59,7 +59,8 @@
 | 41 | [P0 产品闭环修复与真实反馈计划](41_P0_PRODUCT_CLOSURE_AND_FEEDBACK_PLAN.md) | 为什么简单业务仍反复出现小问题，如何从模块完成切换为真实旅程完成？ | 一步邀请、24 小时会话、邀请三态、八站链接渲染和新浏览器续接已完成 API/Web 与隔离合成浏览器回归；正式 Journey V3 材料访问与真人 UAT 仍未证明 |
 | 42 | [第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md) | 什么才算产品进度，身份、体验、事实和复杂度遵循什么公理？ | Owner 批准后成为所有后续需求、设计、实现和验收的最高基线 |
 | 43 | [P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md) | 基于当前真实差距，先修什么、如何验收、什么明确延后？ | Owner 批准 P0 顺序、真人名册、受控上线目标和 P1/P2 延后边界 |
-| 44 | [P0-1 身份中心化与多角色访问施工证据](44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md) | 单角色会话根因如何被模型级修复，哪些机器与浏览器证据已通过？ | 本地 API/Web/Chromium 通过；staging 与真实飞书 OAuth 仍须独立验证 |
+| 44 | [P0-1 身份中心化与多角色访问施工证据](44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md) | 单角色会话根因如何被模型级修复，哪些机器与真人证据已通过？ | staging 机器验证与同一飞书身份 `/content`、`/review` 真人复验均通过；P0-1 已关闭 |
+| 45 | [P0-2 Learner 一站式任务页施工合同](45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md) | 新人如何在 5 秒内看懂当前站、输入、要求与唯一动作？ | P0-1 关闭后唯一产品 WIP；机器/浏览器与真人证据分层记录 |
 | RB-15 | [受控 Alpha 正式域名切换手册](runbooks/WP15_ALPHA_PRODUCTION_CUTOVER.md) | 如何在不丢失 staging 和新业务事实的前提下备份恢复、切换正式域名并一键止血？ | 受保护主线唯一入口；锁定候选、空库恢复、加密异机备份、双 host、OAuth/TLS、维护页与旧站入口回退边界 |
 | RB-15W | [上线战时模式受控生产切换手册](runbooks/WP15_WARTIME_PRODUCTION_CUTOVER.md) | 如何用最短可恢复路径完成新鲜备份、隔离恢复、冻结候选验收和小范围正式使用？ | 不改 DNS/基础设施；只接受 `ff530528…`，任一步失败即停；旧应用＋旧库保持可执行回退，成功也只记 `CONTROLLED_ALPHA_LIVE` |
 | TM | [仓库级 Threat Model](../muchen-journey-vnext-threat-model.md) | 公网、身份、组织隔离、业务事实、Worker、供应链和恢复边界的主要攻击路径是什么？ | 已完成仓库证据绑定和风险排序；DEC-018/019 延期项保留为显式风险，不能替代物理演练或发布 GO |

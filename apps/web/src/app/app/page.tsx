@@ -15,6 +15,13 @@ export default async function LearnerHome() {
     action.action_type,
   );
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
+  const primaryActionLabel = opensResult
+    ? "查看结果"
+    : action.action_type === "REVISE_SUBMISSION"
+      ? "继续修订"
+      : action.title === "继续这一站"
+        ? "继续"
+        : "开始";
 
   return (
     <section className={action.journey ? "learner-journey-page" : "content-narrow"}>
@@ -30,7 +37,7 @@ export default async function LearnerHome() {
             className="button primary"
             href={opensResult ? "/app/result" : `/app/tasks/${action.resource_id}`}
           >
-            {opensResult ? "打开旅程结果" : "进入这一站"}
+            {primaryActionLabel}
           </Link>
         ) : (
           <span className="waiting-mark" aria-label="等待下一步">···</span>

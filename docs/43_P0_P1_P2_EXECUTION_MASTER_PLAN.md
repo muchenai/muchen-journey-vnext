@@ -1,6 +1,6 @@
 # 43｜P0、P1、P2 总施工计划
 
-状态：`APPROVED_FOR_BUILD / P0-1_IMPLEMENTED_LOCAL`
+状态：`APPROVED_FOR_BUILD / P0-1_CLOSED / P0-2_IN_BUILD`
 版本：V1.0
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)
@@ -24,11 +24,10 @@ P0 未达到 `P0_LIVE_CONTROLLED` 且连续真实使用稳定前，不启动 P2�
 - 邀请、Enrollment、任务版本、提交版本、人工评审、修订、结果和审计基础；
 - Journey V3、Day 0、四宝藏、三评测的内容/编排基础；
 - staging 可用，正式域名有受控 Alpha 运行与回退能力；
-- 私密名册中的当前内容主管，其 Content Editor 与 Reviewer 角色授权事实已存在且有审计。
+- 私密名册中的当前内容主管，其 Content Editor 与 Reviewer 角色授权事实已存在且有审计；同一飞书身份已真人复验 `/content` 与 `/review` 均正常。
 
 仍未关闭：
 
-- 多角色用户的 Reviewer 会话/工作台进入失败；
 - Learner 材料、任务要求、链接与页面信息层级仍有真实可用性缺陷；
 - Journey V3 尚未由独立真人完成全路径；
 - 当前 release gate 的完整 UAT、外部通知、异机恢复、审批和观察窗口仍为 `NO_GO/NOT_RUN`；

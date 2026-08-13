@@ -12,8 +12,8 @@
 
 | 需求 | 用户结果 | 设计/领域/API | 自动化验收 | 真人验收 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
-| REQ-BR-016 | 同一飞书用户兼任 Content Editor/Reviewer，一次登录进入两个工作台 | 42 §5；05 §0；07 §0；08 §0 | AT-P0-101..105、AT-P0-AUTH-GOLDEN | 私密名册中的当前兼任者本人 OAuth → `/content` + `/review` | `MACHINE_PASS / STAGING_AND_HUMAN_NOT_RUN` |
-| REQ-BR-017 | 任一站先看到可访问材料和默认任务要求，再输出 | 42 §6；04 §0；14 §0；15 §0 | AT-P0-202..206、AT-P0-JOURNEY-GOLDEN | 3 名未受指导 Learner 5 秒测试与八站完整路径 | `PARTIALLY_IMPLEMENTED` |
+| REQ-BR-016 | 同一飞书用户兼任 Content Editor/Reviewer，一次登录进入两个工作台 | 42 §5；05 §0；07 §0；08 §0 | AT-P0-101..105、AT-P0-AUTH-GOLDEN | 私密名册中的当前兼任者本人 OAuth → `/content` + `/review` | `CLOSED / MACHINE_PASS / HUMAN_FEISHU_PASS` |
+| REQ-BR-017 | 任一站先看到可访问材料和默认任务要求，再输出 | 42 §6；04 §0；14 §0；15 §0 | AT-P0-202..206、AT-P0-JOURNEY-GOLDEN | 3 名未受指导 Learner 5 秒测试与八站完整路径 | `IN_BUILD / HUMAN_NOT_RUN` |
 | REQ-BR-018 | Journey V3 由真人完成四宝藏、三评测、修订和结果 | 42 §7/8；43 P0-3 | AT-P0-301..309 | Learner/Reviewer/Operator/QA Recorder 签署 | `NOT_RUN` |
 | REQ-BR-019 | 单组织私密 cohort 可受控使用，完整 GO 仍诚实分离 | 42 §3.3；11 §0；43 P0-4 | readiness、备份摘要、maintenance/live、公开/受保护路由 | 7 日真实观察 | `IN_PROGRESS / RELEASE_GO_NO_GO` |
 

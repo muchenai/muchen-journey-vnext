@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`STAGING_DEPLOYED / MACHINE_PASS / HUMAN_FEISHU_NOT_RUN`
+状态：`CLOSED / STAGING_MACHINE_PASS / HUMAN_FEISHU_PASS`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -61,7 +61,9 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 
 ## 6. 下一步唯一 WIP
 
-仅使用已绑定 Content Editor 本人执行一次飞书登录：先确认 `/content`，再在同一浏览器直接打开 `/review`。必须是同一浏览器、同一飞书身份，且两页均无 `AUTH_REQUIRED/FORBIDDEN` 回环。两端通过后关闭 P0-1 真人门禁，再启动 P0-2。
+2026-08-13，已绑定 Content Editor 本人使用同一飞书身份在 staging 完成真人复验并报告：`/content = 正常`、`/review = 正常`。结合本文件第 3 节的机器证据，`AT-P0-101..106` 已关闭。该陈述只证明 P0-1 双角色访问，不替代 P0-3 Journey 真人闭环或完整 release UAT。
+
+唯一 WIP 已切换为 P0-2 Learner 一站式任务页。
 
 ## 7. 首次部署授权的安全停止与修复
 
