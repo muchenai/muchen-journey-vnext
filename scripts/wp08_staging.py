@@ -387,6 +387,8 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
 
 def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     script = path.read_text()
+    if "journey_api.seed" in script:
+        raise StagingError("staging deploy must not seed fixture business facts")
     if 'SECRETS="$PWD/secrets"' not in script:
         raise StagingError("staging deploy must read release-local secrets")
     if 'SECRETS="$ROOT/secrets"' in script:
