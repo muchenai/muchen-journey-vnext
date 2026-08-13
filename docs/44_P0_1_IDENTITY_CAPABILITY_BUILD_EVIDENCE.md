@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`IMPLEMENTED_LOCAL / STAGING_NOT_DEPLOYED / HUMAN_FEISHU_NOT_RUN`
+状态：`MAINLINE_CANDIDATE_READY / STAGING_NOT_DEPLOYED / HUMAN_FEISHU_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -42,7 +42,15 @@
 
 Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.pythonhosted.org` connect timeout，因此该项记录为 `NOT_COMPLETED_EXTERNAL_TIMEOUT`，未把外部检查环境失败改写为通过，也未为此重试部署或扩大权限。
 
-## 4. 明确未声称
+## 4. 主线候选与 staging 绑定
+
+- P0-1 实现已通过 PR #193 合入主线，主线 SHA 与候选均为 `ecd90cc06114ad11289a10a710cac258715f77b7`；
+- Mainline Candidate Gate `31669191186` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
+- 候选工件声明 migration head 为 `0021_p0_identity_principal`，source tree clean；
+- `config/wp08_staging.json` 与 staging workflow 已绑定该候选、工件 Run 和 registry digest；
+- 本节只建立不可变部署合同，不代表 staging 已部署，也不授权运行部署 workflow。
+
+## 5. 明确未声称
 
 - 尚未部署 staging；
 - 尚未使用真实飞书账号执行 OAuth；
@@ -50,6 +58,6 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 - P0-2 Learner 一站式任务页尚未开始；
 - 本证据不等同于 P0 完成、UAT 通过或 production GO。
 
-## 5. 下一步唯一 WIP
+## 6. 下一步唯一 WIP
 
 通过 PR 合入并部署 staging 后，仅使用已绑定 Content Editor 本人执行一次飞书登录：先确认 `/content`，再在同一浏览器直接打开 `/review`。两端均通过后关闭 P0-1 真人门禁，再启动 P0-2。
