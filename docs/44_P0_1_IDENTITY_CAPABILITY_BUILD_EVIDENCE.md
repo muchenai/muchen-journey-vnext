@@ -73,3 +73,7 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 该候选的唯一 staging deploy run `31676946822` 在 migration 前拉取 GHCR 镜像层时遇到 `TLS handshake timeout` 并失败关闭；`0021`、runtime grant、应用替换与公开表面验收均未执行，旧候选继续运行，临时 SSH 已关闭。后续修复仅在 migration 前增加三次有界 pull：只重试明确瞬时网络错误，非瞬时错误立即停止，并避免把带临时签名参数的下载 URL写入公开日志。该失败 Run 不取消、不重派。
 
 有界拉取修复经 PR #197 与 Mainline Candidate Gate `31679605396` 形成候选 `2cb6c054f889845570994d984ab564a0e92aa141`，migration head 仍为 `0021_p0_identity_principal`。当前 PR 只把 staging 合同绑定到该候选、工件 Run 和三项 registry digest；没有部署、没有 fixture seed、没有创建或修改任何业务事实。新的 staging 部署必须使用新的精确授权，不复用 Run `31676946822` 已消耗的授权。
+
+候选 `2cb6c054f889845570994d984ab564a0e92aa141` 的唯一获授权 staging deploy run `31682824149` 在远端部署约五分钟没有终端输出时以 `client_loop: send disconnect: Broken pipe` 结束，exit code 为 `255`。该 Run 的不可变合同、冻结 state 读取、SSH 开启和 bundle 准备均通过；外部表面验证未开始，临时 SSH 关闭步骤通过。公开 readiness 仍返回旧候选 `74fe8555410a95fa502ae606a694a30083928462`，根页 `200`、匿名 `/ops` `401`、`/review` 与 `/content` `303`，因此不能声称 migration `0021` 或候选部署完成，也没有重新派发失败 workflow。
+
+根因位于部署传输层而非业务迁移：有界镜像拉取会把包含临时签名 URL 的原始日志留在远端，只输出脱敏的 attempt 结果；单次拉取期间 SSH 因此可能持续静默，现有 workflow 又没有协议保活。修复只为 `Deploy bounded staging release` 的 SSH/SCP 连接增加 `ServerAliveInterval=15`、`ServerAliveCountMax=4` 和 `TCPKeepAlive=yes`，并由 WP-08 workflow 验证器逐项拒绝缺失保活的变更；不改变三次镜像重试、migration、数据库、云资源、身份、角色、Journey 或业务事实。修复合入后必须生成并绑定新候选，并重新取得精确部署授权，不能复用 Run `31682824149` 的授权。
