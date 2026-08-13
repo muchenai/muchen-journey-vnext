@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`NO_SEED_CANDIDATE_BOUND / STAGING_NOT_DEPLOYED / HUMAN_FEISHU_NOT_RUN`
+状态：`STAGING_DEPLOYED / MACHINE_PASS / HUMAN_FEISHU_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -42,25 +42,26 @@
 
 Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.pythonhosted.org` connect timeout，因此该项记录为 `NOT_COMPLETED_EXTERNAL_TIMEOUT`，未把外部检查环境失败改写为通过，也未为此重试部署或扩大权限。
 
-## 4. 主线候选与 staging 绑定
+## 4. 主线候选与 staging 部署事实
 
-- P0-1 实现已通过 PR #193 合入；移除 staging fixture seed 的修复已通过 PR #195 合入；有界镜像拉取修复已通过 PR #197 合入，新候选为 `2cb6c054f889845570994d984ab564a0e92aa141`；
-- Mainline Candidate Gate `31679605396` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
-- 候选工件声明 migration head 为 `0021_p0_identity_principal`，source tree clean；
-- `config/wp08_staging.json` 与 staging workflow 已绑定该候选、工件 Run 和 registry digest；
-- 本节只建立不可变部署合同，不代表 staging 已部署，也不授权运行部署 workflow。
+- P0-1 实现、无 fixture seed、有界镜像拉取和 SSH keepalive 修复分别通过 PR #193、#195、#197、#199 合入；
+- 最终不可变候选为 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`，Mainline Candidate Gate `31683972885` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验与工件上传均为 `PASS`；
+- staging 部署合同通过 PR #200 绑定到主线 `e7570365b84b2894b0c8434e786c931890c13eed`；
+- 唯一获授权 staging deploy Run `31685777433` 成功：冻结基础设施只读、SSH ingress 开启、私有 bundle、镜像拉取、migration、三组件替换、外部表面核验和 SSH ingress 关闭均为 `PASS`；
+- 镜像拉取在第 1 次完成，未消耗额外重试；migration 日志明确记录 `0020_wp09_reviewer_delegation -> 0021_p0_identity_principal`；
+- 外部表面因 Runner 网络出现间歇性连接失败，合同在第 9 次有界尝试同时证明根页 `200`、readiness `200/ready` 且 release 精确等于候选、匿名 `/ops` 为 `401`、`/review` 与 `/content` 安全跳转各自登录页；
+- 部署后独立只读复验再次得到 `/health/ready = {status: ready, release: e927...}`、`/ops = 401`、`/review = 303 -> /review/login`、`/content = 303 -> /content/login`；临时 SSH 已关闭。
 
 ## 5. 明确未声称
 
-- 尚未部署 staging；
-- 尚未使用真实飞书账号执行 OAuth；
-- `AT-P0-106` 只有本地真实 Chromium 的完整 Cookie/路由证据，真实飞书 Provider 段仍为 `NOT_RUN`；
+- 尚未使用目标双角色人员的真实飞书账号完成同浏览器双入口复验；
+- `AT-P0-106` 的机器、部署与匿名入口合同已经通过，但真实飞书 Provider + 本人身份段仍为 `NOT_RUN`；
 - P0-2 Learner 一站式任务页尚未开始；
 - 本证据不等同于 P0 完成、UAT 通过或 production GO。
 
 ## 6. 下一步唯一 WIP
 
-通过 PR 合入并部署 staging 后，仅使用已绑定 Content Editor 本人执行一次飞书登录：先确认 `/content`，再在同一浏览器直接打开 `/review`。两端均通过后关闭 P0-1 真人门禁，再启动 P0-2。
+仅使用已绑定 Content Editor 本人执行一次飞书登录：先确认 `/content`，再在同一浏览器直接打开 `/review`。必须是同一浏览器、同一飞书身份，且两页均无 `AUTH_REQUIRED/FORBIDDEN` 回环。两端通过后关闭 P0-1 真人门禁，再启动 P0-2。
 
 ## 7. 首次部署授权的安全停止与修复
 
