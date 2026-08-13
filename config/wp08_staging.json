@@ -23,12 +23,12 @@
     "source": "official_volcengine_calculator_console_and_pricing_docs",
     "private_evidence_reference": "PEV-WP08-20260722-QUOTE_REFRESH"
   },
-  "candidate_commit": "74fe8555410a95fa502ae606a694a30083928462",
-  "candidate_artifact_run_id": 31609899992,
+  "candidate_commit": "ecd90cc06114ad11289a10a710cac258715f77b7",
+  "candidate_artifact_run_id": 31669191186,
   "candidate_image_digests": {
-    "api": "sha256:893569e5da59bbabd45966bb3242e1216485dfdd18485c14224f8eac1ea8576d",
-    "web": "sha256:cd4845f0a81d22be30522a688132e1ca27fb2568f3d4c09fe5c23e67f79bceaa",
-    "worker": "sha256:542941d48eb92533ba008d24164fe6eb4a2dff8e12202dedd19ef5e5d7c66ed9"
+    "api": "sha256:db388c763704b044e6fb34bdc9f441a6f9be1256abf81f70a4be364dd8f3d7a0",
+    "web": "sha256:3a41c00ea79572c7170bcd91c35b86ba46e7b9a745d7d0dfc9f4b0fdd77abb5c",
+    "worker": "sha256:f77a007b85d9cb1cf1f23e362a90ea23567e6ec75eec7a4e21bcc9bec00b3613"
   },
   "staging_origin": "https://staging-vnext.muchenai.com",
   "resource_prefix": "journey-next-staging",
