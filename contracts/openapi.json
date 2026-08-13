@@ -3531,6 +3531,82 @@
         }
       }
     },
+    "/api/v1/ops/users/{user_id}/reviewer-role/revoke": {
+      "post": {
+        "summary": "Revoke Reviewer Role",
+        "description": "Remove only Reviewer capability while preserving identity and other roles.",
+        "operationId": "revoke_reviewer_role_api_v1_ops_users__user_id__reviewer_role_revoke_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeReviewerRoleCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ops/identity-links": {
       "post": {
         "summary": "Create Identity Link",
@@ -7051,7 +7127,8 @@
                 "create_identity_link",
                 "revoke_identity_link",
                 "revoke_external_identity",
-                "grant_reviewer_role"
+                "grant_reviewer_role",
+                "revoke_reviewer_role"
               ]
             },
             "type": "array",
@@ -9884,6 +9961,28 @@
         ],
         "title": "RevokeNotificationEndpointCommand"
       },
+      "RevokeReviewerRoleCommand": {
+        "properties": {
+          "expected_present": {
+            "type": "boolean",
+            "const": true,
+            "title": "Expected Present"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_present",
+          "reason"
+        ],
+        "title": "RevokeReviewerRoleCommand"
+      },
       "RevokedIdentityTransferCandidateOut": {
         "properties": {
           "identity_id": {
@@ -10416,6 +10515,20 @@
             "type": "array",
             "title": "Roles"
           },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "allowed_workspaces": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Workspaces"
+          },
           "scope": {
             "additionalProperties": {
               "type": "string"
@@ -10451,6 +10564,8 @@
           "organization_id",
           "display_name",
           "roles",
+          "capabilities",
+          "allowed_workspaces",
           "scope",
           "safe_entry",
           "expires_at",

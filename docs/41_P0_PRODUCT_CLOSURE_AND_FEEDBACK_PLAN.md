@@ -1,8 +1,10 @@
 # 41｜P0 产品闭环修复与真实反馈计划
 
-文档状态：`STAGING_DEPLOYED / MACHINE_VERIFIED / HUMAN_UAT_PENDING`
+文档状态：`SUPERSEDED_EXECUTION_ORDER / HISTORICAL_EVIDENCE_RETAINED`
 日期：2026-08-12
 Owner：Product + Tech + QA/UAT
+
+> **2026-08-13 治理说明：** 本文对“模块完成不等于浏览器旅程完成”的诊断和截至当日证据继续有效；后续 P0/P1/P2 顺序、身份模型和退出标准以 42/43 为准。
 
 ## 1. 结论先行
 

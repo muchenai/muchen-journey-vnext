@@ -59,7 +59,13 @@ RUBRIC_KEYS = (
 
 def test_reviewer_transition_locks_context_in_one_scoped_postgres_query():
     statement = locked_scoped_context_query(
-        Actor(REVIEWER_ID, ORGANIZATION_ID, Role.REVIEWER, "Fixture Reviewer"),
+        Actor(
+            REVIEWER_ID,
+            ORGANIZATION_ID,
+            frozenset({Role.REVIEWER}),
+            "Fixture Reviewer",
+            entry_role=Role.REVIEWER,
+        ),
         uuid.uuid4(),
     )
     sql = str(statement.compile(dialect=postgresql.dialect()))
@@ -221,6 +227,7 @@ def client_for_linked_reviewer(reviewer_id: uuid.UUID) -> tuple[TestClient, str]
                 organization_id=ORGANIZATION_ID,
                 user_id=reviewer_id,
                 external_identity_id=external_identity.id,
+                external_identity_revision=external_identity.revision,
                 role=Role.REVIEWER,
                 token_hash=credential_hash(settings.session_secret, "session", session_token),
                 csrf_token_hash=credential_hash(settings.session_secret, "csrf", csrf_token),

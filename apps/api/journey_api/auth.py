@@ -26,9 +26,13 @@ from journey_api.models import (
 class Actor:
     id: UUID
     organization_id: UUID
-    role: Role
+    roles: frozenset[Role]
     display_name: str
     session_id: UUID | None = None
+    entry_role: Role | None = None
+
+    def has_role(self, role: Role) -> bool:
+        return role in self.roles
 
 
 def get_actor(
@@ -41,13 +45,8 @@ def get_actor(
     if session_token:
         token_hash = credential_hash(settings.session_secret, "session", session_token)
         row = session.execute(
-            select(IdentitySession, User, RoleAssignment)
+            select(IdentitySession, User)
             .join(User, User.id == IdentitySession.user_id)
-            .join(
-                RoleAssignment,
-                (RoleAssignment.user_id == IdentitySession.user_id)
-                & (RoleAssignment.role == IdentitySession.role),
-            )
             .outerjoin(
                 ExternalIdentity,
                 ExternalIdentity.id == IdentitySession.external_identity_id,
@@ -58,7 +57,6 @@ def get_actor(
                 IdentitySession.expires_at > datetime.now(UTC),
                 User.status == UserStatus.ACTIVE,
                 User.organization_id == IdentitySession.organization_id,
-                RoleAssignment.organization_id == IdentitySession.organization_id,
                 or_(
                     IdentitySession.external_identity_id.is_(None),
                     and_(
@@ -66,13 +64,25 @@ def get_actor(
                         ExternalIdentity.user_id == IdentitySession.user_id,
                         ExternalIdentity.organization_id
                         == IdentitySession.organization_id,
+                        ExternalIdentity.revision
+                        == IdentitySession.external_identity_revision,
                     ),
                 ),
             )
         ).first()
         if row is None:
             raise ApiError(401, "UNAUTHENTICATED", "vNext 会话无效或已过期。")
-        identity_session, user, assignment = row
+        identity_session, user = row
+        roles = frozenset(
+            session.scalars(
+                select(RoleAssignment.role).where(
+                    RoleAssignment.user_id == user.id,
+                    RoleAssignment.organization_id == user.organization_id,
+                )
+            ).all()
+        )
+        if not roles:
+            raise ApiError(401, "UNAUTHENTICATED", "当前会话已不具备任何有效权限。")
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             csrf_cookie = request.cookies.get(CSRF_COOKIE, "")
             csrf_header = request.headers.get("X-CSRF-Token", "")
@@ -87,9 +97,10 @@ def get_actor(
         return Actor(
             user.id,
             user.organization_id,
-            assignment.role,
+            roles,
             user.display_name,
             identity_session.id,
+            identity_session.role if identity_session.role in roles else None,
         )
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:
         raise ApiError(401, "UNAUTHENTICATED", "需要有效的 vNext 会话。")
@@ -105,9 +116,16 @@ def get_actor(
     if row is None:
         raise ApiError(401, "UNAUTHENTICATED", "本地 fixture 身份不存在。")
     user, assignment = row
-    return Actor(user.id, user.organization_id, assignment.role, user.display_name, None)
+    return Actor(
+        user.id,
+        user.organization_id,
+        frozenset({assignment.role}),
+        user.display_name,
+        None,
+        assignment.role,
+    )
 
 
 def require_role(actor: Actor, role: Role) -> None:
-    if actor.role != role:
+    if not actor.has_role(role):
         raise ApiError(403, "FORBIDDEN", "当前身份无权执行此操作。")

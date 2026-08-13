@@ -1,10 +1,21 @@
 # 03｜产品简报与 PRD
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.2
-日期：2026-08-03
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Product Owner  
 批准结论：首个 Alpha 以 TSK-001 验证探索营闭环；正式探索营按 `DEC-024` 恢复为 Day 0、四个认知宝藏、三个能力评测和完整结果。
+
+## 0. 第一性原理修订
+
+P0 不再以 `REQ` 数量、WP 关闭数、部署成功或完整 production gate 为产品完成定义。P0 的唯一结果是：真实新人无需研发解释完成 Journey V3，真实 Reviewer 用本人身份完成评审/修订，Content Editor 和 Operator 能持续运营，核心事实安全可恢复。详细产品公理见 42，施工与验收见 43。
+
+新增 P0 硬约束：
+
+- `REQ-BR-016`：同一内部 User 可拥有多个有效 RoleAssignment；登录识别人，角色决定能力，会话不得固化唯一角色；
+- `REQ-BR-017`：Learner 任一站必须先获得可访问的学习输入和默认可见任务要求，再出现输出/提交；
+- `REQ-BR-018`：业务完成必须有真实浏览器和目标角色证据，机器通过只能声明相应证据层；
+- `REQ-BR-019`：P0 上线是单组织私密 cohort 的受控可用，不等同完整 production GO。
 
 ## 1. 一句话定义
 

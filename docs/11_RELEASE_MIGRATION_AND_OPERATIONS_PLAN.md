@@ -1,9 +1,18 @@
 # 11｜发布、数据导入与运行计划
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Release/Ops Owner + Data Owner  
+
+## 0. 第一性原理修订
+
+发布分为两个不混用的结论：
+
+- `P0_LIVE_CONTROLLED`：Journey V3 面向单组织私密 cohort，可登录、完成主闭环、维护/回退和最小备份恢复可执行；
+- `RELEASE_GO`：所有 production release gate（真人签署、外部观测/通知、异机恢复、审批和观察窗口）均完成。
+
+当前完整 release gate 继续诚实保持 `NO_GO/NOT_RUN`；这不阻止按 42/43 完成受控 P0，但任何文档不得把受控上线改写为企业级生产完成。一次发布只绑定一个候选和一个目标，不因失败自动重试、扩权或修改基础设施。
 关键区别：本轮没有“边运行边迁移旧系统”的 runtime migration；只有离线数据导出/导入和独立流量切换。
 
 ## 1. 发布原则

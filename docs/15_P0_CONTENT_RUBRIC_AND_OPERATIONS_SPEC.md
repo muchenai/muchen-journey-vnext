@@ -1,9 +1,15 @@
 # 15｜P0 内容、Rubric 与运营规范
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.2
-日期：2026-08-03
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Product/Content Owner + Reviewer Owner  
+
+## 0. 第一性原理修订
+
+内容不是链接字段或 TaskVersion 数量，而是 Learner 完成当前站所需的真实输入。每一站发布前必须有：一句学习结果、批准材料、可访问 HTTPS 链接、负责人、预计时长、3–5 条默认可见任务要求、完成证据和 Reviewer/Rubric（如需评审）。材料链接必须在发布前只读核验，在 UI 中以可点击动作呈现；禁止把 URL 塞进说明正文。
+
+四宝藏的材料由私密名册中的内容主管作为 Content Editor 维护，Operator 发布不可变版本；该负责人兼任 Reviewer 时仍使用同一 User 的独立 RoleAssignment，不建立第二身份。真实姓名和飞书标识只存在于受控名册，不进入 Public Git。三类结果文案必须告诉 Learner“依据、结论、下一步”，不得只输出等级或管理术语。
 批准结论：首个 Alpha 只交付 TSK-001“问题洞察与行动建议”，使用 Rubric V1 和两工作日 Reviewer SLA；`DEC-024` 将正式探索营内容目标恢复为四个认知宝藏和三个能力评测。
 
 ## 1. 目标

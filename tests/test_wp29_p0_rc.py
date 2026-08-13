@@ -25,7 +25,7 @@ def valid_evidence() -> dict:
             "web_digest": f"sha256:{'1' * 64}",
             "api_digest": f"sha256:{'2' * 64}",
             "worker_digest": f"sha256:{'3' * 64}",
-            "migration": "0019_wp30_invitation_control",
+            "migration": "0021_p0_identity_principal",
             "openapi_sha256": "4" * 64,
             "journey_version_id": "11111111-1111-4111-8111-111111111111",
             "journey_revision": 2,

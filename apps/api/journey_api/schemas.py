@@ -406,6 +406,16 @@ class GrantReviewerRoleCommand(StrictModel):
         return value.strip()
 
 
+class RevokeReviewerRoleCommand(StrictModel):
+    expected_present: Literal[True]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_revoke_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class UpdateContentDraftCommand(RevisionCommand):
     content: TaskContentInput
 
@@ -585,6 +595,7 @@ class IdentityAccessOut(StrictModel):
             "revoke_identity_link",
             "revoke_external_identity",
             "grant_reviewer_role",
+            "revoke_reviewer_role",
         ]
     ]
 
@@ -659,6 +670,8 @@ class SessionOut(StrictModel):
     organization_id: UUID
     display_name: str
     roles: list[str]
+    capabilities: list[str]
+    allowed_workspaces: list[str]
     scope: dict[str, str]
     safe_entry: str
     expires_at: datetime | None

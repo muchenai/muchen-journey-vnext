@@ -438,7 +438,11 @@ export type OpsIdentityAccess = {
   link_revision: number | null;
   link_expires_at: string | null;
   allowed_commands: Array<
-    "create_identity_link" | "revoke_identity_link" | "revoke_external_identity" | "grant_reviewer_role"
+    "create_identity_link"
+    | "revoke_identity_link"
+    | "revoke_external_identity"
+    | "grant_reviewer_role"
+    | "revoke_reviewer_role"
   >;
 };
 

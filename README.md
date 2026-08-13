@@ -2,6 +2,8 @@
 
 本仓库是 Muchen Journey vNext 的独立 Greenfield 代码库。批准文档、产品代码、测试和运行合同在此共同版本化；没有复制旧产品代码、数据库迁移或运行时兼容层。
 
+> **2026-08-13 治理重置：** 后续阅读和施工先看 [42｜第一性原理产品与工程总基线](docs/42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md) 与 [43｜P0、P1、P2 总施工计划](docs/43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)。以下工作包列表记录已构建/已验证事实，不再等同于当前产品优先级或用户可用性。当前 P0 唯一目标是让真实 Learner、Reviewer、Content Editor 和 Operator 稳定完成 Journey V3；完整 release gate 的 `NO_GO/NOT_RUN` 项继续保留。
+
 本轮的不可逆前提是：下一版按 Greenfield 项目从零开发。旧系统可用于业务调研、历史数据盘点和验收对照，但不能成为新系统的代码依赖、运行时依赖、数据库依赖、部署依赖或写入回滚目标。
 
 ## 当前交付
@@ -26,7 +28,7 @@
 - WP-24：完整一天学习、三项真实评测、100 分建议证据和人工准入已由候选 `0589fc8…` 部署至 staging，migration 为 `0016_wp24_formal_camp_v2`；Owner 已报告发布 Journey V2。发布后发现路线节点错位、重复文案和宝藏缺少主管材料导入/学习后小任务三个 P0 体验缺口，受控邀请暂停。
 - WP-25～WP-30 本地构建：WP-25 完整零写入原型机器通过；WP-26 已实现 Content Editor 草稿、固定学习材料与服务端完成门禁；WP-27 已实现八站 Journey V3 精确组合和共享路线坐标；WP-28 已分开学习完成、能力证据、Reviewer 结论、系统建议和 Operator 准入；WP-29/30 已增加不可伪造真人签署的 RC 验证、受控上线 preflight、PII-free 指标和组织级新邀请冻结。migration head 为 `0019_wp30_invitation_control`。真实材料、逐包真人门禁、Journey V3 发布、候选部署、RC 签署、正式域名和 cohort 均未执行，production 继续 `NO_GO`；见 39。
 
-从 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md) 开始阅读。真人 UAT、物理 staging/production 资源、恢复/回滚演练与发布签署仍是 G4/G5 独立门禁，当前不是发布 GO。
+从 [第一性原理总基线](docs/42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md) 开始阅读，再看 [P0/P1/P2 总施工计划](docs/43_P0_P1_P2_EXECUTION_MASTER_PLAN.md) 和 [文档地图](docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md)。真人 UAT、完整恢复/回滚、外部观测与发布签署仍是独立证据；受控 Alpha 可用不等于完整发布 GO。
 
 ## 本地运行
 
