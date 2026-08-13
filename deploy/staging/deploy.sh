@@ -317,7 +317,6 @@ trap rollback ERR
 
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api alembic upgrade head
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api python /tmp/grant_runtime.py
-docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api python -m journey_api.seed
 docker compose up -d --remove-orphans --wait
 
 api_health=$(docker compose exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3).read().decode())")

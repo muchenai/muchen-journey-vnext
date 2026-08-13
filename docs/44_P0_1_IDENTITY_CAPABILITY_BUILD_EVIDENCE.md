@@ -61,3 +61,9 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 ## 6. 下一步唯一 WIP
 
 通过 PR 合入并部署 staging 后，仅使用已绑定 Content Editor 本人执行一次飞书登录：先确认 `/content`，再在同一浏览器直接打开 `/review`。两端均通过后关闭 P0-1 真人门禁，再启动 P0-2。
+
+## 7. 首次部署授权的安全停止与修复
+
+候选 `ecd90cc06114ad11289a10a710cac258715f77b7` 的首次 staging 部署授权在派发前安全停止：只读 preflight 发现正式 `phase=deploy` 仍固定执行 fixture seed，而 seed 可创建 Organization、User、RoleAssignment、Enrollment、Assignment 与 TaskVersion，超出“不得修改身份、角色、Journey 或其他业务事实”的授权边界。该次没有派发 workflow、没有打开 SSH、没有修改 staging，授权按“失败不重试”关闭。
+
+后续修复只从既有部署路径移除 fixture seed，并在 `scripts/wp08_staging.py` 与专项测试中增加 fail-closed 禁令；migration、runtime grant、不可变镜像、回滚、公开表面核验与 SSH 关闭合同保持不变。修复合入后必须重新生成候选并重新绑定，不复用已经关闭的候选部署授权。

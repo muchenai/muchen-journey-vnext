@@ -260,6 +260,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     script.write_text(valid)
     staging.validate_deploy_script(script)
 
+    script.write_text(valid + "\npython -m journey_api.seed\n")
+    with pytest.raises(staging.StagingError, match="must not seed fixture business facts"):
+        staging.validate_deploy_script(script)
+
     script.write_text('SECRETS="$ROOT/secrets"\n')
     with pytest.raises(staging.StagingError, match="release-local"):
         staging.validate_deploy_script(script)
