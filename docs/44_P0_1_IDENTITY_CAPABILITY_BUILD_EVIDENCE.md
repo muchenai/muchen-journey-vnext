@@ -69,3 +69,5 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 后续修复只从既有部署路径移除 fixture seed，并在 `scripts/wp08_staging.py` 与专项测试中增加 fail-closed 禁令；migration、runtime grant、不可变镜像、回滚、公开表面核验与 SSH 关闭合同保持不变。修复合入后必须重新生成候选并重新绑定，不复用已经关闭的候选部署授权。
 
 无 fixture seed 修复已通过 PR #195 合入，形成新候选 `d96268d1a423bdbde7e94a29654d37cc9ed3ba72`。Mainline Candidate Gate `31672408071` 的 `ci-main`、候选打包、三镜像推送、registry digest 核验和工件上传均为 `PASS`；清单声明 migration head 为 `0021_p0_identity_principal`。当前 staging 合同只绑定该新候选与不可变 registry digest，仍未执行部署，也没有复用已关闭的旧授权。
+
+该候选的唯一 staging deploy run `31676946822` 在 migration 前拉取 GHCR 镜像层时遇到 `TLS handshake timeout` 并失败关闭；`0021`、runtime grant、应用替换与公开表面验收均未执行，旧候选继续运行，临时 SSH 已关闭。后续修复仅在 migration 前增加三次有界 pull：只重试明确瞬时网络错误，非瞬时错误立即停止，并避免把带临时签名参数的下载 URL写入公开日志。该失败 Run 不取消、不重派，新的部署仍需新候选、新绑定和单独授权。

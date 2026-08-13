@@ -111,7 +111,7 @@ WP-09 首个 Operator 绑定链接已由 run `30181942549` 成功生成并消费
 
 ## 5. 部署顺序与证据
 
-Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行候选源码 Web 合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → API/Worker → Web `/health/ready` → edge/TLS → 匿名 `/ops = 401` → VPC API 撤销精确 SSH 规则。`scripts/wp08_staging.py` 必须静态拒绝正式 staging deploy 出现 `journey_api.seed`。
+Workflow 顺序固定：provision 阶段执行合同检查 → TOS remote state init → Terraform validate → DNS 只读精确匹配与 state import/identity 核对 → Terraform saved plan → 破坏性门禁 → 关闭态 apply；Alpha deploy 阶段执行候选源码 Web 合同检查 → remote state 仅读取既有输出 → VPC API 临时 runner `/32` → 私有 bundle → GHCR digest pull → UID 10001 容器读取 CA → migration → runtime grant → API/Worker → Web `/health/ready` → edge/TLS → 匿名 `/ops = 401` → VPC API 撤销精确 SSH 规则。GHCR pull 位于 migration 前，每次最长 8 分钟、最多 3 次；只对命令超时和明确的 TLS/网络瞬时错误重试，其他错误立即停止。公开日志只输出 attempt、类别与 PASS/RETRY/FAIL，不回显包含临时签名参数的 registry URL。`scripts/wp08_staging.py` 必须静态拒绝正式 staging deploy 出现 `journey_api.seed`，并拒绝绕过该有界 pull helper。
 
 三镜像必须使用 WP-07 已核验 digest，不能只用 tag。公开证据只记录 GitHub run ID、候选 SHA、门禁结果和非敏感资源类别；账号 ID、IP、DNS zone ID、RDS/TOS endpoint、SSH fingerprint、ACL 明细和截图只进入 `evidence/private/wp08` 或 90 天受控外部证据。
 

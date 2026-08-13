@@ -9,6 +9,46 @@ fail() {
   exit 1
 }
 
+pull_with_bounded_retry() {
+  local label=$1
+  shift
+  local attempt status category log_file
+  log_file=$(mktemp /tmp/wp08-image-pull.XXXXXX)
+
+  for attempt in 1 2 3; do
+    : >"$log_file"
+    if timeout --signal=TERM --kill-after=30s 8m "$@" >"$log_file" 2>&1; then
+      rm -f "$log_file"
+      printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 result=PASS\n' \
+        "$label" "$attempt"
+      return 0
+    else
+      status=$?
+    fi
+    category=NON_RETRYABLE
+    if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+      category=COMMAND_TIMEOUT
+    elif grep -Eiq \
+      'TLS handshake timeout|i/o timeout|connection reset by peer|unexpected EOF|temporary failure|502 Bad Gateway|503 Service Unavailable|429 Too Many Requests' \
+      "$log_file"; then
+      category=TRANSIENT_NETWORK
+    fi
+
+    if [[ "$category" == "NON_RETRYABLE" || "$attempt" -eq 3 ]]; then
+      rm -f "$log_file"
+      printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 category=%s result=FAIL\n' \
+        "$label" "$attempt" "$category" >&2
+      return "$status"
+    fi
+
+    rm -f "$log_file"
+    printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 category=%s result=RETRY next_in_seconds=%s\n' \
+      "$label" "$attempt" "$category" "$((attempt * 5))"
+    sleep "$((attempt * 5))"
+    log_file=$(mktemp /tmp/wp08-image-pull.XXXXXX)
+  done
+}
+
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
 [[ "${CANDIDATE_COMMIT:-}" == "d96268d1a423bdbde7e94a29654d37cc9ed3ba72" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
@@ -200,7 +240,7 @@ if [[ "$DEPLOY_MODE" == "web-only" ]]; then
   [[ "$(cat "$ROOT/DEPLOYED_CANDIDATE")" == "$BASELINE_CANDIDATE" ]] || fail "deployed runtime baseline differs from the Web-only contract"
   previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
   verify_web_only_runtime "$previous" || fail "runtime baseline is not healthy and compatible"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"
+  pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"
 
   rollback_web() {
     local code=${1:-$?}
@@ -255,8 +295,8 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   [[ "$backend_previous" == "$worker_previous" ]] || fail "API and Worker do not share one rollback release"
   [[ "$backend_previous" == "$ROOT"/releases/* && -f "$backend_previous/compose.yaml" && -f "$backend_previous/.deployment.env" ]] || fail "backend rollback release is outside the staging root"
   verify_runtime_repair_prestate "$previous" || fail "runtime repair prestate is not reviewed"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$WORKER_IMAGE"
+  pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"
+  pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"
 
   rollback_runtime() {
     local code=${1:-$?}
@@ -293,7 +333,7 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   exit 0
 fi
 
-docker compose pull
+pull_with_bounded_retry full-release docker compose pull
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api \
   python -c "from pathlib import Path; Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
 
