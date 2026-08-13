@@ -86,3 +86,9 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 根因位于部署传输层而非业务迁移：有界镜像拉取会把包含临时签名 URL 的原始日志留在远端，只输出脱敏的 attempt 结果；单次拉取期间 SSH 因此可能持续静默，现有 workflow 又没有协议保活。修复只为 `Deploy bounded staging release` 的 SSH/SCP 连接增加 `ServerAliveInterval=15`、`ServerAliveCountMax=4` 和 `TCPKeepAlive=yes`，并由 WP-08 workflow 验证器逐项拒绝缺失保活的变更；不改变三次镜像重试、migration、数据库、云资源、身份、角色、Journey 或业务事实。修复合入后必须生成并绑定新候选，并重新取得精确部署授权，不能复用 Run `31682824149` 的授权。
 
 SSH 保活修复经 PR #199 合入，Mainline Candidate Gate `31683972885` 全部通过，形成 source tree clean 的候选 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`；候选工件声明 migration head 为 `0021_p0_identity_principal`，三项 GHCR registry digest 已复验。本次绑定只把 staging 部署合同更新为该候选、工件 Run 和不可变 digest，不部署、不读取或修改 staging，也不创建任何业务事实。后续部署需要新的精确授权与新的主线绑定 SHA。
+
+## 8. P0-1 最终真人关闭证据
+
+2026-08-13，目标人员本人使用同一真实飞书身份完成 staging 复验并明确报告：`/content = 正常`、`/review = 正常`。随后既有 Operator 只读核验运营页，确认该 Principal 同时具有 ACTIVE 的 Content Editor 与 Reviewer 角色，最近审计元数据存在 `oauth.login_succeeded` 成功记录；未恢复历史撤销记录，未直接改库，也未追加第三个角色。
+
+结合第 3、4、6 节的机器、部署、运行态与真人证据，`AT-P0-101..106` 全部关闭，P0-1 状态升级为 `CLOSED`。该结论仅覆盖身份中心化与多角色访问，不替代 P0-2 三人无引导测试、P0-3 Journey 真人闭环或 production GO。
