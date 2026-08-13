@@ -210,7 +210,7 @@ def _require_release(value: object, label: str) -> str:
     return value
 
 
-def _component_markers(candidate: str) -> dict[str, str]:
+def _component_markers(candidate: str) -> tuple[dict[str, str], str, dict[str, bool]]:
     deployed = _require_release(
         DEPLOYED_CANDIDATE.read_text().strip(), "deployed runtime candidate marker"
     )
@@ -227,17 +227,18 @@ def _component_markers(candidate: str) -> dict[str, str]:
         service: _require_release(raw.get(service), f"deployed {service} marker")
         for service in ("web", "api", "worker")
     }
-    if web != candidate or components["web"] != candidate:
-        raise InventoryError("deployed Web candidate differs from authorized candidate")
-    if deployed != components["api"] or deployed != components["worker"]:
-        raise InventoryError("deployed runtime marker differs from API/Worker markers")
-    return components
+    relationships = {
+        "authorized_web": web == candidate and components["web"] == candidate,
+        "runtime_api": deployed == components["api"],
+        "runtime_worker": deployed == components["worker"],
+    }
+    return components, deployed, relationships
 
 
 def collect(candidate: str) -> dict[str, object]:
     if not FULL_SHA.fullmatch(candidate):
         raise InventoryError("candidate must be a full release SHA")
-    components = _component_markers(candidate)
+    components, deployed, marker_relationships = _component_markers(candidate)
 
     containers = {
         service: _inspect_running_container(container, service)
@@ -317,6 +318,7 @@ print(json.dumps({
         "compose_singleton_services": all(count == 1 for count in service_counts.values()),
         "caddy_upstreams": caddy_upstreams,
         "deployed_components": components,
+        "deployed_runtime_candidate": deployed,
         "heartbeat_release": _require_release(
             worker.get("heartbeat_release"), "heartbeat release"
         ),
@@ -350,6 +352,8 @@ print(json.dumps({
     }
     result["component_marker_matches"] = marker_matches
     result["component_markers_match_runtime"] = all(marker_matches.values())
+    result["marker_relationships"] = marker_relationships
+    result["marker_relationships_consistent"] = all(marker_relationships.values())
     return result
 
 
