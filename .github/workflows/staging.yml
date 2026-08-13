@@ -411,7 +411,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLIC_IP: ${{ steps.frozen_infrastructure.outputs.public_ip }}
         run: |
-          ssh_opts=(-i "$RUNNER_TEMP/wp08-deploy-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp08-known-hosts")
+          ssh_opts=(-i "$RUNNER_TEMP/wp08-deploy-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp08-known-hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes)
           release="/srv/journey-next-staging/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
           ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
           tar -C "$RUNNER_TEMP/wp08-deploy" -czf - . | ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
