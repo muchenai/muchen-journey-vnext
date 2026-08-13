@@ -1,6 +1,6 @@
 # 45｜P0-2 Learner 一站式任务页施工合同
 
-状态：`STAGING_PASS / HUMAN_CONTENT_AND_5_SECOND_TEST_NOT_RUN`
+状态：`WEB_STAGING_PASS / RUNTIME_TRUTH_RECONCILIATION_IN_PROGRESS / HUMAN_TEST_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -128,3 +128,5 @@ Web-only 部署合同通过 PR #204 合入主线 `7bcabf190fa41aa84fb2d129fca6c0
 - 部署后的独立只读复验再次得到相同 release 与路由结果。
 
 P0-2 的机器实现和 staging 交付至此关闭。产品验收仍保留两项人工事实：逐一打开已发布 Journey V3 的真实外部材料，以及由三名未看说明的新 Learner 完成 5 秒理解测试。在两项均通过前，不把 P0-2 记为关闭，也不进入 P0-3。
+
+部署后刷新两个独立的已登录 `/ops` 会话，运行快照均报告 API/Worker `74fe855...` 与 migration `0020_wp09_reviewer_delegation`，而 Web-only 部署日志声称所保留基线为 API/Worker `e927c1...` 与 migration `0021_p0_identity_principal`。公开 readiness 只能证明 Web `e064590...`，不能证明其实际连接的后端版本。该矛盾存在期间暂停真人 P0-2 测试，先通过扩展后的 PII-free `inspect-runtime` 对账三组件 marker、实际容器、Compose 元数据、网络别名和 Caddy 上游；不部署、不改库、不修改业务事实。

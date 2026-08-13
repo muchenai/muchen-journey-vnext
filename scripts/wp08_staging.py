@@ -193,7 +193,11 @@ def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> 
         "SELECT version_num FROM alembic_version",
         "SELECT release,last_seen_at FROM worker_heartbeats",
         "WP08_RUNTIME_INVENTORY=",
-        "deployed candidate differs from authorized candidate",
+        '"deployed_components"',
+        '"component_marker_matches"',
+        '"component_markers_match_runtime"',
+        "deployed Web candidate differs from authorized candidate",
+        "deployed runtime marker differs from API/Worker markers",
     )
     if any(marker not in source for marker in required):
         raise StagingError("runtime inventory script is incomplete")
@@ -759,7 +763,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:.github/workflows/staging.yml"',
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
-        "INSPECT_RUNTIME_3B7D757_STAGING",
+        "INSPECT_RUNTIME_E064590_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
