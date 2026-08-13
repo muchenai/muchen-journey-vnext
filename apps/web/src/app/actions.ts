@@ -762,6 +762,7 @@ export type InviteActionState = {
   requestId?: string;
   joinPath?: string;
   expiresAt?: string;
+  loginRequired?: boolean;
 };
 
 export async function createLearnerInvite(
@@ -810,6 +811,13 @@ export async function createLearnerInvite(
       expiresAt: result.expires_at,
     };
   } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      return {
+        error: "Operator 会话已失效，请重新使用飞书进入后再创建邀请。",
+        requestId: error.requestId,
+        loginRequired: true,
+      };
+    }
     return submissionError(error);
   }
 }
