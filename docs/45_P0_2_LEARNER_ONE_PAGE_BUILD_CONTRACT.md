@@ -1,6 +1,6 @@
 # 45｜P0-2 Learner 一站式任务页施工合同
 
-状态：`WEB_STAGING_PASS / HUMAN_TEST_NOT_RUN`
+状态：`WEB_STAGING_PASS / MATERIALS_15_OF_15_PASS / HUMAN_3_PERSON_TEST_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -102,7 +102,7 @@
 - 闭环回归：八站提交、Reviewer 要求修订、新浏览器重新进入、再次提交、通过与最终结果完成；
 - 清理：隔离容器、网络和数据卷均已删除。
 
-证据边界：浏览器夹具只证明与生产相同的八站结构、状态机和 HTTPS 链接呈现，不证明已发布 Journey V3 外部材料当前可达；`AT-P0-202` 仍需正式内容源人工打开核验。`AT-P0-201` 三名新人 5 秒测试同样保持 `NOT_RUN`，因此 P0-2 尚未关闭，也不得开始 P0-3。
+证据边界：浏览器夹具只证明与生产相同的八站结构、状态机和 HTTPS 链接呈现；已发布 Journey V3 外部材料的真实可达性证据见第 10 节。`AT-P0-201` 三名新人 5 秒测试保持 `NOT_RUN`，因此 P0-2 尚未关闭，也不得开始 P0-3。
 
 ## 7. 2026-08-13 staging 候选绑定
 
@@ -127,10 +127,18 @@ Web-only 部署合同通过 PR #204 合入主线 `7bcabf190fa41aa84fb2d129fca6c0
 - `WP08_SSH_INGRESS=CLOSED`，临时 SSH 已关闭；
 - 部署后的独立只读复验再次得到相同 release 与路由结果。
 
-P0-2 的机器实现和 staging 交付至此关闭。产品验收仍保留两项人工事实：逐一打开已发布 Journey V3 的真实外部材料，以及由三名未看说明的新 Learner 完成 5 秒理解测试。在两项均通过前，不把 P0-2 记为关闭，也不进入 P0-3。
+P0-2 的机器实现和 staging 交付至此关闭。真实外部材料验收已于第 10 节关闭；产品验收只剩三名未看说明的新 Learner 完成无引导理解测试。在该项通过前，不把 P0-2 记为关闭，也不进入 P0-3。
 
 部署后刷新两个独立的已登录 `/ops` 会话，运行快照均报告 API/Worker `74fe855...` 与 migration `0020_wp09_reviewer_delegation`，而 Web-only 部署日志声称所保留基线为 API/Worker `e927c1...` 与 migration `0021_p0_identity_principal`。公开 readiness 只能证明 Web `e064590...`，不能证明其实际连接的后端版本。该矛盾存在期间暂停真人 P0-2 测试，先通过扩展后的 PII-free `inspect-runtime` 对账三组件 marker、实际容器、Compose 元数据、网络别名和 Caddy 上游；不部署、不改库、不修改业务事实。
 
 首次扩展 inventory Run `31702193785` 发现 `DEPLOYED_CANDIDATE` 与 `DEPLOYED_COMPONENTS` 的 API/Worker marker 不一致后立即停止，未输出实际容器清单；临时 SSH 正常关闭。marker 不一致正是待诊断事实，不应阻断实际容器只读盘点，因此后续审计器把各 marker 关系作为布尔结果输出，同时继续读取实际容器；仍不修 marker、不改变运行态。
 
 纠偏后的只读 inventory Run `31702773602` 成功并关闭临时 SSH：实际 Web `e064590...`、API/Worker `e927c1...`、migration `0021_p0_identity_principal`，三组件均与 `DEPLOYED_COMPONENTS.json` 精确一致；四个 Compose 服务均为单实例、网络别名唯一，Caddy staging 上游指向唯一 Web。原矛盾来自把最近一次 Web-only 候选 marker 错解释为后端 marker，而非实际运行态回退。运行态真相对账关闭，可以恢复 P0-2 的真实材料与 3 人 5 秒理解测试。
+
+## 10. 正式材料只读验收
+
+2026-08-13 在已登录的真实浏览器中，从 staging Journey V3 运营读回逐一打开全部外部材料动作：八站共十五份有效 HTTPS 材料，结果为 `15/15 PASS`；其中两个视频文件页也单独核验到可见文件标题和内容页面。全过程不修改 Journey、TaskVersion、身份、角色、邀请或其他业务事实。
+
+唯一正式飞书表共有十六条材料记录，但 `TRE-002` 第 2 条正文为“无，自行观看”且没有 URL；它是无来源占位记录，不构成第十六份可发布材料。运行态十五份材料与十五条有效 URL 一一对应，每站至少一份，故 `AT-P0-202=PASS`，不存在漏导入。
+
+P0-2 当前唯一未关闭的产品门禁是 `AT-P0-201`：三名未看说明、未参与建设且属于目标用户的真实新人，分别在无口头提示下完成 5 秒当前位置/下一步判断和 60 秒首动作。通过标准为 `3/3`；任何一人需要解释均记为失败并返回页面修正，不培训测试者。

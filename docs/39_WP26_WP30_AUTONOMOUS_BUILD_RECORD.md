@@ -103,7 +103,7 @@ PR #152/#153 已完成受控身份迁移实现、候选绑定和唯一 staging �
 
 ## 8. Journey V3 发布准备冻结
 
-- 唯一正式内容源、八站/十六材料映射和三类结果文案见 38 号文档第 2 节；旧 Base、Wiki、PDF 或本地 seed 只可用于差异说明，不得成为第二内容源。
+- 唯一正式内容源、八站/十六条记录（十五份有效 HTTPS 材料）映射和三类结果文案见 38 号文档第 2 节；`TRE-002` 的无 URL“自行观看”占位记录不得被工程师补造成材料。旧 Base、Wiki、PDF 或本地 seed 只可用于差异说明，不得成为第二内容源。
 - Journey V3 只能绑定以下顺序：`DAY-0`、`TRE-001-COMPANY-VALUES`、`TRE-002-AI-DATA-BASICS`、`TRE-003-PROJECT-AWARENESS`、`TRE-004-DELIVERY-FIT`、`ASM-001-RULE-BREAKDOWN`、`ASM-002-MODEL-JUDGEMENT`、`ASM-003-DATA-CONSTRUCTION`。
 - 每个站点必须选择一个同组织、已发布、至少含一项 required material 的不可变 TaskVersion；八个 ID 必须唯一，顺序错误或缺材料必须 fail closed。
 - Reviewer 复核目前只有 Owner 陈述；发布动作必须再次显式选择真实独立 Reviewer、填写不少于 20 字的复核记录并勾选确认。该机器事实成功后才可写为 `REVIEW_BOUND`。
