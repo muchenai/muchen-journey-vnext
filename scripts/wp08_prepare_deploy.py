@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 
 CANDIDATE = "e064590049eecc05ad8db26e9ba94f51420d7397"
-WEB_ONLY_BASELINE = "02863d0b670ee9b00b9def3e75bc6699827f555a"
+WEB_ONLY_BASELINE = "e927c1bbaf74a9107dadc7ebfafab4fa40f56454"
 STAGING_HOST = "staging-vnext.muchenai.com"
 PRODUCTION_HOST = "journey.muchenai.com"
 IMAGES = {
@@ -24,9 +24,9 @@ IMAGES = {
     "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:6e626c64082bb48e1e386bf7e4998f1d090b0ee4a36e37d02d8fabe79d18c576",
 }
 WEB_ONLY_IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:ba5dbf8e96ba18fa5727024d8bf7dfa9b5e80a8174836096ae47e7fb453e894c",
     "WEB_IMAGE": IMAGES["WEB_IMAGE"],
-    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22",
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:bf6b1419fb8090e5b9e128574801ff8257dd3080c6e3b4fe8634d8dbd22686a3",
 }
 SECRET_NAMES = (
     "WP08_MIGRATION_DB_PASSWORD",

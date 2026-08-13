@@ -109,3 +109,9 @@
 PR #202 合入主线后，Mainline Candidate Gate `31693205762` 完整通过 `ci-main`、候选打包、三镜像推送、registry digest 核验和工件上传，形成 source tree clean 候选 `e064590049eecc05ad8db26e9ba94f51420d7397`。候选 migration head 仍为 `0021_p0_identity_principal`，没有新增 migration。
 
 本次变更只把 WP-08 staging 的不可变候选、工件 Run 与三项 registry digest 绑定到上述证据；不部署、不读取或修改 staging、不运行 Terraform plan/apply/import、不创建邀请、不发送消息，也不修改 Journey、身份、角色或其他业务事实。绑定 PR 合入后，staging 部署仍必须作为单独动作执行；在部署和真人核验发生前，P0-2 状态保持 `MACHINE_PASS / HUMAN_5_SECOND_TEST_NOT_RUN`。
+
+## 8. 首次 staging 部署失败与范围收敛
+
+唯一一次全量部署 Run `31694785627` 在 `Deploy bounded staging release` 失败。三次镜像拉取均在合同规定的 8 分钟边界内返回 `COMMAND_TIMEOUT`；外部 readiness 始终保持旧候选 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`，没有发生部分切流，`Close SSH ingress` 为 `PASS`。因此该 Run 不重试。
+
+候选 `e064590049eecc05ad8db26e9ba94f51420d7397` 相对其直接父提交仅修改 Learner Web、Web 浏览器合同和治理证据；相对当前健康基线 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`，`apps/api/`、`apps/worker/`、`contracts/openapi.json` 与 `migrations/` 均无差异。后续部署范围收敛为 `deploy-web`：只拉取并替换候选 Web 镜像，API、Worker、migration、身份、角色、Journey 和业务事实保持基线；执行前后均核验基线运行态，失败自动回退 Web。P0-2 仍保持 `MACHINE_PASS / STAGING_NOT_UPDATED / HUMAN_5_SECOND_TEST_NOT_RUN`。
