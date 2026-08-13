@@ -112,8 +112,15 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
             "staging": "journey-next-staging-web-1:3000",
         },
         "deployed_components": {"web": CANDIDATE, "api": API, "worker": API},
+        "deployed_runtime_candidate": API,
         "heartbeat_release": API,
         "migration_revision": "0013_wp11_notify_observability",
+        "marker_relationships": {
+            "authorized_web": True,
+            "runtime_api": True,
+            "runtime_worker": True,
+        },
+        "marker_relationships_consistent": True,
         "web_release": CANDIDATE,
         "worker_release": WORKER,
         "worker_stale": True,
@@ -169,8 +176,13 @@ def test_inventory_rejects_missing_or_malformed_revision_evidence(
 def test_inventory_requires_authorized_deployed_candidate(monkeypatch, tmp_path: Path):
     install_component_markers(monkeypatch, tmp_path, web="5" * 40)
 
-    with pytest.raises(inventory.InventoryError, match="Web candidate differs"):
-        inventory.collect(CANDIDATE)
+    _, _, relationships = inventory._component_markers(CANDIDATE)
+    assert relationships == {
+        "authorized_web": False,
+        "runtime_api": True,
+        "runtime_worker": True,
+    }
+    assert all(relationships.values()) is False
 
 
 def test_component_markers_reject_runtime_component_mismatch(monkeypatch, tmp_path: Path):
@@ -179,8 +191,13 @@ def test_component_markers_reject_runtime_component_mismatch(monkeypatch, tmp_pa
         json.dumps({"web": CANDIDATE, "api": API, "worker": WORKER})
     )
 
-    with pytest.raises(inventory.InventoryError, match="API/Worker markers"):
-        inventory.collect(CANDIDATE)
+    _, _, relationships = inventory._component_markers(CANDIDATE)
+    assert relationships == {
+        "authorized_web": True,
+        "runtime_api": True,
+        "runtime_worker": False,
+    }
+    assert all(relationships.values()) is False
 
 
 def test_container_metadata_is_whitelisted_and_redacts_runtime_secrets(monkeypatch):

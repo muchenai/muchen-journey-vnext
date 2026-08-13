@@ -130,3 +130,5 @@ Web-only 部署合同通过 PR #204 合入主线 `7bcabf190fa41aa84fb2d129fca6c0
 P0-2 的机器实现和 staging 交付至此关闭。产品验收仍保留两项人工事实：逐一打开已发布 Journey V3 的真实外部材料，以及由三名未看说明的新 Learner 完成 5 秒理解测试。在两项均通过前，不把 P0-2 记为关闭，也不进入 P0-3。
 
 部署后刷新两个独立的已登录 `/ops` 会话，运行快照均报告 API/Worker `74fe855...` 与 migration `0020_wp09_reviewer_delegation`，而 Web-only 部署日志声称所保留基线为 API/Worker `e927c1...` 与 migration `0021_p0_identity_principal`。公开 readiness 只能证明 Web `e064590...`，不能证明其实际连接的后端版本。该矛盾存在期间暂停真人 P0-2 测试，先通过扩展后的 PII-free `inspect-runtime` 对账三组件 marker、实际容器、Compose 元数据、网络别名和 Caddy 上游；不部署、不改库、不修改业务事实。
+
+首次扩展 inventory Run `31702193785` 发现 `DEPLOYED_CANDIDATE` 与 `DEPLOYED_COMPONENTS` 的 API/Worker marker 不一致后立即停止，未输出实际容器清单；临时 SSH 正常关闭。marker 不一致正是待诊断事实，不应阻断实际容器只读盘点，因此后续审计器把各 marker 关系作为布尔结果输出，同时继续读取实际容器；仍不修 marker、不改变运行态。
