@@ -38,6 +38,14 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
   assert.doesNotMatch(actions, /\/join\?token=/);
 });
 
+test("expired Operator invitation action recovers through explicit Feishu login", () => {
+  assert.match(actions, /createLearnerInvite[\s\S]*?error instanceof ApiRequestError && error\.status === 401/);
+  assert.match(actions, /loginRequired: true/);
+  assert.match(panel, /state\.loginRequired/);
+  assert.match(panel, /href="\/auth\/feishu\?return_to=%2Fops"/);
+  assert.match(panel, />\s*重新使用飞书进入\s*</);
+});
+
 test("formal journey publication requires an explicit offline review attestation", () => {
   assert.match(panel, /已完成线下复核的 Reviewer/);
   assert.match(panel, /name="review_acknowledged" type="checkbox" required/);

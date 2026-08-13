@@ -50,11 +50,16 @@ export function proxy(request: NextRequest) {
     return withContentSecurityPolicy(response, policy);
   }
 
-  const isIdentityRoute = ["/ops"].some(
-    (prefix) => request.nextUrl.pathname === prefix
-      || request.nextUrl.pathname.startsWith(`${prefix}/`),
-  );
-  if (isIdentityRoute && !hasSession) {
+  const isOpsLogin = pathname === "/ops/login";
+  const isOpsRoute = pathname === "/ops" || pathname.startsWith("/ops/");
+  if (isOpsRoute && !isOpsLogin && !hasSession) {
+    const acceptsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+    const isServerAction = request.headers.has("next-action");
+    if (acceptsHtml || isServerAction) {
+      const response = NextResponse.redirect(new URL("/ops/login", request.url), 303);
+      response.headers.set("Cache-Control", "no-store");
+      return withContentSecurityPolicy(response, policy);
+    }
     const response = NextResponse.json(
       { error: { code: "AUTH_REQUIRED", message: "Authentication required." } },
       { status: 401 },

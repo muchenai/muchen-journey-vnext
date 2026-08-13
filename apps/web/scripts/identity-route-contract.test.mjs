@@ -11,15 +11,26 @@ const reviewLoginSource = readFileSync(
   new URL("../src/app/review/login/page.tsx", import.meta.url),
   "utf8",
 );
+const opsLoginSource = readFileSync(
+  new URL("../src/app/ops/login/page.tsx", import.meta.url),
+  "utf8",
+);
 const apiSource = readFileSync(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
-test("ops still rejects anonymous requests before rendering", () => {
+test("anonymous ops browser entry recovers without weakening JSON denial", () => {
+  assert.match(proxySource, /const isOpsLogin = pathname === "\/ops\/login";/);
+  assert.match(proxySource, /if \(isOpsRoute && !isOpsLogin && !hasSession\)/);
+  assert.match(proxySource, /request\.headers\.get\("accept"\)\?\.includes\("text\/html"\)/);
+  assert.match(proxySource, /request\.headers\.has\("next-action"\)/);
   assert.match(
     proxySource,
-    /\["\/ops"\]\.some\(/,
+    /NextResponse\.redirect\(new URL\("\/ops\/login", request\.url\), 303\)/,
   );
   assert.match(proxySource, /code: "AUTH_REQUIRED"/);
   assert.match(proxySource, /\{ status: 401 \}/);
+  assert.match(opsLoginSource, />\s*进入运营工作台\s*</);
+  assert.match(opsLoginSource, />\s*使用飞书进入\s*</);
+  assert.match(opsLoginSource, /href="\/auth\/feishu\?return_to=%2Fops"/);
 });
 
 test("anonymous and wrong-role review entry recover through a dedicated login page", () => {

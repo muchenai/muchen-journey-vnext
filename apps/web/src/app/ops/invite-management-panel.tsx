@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 
 import {
   createLearnerInvite,
@@ -161,10 +162,15 @@ function CreateInviteForm({
         {pending ? "正在生成…" : "生成 24 小时邀请链接"}
       </button>
       {state.error ? (
-        <p className="inline-error" role="alert">
-          {state.error}
+        <div className="inline-error" role="alert">
+          <p>{state.error}</p>
           {state.requestId ? <code>request ID: {state.requestId}</code> : null}
-        </p>
+          {state.loginRequired ? (
+            <Link className="button primary compact" href="/auth/feishu?return_to=%2Fops">
+              重新使用飞书进入
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </form>
   );
