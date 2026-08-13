@@ -103,3 +103,9 @@
 - 清理：隔离容器、网络和数据卷均已删除。
 
 证据边界：浏览器夹具只证明与生产相同的八站结构、状态机和 HTTPS 链接呈现，不证明已发布 Journey V3 外部材料当前可达；`AT-P0-202` 仍需正式内容源人工打开核验。`AT-P0-201` 三名新人 5 秒测试同样保持 `NOT_RUN`，因此 P0-2 尚未关闭，也不得开始 P0-3。
+
+## 7. 2026-08-13 staging 候选绑定
+
+PR #202 合入主线后，Mainline Candidate Gate `31693205762` 完整通过 `ci-main`、候选打包、三镜像推送、registry digest 核验和工件上传，形成 source tree clean 候选 `e064590049eecc05ad8db26e9ba94f51420d7397`。候选 migration head 仍为 `0021_p0_identity_principal`，没有新增 migration。
+
+本次变更只把 WP-08 staging 的不可变候选、工件 Run 与三项 registry digest 绑定到上述证据；不部署、不读取或修改 staging、不运行 Terraform plan/apply/import、不创建邀请、不发送消息，也不修改 Journey、身份、角色或其他业务事实。绑定 PR 合入后，staging 部署仍必须作为单独动作执行；在部署和真人核验发生前，P0-2 状态保持 `MACHINE_PASS / HUMAN_5_SECOND_TEST_NOT_RUN`。
