@@ -466,6 +466,8 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "WP08_RUNTIME_REPAIR=PASS",
         "DEPLOYED_CANDIDATE.tmp",
         "DEPLOYED_COMPONENTS.json",
+        'components["api"] == baseline',
+        'components["worker"] == baseline',
         "WP08_WEB_ONLY_DEPLOY=PASS",
     )
     if any(marker not in script for marker in web_only_markers):

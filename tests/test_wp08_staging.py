@@ -318,6 +318,8 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_RUNTIME_REPAIR=PASS",
                 "DEPLOYED_CANDIDATE.tmp",
                 "DEPLOYED_COMPONENTS.json",
+                'components["api"] == baseline',
+                'components["worker"] == baseline',
                 "WP08_WEB_ONLY_DEPLOY=PASS",
                 'if [[ "$DEPLOY_MODE" == "runtime-repair" ]]',
                 "verify_runtime_repair_prestate",
@@ -335,6 +337,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     )
     script.write_text(valid)
     staging.validate_deploy_script(script)
+
+    script.write_text(valid.replace('components["api"] == baseline', 'components["api"] == candidate'))
+    with pytest.raises(staging.StagingError, match="Web-only deployment contract is incomplete"):
+        staging.validate_deploy_script(script)
 
     script.write_text(valid + "\npython -m journey_api.seed\n")
     with pytest.raises(staging.StagingError, match="must not seed fixture business facts"):

@@ -236,8 +236,18 @@ if [[ "$DEPLOY_MODE" == "web-only" ]]; then
   [[ -L "$ROOT/current" ]] || fail "Web-only deploy requires an existing current release"
   previous=$(readlink -f "$ROOT/current")
   [[ -d "$previous" && -f "$previous/compose.yaml" ]] || fail "current release is invalid"
-  [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "deployed runtime baseline marker is missing"
-  [[ "$(cat "$ROOT/DEPLOYED_CANDIDATE")" == "$BASELINE_CANDIDATE" ]] || fail "deployed runtime baseline differs from the Web-only contract"
+  [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "latest deployed candidate marker is missing"
+  [[ -f "$ROOT/DEPLOYED_COMPONENTS.json" ]] || fail "deployed component marker is missing"
+  python3 - "$ROOT/DEPLOYED_COMPONENTS.json" "$BASELINE_CANDIDATE" <<'PY'
+import json
+import sys
+
+path, baseline = sys.argv[1:]
+components = json.loads(open(path, encoding="utf-8").read())
+assert set(components) == {"web", "api", "worker"}
+assert components["api"] == baseline
+assert components["worker"] == baseline
+PY
   previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
   verify_web_only_runtime "$previous" || fail "runtime baseline is not healthy and compatible"
   pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"
