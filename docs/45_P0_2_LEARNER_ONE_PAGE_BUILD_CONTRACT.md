@@ -162,3 +162,16 @@ PR #210 已将上述恢复路径合入主线 `58bebbecab0dac832ce85bfd2a0ac4ab85
 唯一部署 Run `31709352629` 在镜像拉取和容器替换前 fail-closed，原因是部署脚本仍把 `DEPLOYED_CANDIDATE` 解释为 API/Worker 基线；而第 9 节只读 inventory 已证明该 marker 在 Web-only 发布后表示最近部署的 Web 候选，精确组件基线应以 `DEPLOYED_COMPONENTS.json` 和真实容器为准。公开 readiness 仍为旧 Web `e064590...`，匿名 HTML `/ops` 仍返回旧版 `401`；临时 SSH 已关闭。本次 Run 不重试，也不声称 staging 已更新。
 
 最小修复只把 Web-only 写入前的静态 marker 预检改为：`DEPLOYED_COMPONENTS.json.api/worker` 必须精确等于 `e927c1...`；随后既有 `verify_web_only_runtime` 仍从运行容器、数据库 migration 和 Worker heartbeat 独立复验真实基线。它不放宽 runtime 验证、不修改 marker、数据库或业务事实，并增加 fail-closed 回归测试。任何后续 staging 发布都是新的独立尝试。
+
+## 14. Operator 恢复 staging 验收
+
+修复经 PR #212 合入后，新的独立 Web-only Run `31710086549` 成功：
+
+- 候选 Web 镜像第 1 次有界拉取通过；`WP08_WEB_ONLY_DEPLOY=PASS` 报告 Web=`58bebbecab0dac832ce85bfd2a0ac4ab852bfe5d`、API/Worker=`e927c1bbaf74a9107dadc7ebfafab4fa40f56454`；
+- API、Worker、migration 与 heartbeat 继续由既有真实运行态检查验证，migration 保持 `0021_p0_identity_principal`；
+- 公开表面在第 7 次有界尝试共同通过：root `200`、readiness `200/ready` 且 release 精确为 `58bebbe...`、非浏览器匿名 `/ops` `401`、`/review` 与 `/content` 安全进入各自登录页；
+- `WP08_SSH_INGRESS=CLOSED`，未运行 Terraform plan/apply/import、DNS、云资源写入、数据库迁移、seed、邀请或消息。
+
+部署后的独立真实浏览器复验再次证明：匿名 HTML 访问 `/ops` 得到 `303/no-store -> /ops/login`，页面显示唯一“使用飞书进入”动作；非浏览器 JSON 客户端仍为 `401`。恢复缺陷关闭。
+
+当前飞书授权页默认显示郑田源身份，该身份是 Content Editor/Reviewer，不是 Operator，因此没有执行错误授权。后续由既有 Operator 选择“使用其他账号”完成登录；登录后必须先只读核对是否已存在用途为 `P0-2 无引导理解测试 L1` 的邀请，再决定是否创建 L1/L2/L3，避免前次未知写入造成重复业务事实。`AT-P0-201` 仍为 `NOT_RUN`。
