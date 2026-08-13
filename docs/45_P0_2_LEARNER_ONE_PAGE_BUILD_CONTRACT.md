@@ -1,6 +1,6 @@
 # 45｜P0-2 Learner 一站式任务页施工合同
 
-状态：`MACHINE_PASS / HUMAN_5_SECOND_TEST_NOT_RUN`
+状态：`STAGING_PASS / HUMAN_CONTENT_AND_5_SECOND_TEST_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -115,3 +115,16 @@ PR #202 合入主线后，Mainline Candidate Gate `31693205762` 完整通过 `ci
 唯一一次全量部署 Run `31694785627` 在 `Deploy bounded staging release` 失败。三次镜像拉取均在合同规定的 8 分钟边界内返回 `COMMAND_TIMEOUT`；外部 readiness 始终保持旧候选 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`，没有发生部分切流，`Close SSH ingress` 为 `PASS`。因此该 Run 不重试。
 
 候选 `e064590049eecc05ad8db26e9ba94f51420d7397` 相对其直接父提交仅修改 Learner Web、Web 浏览器合同和治理证据；相对当前健康基线 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`，`apps/api/`、`apps/worker/`、`contracts/openapi.json` 与 `migrations/` 均无差异。后续部署范围收敛为 `deploy-web`：只拉取并替换候选 Web 镜像，API、Worker、migration、身份、角色、Journey 和业务事实保持基线；执行前后均核验基线运行态，失败自动回退 Web。P0-2 仍保持 `MACHINE_PASS / STAGING_NOT_UPDATED / HUMAN_5_SECOND_TEST_NOT_RUN`。
+
+## 9. Web-only staging 部署证据
+
+Web-only 部署合同通过 PR #204 合入主线 `7bcabf190fa41aa84fb2d129fca6c0af18903ab1`。唯一一次 `deploy-web` Run `31698795418` 成功完成：
+
+- 不可变合同确认候选 Web 为 `e064590049eecc05ad8db26e9ba94f51420d7397`，API/Worker 基线保持 `e927c1bbaf74a9107dadc7ebfafab4fa40f56454`；
+- 仅候选 Web 镜像在第 2 次有界拉取成功，第 1 次明确归类为 `TRANSIENT_NETWORK`；
+- `WP08_WEB_ONLY_DEPLOY=PASS`，migration 保持 `0021_p0_identity_principal`，未执行 Terraform plan/apply/import、DNS 或云资源写入；
+- 外部表面在第 6 次有界尝试全部通过：根页 `200`、readiness `200/ready` 且 release 精确为 `e064590...`、匿名 `/ops` 为 `401`、`/review` 与 `/content` 均 `303` 跳转各自登录页并带 `no-store`；
+- `WP08_SSH_INGRESS=CLOSED`，临时 SSH 已关闭；
+- 部署后的独立只读复验再次得到相同 release 与路由结果。
+
+P0-2 的机器实现和 staging 交付至此关闭。产品验收仍保留两项人工事实：逐一打开已发布 Journey V3 的真实外部材料，以及由三名未看说明的新 Learner 完成 5 秒理解测试。在两项均通过前，不把 P0-2 记为关闭，也不进入 P0-3。
