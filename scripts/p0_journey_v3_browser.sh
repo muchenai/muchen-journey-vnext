@@ -463,4 +463,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$re
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=8_stages route_geometry=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
