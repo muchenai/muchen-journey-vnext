@@ -43,6 +43,7 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
             return (
                 "apps/web/src/app/app/page.tsx\n"
                 "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md\n"
+                "scripts/wp08_web_runtime_check.py\n"
             )
         if args[:2] == ("diff", "--name-only") and "--" in args:
             return ""
@@ -84,6 +85,13 @@ def test_contract_rejects_widened_allowed_paths(tmp_path: Path):
     contract.write_text(json.dumps(payload))
     with pytest.raises(web_only.WebOnlyError, match="allowed paths"):
         web_only.load_contract(contract)
+
+
+def test_contract_accepts_runtime_browser_check_as_reviewed_web_evidence():
+    contract = web_only.load_contract()
+    allowed = contract["candidate_commit_allowed_paths"]
+    assert isinstance(allowed, list)
+    assert web_only._path_allowed("scripts/wp08_web_runtime_check.py", allowed)
 
 
 def test_contract_cannot_be_retired_while_candidate_is_pending(tmp_path: Path):

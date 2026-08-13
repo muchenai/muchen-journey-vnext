@@ -148,3 +148,11 @@ P0-2 当前唯一未关闭的产品门禁是 `AT-P0-201`：三名未看说明、
 2026-08-13 准备三条独立测试邀请时，当前 Operator 会话已经失效。直接提交邀请表单未进入 API 写入，而是被 Web 代理返回的裸 `AUTH_REQUIRED` 响应带入全局失败页；因此没有继续创建 L2/L3，也没有把 L1 记为已创建。该现象违反第 3.5 节“失败必须提供可执行恢复动作”的合同。
 
 修复范围只包含 Operator Web 恢复路径：HTML 导航和过期后的 Server Action 安全转入 `/ops/login`，页面只提供“使用飞书进入”主动作并固定回到 `/ops`；非浏览器 JSON 请求继续 `401/no-store`，不削弱 fail-closed 边界。修复不得读取或修改身份、角色、邀请、Journey 或数据库事实。部署前 `AT-P0-201` 继续为 `NOT_RUN`。
+
+## 12. Operator 恢复候选绑定
+
+PR #210 已将上述恢复路径合入主线 `58bebbecab0dac832ce85bfd2a0ac4ab852bfe5d`。Fast Gate `31707252769` 与 Mainline Candidate Gate `31707513746` 均通过；候选 migration 仍为 `0021_p0_identity_principal`，OpenAPI 摘要仍为 `d116ce052e41f1fd8757a3e9d585a035eb8fbc998b0d27fbd80d3fd9c2ac3389`。候选 Web registry digest 为 `sha256:35ba32c25b40dc0447a3f6ef84be68815e045c2780ad78bc8a93da737582a3cc`。
+
+本次部署合同继续收敛为 Web-only：Web 升级至 `58bebbe...`，API、Worker 与 migration 保持健康基线 `e927c1... / 0021_p0_identity_principal`。候选相对直接父提交只修改 Web、P0-2 证据和真实 Web 运行合同；不修改 API、Worker、OpenAPI 或 migration。绑定本身不部署，也不修改 Journey、邀请、身份、角色或业务事实。
+
+真人报告再次确认 `/content = 正常`、`/review = 正常`；该证据关闭 P0-1 双角色入口，不替代 P0-2 的三人无引导理解测试。`AT-P0-201` 继续为 `NOT_RUN`。
