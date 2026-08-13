@@ -156,3 +156,9 @@ PR #210 已将上述恢复路径合入主线 `58bebbecab0dac832ce85bfd2a0ac4ab85
 本次部署合同继续收敛为 Web-only：Web 升级至 `58bebbe...`，API、Worker 与 migration 保持健康基线 `e927c1... / 0021_p0_identity_principal`。候选相对直接父提交只修改 Web、P0-2 证据和真实 Web 运行合同；不修改 API、Worker、OpenAPI 或 migration。绑定本身不部署，也不修改 Journey、邀请、身份、角色或业务事实。
 
 真人报告再次确认 `/content = 正常`、`/review = 正常`；该证据关闭 P0-1 双角色入口，不替代 P0-2 的三人无引导理解测试。`AT-P0-201` 继续为 `NOT_RUN`。
+
+## 13. Web-only 预检停止
+
+唯一部署 Run `31709352629` 在镜像拉取和容器替换前 fail-closed，原因是部署脚本仍把 `DEPLOYED_CANDIDATE` 解释为 API/Worker 基线；而第 9 节只读 inventory 已证明该 marker 在 Web-only 发布后表示最近部署的 Web 候选，精确组件基线应以 `DEPLOYED_COMPONENTS.json` 和真实容器为准。公开 readiness 仍为旧 Web `e064590...`，匿名 HTML `/ops` 仍返回旧版 `401`；临时 SSH 已关闭。本次 Run 不重试，也不声称 staging 已更新。
+
+最小修复只把 Web-only 写入前的静态 marker 预检改为：`DEPLOYED_COMPONENTS.json.api/worker` 必须精确等于 `e927c1...`；随后既有 `verify_web_only_runtime` 仍从运行容器、数据库 migration 和 Worker heartbeat 独立复验真实基线。它不放宽 runtime 验证、不修改 marker、数据库或业务事实，并增加 fail-closed 回归测试。任何后续 staging 发布都是新的独立尝试。
