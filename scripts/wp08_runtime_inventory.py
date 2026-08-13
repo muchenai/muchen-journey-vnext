@@ -212,7 +212,7 @@ def _require_release(value: object, label: str) -> str:
 
 def _component_markers(candidate: str) -> tuple[dict[str, str], str, dict[str, bool]]:
     deployed = _require_release(
-        DEPLOYED_CANDIDATE.read_text().strip(), "deployed runtime candidate marker"
+        DEPLOYED_CANDIDATE.read_text().strip(), "deployed candidate marker"
     )
     web = _require_release(
         DEPLOYED_WEB_CANDIDATE.read_text().strip(), "deployed Web candidate marker"
@@ -229,8 +229,7 @@ def _component_markers(candidate: str) -> tuple[dict[str, str], str, dict[str, b
     }
     relationships = {
         "authorized_web": web == candidate and components["web"] == candidate,
-        "runtime_api": deployed == components["api"],
-        "runtime_worker": deployed == components["worker"],
+        "latest_deploy_web": deployed == components["web"],
     }
     return components, deployed, relationships
 
@@ -318,7 +317,7 @@ print(json.dumps({
         "compose_singleton_services": all(count == 1 for count in service_counts.values()),
         "caddy_upstreams": caddy_upstreams,
         "deployed_components": components,
-        "deployed_runtime_candidate": deployed,
+        "deployed_candidate": deployed,
         "heartbeat_release": _require_release(
             worker.get("heartbeat_release"), "heartbeat release"
         ),

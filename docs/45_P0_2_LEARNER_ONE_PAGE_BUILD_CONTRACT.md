@@ -1,6 +1,6 @@
 # 45｜P0-2 Learner 一站式任务页施工合同
 
-状态：`WEB_STAGING_PASS / RUNTIME_TRUTH_RECONCILIATION_IN_PROGRESS / HUMAN_TEST_NOT_RUN`
+状态：`WEB_STAGING_PASS / HUMAN_TEST_NOT_RUN`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -132,3 +132,5 @@ P0-2 的机器实现和 staging 交付至此关闭。产品验收仍保留两项
 部署后刷新两个独立的已登录 `/ops` 会话，运行快照均报告 API/Worker `74fe855...` 与 migration `0020_wp09_reviewer_delegation`，而 Web-only 部署日志声称所保留基线为 API/Worker `e927c1...` 与 migration `0021_p0_identity_principal`。公开 readiness 只能证明 Web `e064590...`，不能证明其实际连接的后端版本。该矛盾存在期间暂停真人 P0-2 测试，先通过扩展后的 PII-free `inspect-runtime` 对账三组件 marker、实际容器、Compose 元数据、网络别名和 Caddy 上游；不部署、不改库、不修改业务事实。
 
 首次扩展 inventory Run `31702193785` 发现 `DEPLOYED_CANDIDATE` 与 `DEPLOYED_COMPONENTS` 的 API/Worker marker 不一致后立即停止，未输出实际容器清单；临时 SSH 正常关闭。marker 不一致正是待诊断事实，不应阻断实际容器只读盘点，因此后续审计器把各 marker 关系作为布尔结果输出，同时继续读取实际容器；仍不修 marker、不改变运行态。
+
+纠偏后的只读 inventory Run `31702773602` 成功并关闭临时 SSH：实际 Web `e064590...`、API/Worker `e927c1...`、migration `0021_p0_identity_principal`，三组件均与 `DEPLOYED_COMPONENTS.json` 精确一致；四个 Compose 服务均为单实例、网络别名唯一，Caddy staging 上游指向唯一 Web。原矛盾来自把最近一次 Web-only 候选 marker 错解释为后端 marker，而非实际运行态回退。运行态真相对账关闭，可以恢复 P0-2 的真实材料与 3 人 5 秒理解测试。

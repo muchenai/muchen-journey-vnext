@@ -194,7 +194,7 @@ def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> 
         "SELECT release,last_seen_at FROM worker_heartbeats",
         "WP08_RUNTIME_INVENTORY=",
         '"deployed_components"',
-        '"deployed_runtime_candidate"',
+        '"deployed_candidate"',
         '"component_marker_matches"',
         '"component_markers_match_runtime"',
         '"marker_relationships"',
