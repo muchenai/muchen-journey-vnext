@@ -398,9 +398,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-brief-deliverables { padding: 20px 22px; background: #f4f8f7; border: 1px solid #dce8e5; border-radius: 18px; }
 .task-brief-deliverables h3 { margin-top: 0; }
 .task-brief-deliverables .checklist { margin-bottom: 0; }
-.task-supporting-rules { margin-top: 20px; }
-.task-supporting-rules summary { width: max-content; max-width: 100%; cursor: pointer; color: #20877f; font-weight: 750; }
-.task-supporting-rules[open] summary { margin-bottom: 22px; }
+.task-supporting-rules { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-default); }
+.task-supporting-rules h3 { margin-top: 0; }
+.task-supporting-rules .checklist { margin-bottom: 0; }
 .task-contract { cursor: default; }
 .task-contract summary { cursor: pointer; color: #20877f; font-weight: 750; }
 .task-contract[open] summary { margin-bottom: 22px; }
@@ -451,7 +451,6 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-locked small { margin-top: 10px; }
 .learning-material-list form { margin: 0; }
 .material-complete-label { display: inline-block; color: #18794e; font-size: 14px; font-weight: 800; }
-.task-locked-message { margin: 20px 0 0; padding: 18px; color: #19445e; background: #edf5ff; border-radius: 14px; font-weight: 700; }
 .response-map { margin: 16px 0 20px; padding: 14px 18px; background: #edf5ff; border-radius: 14px; }
 .response-map summary { cursor: pointer; color: #19445e; font-weight: 750; }
 .response-map ol { margin-bottom: 0; }

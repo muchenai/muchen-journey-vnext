@@ -84,7 +84,12 @@ function RouteMapSvg({
         );
 
         return node.status === "CURRENT" ? (
-          <g key={node.stable_key} transform={`translate(${x} ${y})`}>
+          <g
+            className="route-node-anchor"
+            data-route-index={index}
+            key={node.stable_key}
+            transform={`translate(${x} ${y})`}
+          >
             <a
               className={`route-node-visual route-node-link ${stateClass}`}
               href={`/app/tasks/${node.assignment_id}`}
@@ -94,7 +99,8 @@ function RouteMapSvg({
           </g>
         ) : (
           <g
-            className={`route-node-visual ${stateClass}`}
+            className={`route-node-anchor route-node-visual ${stateClass}`}
+            data-route-index={index}
             key={node.stable_key}
             transform={`translate(${x} ${y})`}
           >

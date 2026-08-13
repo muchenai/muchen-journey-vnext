@@ -16,6 +16,8 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.match(component, /points\.map\(\(point\) => point\.join/);
   assert.match(component, /points\.slice\(0, journey\.nodes\.length\)\.map/);
   assert.match(component, /transform=\{`translate\(\$\{x\} \$\{y\}\)`\}/);
+  assert.match(component, /className="route-node-anchor"/);
+  assert.match(component, /data-route-index=\{index\}/);
   assert.doesNotMatch(component, /--route-x-/);
   assert.doesNotMatch(component, /style=\{pointStyle\}/);
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);

@@ -121,10 +121,7 @@ export default async function TaskPage({
       {assignment.learning_materials.length > 0 ? (
         <section className="learning-materials" aria-labelledby="learning-materials-title">
           <div className="learning-materials-heading">
-            <div>
-              <p className="section-label">先完成输入</p>
-              <h2 id="learning-materials-title">学习材料</h2>
-            </div>
+            <h2 id="learning-materials-title">学习材料</h2>
             <strong>
               {requiredMaterials.filter((material) => material.completed_at).length}
               /{requiredMaterials.length}
@@ -203,11 +200,6 @@ export default async function TaskPage({
               );
             })}
           </ol>
-          {!materialsReady ? (
-            <p className="task-locked-message" role="status">
-              完成当前材料后，小任务会自动出现。
-            </p>
-          ) : null}
         </section>
       ) : null}
 
@@ -245,48 +237,44 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      {materialsReady ? (
-        <section className="task-brief" aria-labelledby="task-brief-title">
-          <p className="section-label">这一站要完成</p>
-          <h2 id="task-brief-title">{assignment.learner_outcome}</h2>
+      <section className="task-brief" aria-labelledby="task-brief-title">
+        <p className="section-label">这一站要完成</p>
+        <h2 id="task-brief-title">{assignment.learner_outcome}</h2>
 
-          <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
-            <h3 id="task-deliverables-title">需要提交</h3>
+        <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
+          <h3 id="task-deliverables-title">需要提交</h3>
+          <ul className="checklist">
+            {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+
+        <div className="task-supporting-rules task-contract-columns">
+          <div>
+            <h3>怎么做</h3>
+            <ol className="checklist">
+              {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+          </div>
+          <div>
+            <h3>完成标准</h3>
             <ul className="checklist">
-              {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
+              {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
-
-          <details className="task-supporting-rules">
-            <summary>需要时查看方法与完成标准</summary>
-            <div className="task-contract-columns">
-              <div>
-                <h3>如何完成</h3>
-                <ol className="checklist">
-                  {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
-                </ol>
-              </div>
-              <div>
-                <h3>完成标准</h3>
-                <ul className="checklist">
-                  {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </div>
-              {assignment.reference_materials.length > 0 ? (
-                <div>
-                  <h3>参考资料</h3>
-                  <ul className="checklist">
-                    {assignment.reference_materials.map((item) => <li key={item}>{item}</li>)}
-                  </ul>
-                </div>
-              ) : null}
+          {assignment.reference_materials.length > 0 ? (
+            <div>
+              <h3>参考资料</h3>
+              <ul className="checklist">
+                {assignment.reference_materials.map((item) => (
+                  <li key={item}>{textWithSafeLinks(item)}</li>
+                ))}
+              </ul>
             </div>
-          </details>
-        </section>
-      ) : null}
+          ) : null}
+        </div>
+      </section>
 
       {materialsReady ? <section className="task-workspace" aria-labelledby="task-workspace-title">
-      <p className="section-label">完成本阶段</p>
       <h2 id="task-workspace-title">
         {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "提交你的作答" : "留下学习证据"}
       </h2>

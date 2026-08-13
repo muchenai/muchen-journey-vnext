@@ -6,6 +6,7 @@ evidence_dir="$repo_root/output/playwright/p0-journey-v3"
 project_name="journey-next-p0-browser-$$"
 initial_learner_session="p0-v3-learner-$$"
 learner_reentry_session="p0-v3-learner-reentry-$$"
+invalid_invite_session="p0-v3-invalid-invite-$$"
 learner_session="$initial_learner_session"
 reviewer_session="p0-v3-reviewer-$$"
 operator_session="p0-v3-operator-$$"
@@ -19,6 +20,7 @@ runtime_config="$evidence_dir/cli.config.json"
 cleanup() {
     bash "$PLAYWRIGHT_CLI" -s="$initial_learner_session" close >/dev/null 2>&1 || true
     bash "$PLAYWRIGHT_CLI" -s="$learner_reentry_session" close >/dev/null 2>&1 || true
+    bash "$PLAYWRIGHT_CLI" -s="$invalid_invite_session" close >/dev/null 2>&1 || true
     bash "$PLAYWRIGHT_CLI" -s="$reviewer_session" close >/dev/null 2>&1 || true
     bash "$PLAYWRIGHT_CLI" -s="$operator_session" close >/dev/null 2>&1 || true
     docker compose --project-directory "$repo_root" -p "$project_name" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -72,6 +74,7 @@ Path(sys.argv[1]).write_text(
 PY
 
 learner_log="$evidence_dir/learner-cli.log"
+recovery_log="$evidence_dir/recovery-cli.log"
 reviewer_log="$evidence_dir/reviewer-cli.log"
 operator_log="$evidence_dir/operator-cli.log"
 pw_learner() {
@@ -83,6 +86,27 @@ pw_reviewer() {
 pw_operator() {
     bash "$PLAYWRIGHT_CLI" -s="$operator_session" "$@" >>"$operator_log" 2>&1
 }
+
+# Invalid tokens must fail without creating a join fact and without exposing raw API JSON.
+bash "$PLAYWRIGHT_CLI" -s="$invalid_invite_session" open \
+    "$base_url/join#token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+    --config "$runtime_config" >/dev/null 2>&1
+bash "$PLAYWRIGHT_CLI" -s="$invalid_invite_session" run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  await page.locator('#display-name').fill('Invalid Invite Browser Check');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', {name: '开启旅程'}).click();
+  await page.waitForURL('**/join?code=INVITE_EXPIRED_OR_REVOKED**');
+  await page.waitForLoadState('networkidle');
+  const body = await page.locator('body').innerText();
+  if (!body.includes('邀请无效、已过期、已撤销或已经使用')) {
+    throw new Error('invalid invite does not provide a safe recovery message');
+  }
+  if (body.includes('Authentication required.') || body.includes('{\"error\"')) {
+    throw new Error('invalid invite exposes a raw API response');
+  }
+  await page.screenshot({path: '$evidence_dir/00-invalid-invite.png', fullPage: true});
+}" >>"$recovery_log" 2>&1
 
 # The credential is intentionally neither printed nor retained in evidence.
 bash "$PLAYWRIGHT_CLI" -s="$learner_session" open \
@@ -121,24 +145,73 @@ pw_learner run-code "async (page) => {
   await page.waitForLoadState('networkidle');
   const progress = (await page.locator('[aria-label^="已完成"]').getAttribute('aria-label')) ?? '';
   if (!/已完成\s+0\s*\/\s*8\s+站/.test(progress)) throw new Error('Journey V3 progress missing');
-  await page.setViewportSize({width: 390, height: 844});
-  const currentStage = await page.locator('.current-stage-card').boundingBox();
-  const routeMap = await page.locator('.journey-map').boundingBox();
-  if (!currentStage || !routeMap || currentStage.y >= routeMap.y) {
-    throw new Error('mobile route does not put the current action before the map');
+  for (const viewport of [
+    {name: 'desktop', width: 1280, height: 900},
+    {name: 'tablet', width: 768, height: 1024},
+    {name: 'mobile', width: 390, height: 844},
+  ]) {
+    await page.setViewportSize({width: viewport.width, height: viewport.height});
+    const geometry = await page.evaluate(() => {
+      const maps = Array.from(document.querySelectorAll('.journey-route-map'));
+      const svg = maps.find((item) => getComputedStyle(item).display !== 'none');
+      if (!(svg instanceof SVGSVGElement)) return {error: 'visible_svg_missing'};
+      const line = svg.querySelector('polyline');
+      const matrix = svg.getScreenCTM();
+      if (!(line instanceof SVGPolylineElement) || !matrix) return {error: 'line_missing'};
+      const anchors = Array.from(svg.querySelectorAll('.route-node-anchor'));
+      const distances = anchors.map((anchor) => {
+        const index = Number(anchor.getAttribute('data-route-index'));
+        const routePoint = line.points.getItem(index);
+        const point = svg.createSVGPoint();
+        point.x = routePoint.x;
+        point.y = routePoint.y;
+        const projected = point.matrixTransform(matrix);
+        const orb = anchor.querySelector('.route-node-orb');
+        const box = orb?.getBoundingClientRect();
+        if (!box) return Number.POSITIVE_INFINITY;
+        return Math.hypot(box.left + box.width / 2 - projected.x, box.top + box.height / 2 - projected.y);
+      });
+      return {maxDistance: Math.max(...distances), nodes: anchors.length};
+    });
+    if ('error' in geometry || geometry.nodes !== 8 || geometry.maxDistance > 1.5) {
+      throw new Error(viewport.name + ': route nodes drifted off shared line geometry: ' + JSON.stringify(geometry));
+    }
+    if (await page.locator('.button.primary:visible').count() !== 1) {
+      throw new Error(viewport.name + ': route does not have one primary next action');
+    }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    if (overflow) throw new Error(viewport.name + ': route has horizontal overflow');
+    if (viewport.name === 'mobile') {
+      const currentStage = await page.locator('.current-stage-card').boundingBox();
+      const routeMap = await page.locator('.journey-map').boundingBox();
+      if (!currentStage || !routeMap || currentStage.y >= routeMap.y) {
+        throw new Error('mobile route does not put the current action before the map');
+      }
+    }
+    await page.screenshot({
+      path: '$evidence_dir/01-first-station-' + viewport.name + '.png',
+      fullPage: true,
+    });
   }
-  if (await page.locator('.button.primary:visible').count() !== 1) {
-    throw new Error('mobile route does not have one primary next action');
-  }
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-  if (overflow) throw new Error('mobile route has horizontal overflow');
-  await page.screenshot({
-    path: '$evidence_dir/01-first-station-mobile.png',
-    fullPage: true,
-  });
   await page.setViewportSize({width: 1280, height: 900});
 }"
 pw_learner screenshot --filename "$evidence_dir/01-first-station.png" --full-page
+
+# A missing assignment exercises the bounded service-failure surface without changing business facts.
+pw_learner goto "$base_url/app/tasks/00000000-0000-0000-0000-000000000000"
+pw_learner run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  const body = await page.locator('body').innerText();
+  if (!body.includes('操作没有完成') || !body.includes('重试') || !body.includes('返回我的旅程')) {
+    throw new Error('service failure does not provide retry and return actions');
+  }
+  if (body.includes('Authentication required.') || body.includes('{\"error\"')) {
+    throw new Error('service failure exposes a raw API response');
+  }
+}"
+pw_learner screenshot --filename "$evidence_dir/01-service-failure.png" --full-page
+pw_learner goto "$base_url/app"
+pw_learner run-code "async (page) => { await page.waitForLoadState('networkidle'); }"
 
 pw_operator goto "$base_url/ops#learner-invites"
 pw_operator run-code "async (page) => {
@@ -161,9 +234,24 @@ pw_operator screenshot --filename "$evidence_dir/01-invite-statuses.png" --full-
 complete_stage() {
     stage_no=$1
     pw_learner run-code "async (page) => {
-      await page.getByRole('link', {name: '进入这一站'}).click();
+      await page.getByRole('link', {name: '开始', exact: true}).click();
       await page.waitForURL('**/app/tasks/**');
       await page.waitForLoadState('networkidle');
+      const brief = page.locator('.task-brief');
+      if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
+      const briefText = await brief.innerText();
+      if (!briefText.includes('需要提交') || !briefText.includes('怎么做') || !briefText.includes('完成标准')) {
+        throw new Error('stage $stage_no task requirements are not visible on first entry');
+      }
+      if (await brief.locator('details').count()) {
+        throw new Error('stage $stage_no task requirements are hidden in disclosure');
+      }
+      if (await page.locator('.task-workspace').count() !== 0) {
+        throw new Error('stage $stage_no response workspace appeared before learning input');
+      }
+      if (await page.locator('.button.primary:visible').count() !== 1) {
+        throw new Error('stage $stage_no does not have one primary next action');
+      }
       if ($stage_no === 1) {
         for (const viewport of [
           {name: 'desktop', width: 1280, height: 900},
@@ -173,12 +261,6 @@ complete_stage() {
           await page.setViewportSize({width: viewport.width, height: viewport.height});
           if (await page.locator('.learning-material-card[open]').count() !== 1) {
             throw new Error(viewport.name + ': current material is not the only expanded card');
-          }
-          if (await page.locator('.task-workspace').count() !== 0) {
-            throw new Error(viewport.name + ': response workspace appeared before learning input');
-          }
-          if (await page.locator('.button.primary:visible').count() !== 1) {
-            throw new Error(viewport.name + ': task page does not have one primary next action');
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
           if (overflow) throw new Error(viewport.name + ': task page has horizontal overflow');
@@ -218,8 +300,8 @@ complete_stage() {
           if (!(await brief.innerText()).includes('需要提交')) {
             throw new Error(viewport.name + ': required deliverables are not visible before response');
           }
-          if (await brief.locator('.task-supporting-rules[open]').count() !== 0) {
-            throw new Error(viewport.name + ': supporting rules should remain folded by default');
+          if (!(await brief.innerText()).includes('怎么做') || !(await brief.innerText()).includes('完成标准')) {
+            throw new Error(viewport.name + ': complete task requirements are not visible');
           }
           const briefBox = await brief.boundingBox();
           const workspaceBox = await workspace.boundingBox();
@@ -250,7 +332,7 @@ complete_revision() {
     pw_learner run-code "async (page) => {
       const body = await page.locator('body').innerText();
       if (!body.includes('根据反馈修订任务')) throw new Error('revision state missing');
-      await page.getByRole('link', {name: '进入这一站'}).click();
+      await page.getByRole('link', {name: '继续修订', exact: true}).click();
       await page.waitForLoadState('networkidle');
       const input = page.locator('#submission-body');
       await input.fill((await input.inputValue()) + ' 修订补充：新增一条可复核证据，并明确判断失效时的停止条件。');
@@ -331,6 +413,13 @@ pw_learner run-code "async (page) => {
   if (!page.url().includes('auth_error=LEARNER_SESSION_EXPIRED')) {
     throw new Error('old learner session was not rotated after reentry');
   }
+  const body = await page.locator('body').innerText();
+  if (!body.includes('新人会话已失效') || !body.includes('一次性重新进入链接')) {
+    throw new Error('expired learner session does not provide the safe reentry path');
+  }
+  if (body.includes('Authentication required.') || body.includes('{\"error\"')) {
+    throw new Error('expired learner session exposes a raw API response');
+  }
 }"
 learner_session="$learner_reentry_session"
 pw_learner screenshot --filename "$evidence_dir/02-revision-required.png" --full-page
@@ -348,7 +437,7 @@ complete_review approve
 pw_learner reload
 pw_learner run-code "async (page) => {
   const resultPage = page.waitForURL('**/app/result');
-  await page.getByRole('link', {name: '打开旅程结果'}).evaluate((element) => element.click());
+  await page.getByRole('link', {name: '查看结果', exact: true}).evaluate((element) => element.click());
   await resultPage;
   await page.waitForLoadState('networkidle');
   const visibleBody = await page.locator('body').innerText();
@@ -369,9 +458,9 @@ pw_learner screenshot --filename "$evidence_dir/03-journey-details.png" --full-p
 pw_learner console error
 pw_reviewer console error
 pw_operator console error
-if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$reviewer_log" "$operator_log"; then
+if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$recovery_log" "$reviewer_log" "$operator_log"; then
     printf '%s\n' "P0_BROWSER_ERROR=console_error" >&2
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
