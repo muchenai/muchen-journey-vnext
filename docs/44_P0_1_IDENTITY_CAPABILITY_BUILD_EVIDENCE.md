@@ -1,6 +1,6 @@
 # 44｜P0-1 身份中心化与多角色访问施工证据
 
-状态：`HUMAN_FEISHU_PASS / STAGING_RUNTIME_TRUTH_RECONCILIATION_IN_PROGRESS`
+状态：`CLOSED / HUMAN_FEISHU_PASS / STAGING_MACHINE_PASS`
 日期：2026-08-13
 上位合同：[42｜第一性原理产品与工程总基线](42_FIRST_PRINCIPLES_PRODUCT_AND_ENGINEERING_BASELINE.md)、[43｜P0、P1、P2 总施工计划](43_P0_P1_P2_EXECUTION_MASTER_PLAN.md)
 
@@ -66,6 +66,8 @@ Python 依赖审计工具在容器内下载 `defusedxml` 时持续遇到 `files.
 唯一 WIP 已切换为 P0-2 Learner 一站式任务页。
 
 2026-08-13 后续只读核验发现运行证据冲突：两个真实入口均已通过，但刷新后的 `/ops` 运行快照仍报告 API/Worker `74fe855...`、migration `0020_wp09_reviewer_delegation`，与本节记录的 `e927c1...`、`0021_p0_identity_principal` 不一致。该冲突不能解释为页面缓存，也不能以先前 workflow 成功覆盖。P0-1 的真人产品结果保留，但 staging 机器关闭状态暂时重新打开；在 PII-free inventory 证明实际容器、Compose、网络与 Edge 路由前，不再声称 `STAGING_MACHINE_PASS`。
+
+纠偏后的只读 inventory Run `31702773602` 已消除该疑点：实际 Web 为 `e064590...`，API、API readiness、Worker heartbeat 均为 `e927c1...`，migration 为 `0021_p0_identity_principal`；Web/API/Worker/Edge 各一实例、同属 `journey-next-staging` Compose 项目和同一网络，Caddy staging 上游为唯一 Web 容器，临时 SSH 正常关闭。此前 `/ops` 截图不是当前运行态证据。`DEPLOYED_CANDIDATE` 在 Web-only 后记录最近部署的 Web 候选，不能再被解释成 API/Worker marker；精确组件事实由 `DEPLOYED_COMPONENTS.json` 与实际容器共同证明。P0-1 的机器与真人门禁至此关闭。
 
 ## 7. 首次部署授权的安全停止与修复
 

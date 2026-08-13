@@ -112,15 +112,14 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
             "staging": "journey-next-staging-web-1:3000",
         },
         "deployed_components": {"web": CANDIDATE, "api": API, "worker": API},
-        "deployed_runtime_candidate": API,
+        "deployed_candidate": API,
         "heartbeat_release": API,
         "migration_revision": "0013_wp11_notify_observability",
         "marker_relationships": {
             "authorized_web": True,
-            "runtime_api": True,
-            "runtime_worker": True,
+            "latest_deploy_web": False,
         },
-        "marker_relationships_consistent": True,
+        "marker_relationships_consistent": False,
         "web_release": CANDIDATE,
         "worker_release": WORKER,
         "worker_stale": True,
@@ -179,23 +178,22 @@ def test_inventory_requires_authorized_deployed_candidate(monkeypatch, tmp_path:
     _, _, relationships = inventory._component_markers(CANDIDATE)
     assert relationships == {
         "authorized_web": False,
-        "runtime_api": True,
-        "runtime_worker": True,
+        "latest_deploy_web": False,
     }
     assert all(relationships.values()) is False
 
 
-def test_component_markers_reject_runtime_component_mismatch(monkeypatch, tmp_path: Path):
+def test_component_markers_allow_independent_component_releases(monkeypatch, tmp_path: Path):
     install_component_markers(monkeypatch, tmp_path)
     inventory.DEPLOYED_COMPONENTS.write_text(
         json.dumps({"web": CANDIDATE, "api": API, "worker": WORKER})
     )
 
-    _, _, relationships = inventory._component_markers(CANDIDATE)
+    components, _, relationships = inventory._component_markers(CANDIDATE)
+    assert components == {"web": CANDIDATE, "api": API, "worker": WORKER}
     assert relationships == {
         "authorized_web": True,
-        "runtime_api": True,
-        "runtime_worker": False,
+        "latest_deploy_web": False,
     }
     assert all(relationships.values()) is False
 
