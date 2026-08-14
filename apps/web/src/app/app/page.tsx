@@ -6,7 +6,12 @@ import { JourneyMap } from "./journey-map";
 
 export const dynamic = "force-dynamic";
 
-export default async function LearnerHome() {
+export default async function LearnerHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ transition?: string }>;
+}) {
+  const query = await searchParams;
   const [action, hasSession] = await Promise.all([
     learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
     hasVNextSession(),
@@ -25,8 +30,20 @@ export default async function LearnerHome() {
 
   return (
     <section className={action.journey ? "learner-journey-page" : "content-narrow"}>
+      {query.transition === "submitted" ? (
+        <section className="journey-transition" role="status" aria-labelledby="journey-transition-title">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p className="eyebrow">这一站已保存</p>
+            <h1 id="journey-transition-title">
+              {opensTask ? "下一站已解锁" : "已经交给 Reviewer"}
+            </h1>
+            <p>{opensTask ? "路线已经更新，继续从当前路标出发。" : "你的提交与版本已经保留，等待真人反馈。"}</p>
+          </div>
+        </section>
+      ) : null}
       {action.journey ? <JourneyMap journey={action.journey} /> : null}
-      <article className={action.journey ? "current-stage-card" : "status-card"}>
+      <article id="next-action" className={action.journey ? "current-stage-card" : "status-card"}>
         <div>
           <span className="stage-pulse" aria-hidden="true" />
           <p className="eyebrow">{action.stage}</p>

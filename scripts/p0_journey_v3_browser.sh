@@ -240,7 +240,7 @@ complete_stage() {
       const brief = page.locator('.task-brief');
       if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
       const briefText = await brief.innerText();
-      if (!briefText.includes('需要提交') || !briefText.includes('怎么做') || !briefText.includes('完成标准')) {
+      if (!briefText.includes('你要交付什么') || !briefText.includes('怎么做') || !briefText.includes('完成标准')) {
         throw new Error('stage $stage_no task requirements are not visible on first entry');
       }
       if (await brief.locator('details').count()) {
@@ -279,9 +279,9 @@ complete_stage() {
           throw new Error('stage $stage_no material is not HTTPS');
         }
       }
-      while (await page.getByRole('button', {name: '完成并继续'}).count()) {
-        const completed = page.waitForURL('**?material=completed');
-        await page.getByRole('button', {name: '完成并继续'}).first().evaluate((element) => element.click());
+      while (await page.getByRole('button', {name: /完成，打开下一份|完成材料，开始/}).count()) {
+        const completed = page.waitForURL('**?material=completed*');
+        await page.getByRole('button', {name: /完成，打开下一份|完成材料，开始/}).first().evaluate((element) => element.click());
         await completed;
         await page.waitForLoadState('networkidle');
       }
@@ -297,7 +297,7 @@ complete_stage() {
           if (await brief.count() !== 1 || await workspace.count() !== 1) {
             throw new Error(viewport.name + ': visible task brief or response workspace missing after learning input');
           }
-          if (!(await brief.innerText()).includes('需要提交')) {
+          if (!(await brief.innerText()).includes('你要交付什么')) {
             throw new Error(viewport.name + ': required deliverables are not visible before response');
           }
           if (!(await brief.innerText()).includes('怎么做') || !(await brief.innerText()).includes('完成标准')) {
@@ -317,14 +317,40 @@ complete_stage() {
         }
         await page.setViewportSize({width: 1280, height: 900});
       }
-      if (await page.getByRole('button', {name: '开始小任务'}).count()) {
-        await page.getByRole('button', {name: '开始小任务'}).click();
-        await page.waitForLoadState('networkidle');
+      if (await page.getByRole('button', {name: /开始本主题实践|开始评测/}).count()) {
+        await page.getByRole('button', {name: /开始本主题实践|开始评测/}).click();
+        await page.locator('#submission-body').waitFor({state: 'visible'});
+      }
+      if ($stage_no >= 6) {
+        const evidence = page.locator('#evidence-url');
+        if (await evidence.count() !== 1) {
+          const state = (await page.locator('.task-workspace').innerText()).slice(0, 600).replaceAll('\n', ' / ');
+          throw new Error('stage $stage_no Feishu submission entry missing; workspace=' + state);
+        }
+        const guidance = await page.locator('.external-document-path').innerText();
+        if (!guidance.includes('创建自己的副本') || !guidance.includes('复制完整文档链接')) {
+          throw new Error('stage $stage_no Feishu novice guidance missing');
+        }
+        await evidence.fill('https://example.feishu.cn/docx/p0-stage-$stage_no');
       }
       await page.locator('#submission-body').fill('第 ${stage_no} 站浏览器验证：我完成了固定输入，记录当前判断、可定位依据、风险边界以及下一步行动。');
       const submit = page.getByRole('button', {name: /完成这一站|交给 Reviewer/});
-      await Promise.all([page.waitForURL('**/app'), submit.click()]);
+      await Promise.all([page.waitForURL('**/app?transition=submitted*'), submit.click()]);
       await page.waitForLoadState('networkidle');
+      const transition = await page.locator('.journey-transition').innerText();
+      if (!transition.includes('这一站已保存')) throw new Error('stage $stage_no transition feedback missing');
+      if ($stage_no === 1) {
+        const completedLink = page.locator('.journey-route-map-wide .route-node-link.route-node-visual-completed').first();
+        if (await completedLink.count() !== 1) throw new Error('completed stage cannot be revisited');
+        const completedOrb = completedLink.locator('.route-node-orb');
+        if (await completedOrb.count() !== 1) throw new Error('completed stage has no visible revisit target');
+        await completedOrb.click();
+        await page.waitForURL('**/app/tasks/**');
+        await page.waitForLoadState('networkidle');
+        if (await page.locator('.task-hero-card').count() !== 1) throw new Error('completed stage revisit lost task context');
+        await page.goto('$base_url/app');
+        await page.waitForLoadState('networkidle');
+      }
     }"
 }
 
@@ -337,10 +363,13 @@ complete_revision() {
       const input = page.locator('#submission-body');
       await input.fill((await input.inputValue()) + ' 修订补充：新增一条可复核证据，并明确判断失效时的停止条件。');
       await Promise.all([
-        page.waitForURL('**/app'),
+        page.waitForURL('**/app?transition=submitted*'),
         page.getByRole('button', {name: '提交修订版本'}).click(),
       ]);
       await page.waitForLoadState('networkidle');
+      if (!(await page.locator('.journey-transition').innerText()).includes('这一站已保存')) {
+        throw new Error('revision transition feedback missing');
+      }
     }"
 }
 
@@ -353,6 +382,10 @@ complete_review() {
       await page.locator('.queue-item').first().evaluate((element) => element.click());
       await detail;
       await page.waitForLoadState('networkidle');
+      if (await page.getByRole('link', {name: '打开 Learner 的飞书文档 ↗'}).count()) {
+        const href = await page.getByRole('link', {name: '打开 Learner 的飞书文档 ↗'}).getAttribute('href');
+        if (!href || !href.startsWith('https://example.feishu.cn/')) throw new Error('reviewer evidence link is not bounded to Feishu');
+      }
       if (await page.getByRole('button', {name: '开始评审'}).count()) {
         const started = page.waitForURL('**?started=yes');
         await page.getByRole('button', {name: '开始评审'}).evaluate((element) => element.click());

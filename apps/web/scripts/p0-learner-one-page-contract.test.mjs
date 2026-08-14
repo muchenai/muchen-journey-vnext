@@ -13,10 +13,10 @@ test("task requirements are visible before the gated response workspace", () => 
   assert.match(taskPage, /<section className="task-brief"/);
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
-  assert.match(taskPage, /<h3 id="task-deliverables-title">需要提交<\/h3>/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">你要交付什么<\/h3>/);
   assert.match(taskPage, /<h3>怎么做<\/h3>/);
   assert.match(taskPage, /<h3>完成标准<\/h3>/);
-  assert.match(taskPage, /\{materialsReady \? <section className="task-workspace"/);
+  assert.match(taskPage, /\{materialsReady \? <section id="task-workspace" className="task-workspace"/);
 });
 
 test("learner copy removes repeated locking and stage labels", () => {

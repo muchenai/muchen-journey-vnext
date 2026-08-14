@@ -95,9 +95,20 @@ export default async function TaskPage({
     : null;
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
+  const pendingRequiredMaterials = requiredMaterials.filter((material) => material.completed_at === null);
   const activeMaterialIndex = assignment.learning_materials.findIndex(
     (material) => material.completed_at === null,
   );
+  const isAssessment = assignment.journey_stage?.stage_kind === "ASSESSMENT";
+  const practiceNoun = isAssessment ? "评测" : "本主题实践";
+  const taskContractText = [
+    ...assignment.instructions,
+    ...assignment.required_deliverables,
+    ...assignment.completion_criteria,
+  ].join(" ");
+  const expectsExternalDocument = isAssessment
+    || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
+  const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
 
   return (
     <article className="learner-task-page">
@@ -118,6 +129,26 @@ export default async function TaskPage({
         </div>
       </header>
 
+      <nav className="task-flow" aria-label="这一站的完成路径">
+        <ol>
+          <li data-state={materialsReady ? "complete" : "current"}>
+            <span>{materialsReady ? "✓" : "01"}</span>
+            <strong>完成学习材料</strong>
+            <small>{requiredMaterials.length} 份必读</small>
+          </li>
+          <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
+            <span>{stageComplete ? "✓" : "02"}</span>
+            <strong>完成{practiceNoun}</strong>
+            <small>{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</small>
+          </li>
+          <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
+            <span>{stageComplete ? "✓" : "03"}</span>
+            <strong>{isAssessment ? "交给 Reviewer" : "进入下一站"}</strong>
+            <small>{isAssessment ? "提交后等待真人评审" : "提交后路线自动更新"}</small>
+          </li>
+        </ol>
+      </nav>
+
       {assignment.learning_materials.length > 0 ? (
         <section className="learning-materials" aria-labelledby="learning-materials-title">
           <div className="learning-materials-heading">
@@ -129,7 +160,7 @@ export default async function TaskPage({
           </div>
           {query.material === "completed" ? (
             <p className="success-text" role="status">
-              {materialsReady ? "材料已完成，继续小任务。" : "完成一项，下一份材料已展开。"}
+              {materialsReady ? `材料已完成，现在完成${practiceNoun}。` : "已完成，下一份材料就在下方。"}
             </p>
           ) : null}
           <ol className="learning-material-list">
@@ -185,11 +216,18 @@ export default async function TaskPage({
                             <input type="hidden" name="task_version" value={assignment.task_version} />
                             <input type="hidden" name="material_key" value={material.key} />
                             <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                            <input
+                              type="hidden"
+                              name="final_required_material"
+                              value={material.required && pendingRequiredMaterials.length === 1 ? "true" : "false"}
+                            />
                             <button
                               className={`button ${material.required ? "primary" : "secondary"} compact`}
                               type="submit"
                             >
-                              完成并继续
+                              {material.required && pendingRequiredMaterials.length === 1
+                                ? `完成材料，开始${practiceNoun}`
+                                : "完成，打开下一份"}
                             </button>
                           </form>
                         )}
@@ -238,11 +276,11 @@ export default async function TaskPage({
       ) : null}
 
       <section className="task-brief" aria-labelledby="task-brief-title">
-        <p className="section-label">这一站要完成</p>
+        <p className="section-label">{isAssessment ? "评测任务" : "学习后的实践"}</p>
         <h2 id="task-brief-title">{assignment.learner_outcome}</h2>
 
         <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
-          <h3 id="task-deliverables-title">需要提交</h3>
+          <h3 id="task-deliverables-title">你要交付什么</h3>
           <ul className="checklist">
             {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
           </ul>
@@ -274,9 +312,9 @@ export default async function TaskPage({
         </div>
       </section>
 
-      {materialsReady ? <section className="task-workspace" aria-labelledby="task-workspace-title">
+      {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
       <h2 id="task-workspace-title">
-        {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "提交你的作答" : "留下学习证据"}
+        {isAssessment ? "提交评测" : "提交本主题实践"}
       </h2>
 
       {query.draft === "saved" ? (
@@ -300,7 +338,7 @@ export default async function TaskPage({
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
-          <button className="button primary" type="submit">开始小任务</button>
+          <button className="button primary" type="submit">开始{practiceNoun}</button>
         </form>
       ) : null}
 
@@ -348,6 +386,7 @@ export default async function TaskPage({
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
+            expectsExternalDocument={expectsExternalDocument}
           />
         </>
       ) : null}

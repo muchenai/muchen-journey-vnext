@@ -18,7 +18,7 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /const isLocked = !isComplete && !isActive/);
   assert.match(taskPage, /className="learning-material-card" open=\{isActive\}/);
   assert.match(taskPage, /完成上一项后解锁/);
-  assert.match(taskPage, /完成并继续/);
+  assert.match(taskPage, /完成材料，开始\$\{practiceNoun\}/);
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
   assert.match(taskPage, /<span>打开学习材料<\/span>/);
 });
@@ -26,9 +26,9 @@ test("the task page reveals one learning material at a time", () => {
 test("the response workspace stays hidden until required input is complete", () => {
   assert.match(
     taskPage,
-    /<section className="task-brief"[\s\S]*\{materialsReady \? <section className="task-workspace"[\s\S]*<SubmissionComposer/,
+    /<section className="task-brief"[\s\S]*\{materialsReady \? <section id="task-workspace" className="task-workspace"[\s\S]*<SubmissionComposer/,
   );
-  assert.match(taskPage, /开始小任务/);
+  assert.match(taskPage, /开始\{practiceNoun\}/);
   assert.doesNotMatch(taskPage, /沿着动作前进/);
   assert.doesNotMatch(taskPage, /当前固定任务版本不接收附件/);
 });
@@ -36,7 +36,7 @@ test("the response workspace stays hidden until required input is complete", () 
 test("the complete task contract is visible before input is complete or response begins", () => {
   assert.match(taskPage, /<section className="task-brief"/);
   assert.match(taskPage, /<h2 id="task-brief-title">\{assignment\.learner_outcome\}<\/h2>/);
-  assert.match(taskPage, /<h3 id="task-deliverables-title">需要提交<\/h3>/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">你要交付什么<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
   assert.match(taskPage, /className="task-supporting-rules task-contract-columns"/);
