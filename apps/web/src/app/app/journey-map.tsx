@@ -83,7 +83,7 @@ function RouteMapSvg({
           </>
         );
 
-        return node.status === "CURRENT" ? (
+        return node.status !== "LOCKED" ? (
           <g
             className="route-node-anchor"
             data-route-index={index}
@@ -132,7 +132,7 @@ export function JourneyMap({ journey }: { journey: JourneyProgress }) {
             const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
             return (
               <li key={node.stable_key}>
-                {node.status === "CURRENT" ? (
+                {node.status !== "LOCKED" ? (
                   <Link href={`/app/tasks/${node.assignment_id}`}>{label}</Link>
                 ) : label}
               </li>

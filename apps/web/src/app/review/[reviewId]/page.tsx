@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 
 const RATING_LABELS = { MEETS: "达标", NEEDS_WORK: "待改进" } as const;
 const DECISION_LABELS = { APPROVE: "通过", REQUEST_REVISION: "要求修订" } as const;
+const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
+const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -15,6 +17,26 @@ function formatDate(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function submissionWithSafeLinks(value: string) {
+  return value.split(HTTPS_URL).map((part, index) => {
+    if (!part.startsWith("https://")) return part;
+    const trailing = part.match(TRAILING_URL_PUNCTUATION)?.[0] ?? "";
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    const hostname = new URL(href).hostname;
+    const isFeishuHost = hostname === "feishu.cn"
+      || hostname.endsWith(".feishu.cn")
+      || hostname === "larksuite.com"
+      || hostname.endsWith(".larksuite.com");
+    if (!isFeishuHost) return part;
+    return (
+      <span key={`${href}-${index}`}>
+        <a href={href} target="_blank" rel="noreferrer">打开 Learner 的飞书文档 ↗</a>
+        {trailing}
+      </span>
+    );
+  });
 }
 
 export default async function ReviewPage({
@@ -99,7 +121,7 @@ export default async function ReviewPage({
       <section className="review-section" aria-labelledby="submission-title">
         <h2 id="submission-title">固定提交正文</h2>
         <p className="status-meta">该正文属于 SubmissionVersion {review.submission_version_no}，评审不会修改它。</p>
-        <div className="submission">{review.submission_body}</div>
+        <div className="submission">{submissionWithSafeLinks(review.submission_body)}</div>
       </section>
 
       <details className="fixed-references">

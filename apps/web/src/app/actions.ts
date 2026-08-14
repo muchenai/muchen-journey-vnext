@@ -18,6 +18,7 @@ import {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
+const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
 
 function requiredUuid(data: FormData, key: string): string {
   const value = data.get(key);
@@ -152,6 +153,42 @@ function attachmentIds(data: FormData): string[] {
     throw new Error("附件选择无效。请刷新页面后重试。");
   }
   return values as string[];
+}
+
+function submissionBody(data: FormData, requireComplete: boolean): SubmissionActionState | string {
+  const rawBody = data.get("body");
+  const rawEvidenceUrl = data.get("evidence_url");
+  const evidenceUrlRequired = data.get("evidence_url_required") === "true";
+  const body = typeof rawBody === "string" ? rawBody.trim() : "";
+  const evidenceUrl = typeof rawEvidenceUrl === "string" ? rawEvidenceUrl.trim() : "";
+
+  if (evidenceUrl) {
+    try {
+      const parsed = new URL(evidenceUrl);
+      const isFeishuHost = parsed.hostname === "feishu.cn"
+        || parsed.hostname.endsWith(".feishu.cn")
+        || parsed.hostname === "larksuite.com"
+        || parsed.hostname.endsWith(".larksuite.com");
+      if (parsed.protocol !== "https:" || !isFeishuHost) {
+        return { error: "请粘贴 HTTPS 飞书文档链接；草稿仍保留在当前页面。" };
+      }
+    } catch {
+      return { error: "飞书文档链接无效；请从浏览器地址栏复制完整链接。" };
+    }
+  } else if (requireComplete && evidenceUrlRequired) {
+    return { error: "请先粘贴飞书文档链接，再提交给 Reviewer。" };
+  }
+
+  const composed = evidenceUrl
+    ? `${FEISHU_EVIDENCE_PREFIX}${evidenceUrl}${body ? `\n\n补充说明：\n${body}` : ""}`
+    : body;
+  if (composed.length > 8_000) {
+    return { error: "提交内容不能超过 8000 个字符；草稿仍保留在当前页面。" };
+  }
+  if (requireComplete && composed.length < 40) {
+    return { error: "提交内容需为 40–8000 个字符。草稿仍保留在当前页面。" };
+  }
+  return composed;
 }
 
 export type SubmissionActionState = {
@@ -417,7 +454,10 @@ export async function completeLearningMaterial(data: FormData) {
   );
   revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  redirect(`/app/tasks/${assignmentId}?material=completed`);
+  const anchor = data.get("final_required_material") === "true"
+    ? "task-brief-title"
+    : "learning-materials-title";
+  redirect(`/app/tasks/${assignmentId}?material=completed#${anchor}`);
 }
 
 export async function submitAssignment(
@@ -427,17 +467,15 @@ export async function submitAssignment(
   const assignmentId = requiredUuid(data, "assignment_id");
   const expectedRevision = requiredRevision(data);
   const idempotencyKey = requiredIdempotencyKey(data, "submission_idempotency_key");
-  const body = data.get("body");
-  if (typeof body !== "string" || body.trim().length < 40 || body.length > 8_000) {
-    return { error: "提交内容需为 40–8000 个字符。草稿仍保留在当前页面。" };
-  }
+  const body = submissionBody(data, true);
+  if (typeof body !== "string") return body;
   try {
     await apiRequest(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         expected_revision: expectedRevision,
-        body: body.trim(),
+        body,
         attachment_ids: attachmentIds(data),
       }),
     });
@@ -445,7 +483,7 @@ export async function submitAssignment(
     return submissionError(error);
   }
   revalidatePath("/app");
-  redirect("/app");
+  redirect("/app?transition=submitted#next-action");
 }
 
 export async function saveSubmissionDraft(
@@ -455,10 +493,8 @@ export async function saveSubmissionDraft(
   const assignmentId = requiredUuid(data, "assignment_id");
   const expectedRevision = requiredRevision(data);
   const idempotencyKey = requiredIdempotencyKey(data, "draft_idempotency_key");
-  const body = data.get("body");
-  if (typeof body !== "string" || body.length > 8_000) {
-    return { error: "草稿内容不能超过 8000 个字符。" };
-  }
+  const body = submissionBody(data, false);
+  if (typeof body !== "string") return body;
   try {
     await apiRequest(`/api/v1/me/assignments/${assignmentId}/draft`, "LEARNER", {
       method: "PUT",
