@@ -239,3 +239,15 @@ PR #210 已将上述恢复路径合入主线 `58bebbecab0dac832ce85bfd2a0ac4ab85
 PR #215 将 P0-2R 合入主线 `824ecd0b2f76973015765260e3934219270a565e`。Fast Gate `31831757432` 与 Mainline Candidate Gate `31832092834` 均通过；主线候选 registry 状态为 `VERIFIED`，Web digest 为 `sha256:28f378d52607b3f88398416552865dd686fd5b5784b3aadaa327f66ad7f46dd8`。候选相对直接父提交只修改 `apps/web/`、P0-2 证据、本地浏览器合同及其隔离夹具；API、Worker、OpenAPI 与 migration 相对健康基线无差异。
 
 本次 staging 合同继续采用 Web-only：Web 升级至 `824ecd0...`，API、Worker 与 migration 保持 `e927c1b... / 0021_p0_identity_principal`。当前候选没有可用的 `phase=deploy` 全量派发确认，绑定 PR 本身不部署、不运行 migration 或 seed，不修改 Journey V3、邀请、身份、角色或其他业务事实，也不运行 Terraform plan/apply/import、DNS、WP-12B 或云资源变更。只有绑定门禁通过后才能执行一次 `deploy-web`；失败不重试并必须关闭临时 SSH。部署与同候选真人复验发生前，P0-2 仍为 `MACHINE_PASS / STAGING_NOT_UPDATED / HUMAN_RETEST_NOT_RUN`。
+
+## 21. P0-2R Web-only staging 验收
+
+绑定 PR #216 经 Fast Gate `31837410125` 合入主线 `4061a8495165ccc158ecdc0d733c47db067bce05`，其 Mainline Candidate Gate `31837726413` 通过。随后仅派发一次 `deploy-web` Run `31838391751`，结果为 `PASS`：
+
+- 候选 Web digest 第 1 次有界拉取成功，`WP08_WEB_ONLY_DEPLOY=PASS` 精确报告 Web=`824ecd0b2f76973015765260e3934219270a565e`、API/Worker=`e927c1bbaf74a9107dadc7ebfafab4fa40f56454`；
+- migration 保持 `0021_p0_identity_principal`，没有执行 migration、seed、Terraform plan/apply/import、DNS、WP-12B 或云资源变更；
+- 外部表面第 1 次检查全部通过：根页 `200`，readiness=`200/ready/824ecd0...`，匿名 JSON `/ops`=`401`，`/review` 与 `/content` 均为 `303/no-store` 并分别进入专用登录页；
+- `WP08_SSH_INGRESS=CLOSED`，临时 SSH 已关闭；没有创建邀请、发送消息或修改 Journey、身份、角色及其他业务事实；
+- 部署完成后的独立只读 HTTP 复验再次得到同一 Web revision 和相同路由结果。
+
+P0-2 机器交付与 staging 交付现为 `PASS`，但产品验收仍是 `HUMAN_RETEST_REQUIRED`。下一项唯一 WIP 是在该同一候选上，由未接受口头提示的真人复验：宝藏学习路径、飞书文档交付、提交后的上下文连续性、已完成阶段回看。L2/L3 共同反馈不是通过证据；真人未报告结果前不得关闭 P0-2，也不得提前启动 P0-3。
