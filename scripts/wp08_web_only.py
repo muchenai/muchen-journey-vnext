@@ -117,6 +117,7 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         "docs/44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md",
         "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md",
         "scripts/p0_journey_v3_browser.sh",
+        "scripts/p0_journey_v3_browser_fixture.py",
         "scripts/wp08_web_runtime_check.py",
     }:
         raise WebOnlyError("candidate allowed paths differ from the reviewed set")
