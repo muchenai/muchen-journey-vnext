@@ -233,3 +233,9 @@ PR #210 已将上述恢复路径合入主线 `58bebbecab0dac832ce85bfd2a0ac4ab85
 - 浏览器夹具、容器、网络和数据卷均为本地一次性资源，测试结束后已清理；没有访问或修改 staging、production、Journey V3、身份、角色、邀请或真实业务事实。
 
 机器结果把状态推进为 `MACHINE_PASS / STAGING_NOT_UPDATED / HUMAN_RETEST_NOT_RUN`，不等于 P0-2 关闭。下一候选进入 staging 后，真人必须复验第 18 节四段主路径；L2/L3 的联合反馈不能倒推为两份独立通过证据。最终完成页的获得感和归属感缺陷进入紧随其后的 P0-3，不降级为 P1，也不以当前合成闭环的“能完成”替代真实体验验收。
+
+## 20. P0-2R 主线候选与 staging 绑定
+
+PR #215 将 P0-2R 合入主线 `824ecd0b2f76973015765260e3934219270a565e`。Fast Gate `31831757432` 与 Mainline Candidate Gate `31832092834` 均通过；主线候选 registry 状态为 `VERIFIED`，Web digest 为 `sha256:28f378d52607b3f88398416552865dd686fd5b5784b3aadaa327f66ad7f46dd8`。候选相对直接父提交只修改 `apps/web/`、P0-2 证据、本地浏览器合同及其隔离夹具；API、Worker、OpenAPI 与 migration 相对健康基线无差异。
+
+本次 staging 合同继续采用 Web-only：Web 升级至 `824ecd0...`，API、Worker 与 migration 保持 `e927c1b... / 0021_p0_identity_principal`。当前候选没有可用的 `phase=deploy` 全量派发确认，绑定 PR 本身不部署、不运行 migration 或 seed，不修改 Journey V3、邀请、身份、角色或其他业务事实，也不运行 Terraform plan/apply/import、DNS、WP-12B 或云资源变更。只有绑定门禁通过后才能执行一次 `deploy-web`；失败不重试并必须关闭临时 SSH。部署与同候选真人复验发生前，P0-2 仍为 `MACHINE_PASS / STAGING_NOT_UPDATED / HUMAN_RETEST_NOT_RUN`。

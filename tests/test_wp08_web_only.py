@@ -92,6 +92,7 @@ def test_contract_accepts_runtime_browser_check_as_reviewed_web_evidence():
     allowed = contract["candidate_commit_allowed_paths"]
     assert isinstance(allowed, list)
     assert web_only._path_allowed("scripts/wp08_web_runtime_check.py", allowed)
+    assert web_only._path_allowed("scripts/p0_journey_v3_browser_fixture.py", allowed)
 
 
 def test_contract_cannot_be_retired_while_candidate_is_pending(tmp_path: Path):

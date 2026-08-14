@@ -3,10 +3,10 @@
   "status": "ACTIVE",
   "target_environment": "staging",
   "region_id": "cn-beijing",
-  "candidate_commit": "58bebbecab0dac832ce85bfd2a0ac4ab852bfe5d",
-  "candidate_parent": "56f651c3ff85ad3667e5bd3d4ffa177efb0e8008",
-  "candidate_artifact_run_id": 31707513746,
-  "web_image_digest": "sha256:35ba32c25b40dc0447a3f6ef84be68815e045c2780ad78bc8a93da737582a3cc",
+  "candidate_commit": "824ecd0b2f76973015765260e3934219270a565e",
+  "candidate_parent": "faa93c22bd0af13b1dad6a8511e3697fcc8790a9",
+  "candidate_artifact_run_id": 31832092834,
+  "web_image_digest": "sha256:28f378d52607b3f88398416552865dd686fd5b5784b3aadaa327f66ad7f46dd8",
   "runtime_baseline": {
     "candidate_commit": "e927c1bbaf74a9107dadc7ebfafab4fa40f56454",
     "api_image_digest": "sha256:ba5dbf8e96ba18fa5727024d8bf7dfa9b5e80a8174836096ae47e7fb453e894c",
@@ -24,6 +24,7 @@
     "docs/44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md",
     "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md",
     "scripts/p0_journey_v3_browser.sh",
+    "scripts/p0_journey_v3_browser_fixture.py",
     "scripts/wp08_web_runtime_check.py"
   ],
   "baseline_compatibility_paths": [
