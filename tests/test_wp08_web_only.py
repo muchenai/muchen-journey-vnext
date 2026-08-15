@@ -26,9 +26,12 @@ def accepted_runtime(contract: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypatch):
+def test_checked_in_contract_is_static_web_only_and_baseline_compatible(
+    monkeypatch, tmp_path: Path
+):
     contract = copy.deepcopy(web_only.load_contract())
-    assert contract["status"] == "ACTIVE"
+    assert contract["status"] == "RETIRED"
+    contract["status"] = "ACTIVE"
     candidate_openapi = b'{"openapi":"historical-candidate"}\n'
     baseline = contract["runtime_baseline"]
     assert isinstance(baseline, dict)
@@ -52,6 +55,9 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
         raise AssertionError(args)
 
     monkeypatch.setattr(web_only, "_git", fake_git)
+    wp08_contract = tmp_path / "wp08_staging.json"
+    wp08_contract.write_text(json.dumps({"candidate_commit": contract["candidate_commit"]}))
+    monkeypatch.setattr(web_only, "WP08_CONTRACT", wp08_contract)
     web_only.check_repository(contract)
 
 
@@ -95,12 +101,20 @@ def test_contract_accepts_runtime_browser_check_as_reviewed_web_evidence():
     assert web_only._path_allowed("scripts/p0_journey_v3_browser_fixture.py", allowed)
 
 
-def test_contract_cannot_be_retired_while_candidate_is_pending(tmp_path: Path):
+def test_contract_accepts_retired_tombstone(tmp_path: Path):
     payload = json.loads(web_only.CONTRACT.read_text())
     payload["status"] = "RETIRED"
     contract = tmp_path / "wp08_web_only.json"
     contract.write_text(json.dumps(payload))
-    with pytest.raises(web_only.WebOnlyError, match="must be active"):
+    assert web_only.load_contract(contract)["status"] == "RETIRED"
+
+
+def test_contract_rejects_unknown_status(tmp_path: Path):
+    payload = json.loads(web_only.CONTRACT.read_text())
+    payload["status"] = "PAUSED"
+    contract = tmp_path / "wp08_web_only.json"
+    contract.write_text(json.dumps(payload))
+    with pytest.raises(web_only.WebOnlyError, match="ACTIVE or RETIRED"):
         web_only.load_contract(contract)
 
 

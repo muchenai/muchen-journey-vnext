@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config" / "wp08_staging.json"
-WEB_ONLY_CONTRACT = ROOT / "config" / "wp08_web_only.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "staging.yml"
 EDGE_MIRROR_WORKFLOW = ROOT / ".github" / "workflows" / "wp08-edge-mirror.yml"
 WP09_BOOTSTRAP_WORKFLOW = ROOT / ".github" / "workflows" / "wp09-operator-bootstrap.yml"
@@ -609,15 +608,7 @@ def validate_candidate(data: dict[str, object]) -> None:
 
     commit = str(data["candidate_commit"])
     run_id = str(data["candidate_artifact_run_id"])
-    web_only = json.loads(WEB_ONLY_CONTRACT.read_text())
-    if web_only.get("candidate_commit") != commit:
-        raise StagingError("Web-only and staging candidates differ")
-    baseline = str(web_only.get("runtime_baseline", {}).get("candidate_commit", ""))
-    if not FULL_SHA.fullmatch(baseline):
-        raise StagingError("Web-only runtime baseline is invalid")
-    confirmation = (
-        f"DEPLOY_WEB_{commit[:7].upper()}_ON_{baseline[:7].upper()}_STAGING"
-    )
+    confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
     prepare = (ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
     deploy = DEPLOY_SCRIPT.read_text()
     workflow = WORKFLOW.read_text()
@@ -629,7 +620,7 @@ def validate_candidate(data: dict[str, object]) -> None:
         (workflow, commit, "workflow candidate"),
         (workflow, f"wp07-candidate-{commit}", "workflow artifact name"),
         (workflow, f"run-id: {run_id}", "workflow artifact run"),
-        (workflow, confirmation, "Web-only workflow confirmation"),
+        (workflow, confirmation, "workflow confirmation"),
     )
     for source, marker, label in required_markers:
         if marker not in source:
@@ -693,16 +684,16 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         job_guard = workflow[jobs_start:guard_end]
         retired_dispatches = (
             "inputs.phase == 'provision'",
+            "inputs.phase == 'deploy-web'",
             "inputs.phase == 'repair-runtime'",
-            "inputs.phase == 'deploy'",
         )
         if any(marker in job_guard for marker in retired_dispatches):
             raise StagingError(
                 "controlled Alpha candidate must not dispatch retired mutation phases"
             )
     required = (
-        "- audit\n          - deploy\n          - deploy-web\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_WEB_0B1B0B1_ON_E927C1B_STAGING'",
+        "- audit\n          - deploy\n          - inspect-runtime",
+        "inputs.confirmation == 'DEPLOY_9E8A806_TO_VOLCENGINE_STAGING'",
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
@@ -776,7 +767,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:.github/workflows/staging.yml"',
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
-        "INSPECT_RUNTIME_0B1B0B1_STAGING",
+        "INSPECT_RUNTIME_9E8A806_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
@@ -940,8 +931,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,bounded-web-only,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
-        " retired=provision,runtime-repair"
+        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
+        " retired=provision,bounded-web-only,runtime-repair"
     )
 
 

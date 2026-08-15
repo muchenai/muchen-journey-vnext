@@ -50,7 +50,7 @@ pull_with_bounded_retry() {
 }
 
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "0b1b0b110591fa888ea627131a7ec02148b4b940" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
@@ -60,10 +60,10 @@ for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${WEB_IMAGE#*@}" == "sha256:c396e39657f74f1d218d0badde42f569c07ef3cd04ee2ec1762160ec32a7ef00" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:1b6565ab91e7cabd21489699d26c032e3694221a4eaea9b22c80ed88233c3ec6" ]] || fail "Web digest differs from candidate manifest"
 if [[ "$DEPLOY_MODE" == "full" ]]; then
-  [[ "${API_IMAGE#*@}" == "sha256:6264c3fa0c6f4e20500a71ccda1c06cb445038d6936ec568f128c3fd8769611e" ]] || fail "API digest differs from candidate manifest"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:8edd08211325469bafc3e1ebd33c545d2b20b1fe528eaa903509d1b3a0550c0f" ]] || fail "Worker digest differs from candidate manifest"
+  [[ "${API_IMAGE#*@}" == "sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d" ]] || fail "API digest differs from candidate manifest"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da" ]] || fail "Worker digest differs from candidate manifest"
 else
   [[ "${API_IMAGE#*@}" == "sha256:ba5dbf8e96ba18fa5727024d8bf7dfa9b5e80a8174836096ae47e7fb453e894c" ]] || fail "API digest differs from the Web-only baseline"
   [[ "${WORKER_IMAGE#*@}" == "sha256:bf6b1419fb8090e5b9e128574801ff8257dd3080c6e3b4fe8634d8dbd22686a3" ]] || fail "Worker digest differs from the Web-only baseline"

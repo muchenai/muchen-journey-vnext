@@ -75,8 +75,8 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
         raise WebOnlyError("Web-only contract keys differ from the reviewed schema")
     if data["schema_version"] != 3:
         raise WebOnlyError("Web-only contract schema must be 3")
-    if data["status"] != "ACTIVE":
-        raise WebOnlyError("Web-only contract must be active")
+    if data["status"] not in {"ACTIVE", "RETIRED"}:
+        raise WebOnlyError("Web-only contract status must be ACTIVE or RETIRED")
     if data["target_environment"] != "staging" or data["region_id"] != "cn-beijing":
         raise WebOnlyError("Web-only target must be cn-beijing staging")
     _require_full_sha(data["candidate_commit"], "candidate_commit")
@@ -347,6 +347,16 @@ def main() -> None:
     args = parser.parse_args()
     try:
         data = load_contract()
+        if data["status"] == "RETIRED":
+            if args.command != "check":
+                raise WebOnlyError("retired Web-only contract cannot verify runtime")
+            print(
+                "WP08_WEB_ONLY_CONTRACT=PASS"
+                " status=RETIRED"
+                f" candidate={data['candidate_commit']}"
+                " modes=none"
+            )
+            return
         check_repository(data)
         if args.command == "check":
             baseline = data["runtime_baseline"]
