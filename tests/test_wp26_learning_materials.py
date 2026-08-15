@@ -5,12 +5,37 @@ from sqlalchemy import func, select
 
 from journey_api.db import SessionLocal
 from journey_api.fixtures import REVIEWER_ID
+from journey_api.learning_materials import is_publishable_learning_material
 from journey_api.main import app
 from journey_api.models import LearningMaterialCompletion, Review
 
 
 OPERATOR_HEADERS = {"X-Fixture-Role": "OPERATOR"}
 REVIEWER_HEADERS = {"X-Fixture-Role": "REVIEWER"}
+
+
+def test_source_table_no_video_sentinel_is_not_a_learner_material():
+    placeholder = {
+        "key": "treasure-two-missing-video",
+        "title": "第二份视频",
+        "kind": "TEXT",
+        "source_label": "正式内容源",
+        "body": (
+            "正式内容源未指定第二份视频，登记为‘无，自行观看’。"
+            "本版本不伪造视频 URL；请完成本阶段正式文档材料。"
+        ),
+        "estimated_duration_minutes": 40,
+        "required": True,
+    }
+    real_text_material = {
+        **placeholder,
+        "key": "real-text-material",
+        "title": "给 Muchener 的一封信",
+        "body": "这是一份真实固定文本材料，Learner 阅读后需要留下自己的判断与证据。",
+    }
+
+    assert is_publishable_learning_material(placeholder) is False
+    assert is_publishable_learning_material(real_text_material) is True
 
 
 def client_for(label: str) -> TestClient:

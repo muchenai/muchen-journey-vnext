@@ -51,6 +51,8 @@ test("material and submission transitions preserve the learner context", () => {
   assert.match(learnerHome, /className="journey-transition"/);
   assert.match(learnerHome, /下一站已解锁/);
   assert.match(learnerHome, /已经交给 Reviewer/);
+  assert.match(learnerHome, /八个路标都已点亮/);
+  assert.match(learnerHome, /打开旅程收获，看看你带走了什么/);
 });
 
 test("completed stages remain available for review without unlocking future stages", () => {

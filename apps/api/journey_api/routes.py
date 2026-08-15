@@ -13,6 +13,7 @@ from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import (
     completed_materials,
     ensure_required_materials_completed,
+    learner_learning_materials,
     material_by_key,
     reviewable_material_links,
 )
@@ -1066,7 +1067,9 @@ def assignment_detail(
             Assignment.id == assignment_id,
             Assignment.organization_id == actor.organization_id,
             Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
+            Enrollment.status.in_(
+                (EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+            ),
             TaskVersion.organization_id == actor.organization_id,
             TaskDefinition.organization_id == actor.organization_id,
         )
@@ -1108,8 +1111,7 @@ def assignment_detail(
                     else None
                 ),
             )
-            for material in task.learning_materials
-            if isinstance(material, dict) and material.get("key")
+            for material in learner_learning_materials(task.learning_materials)
         ],
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
