@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { hasLearnerSession } from "@/lib/server/api";
-
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,7 +19,6 @@ export default async function RootLayout({
   // framework scripts. Keep the whole application request-rendered so Next.js
   // can apply the nonce supplied by proxy.ts.
   await connection();
-  const learnerSession = await hasLearnerSession();
 
   return (
     <html lang="zh-CN">
@@ -33,11 +30,6 @@ export default async function RootLayout({
           <Link className="brand" href="/">
             Muchen Journey
           </Link>
-          {learnerSession ? (
-            <nav aria-label="主要导航">
-              <Link href="/app">我的旅程</Link>
-            </nav>
-          ) : null}
         </header>
         <main id="main-content" className="page-shell">
           {children}

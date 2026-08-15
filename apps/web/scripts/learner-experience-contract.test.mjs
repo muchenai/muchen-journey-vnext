@@ -13,6 +13,10 @@ const resultPage = await readFile(
 );
 const homePage = await readFile(new URL("../src/app/page.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+const learnerLayout = await readFile(
+  new URL("../src/app/app/layout.tsx", import.meta.url),
+  "utf8",
+);
 const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
 test("the task page reveals one learning material at a time", () => {
@@ -81,5 +85,6 @@ test("the golden path starts as a journey instead of a generic session shortcut"
   assert.match(joinPage, /走进第一站/);
   assert.match(api, /export async function hasLearnerSession/);
   assert.match(api, /\/api\/v1\/me\/current-action/);
-  assert.match(layout, /learnerSession \? \(/);
+  assert.doesNotMatch(layout, /hasLearnerSession|learnerPageRequest/);
+  assert.match(learnerLayout, /href="\/app">我的旅程/);
 });

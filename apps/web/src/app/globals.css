@@ -365,6 +365,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .join-pass form { margin-top: 30px; }
 
 .learner-journey-page { display: grid; gap: 24px; max-width: 1040px; margin: 0 auto; }
+.learner-route-nav { display: flex; justify-content: flex-end; max-width: 1040px; margin: -24px auto 28px; }
+.learner-route-nav a { color: var(--text-secondary); font-weight: 700; text-decoration: none; }
+.learner-route-nav a:hover, .learner-route-nav a:focus-visible { color: #20877f; }
 .journey-transition { position: relative; display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 20px; align-items: center; overflow: hidden; padding: 26px 30px; color: #fff; background: linear-gradient(120deg, #2854d7, #147b78); border-radius: 24px; box-shadow: 0 18px 46px rgba(40, 84, 215, .18); }
 .journey-transition > span { display: grid; width: 54px; height: 54px; place-items: center; color: #173e5c; background: #f7e4a2; border-radius: 50%; font-size: 28px; font-weight: 900; box-shadow: 0 0 0 10px rgba(247, 228, 162, .16); }
 .journey-transition .eyebrow { margin: 0; color: #c9e9e5; }
@@ -627,6 +630,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
     transform: translate(0, 0);
   }
   .journey-map { padding: 26px 18px; border-radius: 28px; }
+  .learner-route-nav { justify-content: flex-start; margin-top: -12px; }
   .journey-map-heading { flex-direction: column; }
   .journey-route-canvas { aspect-ratio: 360 / 450; min-height: 360px; }
   .journey-route-map-wide { display: none; }

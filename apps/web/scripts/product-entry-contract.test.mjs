@@ -4,6 +4,10 @@ import test from "node:test";
 
 const home = await readFile(new URL("../src/app/page.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+const learnerLayout = await readFile(
+  new URL("../src/app/app/layout.tsx", import.meta.url),
+  "utf8",
+);
 
 test("public entry uses the approved visual-first journey proposition", () => {
   assert.match(home, /这里，没有标准答案/);
@@ -15,7 +19,8 @@ test("public entry uses the approved visual-first journey proposition", () => {
 });
 
 test("staff tools stay out of the public learner entry", () => {
-  assert.match(layout, /href="\/app">我的旅程/);
+  assert.match(learnerLayout, /href="\/app">我的旅程/);
+  assert.doesNotMatch(layout, /href="\/app">我的旅程/);
   assert.doesNotMatch(layout, /return_to=%2Fops|>运营</);
   assert.doesNotMatch(home, /return_to=%2F(?:review|ops)/);
 });
