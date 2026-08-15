@@ -113,12 +113,21 @@ function RouteMapSvg({
 }
 
 export function JourneyMap({ journey }: { journey: JourneyProgress }) {
+  const version = journey.title.match(/(?:^|\s·\s)(V\d+)$/i)?.[1] ?? null;
+  const displayTitle = journey.title
+    .replace(/^Muchen Journey\s*/i, "")
+    .replace(/\s*·\s*V\d+$/i, "")
+    .trim() || journey.title;
+
   return (
     <section className="journey-map" aria-labelledby="journey-map-title">
       <header className="journey-map-heading">
         <div>
           <p className="journey-whisper">It&apos;s a long game.</p>
-          <h1 id="journey-map-title">{journey.title}</h1>
+          <h1 id="journey-map-title" aria-label={journey.title}>
+            {displayTitle}
+            {version ? <small>{version}</small> : null}
+          </h1>
         </div>
         <strong aria-label={`已完成 ${journey.completed_stages} / ${journey.total_stages} 站`}>
           {journey.completed_stages}<span>/ {journey.total_stages}</span>

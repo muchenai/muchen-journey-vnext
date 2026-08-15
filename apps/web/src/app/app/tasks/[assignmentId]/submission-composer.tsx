@@ -61,6 +61,9 @@ export function SubmissionComposer({
     INITIAL_STATE,
   );
   const errorState = submitState.error ? submitState : draftState;
+  const answerPlan = responseSections.length > 0
+    ? responseSections
+    : ["先写下你的判断", "补上支持判断的证据", "说明下一步或停止条件"];
 
   return (
     <form action={submitAction}>
@@ -77,24 +80,28 @@ export function SubmissionComposer({
         name="evidence_url_required"
         value={expectsExternalDocument ? "true" : "false"}
       />
-      {responseSections.length > 0 ? (
-        <details className="response-map">
-          <summary>查看作答结构</summary>
+      <section className="response-map" aria-labelledby="response-map-title">
+          <p className="section-label">作答地图</p>
+          <h3 id="response-map-title">按这三步，把想法变成证据</h3>
           <ol>
-            {responseSections.map((section) => <li key={section}>{section}</li>)}
+            {answerPlan.map((section, index) => (
+              <li key={section}>
+                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                {section}
+              </li>
+            ))}
           </ol>
-        </details>
-      ) : null}
+      </section>
       {expectsExternalDocument ? (
         <section className="external-document-path" aria-labelledby="external-document-title">
-          <p className="section-label">交付入口</p>
-          <h3 id="external-document-title">把你的飞书文档交到这里</h3>
+          <p className="section-label">交付通道</p>
+          <h3 id="external-document-title">完成文档，再把链接交给 Reviewer</h3>
           <ol>
-            <li>打开题面提供的飞书文件；需要独立编辑时，在飞书中创建自己的副本。</li>
-            <li>完成作答后，从浏览器地址栏复制完整文档链接。</li>
-            <li>粘贴到下方并提交；Reviewer 将从该链接查看固定作答。</li>
+            <li><span aria-hidden="true">01</span><strong>创建副本</strong><small>打开题面中的飞书文件，在飞书中创建自己的副本。</small></li>
+            <li><span aria-hidden="true">02</span><strong>完成作答</strong><small>按照上方作答地图写完，不要修改原始题面。</small></li>
+            <li><span aria-hidden="true">03</span><strong>交付链接</strong><small>从浏览器地址栏复制完整链接，粘贴到下方。</small></li>
           </ol>
-          <label htmlFor="evidence-url">飞书文档链接</label>
+          <label htmlFor="evidence-url">你的飞书文档链接</label>
           <input
             id="evidence-url"
             name="evidence_url"
@@ -121,7 +128,7 @@ export function SubmissionComposer({
         minLength={expectsExternalDocument ? undefined : 40}
         maxLength={8000}
         required={!expectsExternalDocument}
-        placeholder={expectsExternalDocument ? "可补充说明文档中的重点或需要 Reviewer 特别关注的内容" : responseSections.join("\n\n")}
+        placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : answerPlan.join("\n\n")}
         value={body}
         onChange={(event) => setBody(event.target.value)}
       />

@@ -706,3 +706,17 @@ export function cookieValue(setCookies: string[], name: string): string | undefi
 export async function hasVNextSession(): Promise<boolean> {
   return Boolean((await cookies()).get(SESSION_COOKIE)?.value);
 }
+
+export async function hasLearnerSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  if (!cookieStore.get(SESSION_COOKIE)?.value) return false;
+  try {
+    await apiRequest<CurrentAction>("/api/v1/me/current-action", "LEARNER");
+    return true;
+  } catch (error) {
+    if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+      return false;
+    }
+    throw error;
+  }
+}

@@ -95,7 +95,7 @@ bash "$PLAYWRIGHT_CLI" -s="$invalid_invite_session" run-code "async (page) => {
   await page.waitForLoadState('networkidle');
   await page.locator('#display-name').fill('Invalid Invite Browser Check');
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', {name: '开启旅程'}).click();
+  await page.getByRole('button', {name: '走进第一站'}).click();
   await page.waitForURL('**/join?code=INVITE_EXPIRED_OR_REVOKED**');
   await page.waitForLoadState('networkidle');
   const body = await page.locator('body').innerText();
@@ -140,7 +140,7 @@ pw_learner run-code "async (page) => {
   await page.getByRole('checkbox').check();
   await Promise.all([
     page.waitForURL('**/app'),
-    page.getByRole('button', {name: '开启旅程'}).click(),
+    page.getByRole('button', {name: '走进第一站'}).click(),
   ]);
   await page.waitForLoadState('networkidle');
   const progress = (await page.locator('[aria-label^="已完成"]').getAttribute('aria-label')) ?? '';
@@ -240,7 +240,7 @@ complete_stage() {
       const brief = page.locator('.task-brief');
       if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
       const briefText = await brief.innerText();
-      if (!briefText.includes('你要交付什么') || !briefText.includes('怎么做') || !briefText.includes('完成标准')) {
+      if (!briefText.includes('最后留下') || !briefText.includes('行动路径') || !briefText.includes('过关条件')) {
         throw new Error('stage $stage_no task requirements are not visible on first entry');
       }
       if (await brief.locator('details').count()) {
@@ -261,6 +261,22 @@ complete_stage() {
           await page.setViewportSize({width: viewport.width, height: viewport.height});
           if (await page.locator('.learning-material-card[open]').count() !== 1) {
             throw new Error(viewport.name + ': current material is not the only expanded card');
+          }
+          const contractGeometry = await page.evaluate(() => {
+            const columns = Array.from(document.querySelectorAll('.task-contract-columns > div'));
+            const links = Array.from(document.querySelectorAll('.task-contract-columns a'));
+            const columnOverflow = columns.some((column) => column.scrollWidth > column.clientWidth + 1);
+            const escapedLink = links.some((link) => {
+              const parent = link.closest('.task-contract-columns > div');
+              if (!parent) return true;
+              const linkBox = link.getBoundingClientRect();
+              const parentBox = parent.getBoundingClientRect();
+              return linkBox.left < parentBox.left - 1 || linkBox.right > parentBox.right + 1;
+            });
+            return {columnOverflow, escapedLink, linkCount: links.length};
+          });
+          if (contractGeometry.linkCount < 2 || contractGeometry.columnOverflow || contractGeometry.escapedLink) {
+            throw new Error(viewport.name + ': real-length task links collide or escape their contract cards: ' + JSON.stringify(contractGeometry));
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
           if (overflow) throw new Error(viewport.name + ': task page has horizontal overflow');
@@ -297,10 +313,10 @@ complete_stage() {
           if (await brief.count() !== 1 || await workspace.count() !== 1) {
             throw new Error(viewport.name + ': visible task brief or response workspace missing after learning input');
           }
-          if (!(await brief.innerText()).includes('你要交付什么')) {
+          if (!(await brief.innerText()).includes('最后留下')) {
             throw new Error(viewport.name + ': required deliverables are not visible before response');
           }
-          if (!(await brief.innerText()).includes('怎么做') || !(await brief.innerText()).includes('完成标准')) {
+          if (!(await brief.innerText()).includes('行动路径') || !(await brief.innerText()).includes('过关条件')) {
             throw new Error(viewport.name + ': complete task requirements are not visible');
           }
           const briefBox = await brief.boundingBox();
@@ -319,7 +335,15 @@ complete_stage() {
       }
       if (await page.getByRole('button', {name: /开始本主题实践|开始评测/}).count()) {
         await page.getByRole('button', {name: /开始本主题实践|开始评测/}).click();
+        await page.waitForURL('**#task-workspace');
         await page.locator('#submission-body').waitFor({state: 'visible'});
+        const workspacePosition = await page.locator('#task-workspace').evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return {top: box.top, bottom: box.bottom, viewport: window.innerHeight};
+        });
+        if (workspacePosition.top < -1 || workspacePosition.top >= workspacePosition.viewport) {
+          throw new Error('stage $stage_no start action lost the learner position: ' + JSON.stringify(workspacePosition));
+        }
       }
       if ($stage_no >= 6) {
         const evidence = page.locator('#evidence-url');
@@ -328,7 +352,7 @@ complete_stage() {
           throw new Error('stage $stage_no Feishu submission entry missing; workspace=' + state);
         }
         const guidance = await page.locator('.external-document-path').innerText();
-        if (!guidance.includes('创建自己的副本') || !guidance.includes('复制完整文档链接')) {
+        if (!guidance.includes('创建自己的副本') || !guidance.includes('复制完整链接')) {
           throw new Error('stage $stage_no Feishu novice guidance missing');
         }
         await evidence.fill('https://example.feishu.cn/docx/p0-stage-$stage_no');
@@ -358,7 +382,7 @@ complete_revision() {
     pw_learner run-code "async (page) => {
       const body = await page.locator('body').innerText();
       if (!body.includes('根据反馈修订任务')) throw new Error('revision state missing');
-      await page.getByRole('link', {name: '继续修订', exact: true}).click();
+      await page.getByRole('link', {name: '查看反馈并修订', exact: true}).click();
       await page.waitForLoadState('networkidle');
       const input = page.locator('#submission-body');
       await input.fill((await input.inputValue()) + ' 修订补充：新增一条可复核证据，并明确判断失效时的停止条件。');
@@ -432,7 +456,7 @@ bash "$PLAYWRIGHT_CLI" -s="$learner_reentry_session" run-code "async (page) => {
   await page.getByRole('checkbox').check();
   await Promise.all([
     page.waitForURL('**/app'),
-    page.getByRole('button', {name: '继续旅程'}).click(),
+    page.getByRole('button', {name: '回到旅程'}).click(),
   ]);
   await page.waitForLoadState('networkidle');
   if (!(await page.locator('body').innerText()).includes('根据反馈修订任务')) {
@@ -470,11 +494,11 @@ complete_review approve
 pw_learner reload
 pw_learner run-code "async (page) => {
   const resultPage = page.waitForURL('**/app/result');
-  await page.getByRole('link', {name: '查看结果', exact: true}).evaluate((element) => element.click());
+  await page.getByRole('link', {name: '打开旅程收获', exact: true}).evaluate((element) => element.click());
   await resultPage;
   await page.waitForLoadState('networkidle');
   const visibleBody = await page.locator('body').innerText();
-  if (!visibleBody.includes('这段旅程，走完了。') || !visibleBody.includes('下一步')) {
+  if (!visibleBody.includes('你留下了自己的判断。') || !visibleBody.includes('四枚宝藏 · 三项能力证据') || !visibleBody.includes('下一步')) {
     throw new Error('final journey summary or handoff missing');
   }
 }"
