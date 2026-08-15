@@ -343,7 +343,9 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   exit 0
 fi
 
-pull_with_bounded_retry full-release docker compose pull
+pull_with_bounded_retry full-api docker pull "$API_IMAGE"
+pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"
+pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api \
   python -c "from pathlib import Path; Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
 

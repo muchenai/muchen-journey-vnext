@@ -401,7 +401,11 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     compose_check = (
         "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet"
     )
-    image_pull = "pull_with_bounded_retry full-release docker compose pull"
+    image_pulls = (
+        'pull_with_bounded_retry full-api docker pull "$API_IMAGE"',
+        'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"',
+        'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"',
+    )
     container_ca_check = (
         "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
     )
@@ -411,12 +415,14 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     )
     if any(
         command not in script
-        for command in (compose_check, image_pull, container_ca_check, migration)
+        for command in (compose_check, *image_pulls, container_ca_check, migration)
     ):
         raise StagingError("staging deploy preflight commands are incomplete")
     if not (
         script.index(compose_check)
-        < script.index(image_pull)
+        < script.index(image_pulls[0])
+        < script.index(image_pulls[1])
+        < script.index(image_pulls[2])
         < script.index(container_ca_check)
         < script.index(migration)
     ):
@@ -432,6 +438,9 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "COMMAND_TIMEOUT",
         "NON_RETRYABLE",
         "WP08_IMAGE_PULL",
+        "pull_with_bounded_retry full-api docker pull",
+        "pull_with_bounded_retry full-web docker pull",
+        "pull_with_bounded_retry full-worker docker pull",
         "pull_with_bounded_retry web-only docker pull",
         "pull_with_bounded_retry runtime-api docker pull",
         "pull_with_bounded_retry runtime-worker docker pull",

@@ -297,7 +297,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_IMAGE_PULL",
                 'SECRETS="$PWD/secrets"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet",
-                "pull_with_bounded_retry full-release docker compose pull",
+                'pull_with_bounded_retry full-api docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"',
+                'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api python -c \"from pathlib import Path; "
                 "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -375,7 +377,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text(
         valid.replace(
-            "pull_with_bounded_retry full-release docker compose pull\n"
+            'pull_with_bounded_retry full-api docker pull "$API_IMAGE"\n'
+            'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"\n'
+            'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n"
@@ -383,7 +387,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
             "run --rm --no-deps api alembic upgrade head",
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head\n"
-            "pull_with_bounded_retry full-release docker compose pull\n"
+            'pull_with_bounded_retry full-api docker pull "$API_IMAGE"\n'
+            'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"\n'
+            'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
