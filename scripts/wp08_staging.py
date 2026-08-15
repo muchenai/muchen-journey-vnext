@@ -756,7 +756,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        '["/ops"]',
+        'pathname === "/ops" || pathname.startsWith("/ops/")',
         "isReviewRoute && !isReviewLogin && !hasSession",
         'git show "$candidate:apps/web/src/app/review/login/page.tsx"',
         "进入主管评审",

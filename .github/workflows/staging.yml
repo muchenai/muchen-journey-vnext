@@ -105,7 +105,7 @@ jobs:
               grep -Fq "http://localhost:3000/health/ready"
             git show "$candidate:apps/web/src/proxy.ts" | grep -Fq 'code: "AUTH_REQUIRED"'
             git show "$candidate:apps/web/src/proxy.ts" | \
-              grep -Fq '["/ops"]'
+              grep -Fq 'pathname === "/ops" || pathname.startsWith("/ops/")'
             git show "$candidate:apps/web/src/proxy.ts" | \
               grep -Fq 'isReviewRoute && !isReviewLogin && !hasSession'
             git show "$candidate:apps/web/src/app/review/login/page.tsx" | \
