@@ -36,9 +36,19 @@ export default async function LearnerHome({
           <div>
             <p className="eyebrow">这一站已保存</p>
             <h1 id="journey-transition-title">
-              {opensTask ? "下一站已解锁" : "已经交给 Reviewer"}
+              {opensResult
+                ? "八个路标都已点亮"
+                : opensTask
+                  ? "下一站已解锁"
+                  : "已经交给 Reviewer"}
             </h1>
-            <p>{opensTask ? "路线已经更新，继续从当前路标出发。" : "你的提交与版本已经保留，等待真人反馈。"}</p>
+            <p>
+              {opensResult
+                ? "打开旅程收获，看看你带走了什么。"
+                : opensTask
+                  ? "路线已经更新，继续从当前路标出发。"
+                  : "你的提交与版本已经保留，等待真人反馈。"}
+            </p>
           </div>
         </section>
       ) : null}

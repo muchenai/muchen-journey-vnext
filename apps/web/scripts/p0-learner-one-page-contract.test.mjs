@@ -8,6 +8,7 @@ const routeMap = readFileSync(new URL("../src/app/app/journey-map.tsx", import.m
 const globalError = readFileSync(new URL("../src/app/error.tsx", import.meta.url), "utf8");
 const joinPage = readFileSync(new URL("../src/app/join/page.tsx", import.meta.url), "utf8");
 const homePage = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 
 test("task requirements are visible before the gated response workspace", () => {
   assert.match(taskPage, /<section className="task-brief"/);
@@ -43,4 +44,10 @@ test("learner failure surfaces provide bounded recovery without raw API JSON", (
   for (const source of [globalError, joinPage, homePage]) {
     assert.doesNotMatch(source, /Authentication required\./);
   }
+});
+
+test("desktop invitation headline stays on one deliberate line", () => {
+  assert.match(joinPage, /这张通行证，只属于你。/);
+  assert.match(styles, /\.join-entry > h1 \{[^}]*white-space: nowrap/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-entry > h1 \{[^}]*white-space: normal/);
 });
