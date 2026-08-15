@@ -19,6 +19,8 @@ const admissionLabels: Record<string, string> = {
   NOT_ADMIT: "本次不准入",
 };
 
+const treasureLabels = ["公司价值", "AI 与模型", "项目认知", "交付边界"];
+
 function timelineDetail(eventType: string, details: Timeline["items"][number]["details"]) {
   if (eventType === "SUBMISSION_VERSION_CREATED") {
     return `提交版本 ${details.version_no ?? "—"}`;
@@ -51,12 +53,39 @@ export default async function ResultPage() {
   return (
     <article className="result-page">
       <header className="panel result-hero">
-        <div className="completion-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <div className="completion-orbit" aria-hidden="true">
+          {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+        </div>
         <p className="journey-whisper">The journey continues.</p>
-        <p className="result-kicker"><span aria-hidden="true">✓</span> 已完成</p>
-        <h1>这段旅程，走完了。</h1>
+        <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
+        <h1>你留下了自己的判断。</h1>
         <p className="lede">{result.summary}</p>
       </header>
+
+      <section className="panel result-section result-collection" aria-labelledby="collection-title">
+        <p className="section-label">你的探索营通行证</p>
+        <h2 id="collection-title">四枚宝藏 · 三项能力证据</h2>
+        <div className="treasure-collection" aria-label="已完成四个宝藏主题">
+          {treasureLabels.map((label, index) => (
+            <article key={label}>
+              <span aria-hidden="true">✦</span>
+              <small>宝藏 {index + 1}</small>
+              <strong>{label}</strong>
+            </article>
+          ))}
+        </div>
+        <div className="ability-collection" aria-label="已通过三项能力评测">
+          {result.journey_evaluations.map((evaluation, index) => (
+            <article key={evaluation.id}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <small>Reviewer 已确认</small>
+                <strong>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</strong>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="panel result-section" aria-labelledby="handoff-title">
         <p className="section-label">下一步</p>

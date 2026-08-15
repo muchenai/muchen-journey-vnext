@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { hasVNextSession } from "@/lib/server/api";
+import { hasLearnerSession } from "@/lib/server/api";
 
 const AUTH_ERRORS: Record<string, string> = {
   IDENTITY_NOT_LINKED: "该飞书身份尚未获得访问权限，请联系运营获取一次性绑定链接。",
@@ -28,7 +28,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string; return_to?: string }>;
 }) {
-  const [query, hasSession] = await Promise.all([searchParams, hasVNextSession()]);
+  const [query, hasSession] = await Promise.all([searchParams, hasLearnerSession()]);
   const authError = query.auth_error;
   const returnTo = query.return_to && IDENTITY_RETURN_PATHS.has(query.return_to)
     ? query.return_to
@@ -38,6 +38,7 @@ export default async function Home({
       <div className="landing-copy">
         <p className="journey-whisper">It&apos;s a long game.</p>
         <h1>这里，没有标准答案。</h1>
+        <p className="landing-promise">一天，八站。带走四份认知与三项真实能力证据。</p>
         {hasSession ? (
           <Link className="button primary landing-cta" href="/app">
             继续旅程 <span aria-hidden="true">→</span>
@@ -63,6 +64,11 @@ export default async function Home({
           </li>
         ))}
       </ol>
+      <div className="landing-route-legend" aria-label="探索营由三个篇章组成">
+        <span><b>01</b> Day 0 · 启程</span>
+        <span><b>04</b> 四枚宝藏</span>
+        <span><b>03</b> 三项能力评测</span>
+      </div>
       {authError ? (
         <div className="inline-error" role="alert">
           <p>{AUTH_ERRORS[authError] ?? "身份登录没有完成，请重新开始或联系运营。"}</p>

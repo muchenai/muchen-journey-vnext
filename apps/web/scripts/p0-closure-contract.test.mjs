@@ -22,7 +22,7 @@ test("a fresh invite completes exchange and identity confirmation in one learner
   assert.match(actions, /acceptInvite[\s\S]*?\/api\/v1\/join\/exchange/);
   assert.match(actions, /acceptInvite[\s\S]*?\/api\/v1\/identity\/confirm/);
   assert.match(inviteForm, /action=\{acceptInvite\}/);
-  assert.match(inviteForm, /开启旅程/);
+  assert.match(inviteForm, /走进第一站/);
   assert.doesNotMatch(inviteForm, /打开通行证/);
 });
 
@@ -30,7 +30,7 @@ test("learner reentry is explicit and restores the existing journey", () => {
   assert.match(actions, /createLearnerReentry[\s\S]*?&flow=reentry/);
   assert.match(actions, /createLearnerInvite[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
   assert.match(inviteForm, /恢复原有进度，不会创建新的学习记录/);
-  assert.match(inviteForm, /继续旅程/);
+  assert.match(inviteForm, /回到旅程/);
 });
 
 test("https links embedded in frozen text materials remain clickable without unsafe html", () => {

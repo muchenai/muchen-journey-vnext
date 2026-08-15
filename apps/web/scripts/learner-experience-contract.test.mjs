@@ -11,6 +11,9 @@ const resultPage = await readFile(
   new URL("../src/app/app/result/page.tsx", import.meta.url),
   "utf8",
 );
+const homePage = await readFile(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+const layout = await readFile(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
 test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /const activeMaterialIndex =/);
@@ -35,13 +38,13 @@ test("the response workspace stays hidden until required input is complete", () 
 
 test("the complete task contract is visible before input is complete or response begins", () => {
   assert.match(taskPage, /<section className="task-brief"/);
-  assert.match(taskPage, /<h2 id="task-brief-title">\{assignment\.learner_outcome\}<\/h2>/);
-  assert.match(taskPage, /<h3 id="task-deliverables-title">你要交付什么<\/h3>/);
+  assert.match(taskPage, /<p className="task-outcome">\{assignment\.learner_outcome\}<\/p>/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">最后留下<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
   assert.match(taskPage, /className="task-supporting-rules task-contract-columns"/);
-  assert.match(taskPage, /<h3>怎么做<\/h3>/);
-  assert.match(taskPage, /<h3>完成标准<\/h3>/);
+  assert.match(taskPage, /行动路径<\/h3>/);
+  assert.match(taskPage, /过关条件<\/h3>/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
   assert.doesNotMatch(taskPage, /需要时查看方法与完成标准/);
@@ -62,7 +65,21 @@ test("join and result pages keep operational explanations below the primary expe
   assert.doesNotMatch(joinPage, /Enrollment|Assignment/);
   assert.match(resultPage, /<summary>查看通知与过程记录<\/summary>/);
   assert.match(resultPage, /<summary>查看评审与准入详情<\/summary>/);
+  assert.match(resultPage, /四枚宝藏 · 三项能力证据/);
+  assert.match(resultPage, /className="treasure-collection"/);
+  assert.match(resultPage, /className="ability-collection"/);
   assert.ok(resultPage.indexOf("下一步") < resultPage.indexOf("结论分层"));
   assert.doesNotMatch(resultPage, /04 · 通知状态|05 · 不可变时间线/);
   assert.doesNotMatch(resultPage, /系统只整理固定证据/);
+});
+
+test("the golden path starts as a journey instead of a generic session shortcut", () => {
+  assert.match(homePage, /一天，八站。带走四份认知与三项真实能力证据/);
+  assert.match(homePage, /Day 0 · 启程/);
+  assert.match(joinPage, /className="join-scene"/);
+  assert.match(joinPage, /第一站已经为你亮起/);
+  assert.match(joinPage, /走进第一站/);
+  assert.match(api, /export async function hasLearnerSession/);
+  assert.match(api, /\/api\/v1\/me\/current-action/);
+  assert.match(layout, /learnerSession \? \(/);
 });

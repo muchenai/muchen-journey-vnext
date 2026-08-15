@@ -429,7 +429,7 @@ export async function startAssignment(data: FormData) {
     body: JSON.stringify({ expected_revision: expectedRevision }),
   });
   revalidatePath("/app");
-  redirect(`/app/tasks/${assignmentId}`);
+  redirect(`/app/tasks/${assignmentId}#task-workspace`);
 }
 
 export async function completeLearningMaterial(data: FormData) {
@@ -509,7 +509,7 @@ export async function saveSubmissionDraft(
     return submissionError(error);
   }
   revalidatePath(`/app/tasks/${assignmentId}`);
-  redirect(`/app/tasks/${assignmentId}?draft=saved`);
+  redirect(`/app/tasks/${assignmentId}?draft=saved#task-workspace`);
 }
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([

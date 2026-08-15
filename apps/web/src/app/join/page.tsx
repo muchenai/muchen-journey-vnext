@@ -43,49 +43,55 @@ export default async function JoinPage({
 
   return (
     <section className="learner-join">
-      <div className="join-symbol" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <p className="journey-whisper">{isReentry ? "Welcome back." : "Your journey starts here."}</p>
-      <h1>{isReentry ? "回到你离开的地方。" : "这张通行证，只属于你。"}</h1>
-      {errorMessage ? (
-        <div className="notice" role="alert">
-          <strong>{errorMessage}</strong>
-          {query.request_id ? <p>请求编号：{query.request_id}</p> : null}
+      <div className="join-scene" aria-hidden="true">
+        <div className="join-scene-copy">
+          <span>DAY 0 · 启程</span>
+          <strong>第一站已经为你亮起</strong>
+          <small>一天 · 八站 · 一段由你完成的旅程</small>
         </div>
-      ) : null}
-      {summary ? (
-        <article className="join-pass">
-          <span className="join-pass-label">Muchen Journey · 邀请</span>
-          <h2>{summary.purpose}</h2>
-          <time dateTime={summary.expires_at}>
-            {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-          </time>
-          <form action={confirmIdentity}>
-            {!isReentry ? (
-              <>
-                <label htmlFor="display-name">你希望显示的称呼</label>
-                <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
-              </>
-            ) : (
-              <p className="status-meta">
-                从上次离开的地方继续。
-              </p>
-            )}
-            <label className="consent-row">
-              <input type="checkbox" name="accepted_purpose" value="yes" required />
-              我确认这是我的邀请
-            </label>
-            <button className="button primary" type="submit">
-              {isReentry ? "继续旅程" : "开启旅程"}
-            </button>
-          </form>
-        </article>
-      ) : (
-        <InviteTokenExchangeForm />
-      )}
+        <ol>
+          {Array.from({ length: 8 }, (_, index) => <li key={index} />)}
+        </ol>
+      </div>
+      <div className="join-entry">
+        <p className="journey-whisper">{isReentry ? "Welcome back." : "Your journey starts here."}</p>
+        <h1>{isReentry ? "回到你离开的地方。" : "这张通行证，只属于你。"}</h1>
+        <p className="join-promise">从 Day 0 出发，找到四枚宝藏，完成三次真实判断。</p>
+        {errorMessage ? (
+          <div className="notice" role="alert">
+            <strong>{errorMessage}</strong>
+            {query.request_id ? <p>请求编号：{query.request_id}</p> : null}
+          </div>
+        ) : null}
+        {summary ? (
+          <article className="join-pass">
+            <span className="join-pass-label">Muchen Journey · 邀请</span>
+            <h2>{summary.purpose}</h2>
+            <time dateTime={summary.expires_at}>
+              {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
+            </time>
+            <form action={confirmIdentity}>
+              {!isReentry ? (
+                <>
+                  <label htmlFor="display-name">旅途中怎么称呼你</label>
+                  <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
+                </>
+              ) : (
+                <p className="status-meta">从上次离开的地方继续。</p>
+              )}
+              <label className="consent-row">
+                <input type="checkbox" name="accepted_purpose" value="yes" required />
+                我确认这是我的邀请
+              </label>
+              <button className="button primary" type="submit">
+                {isReentry ? "回到旅程" : "走进第一站"}
+              </button>
+            </form>
+          </article>
+        ) : (
+          <InviteTokenExchangeForm />
+        )}
+      </div>
     </section>
   );
 }

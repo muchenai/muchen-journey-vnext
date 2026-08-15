@@ -64,7 +64,7 @@ export function InviteTokenExchangeForm() {
         我确认这是我的邀请
       </label>
       <button className="button primary" type="submit">
-        {isReentry ? "继续旅程" : "开启旅程"}
+        {isReentry ? "回到旅程" : "走进第一站"}
       </button>
     </form>
   );

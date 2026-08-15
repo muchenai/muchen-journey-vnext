@@ -44,7 +44,21 @@ def request_json(base_url: str, path: str, *, method: str = "GET", payload=None)
 
 
 def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
-    material_url = f"https://example.com/journey-v3-learning/{stable_key.lower()}"
+    material_url = (
+        "https://example.feishu.cn/wiki/"
+        f"P0LearnerExperienceMaterial{stable_key.replace('-', '')}"
+        "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
+    )
+    challenge_url = (
+        "https://example.feishu.cn/docx/"
+        f"P0LearnerChallenge{stable_key.replace('-', '')}"
+        "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
+    )
+    answer_url = (
+        "https://example.feishu.cn/docx/"
+        f"P0LearnerAnswer{stable_key.replace('-', '')}"
+        "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
+    )
     requires_external_document = stable_key.startswith("ASM-")
     return {
         "expected_revision": revision,
@@ -52,10 +66,13 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         "purpose": "验证新人可以先完成学习输入，再留下当前阶段的结构化证据并继续旅程。",
         "learner_outcome": "新人能够辨认当前位置、完成输入并提交一份与当前主题对应的证据。",
         "instructions": [
-            "先完成固定学习材料。",
+            f"先打开完整挑战题面并确认本阶段边界：{challenge_url}",
             "在飞书文档副本中写下判断、依据和下一步。" if requires_external_document else "写下判断、依据和下一步。",
         ],
-        "completion_criteria": ["固定输入已完成", "判断与证据可以对应"],
+        "completion_criteria": [
+            "固定输入已完成，判断与证据可以对应",
+            f"提交前对照示例答案完成自检：{answer_url}",
+        ],
         "required_deliverables": [
             "一份飞书文档链接" if requires_external_document else "一份不少于四十字的结构化记录"
         ],

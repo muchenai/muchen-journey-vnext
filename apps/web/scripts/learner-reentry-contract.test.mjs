@@ -33,5 +33,5 @@ test("reentry confirmation does not collect a new display name or claim new busi
   assert.match(join, /\{!isReentry \? \([\s\S]*name="display_name"/);
   assert.match(join, /从上次离开的地方继续/);
   assert.doesNotMatch(join, /Enrollment|Assignment/);
-  assert.match(join, /继续旅程/);
+  assert.match(join, /回到旅程/);
 });
