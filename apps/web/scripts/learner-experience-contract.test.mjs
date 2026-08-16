@@ -75,6 +75,11 @@ test("join and result pages keep operational explanations below the primary expe
   assert.match(resultPage, /Journey 8 \/ 8/);
   assert.match(resultPage, /className="treasure-collection"/);
   assert.match(resultPage, /className="ability-collection"/);
+  assert.match(resultPage, /learnerPageRequest<CurrentAction>\("\/api\/v1\/me\/current-action"\)/);
+  assert.match(resultPage, /aria-label="回看启程"/);
+  assert.match(resultPage, /aria-label=\{`回看宝藏/);
+  assert.match(resultPage, /aria-label=\{`回看能力评测/);
+  assert.match(resultPage, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
   assert.ok(resultPage.indexOf("下一步") < resultPage.indexOf("结论分层"));
   assert.doesNotMatch(resultPage, /04 · 通知状态|05 · 不可变时间线/);
   assert.doesNotMatch(resultPage, /系统只整理固定证据/);
