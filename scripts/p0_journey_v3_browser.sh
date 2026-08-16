@@ -300,6 +300,13 @@ complete_stage() {
         await page.getByRole('button', {name: /完成，打开下一份|完成材料，开始/}).first().evaluate((element) => element.click());
         await completed;
         await page.waitForLoadState('networkidle');
+        const skipLinkIntrudes = await page.locator('.skip-link').evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return box.bottom > 0 && box.right > 0;
+        });
+        if (skipLinkIntrudes) {
+          throw new Error('stage $stage_no material completion exposed the keyboard-only skip link');
+        }
       }
       if ($stage_no === 1) {
         for (const viewport of [
