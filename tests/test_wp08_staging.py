@@ -320,9 +320,13 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_RUNTIME_REPAIR=PASS",
                 "DEPLOYED_CANDIDATE.tmp",
                 "DEPLOYED_COMPONENTS.json",
-                'components["api"] == baseline',
-                'components["worker"] == baseline',
+                "validate_component_marker_shape",
+                "full_sha.fullmatch(value)",
                 "WP08_WEB_ONLY_DEPLOY=PASS",
+                'if [[ "$DEPLOY_MODE" == "web-only" ]]',
+                'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+                'verify_web_only_runtime "$previous"',
+                'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
                 'if [[ "$DEPLOY_MODE" == "runtime-repair" ]]',
                 "verify_runtime_repair_prestate",
                 'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
@@ -340,8 +344,23 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     script.write_text(valid)
     staging.validate_deploy_script(script)
 
-    script.write_text(valid.replace('components["api"] == baseline', 'components["api"] == candidate'))
+    script.write_text(valid.replace("full_sha.fullmatch(value)", "value == candidate"))
     with pytest.raises(staging.StagingError, match="Web-only deployment contract is incomplete"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(valid + '\ncomponents["api"] == baseline\n')
+    with pytest.raises(staging.StagingError, match="live runtime instead of trusting stale markers"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"\n'
+            'verify_web_only_runtime "$previous"',
+            'verify_web_only_runtime "$previous"\n'
+            'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+        )
+    )
+    with pytest.raises(staging.StagingError, match="marker shape and live runtime"):
         staging.validate_deploy_script(script)
 
     script.write_text(valid + "\npython -m journey_api.seed\n")

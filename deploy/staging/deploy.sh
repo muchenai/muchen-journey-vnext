@@ -160,6 +160,20 @@ assert worker["stale"] is False
 PY
 }
 
+validate_component_marker_shape() {
+  local path=$1
+  python3 - "$path" <<'PY'
+import json
+import re
+import sys
+
+components = json.loads(open(sys.argv[1], encoding="utf-8").read())
+full_sha = re.compile(r"^[0-9a-f]{40}$")
+assert set(components) == {"web", "api", "worker"}
+assert all(isinstance(value, str) and full_sha.fullmatch(value) for value in components.values())
+PY
+}
+
 verify_runtime_repair_prestate() {
   local release_dir=$1
   local api_runtime worker_runtime web_release
@@ -238,16 +252,8 @@ if [[ "$DEPLOY_MODE" == "web-only" ]]; then
   [[ -d "$previous" && -f "$previous/compose.yaml" ]] || fail "current release is invalid"
   [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "latest deployed candidate marker is missing"
   [[ -f "$ROOT/DEPLOYED_COMPONENTS.json" ]] || fail "deployed component marker is missing"
-  python3 - "$ROOT/DEPLOYED_COMPONENTS.json" "$BASELINE_CANDIDATE" <<'PY'
-import json
-import sys
-
-path, baseline = sys.argv[1:]
-components = json.loads(open(path, encoding="utf-8").read())
-assert set(components) == {"web", "api", "worker"}
-assert components["api"] == baseline
-assert components["worker"] == baseline
-PY
+  validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json" || \
+    fail "deployed component marker shape is invalid"
   previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
   verify_web_only_runtime "$previous" || fail "runtime baseline is not healthy and compatible"
   pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"
