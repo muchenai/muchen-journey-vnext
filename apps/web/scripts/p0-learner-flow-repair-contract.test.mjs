@@ -48,6 +48,8 @@ test("material and submission transitions preserve the learner context", () => {
   assert.match(actions, /redirect\(`\/app\/tasks\/\$\{assignmentId\}#task-workspace`\)/);
   assert.match(actions, /#\$\{anchor\}/);
   assert.match(actions, /\/app\?transition=submitted#next-action/);
+  assert.match(styles, /\.skip-link:focus-visible\s*\{[^}]*translateY\(0\)/);
+  assert.doesNotMatch(styles, /\.skip-link:focus\s*\{/);
   assert.match(learnerHome, /className="journey-transition"/);
   assert.match(learnerHome, /下一站已解锁/);
   assert.match(learnerHome, /已经交给 Reviewer/);

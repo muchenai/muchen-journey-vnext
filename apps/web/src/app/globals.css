@@ -42,7 +42,7 @@ button, textarea, input, select { font: inherit; }
   background: var(--action-primary);
   transform: translateY(-160%);
 }
-.skip-link:focus { transform: translateY(0); }
+.skip-link:focus-visible { transform: translateY(0); }
 
 .site-header,
 .site-footer {
