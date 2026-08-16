@@ -683,7 +683,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .content-editor-grid { grid-template-columns: 1fr; }
   .learner-join { gap: 28px; }
   .join-entry { order: -1; }
-  .join-entry > h1 { max-width: none; font-size: clamp(34px, 10vw, 42px); letter-spacing: -.045em; text-wrap: balance; white-space: normal; }
+  .join-entry > h1 { max-width: none; font-size: clamp(24px, 7vw, 31px); letter-spacing: -.045em; white-space: nowrap; }
   .join-promise { margin-bottom: 22px; }
   .join-scene { min-height: 330px; padding: 24px; background-position: 36% center; border-radius: 28px; }
   .join-scene-copy > strong { font-size: 26px; }
