@@ -10,11 +10,13 @@ function withContentSecurityPolicy(response: NextResponse, policy: string) {
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
+  const isLocal = process.env.APP_ENV === "local";
   const developmentEval = isDevelopment ? " 'unsafe-eval'" : "";
+  const stylePolicy = isLocal ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`;
   const policy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentEval}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    stylePolicy,
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",
@@ -22,7 +24,7 @@ export function proxy(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
+    ...(isDevelopment || isLocal ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);
