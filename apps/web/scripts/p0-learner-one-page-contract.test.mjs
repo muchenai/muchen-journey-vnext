@@ -49,5 +49,5 @@ test("learner failure surfaces provide bounded recovery without raw API JSON", (
 test("desktop invitation headline stays on one deliberate line", () => {
   assert.match(joinPage, /这张通行证，只属于你。/);
   assert.match(styles, /\.join-entry > h1 \{[^}]*white-space: nowrap/);
-  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-entry > h1 \{[^}]*white-space: normal/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-entry > h1 \{[^}]*font-size: clamp\(24px, 7vw, 31px\)[^}]*white-space: nowrap/);
 });
