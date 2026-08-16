@@ -10,6 +10,7 @@ on:
         options:
           - audit
           - deploy
+          - deploy-web
           - inspect-runtime
           - diagnose-publication
           - repair-edge-route
@@ -38,7 +39,7 @@ jobs:
     if: >-
       inputs.candidate == 'ddd063b39dbc323f4d8fbfcaac71e36e4faf6b18' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_DDD063B_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'deploy-web' && inputs.confirmation == 'DEPLOY_WEB_DDD063B_ON_9E8A806_STAGING') ||
       (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_DDD063B_STAGING') ||
       (inputs.phase == 'diagnose-publication' && inputs.confirmation == 'DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING') ||
       (inputs.phase == 'repair-edge-route' && inputs.confirmation == 'REPAIR_EDGE_ROUTE_EF0A512_STAGING') ||
