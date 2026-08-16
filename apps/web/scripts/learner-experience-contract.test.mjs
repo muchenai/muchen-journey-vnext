@@ -69,7 +69,10 @@ test("join and result pages keep operational explanations below the primary expe
   assert.doesNotMatch(joinPage, /Enrollment|Assignment/);
   assert.match(resultPage, /<summary>查看通知与过程记录<\/summary>/);
   assert.match(resultPage, /<summary>查看评审与准入详情<\/summary>/);
-  assert.match(resultPage, /四枚宝藏 · 三项能力证据/);
+  assert.match(resultPage, /你走完了这段探索/);
+  assert.match(resultPage, /也留下了只属于你的判断/);
+  assert.match(resultPage, /你带走的，不只是答案/);
+  assert.match(resultPage, /Journey 8 \/ 8/);
   assert.match(resultPage, /className="treasure-collection"/);
   assert.match(resultPage, /className="ability-collection"/);
   assert.ok(resultPage.indexOf("下一步") < resultPage.indexOf("结论分层"));

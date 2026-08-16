@@ -53,18 +53,29 @@ export default async function ResultPage() {
   return (
     <article className="result-page">
       <header className="panel result-hero">
-        <div className="completion-orbit" aria-hidden="true">
-          {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+        <div className="result-sky" aria-hidden="true">
+          <span className="result-horizon" />
+          <div className="completion-orbit">
+            {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+          </div>
         </div>
-        <p className="journey-whisper">The journey continues.</p>
-        <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
-        <h1>你留下了自己的判断。</h1>
-        <p className="lede">{result.summary}</p>
+        <div className="result-hero-copy">
+          <p className="journey-whisper">The journey continues.</p>
+          <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
+          <h1>你走完了这段探索。</h1>
+          <p className="result-hero-statement">也留下了只属于你的判断。</p>
+          <p className="lede">{result.summary}</p>
+        </div>
       </header>
 
       <section className="panel result-section result-collection" aria-labelledby="collection-title">
-        <p className="section-label">你的探索营通行证</p>
-        <h2 id="collection-title">四枚宝藏 · 三项能力证据</h2>
+        <div className="result-section-heading">
+          <div>
+            <p className="section-label">探索通行证已盖章</p>
+            <h2 id="collection-title">你带走的，不只是答案</h2>
+          </div>
+          <span className="result-pass-stamp" aria-label="四枚宝藏与三项能力证据已确认">Journey 8 / 8</span>
+        </div>
         <div className="treasure-collection" aria-label="已完成四个宝藏主题">
           {treasureLabels.map((label, index) => (
             <article key={label}>
@@ -88,7 +99,7 @@ export default async function ResultPage() {
       </section>
 
       <section className="panel result-section" aria-labelledby="handoff-title">
-        <p className="section-label">下一步</p>
+        <p className="section-label">旅程没有在这里结束</p>
         <h2 id="handoff-title">{result.handoff.next_step_title}</h2>
         <div className="handoff-card">
           <div>

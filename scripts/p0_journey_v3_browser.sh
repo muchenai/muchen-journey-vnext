@@ -505,9 +505,28 @@ pw_learner run-code "async (page) => {
   await resultPage;
   await page.waitForLoadState('networkidle');
   const visibleBody = await page.locator('body').innerText();
-  if (!visibleBody.includes('你留下了自己的判断。') || !visibleBody.includes('四枚宝藏 · 三项能力证据') || !visibleBody.includes('下一步')) {
+  if (!visibleBody.includes('你走完了这段探索。') || !visibleBody.includes('也留下了只属于你的判断。') || !visibleBody.includes('你带走的，不只是答案') || !visibleBody.includes('旅程没有在这里结束')) {
     throw new Error('final journey summary or handoff missing');
   }
+}"
+pw_learner run-code "async (page) => {
+  for (const viewport of [
+    {name: 'desktop', width: 1280, height: 900},
+    {name: 'mobile', width: 390, height: 844},
+  ]) {
+    await page.setViewportSize({width: viewport.width, height: viewport.height});
+    const visibleBody = await page.locator('body').innerText();
+    if (!visibleBody.includes('你走完了这段探索。') || !visibleBody.toUpperCase().includes('JOURNEY 8 / 8')) {
+      throw new Error(viewport.name + ': completion climax is not visible');
+    }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    if (overflow) throw new Error(viewport.name + ': completion page has horizontal overflow');
+    await page.screenshot({
+      path: '$evidence_dir/03-journey-complete-' + viewport.name + '.png',
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({width: 1280, height: 900});
 }"
 pw_learner screenshot --filename "$evidence_dir/03-journey-complete.png" --full-page
 pw_learner run-code "async (page) => {
