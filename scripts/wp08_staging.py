@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config" / "wp08_staging.json"
+WEB_ONLY_CONTRACT = ROOT / "config" / "wp08_web_only.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "staging.yml"
 EDGE_MIRROR_WORKFLOW = ROOT / ".github" / "workflows" / "wp08-edge-mirror.yml"
 WP09_BOOTSTRAP_WORKFLOW = ROOT / ".github" / "workflows" / "wp09-operator-bootstrap.yml"
@@ -617,11 +618,36 @@ def validate_candidate(data: dict[str, object]) -> None:
 
     commit = str(data["candidate_commit"])
     run_id = str(data["candidate_artifact_run_id"])
-    confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
     prepare = (ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
     deploy = DEPLOY_SCRIPT.read_text()
     workflow = WORKFLOW.read_text()
     variables = (ROOT / "infra" / "staging" / "variables.tf").read_text()
+    web_only = json.loads(WEB_ONLY_CONTRACT.read_text())
+    if (
+        web_only.get("status") == "ACTIVE"
+        and web_only.get("candidate_commit") == commit
+    ):
+        if web_only.get("candidate_artifact_run_id") != data["candidate_artifact_run_id"]:
+            raise StagingError("active Web-only artifact differs from WP-08")
+        if web_only.get("web_image_digest") != expected_digests["web"]:
+            raise StagingError("active Web-only digest differs from WP-08")
+        baseline = str(web_only["runtime_baseline"]["candidate_commit"])
+        confirmation = (
+            f"DEPLOY_WEB_{commit[:7].upper()}_ON_"
+            f"{baseline[:7].upper()}_STAGING"
+        )
+        baseline_markers = (
+            baseline,
+            str(web_only["runtime_baseline"]["api_image_digest"]),
+            str(web_only["runtime_baseline"]["worker_image_digest"]),
+        )
+        for marker in baseline_markers:
+            if marker not in prepare or marker not in deploy:
+                raise StagingError(
+                    "active Web-only runtime baseline differs from deploy bundle"
+                )
+    else:
+        confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
     required_markers = (
         (prepare, commit, "deploy bundle candidate"),
         (deploy, commit, "deploy preflight candidate"),
@@ -693,7 +719,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         job_guard = workflow[jobs_start:guard_end]
         retired_dispatches = (
             "inputs.phase == 'provision'",
-            "inputs.phase == 'deploy-web'",
+            "inputs.phase == 'deploy'",
             "inputs.phase == 'repair-runtime'",
         )
         if any(marker in job_guard for marker in retired_dispatches):
@@ -701,8 +727,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
                 "controlled Alpha candidate must not dispatch retired mutation phases"
             )
     required = (
-        "- audit\n          - deploy\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_DDD063B_TO_VOLCENGINE_STAGING'",
+        "- audit\n          - deploy\n          - deploy-web\n          - inspect-runtime",
+        "inputs.confirmation == 'DEPLOY_WEB_DDD063B_ON_9E8A806_STAGING'",
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
@@ -940,8 +966,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
-        " retired=provision,bounded-web-only,runtime-repair"
+        " dispatch=audit,bounded-web-only,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
+        " retired=provision,full-deploy,runtime-repair"
     )
 
 

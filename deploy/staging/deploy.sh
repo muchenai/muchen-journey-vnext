@@ -54,7 +54,7 @@ pull_with_bounded_retry() {
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
-[[ "${BASELINE_CANDIDATE:-}" == "e927c1bbaf74a9107dadc7ebfafab4fa40f56454" ]] || fail "unexpected Web-only baseline"
+[[ "${BASELINE_CANDIDATE:-}" == "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4" ]] || fail "unexpected Web-only baseline"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
@@ -65,8 +65,8 @@ if [[ "$DEPLOY_MODE" == "full" ]]; then
   [[ "${API_IMAGE#*@}" == "sha256:cdf50cea35a0e3ad6a847a92f8e68d4605225f63761b9cba872d20db74d1e7b8" ]] || fail "API digest differs from candidate manifest"
   [[ "${WORKER_IMAGE#*@}" == "sha256:7f2ffac496bd5d7209ceb2e4356d3cfe9a287385df4842abe87d8f9377cd8321" ]] || fail "Worker digest differs from candidate manifest"
 else
-  [[ "${API_IMAGE#*@}" == "sha256:ba5dbf8e96ba18fa5727024d8bf7dfa9b5e80a8174836096ae47e7fb453e894c" ]] || fail "API digest differs from the Web-only baseline"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:bf6b1419fb8090e5b9e128574801ff8257dd3080c6e3b4fe8634d8dbd22686a3" ]] || fail "Worker digest differs from the Web-only baseline"
+  [[ "${API_IMAGE#*@}" == "sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d" ]] || fail "API digest differs from the Web-only baseline"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da" ]] || fail "Worker digest differs from the Web-only baseline"
 fi
 
 command -v docker >/dev/null || fail "docker is missing"
