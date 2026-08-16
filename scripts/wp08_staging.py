@@ -476,12 +476,38 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "WP08_RUNTIME_REPAIR=PASS",
         "DEPLOYED_CANDIDATE.tmp",
         "DEPLOYED_COMPONENTS.json",
-        'components["api"] == baseline',
-        'components["worker"] == baseline',
+        "validate_component_marker_shape",
+        "full_sha.fullmatch(value)",
         "WP08_WEB_ONLY_DEPLOY=PASS",
     )
     if any(marker not in script for marker in web_only_markers):
         raise StagingError("bounded Web-only deployment contract is incomplete")
+    stale_marker_assertions = (
+        'components["api"] == baseline',
+        'components["worker"] == baseline',
+    )
+    if any(marker in script for marker in stale_marker_assertions):
+        raise StagingError(
+            "Web-only deployment must verify the live runtime instead of trusting stale markers"
+        )
+    web_only_start = script.find('if [[ "$DEPLOY_MODE" == "web-only" ]]')
+    marker_shape_check = script.find(
+        'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+        web_only_start,
+    )
+    live_runtime_check = script.find(
+        'verify_web_only_runtime "$previous"', web_only_start
+    )
+    web_image_pull = script.find(
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"', web_only_start
+    )
+    if not (
+        web_only_start >= 0
+        and web_only_start < marker_shape_check < live_runtime_check < web_image_pull
+    ):
+        raise StagingError(
+            "Web-only deployment must validate marker shape and live runtime before pulling Web"
+        )
     repair_start = script.find('if [[ "$DEPLOY_MODE" == "runtime-repair" ]]')
     repair_end = script.find("\nfi", repair_start)
     if repair_start < 0 or repair_end < 0:
