@@ -3,6 +3,18 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const proxySource = readFileSync(new URL("../src/proxy.ts", import.meta.url), "utf8");
+
+test("local browser verification does not upgrade HTTP fixture assets", () => {
+  assert.match(proxySource, /const isLocal = process\.env\.APP_ENV === "local";/);
+  assert.match(
+    proxySource,
+    /isDevelopment \|\| isLocal \? \[\] : \["upgrade-insecure-requests"\]/,
+  );
+  assert.match(
+    proxySource,
+    /const stylePolicy = isLocal \? "style-src 'self'"/,
+  );
+});
 const contentLoginSource = readFileSync(
   new URL("../src/app/content/login/page.tsx", import.meta.url),
   "utf8",

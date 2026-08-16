@@ -426,7 +426,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learner-task-page[data-stage-kind="TREASURE"] .task-hero-card { background: linear-gradient(90deg, rgba(10, 29, 45, .96) 0%, rgba(10, 29, 45, .72) 47%, rgba(10, 29, 45, .08) 100%), url("/journey/day0-threshold-v1.jpg") center / cover; }
 .learner-task-page[data-stage-kind="TREASURE"] .task-hero-card { background-position: 68% center; }
 .task-hero-card::after { position: absolute; right: -70px; bottom: -100px; width: 300px; height: 300px; border: 56px solid rgba(255, 255, 255, .07); border-radius: 50%; content: ""; }
-.task-hero-card h1 { position: relative; z-index: 1; max-width: 18ch; margin: 16px 0 12px; font-size: clamp(36px, 6vw, 58px); }
+.task-hero-card h1 { position: relative; z-index: 1; max-width: 18ch; margin: 16px 0 12px; font-size: clamp(36px, 6vw, 58px); line-break: strict; text-wrap: balance; }
 .task-hero-card > p { position: relative; z-index: 1; max-width: 30ch; color: #c9e9e5; font-size: 18px; }
 .task-hero-card .task-hero-label { margin: 32px 0 0; color: #f5d777; font-size: 11px; font-weight: 850; letter-spacing: .16em; text-transform: uppercase; }
 .task-identity { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
@@ -660,7 +660,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .task-hero-card { min-height: 390px; border-radius: 28px; }
   .learner-task-page[data-stage-kind="DAY_0"] .task-hero-card,
   .learner-task-page[data-stage-kind="TREASURE"] .task-hero-card { background: linear-gradient(180deg, rgba(10, 29, 45, .52) 0%, rgba(10, 29, 45, .92) 72%), url("/journey/day0-threshold-v1.jpg") 44% center / cover; }
-  .task-hero-card h1 { margin-top: 12px; }
+  .task-hero-card h1 { max-width: 100%; margin-top: 12px; font-size: clamp(32px, 9vw, 40px); line-height: 1.08; }
   .task-hero-card .task-hero-label { margin-top: 24px; }
   .task-time { right: 24px; bottom: 22px; }
   .mission-now { align-items: stretch; flex-direction: column; gap: 18px; margin: -54px 14px 0; }

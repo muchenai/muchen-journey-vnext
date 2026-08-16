@@ -51,3 +51,8 @@ test("desktop invitation headline stays on one deliberate line", () => {
   assert.match(styles, /\.join-entry > h1 \{[^}]*white-space: nowrap/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-entry > h1 \{[^}]*font-size: clamp\(24px, 7vw, 31px\)[^}]*white-space: nowrap/);
 });
+
+test("mobile task titles balance deliberate lines instead of leaving an orphan glyph", () => {
+  assert.match(styles, /\.task-hero-card h1 \{[^}]*line-break: strict[^}]*text-wrap: balance/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.task-hero-card h1 \{[^}]*max-width: 100%[^}]*font-size: clamp\(32px, 9vw, 40px\)[^}]*line-height: 1\.08/);
+});
