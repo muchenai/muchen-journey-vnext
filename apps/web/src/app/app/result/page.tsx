@@ -1,4 +1,7 @@
-import { learnerPageRequest, Result, Timeline } from "@/lib/server/api";
+import Link from "next/link";
+
+import { learnerPageRequest } from "@/lib/server/api";
+import type { CurrentAction, Result, Timeline } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +44,19 @@ function timelineDetail(eventType: string, details: Timeline["items"][number]["d
 }
 
 export default async function ResultPage() {
-  const [result, timeline] = await Promise.all([
+  const [result, timeline, currentAction] = await Promise.all([
     learnerPageRequest<Result>("/api/v1/me/result"),
     learnerPageRequest<Timeline>("/api/v1/me/timeline?limit=100"),
+    learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
   ]);
+  const journeyNodes = currentAction.journey?.nodes ?? [];
+  const dayZero = journeyNodes.find((node) => node.stage_kind === "DAY_0");
+  const treasureNodes = journeyNodes.filter((node) => node.stage_kind === "TREASURE");
+  const assessmentNodes = new Map(
+    journeyNodes
+      .filter((node) => node.stage_kind === "ASSESSMENT")
+      .map((node) => [node.stable_key, node]),
+  );
   const notificationEvidence = result.notification.external_delivery_confirmed
     ? "飞书服务已确认接受通知请求。"
     : result.notification.delivery_scope === "FEISHU"
@@ -61,7 +73,17 @@ export default async function ResultPage() {
         </div>
         <div className="result-hero-copy">
           <p className="journey-whisper">The journey continues.</p>
-          <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
+          {dayZero ? (
+            <Link
+              className="result-kicker result-kicker-link"
+              href={`/app/tasks/${dayZero.assignment_id}`}
+              aria-label="回看启程"
+            >
+              <span aria-hidden="true">✓</span> 8 / 8 路标已点亮
+            </Link>
+          ) : (
+            <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
+          )}
           <h1>你走完了这段探索。</h1>
           <p className="result-hero-statement">也留下了只属于你的判断。</p>
           <p className="lede">{result.summary}</p>
@@ -77,24 +99,55 @@ export default async function ResultPage() {
           <span className="result-pass-stamp" aria-label="四枚宝藏与三项能力证据已确认">Journey 8 / 8</span>
         </div>
         <div className="treasure-collection" aria-label="已完成四个宝藏主题">
-          {treasureLabels.map((label, index) => (
-            <article key={label}>
-              <span aria-hidden="true">✦</span>
-              <small>宝藏 {index + 1}</small>
-              <strong>{label}</strong>
-            </article>
-          ))}
+          {treasureLabels.map((label, index) => {
+            const node = treasureNodes[index];
+            const card = (
+              <article>
+                <span aria-hidden="true">✦</span>
+                <small>宝藏 {index + 1}</small>
+                <strong>{label}</strong>
+              </article>
+            );
+            return node ? (
+              <Link
+                className="result-revisit-link"
+                href={`/app/tasks/${node.assignment_id}`}
+                aria-label={`回看宝藏 ${index + 1}：${label}`}
+                key={label}
+              >
+                {card}
+              </Link>
+            ) : (
+              <div key={label}>{card}</div>
+            );
+          })}
         </div>
         <div className="ability-collection" aria-label="已通过三项能力评测">
-          {result.journey_evaluations.map((evaluation, index) => (
-            <article key={evaluation.id}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <small>Reviewer 已确认</small>
-                <strong>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</strong>
-              </div>
-            </article>
-          ))}
+          {result.journey_evaluations.map((evaluation, index) => {
+            const node = assessmentNodes.get(evaluation.stage_key);
+            const title = evaluation.stage_title.replace(/^能力评测[一二三]：/, "");
+            const card = (
+              <article>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>Reviewer 已确认</small>
+                  <strong>{title}</strong>
+                </div>
+              </article>
+            );
+            return node ? (
+              <Link
+                className="result-revisit-link"
+                href={`/app/tasks/${node.assignment_id}`}
+                aria-label={`回看能力评测 ${index + 1}：${title}`}
+                key={evaluation.id}
+              >
+                {card}
+              </Link>
+            ) : (
+              <div key={evaluation.id}>{card}</div>
+            );
+          })}
         </div>
       </section>
 

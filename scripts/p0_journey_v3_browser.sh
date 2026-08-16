@@ -508,6 +508,13 @@ pw_learner run-code "async (page) => {
   if (!visibleBody.includes('你走完了这段探索。') || !visibleBody.includes('也留下了只属于你的判断。') || !visibleBody.includes('你带走的，不只是答案') || !visibleBody.includes('旅程没有在这里结束')) {
     throw new Error('final journey summary or handoff missing');
   }
+  const revisitLinks = page.locator('.result-revisit-link');
+  if (await revisitLinks.count() !== 7) {
+    throw new Error('final result does not expose all four treasures and three assessments for revisit');
+  }
+  if (await page.getByRole('link', {name: '回看启程'}).count() !== 1) {
+    throw new Error('final result does not expose Day 0 for revisit');
+  }
 }"
 pw_learner run-code "async (page) => {
   for (const viewport of [
@@ -527,6 +534,15 @@ pw_learner run-code "async (page) => {
     });
   }
   await page.setViewportSize({width: 1280, height: 900});
+  await page.locator('.result-revisit-link').first().click();
+  await page.waitForURL('**/app/tasks/**');
+  await page.waitForLoadState('networkidle');
+  if (await page.locator('.task-hero-card').count() !== 1) {
+    throw new Error('final result revisit did not restore completed stage context');
+  }
+  await page.goBack();
+  await page.waitForURL('**/app/result');
+  await page.waitForLoadState('networkidle');
 }"
 pw_learner screenshot --filename "$evidence_dir/03-journey-complete.png" --full-page
 pw_learner run-code "async (page) => {

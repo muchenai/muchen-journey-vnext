@@ -166,6 +166,8 @@ fieldset { margin: 24px 0; padding: 20px; border: 1px solid var(--border-default
 .result-hero-statement { margin: 0; color: #f5d777; font-size: clamp(20px, 2.4vw, 29px); font-weight: 760; letter-spacing: -.02em; }
 .result-kicker { display: flex; width: fit-content; align-items: center; gap: 8px; margin: 44px 0 0; padding: 7px 12px 7px 8px; color: #ecfff8; background: rgba(13, 97, 90, .58); border: 1px solid rgba(188, 233, 223, .25); border-radius: 999px; font-weight: 750; backdrop-filter: blur(8px); }
 .result-kicker span { display: inline-grid; width: 24px; height: 24px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 999px; }
+.result-kicker-link { text-decoration: none; transition: transform .18s ease, background .18s ease; }
+.result-kicker-link:hover, .result-kicker-link:focus-visible { background: rgba(20, 123, 120, .82); transform: translateY(-2px); }
 .result-section { box-shadow: 0 10px 32px rgba(23, 32, 51, 0.055); }
 .section-label { margin-bottom: 8px; color: var(--action-primary); font-size: 13px; font-weight: 800; letter-spacing: 0.1em; }
 .feedback-summary { padding: 18px 20px; background: #f8f9fc; border-left: 4px solid var(--action-primary); border-radius: 0 8px 8px 0; font-size: 18px; }
@@ -563,12 +565,17 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .result-section-heading h2 { margin-bottom: 0; }
 .result-pass-stamp { display: grid; min-width: 108px; min-height: 72px; place-items: center; padding: 10px 14px; color: #147b78; background: #f4f8f7; border: 2px solid #258b81; border-radius: 50%; font-size: 13px; font-weight: 850; letter-spacing: .08em; text-align: center; text-transform: uppercase; transform: rotate(-7deg); }
 .treasure-collection { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.result-revisit-link { position: relative; min-width: 0; color: inherit; border-radius: 18px; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }
+.result-revisit-link::after { position: absolute; top: 14px; right: 14px; z-index: 1; color: #bce9df; font-size: 16px; font-weight: 850; content: "↗"; opacity: .82; }
+.result-revisit-link:hover, .result-revisit-link:focus-visible { box-shadow: 0 14px 28px rgba(23, 62, 92, .16); transform: translateY(-3px); }
+.result-revisit-link article { height: 100%; }
 .treasure-collection article { display: grid; min-width: 0; min-height: 142px; align-content: end; padding: 18px; color: #fff; background: radial-gradient(circle at 25% 22%, rgba(245, 215, 119, .34), transparent 26%), linear-gradient(145deg, #147b78, #173e5c); border-radius: 18px; }
 .treasure-collection article > span { align-self: start; color: #f5d777; font-size: 25px; }
 .treasure-collection article > small { margin-top: 26px; color: #bce9df; font-weight: 750; }
 .treasure-collection article > strong { overflow-wrap: anywhere; }
 .ability-collection { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .ability-collection article { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; align-items: center; min-width: 0; padding: 16px; background: #f4f8f7; border: 1px solid #d8e3df; border-radius: 16px; }
+.ability-collection .result-revisit-link::after { color: #20877f; }
 .ability-collection article > span { display: grid; width: 40px; height: 40px; place-items: center; color: #fff; background: #2854d7; border-radius: 13px; font-size: 11px; font-weight: 850; }
 .ability-collection article > div { display: grid; min-width: 0; }
 .ability-collection small { color: #20877f; font-weight: 700; }
