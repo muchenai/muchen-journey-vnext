@@ -240,11 +240,12 @@ complete_stage() {
       const brief = page.locator('.task-brief');
       if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
       const briefText = await brief.innerText();
-      if (!briefText.includes('最后留下') || !briefText.includes('行动路径') || !briefText.includes('过关条件')) {
+      if (!briefText.includes('这一站只交付') || !briefText.includes('怎么完成') || !briefText.includes('怎样算完成？')) {
         throw new Error('stage $stage_no task requirements are not visible on first entry');
       }
-      if (await brief.locator('details').count()) {
-        throw new Error('stage $stage_no task requirements are hidden in disclosure');
+      const successCriteria = brief.locator('.task-success-criteria');
+      if (await successCriteria.count() !== 1 || await successCriteria.getAttribute('open') !== null) {
+        throw new Error('stage $stage_no completion criteria are not progressively disclosed');
       }
       if (await page.locator('.task-workspace').count() !== 0) {
         throw new Error('stage $stage_no response workspace appeared before learning input');
@@ -253,6 +254,17 @@ complete_stage() {
         throw new Error('stage $stage_no does not have one primary next action');
       }
       if ($stage_no === 1) {
+        const dayZeroBriefing = page.locator('.day-zero-briefing');
+        if (await dayZeroBriefing.count() !== 1) throw new Error('Day 0 60-second briefing missing');
+        const briefingText = await dayZeroBriefing.innerText();
+        if (!briefingText.includes('今天不是先答题，而是先看清地图') || !briefingText.includes('四个宝藏 · 三项真实能力评测')) {
+          throw new Error('Day 0 does not explain the journey before asking for output');
+        }
+        const firstMaterialCta = dayZeroBriefing.getByRole('link', {name: /打开第 1 份材料/});
+        if (await firstMaterialCta.count() !== 1) throw new Error('Day 0 first-material action missing');
+        if (await page.locator('.material-focus-prompt').count() !== 1) {
+          throw new Error('Day 0 active material does not expose one reading question');
+        }
         for (const viewport of [
           {name: 'desktop', width: 1280, height: 900},
           {name: 'tablet', width: 768, height: 1024},
@@ -264,10 +276,10 @@ complete_stage() {
           }
           const contractGeometry = await page.evaluate(() => {
             const columns = Array.from(document.querySelectorAll('.task-contract-columns > div'));
-            const links = Array.from(document.querySelectorAll('.task-contract-columns a'));
+            const links = Array.from(document.querySelectorAll('.task-brief a'));
             const columnOverflow = columns.some((column) => column.scrollWidth > column.clientWidth + 1);
             const escapedLink = links.some((link) => {
-              const parent = link.closest('.task-contract-columns > div');
+              const parent = link.closest('.task-contract-columns > div, .task-success-criteria');
               if (!parent) return true;
               const linkBox = link.getBoundingClientRect();
               const parentBox = parent.getBoundingClientRect();
@@ -295,9 +307,9 @@ complete_stage() {
           throw new Error('stage $stage_no material is not HTTPS');
         }
       }
-      while (await page.getByRole('button', {name: /完成，打开下一份|完成材料，开始/}).count()) {
+      while (await page.getByRole('button', {name: /我找到答案了，继续|我找到答案了，开始/}).count()) {
         const completed = page.waitForURL('**?material=completed*');
-        await page.getByRole('button', {name: /完成，打开下一份|完成材料，开始/}).first().evaluate((element) => element.click());
+        await page.getByRole('button', {name: /我找到答案了，继续|我找到答案了，开始/}).first().evaluate((element) => element.click());
         await completed;
         await page.waitForLoadState('networkidle');
         const skipLinkIntrudes = await page.locator('.skip-link').evaluate((element) => {
@@ -320,11 +332,15 @@ complete_stage() {
           if (await brief.count() !== 1 || await workspace.count() !== 1) {
             throw new Error(viewport.name + ': visible task brief or response workspace missing after learning input');
           }
-          if (!(await brief.innerText()).includes('最后留下')) {
+          if (!(await brief.innerText()).includes('这一站只交付')) {
             throw new Error(viewport.name + ': required deliverables are not visible before response');
           }
-          if (!(await brief.innerText()).includes('行动路径') || !(await brief.innerText()).includes('过关条件')) {
-            throw new Error(viewport.name + ': complete task requirements are not visible');
+          if (!(await brief.innerText()).includes('怎么完成') || !(await brief.innerText()).includes('怎样算完成？')) {
+            throw new Error(viewport.name + ': task path or completion criteria entry is missing');
+          }
+          const successCriteria = brief.locator('.task-success-criteria');
+          if (await successCriteria.count() !== 1 || await successCriteria.getAttribute('open') !== null) {
+            throw new Error(viewport.name + ': completion criteria do not remain available on demand');
           }
           const briefBox = await brief.boundingBox();
           const workspaceBox = await workspace.boundingBox();

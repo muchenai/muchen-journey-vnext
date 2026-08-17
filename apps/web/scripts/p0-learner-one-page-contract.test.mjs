@@ -10,13 +10,14 @@ const joinPage = readFileSync(new URL("../src/app/join/page.tsx", import.meta.ur
 const homePage = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 
-test("task requirements are visible before the gated response workspace", () => {
+test("the essential task remains visible while secondary criteria stay on demand", () => {
   assert.match(taskPage, /<section className="task-brief"/);
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
-  assert.match(taskPage, /<h3 id="task-deliverables-title">最后留下<\/h3>/);
-  assert.match(taskPage, /行动路径<\/h3>/);
-  assert.match(taskPage, /过关条件<\/h3>/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
+  assert.match(taskPage, /怎么完成<\/h3>/);
+  assert.match(taskPage, /<details className="task-success-criteria">/);
+  assert.match(taskPage, /<summary>怎样算完成？<\/summary>/);
   assert.match(taskPage, /\{materialsReady \? <section id="task-workspace" className="task-workspace"/);
 });
 

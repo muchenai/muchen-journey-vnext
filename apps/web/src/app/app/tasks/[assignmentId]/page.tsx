@@ -36,6 +36,22 @@ function ContractLine({ value }: { value: string }) {
   return <span className="contract-line">{textWithSafeLinks(value)}</span>;
 }
 
+const MATERIAL_FOCUS_BY_STAGE: Record<string, string> = {
+  "DAY-0": "看完后，你只需要能说出：今天会经历什么，第一步从哪里开始？",
+  "TRE-001-COMPANY-VALUES": "找出一个你认同或质疑的观点，以及它能被怎样观察。",
+  "TRE-002-AI-DATA-BASICS": "找出一个“表达很流畅，但结论未必可靠”的例子。",
+  "TRE-003-PROJECT-AWARENESS": "找出新人进入真实项目后需要承担的一项具体责任。",
+  "TRE-004-DELIVERY-FIT": "找出一个应该停下来提问，而不是自行猜测的边界。",
+  "ASM-001-RULE-BREAKDOWN": "找出做判断时最容易漏掉的一条规则。",
+  "ASM-002-MODEL-JUDGEMENT": "找出支持你选择 A 或 B 的关键证据。",
+  "ASM-003-DATA-CONSTRUCTION": "找出一份可交付数据必须保持一致的结构与校验点。",
+};
+
+function materialFocus(stageKey: string | undefined, learnerOutcome: string) {
+  return MATERIAL_FOCUS_BY_STAGE[stageKey ?? ""]
+    ?? `读完后，试着用自己的话回答：${learnerOutcome}`;
+}
+
 function materialLinks(value: string | null): string[] {
   if (!value) return [];
   const links = Array.from(value.matchAll(HTTPS_URL), ([match]) =>
@@ -120,8 +136,9 @@ export default async function TaskPage({
   const expectsExternalDocument = isAssessment
     || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
+  const stageFocus = materialFocus(assignment.journey_stage?.stable_key, assignment.learner_outcome);
   const currentFocus = !materialsReady
-    ? `收集第 ${Math.max(1, activeMaterialIndex + 1)} 份线索`
+    ? `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
     : canStart
       ? `看清挑战，开始${practiceNoun}`
       : submitCommand
@@ -159,7 +176,42 @@ export default async function TaskPage({
         </div>
       </section>
 
-      <nav className="task-flow" aria-label="这一站的完成路径">
+      {isDayZero ? (
+        <section className="day-zero-briefing" aria-labelledby="day-zero-briefing-title">
+          <div className="day-zero-briefing-heading">
+            <div>
+              <p className="section-label">60 秒启程</p>
+              <h2 id="day-zero-briefing-title">今天不是先答题，而是先看清地图</h2>
+            </div>
+            {!materialsReady ? (
+              <a className="button primary compact" href="#learning-materials-title">
+                打开第 1 份材料 <span aria-hidden="true">↓</span>
+              </a>
+            ) : (
+              <strong className="day-zero-ready">出发准备完成 ✓</strong>
+            )}
+          </div>
+          <ol>
+            <li data-state={materialsReady ? "complete" : "current"}>
+              <span aria-hidden="true">01</span>
+              <strong>看 {requiredMaterials.length} 份出发材料</strong>
+              <small>不用记住全部，只找一个答案</small>
+            </li>
+            <li data-state={materialsReady ? "current" : "locked"}>
+              <span aria-hidden="true">02</span>
+              <strong>写下一个想验证的问题</strong>
+              <small>没有标准答案，留下你的判断即可</small>
+            </li>
+            <li data-state={stageComplete ? "complete" : "locked"}>
+              <span aria-hidden="true">03</span>
+              <strong>开启后面的七站</strong>
+              <small>四个宝藏 · 三项真实能力评测</small>
+            </li>
+          </ol>
+        </section>
+      ) : null}
+
+      {!isDayZero ? <nav className="task-flow" aria-label="这一站的完成路径">
         <ol>
           <li data-state={materialsReady ? "complete" : "current"}>
             <span>{materialsReady ? "✓" : "01"}</span>
@@ -177,14 +229,14 @@ export default async function TaskPage({
             <small>{isAssessment ? "提交后等待真人评审" : "提交后路线自动更新"}</small>
           </li>
         </ol>
-      </nav>
+      </nav> : null}
 
       {assignment.learning_materials.length > 0 ? (
         <section className="learning-materials" aria-labelledby="learning-materials-title">
           <div className="learning-materials-heading">
             <div>
               <p className="section-label">{isTreasure ? "宝藏线索" : isAssessment ? "评测输入" : "出发准备"}</p>
-              <h2 id="learning-materials-title">先看，再判断</h2>
+              <h2 id="learning-materials-title">{isDayZero ? "先打开材料，再留下你的问题" : "每份材料，只找一个答案"}</h2>
             </div>
             <strong>
               {completedRequiredMaterials}
@@ -206,7 +258,7 @@ export default async function TaskPage({
                 <>
                   <span>
                     {material.source_label} · {material.estimated_duration_minutes} min
-                    {material.required ? " · 必读" : " · 选读"}
+                    {material.required ? " · 核心线索" : " · 可选补给"}
                   </span>
                   <strong>{material.title}</strong>
                 </>
@@ -226,6 +278,13 @@ export default async function TaskPage({
                     <details className="learning-material-card" open={isActive}>
                       <summary>{heading}</summary>
                       <div className="learning-material-content">
+                        <div className="material-focus-prompt">
+                          <span aria-hidden="true">?</span>
+                          <div>
+                            <small>打开前，先记住这一个问题</small>
+                            <strong>{stageFocus}</strong>
+                          </div>
+                        </div>
                         {material.kind === "TEXT" ? (
                           <LearningMaterialBody value={material.body} />
                         ) : (
@@ -259,8 +318,8 @@ export default async function TaskPage({
                               type="submit"
                             >
                               {material.required && pendingRequiredMaterials.length === 1
-                                ? `完成材料，开始${practiceNoun}`
-                                : "完成，打开下一份"}
+                                ? `我找到答案了，开始${practiceNoun}`
+                                : "我找到答案了，继续"}
                             </button>
                           </form>
                         )}
@@ -320,12 +379,12 @@ export default async function TaskPage({
       ) : null}
 
       <section className="task-brief" aria-labelledby="task-brief-title">
-        <p className="section-label">{isAssessment ? "能力挑战" : "这一站的挑战"}</p>
-        <h2 id="task-brief-title">现在，用自己的判断完成它</h2>
-        <p className="task-outcome">{assignment.learner_outcome}</p>
+        <p className="section-label">{materialsReady ? (isAssessment ? "能力挑战" : "轮到你行动") : "材料看完后"}</p>
+        <h2 id="task-brief-title">{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</h2>
+        <p className="task-outcome">{materialsReady ? "把刚才找到的线索，变成你自己的判断。" : "先不用作答。带着上面的一个问题完成材料，再回来行动。"}</p>
 
         <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
-          <h3 id="task-deliverables-title">最后留下</h3>
+          <h3 id="task-deliverables-title">这一站只交付</h3>
           <ul className="checklist">
             {assignment.required_deliverables.map((item) => (
               <li key={item}><ContractLine value={item} /></li>
@@ -335,20 +394,12 @@ export default async function TaskPage({
 
         <div className="task-supporting-rules task-contract-columns">
           <div>
-            <h3><span aria-hidden="true">01</span> 行动路径</h3>
+            <h3><span aria-hidden="true">→</span> 怎么完成</h3>
             <ol className="checklist">
               {assignment.instructions.map((item) => (
                 <li key={item}><ContractLine value={item} /></li>
               ))}
             </ol>
-          </div>
-          <div>
-            <h3><span aria-hidden="true">02</span> 过关条件</h3>
-            <ul className="checklist">
-              {assignment.completion_criteria.map((item) => (
-                <li key={item}><ContractLine value={item} /></li>
-              ))}
-            </ul>
           </div>
           {assignment.reference_materials.length > 0 ? (
             <div>
@@ -361,6 +412,15 @@ export default async function TaskPage({
             </div>
           ) : null}
         </div>
+        <details className="task-success-criteria">
+          <summary>怎样算完成？</summary>
+          <p>{assignment.learner_outcome}</p>
+          <ul className="checklist">
+            {assignment.completion_criteria.map((item) => (
+              <li key={item}><ContractLine value={item} /></li>
+            ))}
+          </ul>
+        </details>
       </section>
 
       {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
