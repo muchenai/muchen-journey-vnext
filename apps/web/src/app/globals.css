@@ -17,6 +17,7 @@
 * { box-sizing: border-box; }
 
 html { min-width: 320px; background: var(--surface-base); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 body {
   min-height: 100vh;
@@ -456,6 +457,20 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .day-zero-briefing li[data-state="locked"] > span { color: #c9d8df; background: rgba(255, 255, 255, .12); }
 .day-zero-briefing li strong { min-width: 0; }
 .day-zero-briefing li small { color: inherit; line-height: 1.45; opacity: .78; }
+.treasure-opening-choice { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 20px 28px; align-items: end; padding: clamp(24px, 5vw, 38px); color: #fff; background: radial-gradient(circle at 88% 12%, rgba(245, 215, 119, .2), transparent 27%), linear-gradient(135deg, #173e5c, #147b78); border-radius: 28px; box-shadow: 0 18px 48px rgba(16, 45, 69, .16); }
+.treasure-opening-choice .section-label { margin: 0; color: #f5d777; }
+.treasure-opening-choice h2 { margin: 5px 0 8px; font-size: clamp(28px, 4vw, 40px); }
+.treasure-opening-choice > div > p:last-child { margin: 0; color: #c9e9e5; }
+.treasure-opening-choice fieldset { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.treasure-opening-choice label { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; padding: 16px; color: #173e5c; background: rgba(255, 255, 255, .9); border: 2px solid transparent; border-radius: 16px; cursor: pointer; }
+.treasure-opening-choice label:has(input:checked) { background: #fff8df; border-color: #f5d777; box-shadow: 0 0 0 5px rgba(245, 215, 119, .14); }
+.treasure-opening-choice label:has(input:focus-visible) { outline: 3px solid #fff; outline-offset: 3px; }
+.treasure-opening-choice input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.treasure-opening-choice label > span { display: grid; width: 36px; height: 36px; place-items: center; color: #fff; background: #20877f; border-radius: 12px; font-size: 12px; font-weight: 850; }
+.treasure-choice-feedback { display: none; grid-column: 2; margin: -8px 0 0; padding: 12px 14px; color: #e6f5f2; background: rgba(255, 255, 255, .09); border-radius: 12px; font-size: 13px; }
+.treasure-opening-choice:has(#treasure-choice-labor:checked) .treasure-choice-feedback-labor,
+.treasure-opening-choice:has(#treasure-choice-delivery:checked) .treasure-choice-feedback-delivery { display: block; }
+.treasure-opening-choice > .button { grid-column: 2; justify-self: start; color: #173e5c; background: #f5d777; }
 .task-flow { padding: 18px 20px; background: #fff; border: 1px solid #d8e3df; border-radius: 22px; box-shadow: 0 12px 30px rgba(23, 75, 92, .06); }
 .task-flow ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .task-flow li { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; align-items: center; min-width: 0; padding: 12px; border-radius: 14px; }
@@ -474,6 +489,18 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-brief-deliverables { padding: 20px 22px; background: #f4f8f7; border: 1px solid #dce8e5; border-radius: 18px; }
 .task-brief-deliverables h3 { margin-top: 0; }
 .task-brief-deliverables .checklist { margin-bottom: 0; }
+.treasure-response-cues { padding: 22px; color: #fff; background: linear-gradient(135deg, #173e5c, #147b78); border-radius: 20px; }
+.treasure-response-cues .section-label { margin: 0; color: #f5d777; }
+.treasure-response-cues h3 { margin: 4px 0 0; }
+.treasure-response-cues ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.treasure-response-cues li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 3px 9px; min-width: 0; padding: 14px; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px; }
+.treasure-response-cues li > span { grid-row: 1 / 3; display: grid; width: 32px; height: 32px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 10px; font-size: 10px; font-weight: 850; }
+.treasure-response-cues li > strong { line-height: 1.35; }
+.treasure-response-cues li > small { color: #c9e9e5; line-height: 1.4; }
+.treasure-method-details { margin-top: 18px; }
+.treasure-method-details summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 750; }
+.treasure-method-details[open] { padding: 16px 18px; background: #f4f8f7; border-radius: 14px; }
+.treasure-method-details[open] summary { margin-bottom: 12px; }
 .task-success-criteria { margin-top: 18px; padding-top: 16px; border-top: 1px solid #e1e7ef; }
 .task-success-criteria summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 750; }
 .task-success-criteria[open] summary { margin-bottom: 12px; }
@@ -528,7 +555,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-list > li.is-locked { color: var(--text-muted); background: #f7f8fa; }
 .learning-material-order { display: grid; width: 42px; height: 42px; place-items: center; color: #fff; background: #20877f; border-radius: 14px; font-size: 12px; font-weight: 800; }
 .is-locked .learning-material-order { background: #98a2b3; }
-.learning-material-card { min-width: 0; }
+.learning-material-card { width: 100%; min-width: 0; }
 .learning-material-card summary { display: grid; gap: 2px; cursor: pointer; list-style: none; }
 .learning-material-card summary::-webkit-details-marker { display: none; }
 .learning-material-card summary span,
@@ -537,7 +564,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-locked > strong { font-size: 20px; }
 .learning-material-card[open] summary { margin-bottom: 18px; }
 .learning-material-card[open] summary::after { content: "收起"; justify-self: end; color: var(--text-muted); font-size: 12px; font-weight: 500; }
-.learning-material-content { display: grid; justify-items: start; gap: 18px; color: var(--text-secondary); line-height: 1.75; }
+.learning-material-content { display: grid; width: 100%; min-width: 0; justify-items: start; gap: 18px; color: var(--text-secondary); line-height: 1.75; }
 .material-focus-prompt { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; padding: 15px 16px; color: #173e5c; background: #fff8df; border: 1px solid #f2df9a; border-radius: 14px; line-height: 1.45; }
 .material-focus-prompt > span { display: grid; width: 36px; height: 36px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 50%; font-size: 18px; font-weight: 900; }
 .material-focus-prompt > div { display: grid; gap: 2px; min-width: 0; }
@@ -683,6 +710,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .task-hero-card { min-height: 390px; border-radius: 28px; }
   .learner-task-page[data-stage-kind="DAY_0"] .task-hero-card,
   .learner-task-page[data-stage-kind="TREASURE"] .task-hero-card { background: linear-gradient(180deg, rgba(10, 29, 45, .52) 0%, rgba(10, 29, 45, .92) 72%), url("/journey/day0-threshold-v1.jpg") 44% center / cover; }
+  .learner-task-page[data-stage-kind="TREASURE"] .task-hero-card { min-height: 320px; }
   .task-hero-card h1 { max-width: 100%; margin-top: 12px; font-size: clamp(32px, 9vw, 40px); line-height: 1.08; }
   .task-hero-card .task-hero-label { margin-top: 24px; }
   .task-time { right: 24px; bottom: 22px; }
@@ -691,6 +719,15 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .day-zero-briefing-heading { align-items: stretch; flex-direction: column; }
   .day-zero-briefing .button { width: 100%; }
   .day-zero-briefing ol { grid-template-columns: 1fr; }
+  .treasure-opening-choice { grid-template-columns: 1fr; align-items: stretch; }
+  .treasure-opening-choice fieldset { grid-template-columns: 1fr; }
+  .treasure-choice-feedback, .treasure-opening-choice > .button { grid-column: 1; }
+  .treasure-opening-choice > .button { width: 100%; }
+  .treasure-response-cues ol { grid-template-columns: 1fr; }
+  .learning-material-list > li { grid-template-columns: 1fr; padding: 18px; }
+  .learning-material-order { width: 34px; height: 34px; border-radius: 11px; }
+  .material-focus-prompt { grid-template-columns: 34px minmax(0, 1fr); padding: 14px; }
+  .material-focus-prompt > span { width: 32px; height: 32px; }
   .treasure-unlocked { grid-template-columns: 52px minmax(0, 1fr); padding: 24px 20px; }
   .treasure-seal { width: 48px; height: 48px; border-width: 5px; font-size: 20px; }
   .task-flow ol { grid-template-columns: 1fr; }
