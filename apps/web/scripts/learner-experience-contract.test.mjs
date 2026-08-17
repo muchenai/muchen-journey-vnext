@@ -25,9 +25,11 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /const isLocked = !isComplete && !isActive/);
   assert.match(taskPage, /className="learning-material-card" open=\{isActive\}/);
   assert.match(taskPage, /完成上一项后解锁/);
-  assert.match(taskPage, /完成材料，开始\$\{practiceNoun\}/);
+  assert.match(taskPage, /我找到答案了，开始\$\{practiceNoun\}/);
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
   assert.match(taskPage, /<span>打开学习材料<\/span>/);
+  assert.match(taskPage, /className="material-focus-prompt"/);
+  assert.match(taskPage, /打开前，先记住这一个问题/);
 });
 
 test("the response workspace stays hidden until required input is complete", () => {
@@ -40,18 +42,28 @@ test("the response workspace stays hidden until required input is complete", () 
   assert.doesNotMatch(taskPage, /当前固定任务版本不接收附件/);
 });
 
-test("the complete task contract is visible before input is complete or response begins", () => {
+test("the task contract leads with one deliverable and keeps secondary criteria on demand", () => {
   assert.match(taskPage, /<section className="task-brief"/);
-  assert.match(taskPage, /<p className="task-outcome">\{assignment\.learner_outcome\}<\/p>/);
-  assert.match(taskPage, /<h3 id="task-deliverables-title">最后留下<\/h3>/);
+  assert.match(taskPage, /<h2 id="task-brief-title">\{assignment\.required_deliverables\[0\]/);
+  assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
   assert.match(taskPage, /className="task-supporting-rules task-contract-columns"/);
-  assert.match(taskPage, /行动路径<\/h3>/);
-  assert.match(taskPage, /过关条件<\/h3>/);
+  assert.match(taskPage, /怎么完成<\/h3>/);
+  assert.match(taskPage, /className="task-success-criteria"/);
+  assert.match(taskPage, /<summary>怎样算完成？<\/summary>/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
   assert.doesNotMatch(taskPage, /需要时查看方法与完成标准/);
+});
+
+test("Day 0 gives a 60-second mission briefing before the learner is asked to respond", () => {
+  assert.match(taskPage, /className="day-zero-briefing"/);
+  assert.match(taskPage, /今天不是先答题，而是先看清地图/);
+  assert.match(taskPage, /看 \{requiredMaterials\.length\} 份出发材料/);
+  assert.match(taskPage, /写下一个想验证的问题/);
+  assert.match(taskPage, /四个宝藏 · 三项真实能力评测/);
+  assert.match(taskPage, /href="#learning-materials-title"/);
 });
 
 test("historical evidence stays available on demand", () => {
