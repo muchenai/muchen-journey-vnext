@@ -340,9 +340,9 @@ complete_stage() {
           throw new Error('stage $stage_no material is not HTTPS');
         }
       }
-      while (await page.getByRole('button', {name: /我找到答案了，继续|我找到答案了，开始/}).count()) {
+      while (await page.getByRole('button', {name: /我找到 1 条线索，继续|我找到 1 条线索，开始/}).count()) {
         const completed = page.waitForURL('**?material=completed*');
-        await page.getByRole('button', {name: /我找到答案了，继续|我找到答案了，开始/}).first().evaluate((element) => element.click());
+        await page.getByRole('button', {name: /我找到 1 条线索，继续|我找到 1 条线索，开始/}).first().evaluate((element) => element.click());
         await completed;
         await page.waitForLoadState('networkidle');
         const skipLinkIntrudes = await page.locator('.skip-link').evaluate((element) => {

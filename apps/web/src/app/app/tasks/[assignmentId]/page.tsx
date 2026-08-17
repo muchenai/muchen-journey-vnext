@@ -152,7 +152,7 @@ export default async function TaskPage({
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
   const currentFocus = !materialsReady
     ? isDayZero
-      ? "选一个今天最想带走的答案，再打开第 1 条线索"
+      ? "先选一个问题，再从第 1 份材料里找 1 条线索"
       : isFirstTreasure
         ? "先做一个 10 秒判断，再打开第 1 条核心线索"
         : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
@@ -338,7 +338,7 @@ export default async function TaskPage({
                   </span>
                   <strong>{material.title}</strong>
                   <small>
-                    完整材料约 {material.estimated_duration_minutes} min · 本轮只找 1 个答案
+                    原材料约 {material.estimated_duration_minutes} min · 这一轮只找 1 条线索
                   </small>
                 </>
               );
@@ -364,6 +364,13 @@ export default async function TaskPage({
                             <strong>{stageFocus}</strong>
                           </div>
                         </div>
+                        <div className="material-exploration-contract" aria-label="这一轮的探索方式">
+                          <span><b>1</b> 带着问题</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>2</b> 找到一条线索</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>3</b> 立即返回</span>
+                        </div>
                         {material.kind === "TEXT" ? (
                           <LearningMaterialBody value={material.body} />
                         ) : (
@@ -374,7 +381,7 @@ export default async function TaskPage({
                             rel="noreferrer"
                             aria-label="打开学习材料"
                           >
-                            <span>打开学习材料</span>
+                            <span>打开材料，找 1 条线索</span>
                             <small>{new URL(material.url ?? "https://invalid.example").hostname}</small>
                             <i aria-hidden="true">↗</i>
                           </a>
@@ -397,8 +404,8 @@ export default async function TaskPage({
                               type="submit"
                             >
                               {material.required && pendingRequiredMaterials.length === 1
-                                ? `我找到答案了，开始${practiceNoun}`
-                                : "我找到答案了，继续"}
+                                ? `我找到 1 条线索，开始${practiceNoun}`
+                                : "我找到 1 条线索，继续"}
                             </button>
                           </form>
                         )}

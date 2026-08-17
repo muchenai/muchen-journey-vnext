@@ -585,6 +585,10 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .material-focus-prompt > div { display: grid; gap: 2px; min-width: 0; }
 .material-focus-prompt small { color: #756526; font-size: 11px; font-weight: 750; }
 .material-focus-prompt strong { overflow-wrap: anywhere; }
+.material-exploration-contract { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #52606d; font-size: 12px; font-weight: 750; }
+.material-exploration-contract span { display: inline-flex; align-items: center; gap: 6px; }
+.material-exploration-contract b { display: grid; width: 22px; height: 22px; place-items: center; color: #fff; background: #20877f; border-radius: 7px; font-size: 9px; }
+.material-exploration-contract i { color: #efb43e; font-style: normal; }
 .learning-material-content .material-body { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
 .material-link-actions { display: grid; gap: 10px; }
 .material-open-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; max-width: 100%; gap: 10px; overflow-wrap: anywhere; text-align: left; }

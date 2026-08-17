@@ -25,7 +25,7 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /const isLocked = !isComplete && !isActive/);
   assert.match(taskPage, /className="learning-material-card" open=\{isActive\}/);
   assert.match(taskPage, /完成上一项后解锁/);
-  assert.match(taskPage, /我找到答案了，开始\$\{practiceNoun\}/);
+  assert.match(taskPage, /我找到 1 条线索，开始\$\{practiceNoun\}/);
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
   assert.match(taskPage, /<span>打开学习材料<\/span>/);
   assert.match(taskPage, /className="material-focus-prompt"/);
@@ -74,8 +74,11 @@ test("Day 0 begins with a concrete 10-second choice and a three-line departure c
 });
 
 test("long source materials are framed as one-answer exploration instead of required consumption", () => {
-  assert.match(taskPage, /完整材料约 \{material\.estimated_duration_minutes\} min · 本轮只找 1 个答案/);
+  assert.match(taskPage, /原材料约 \{material\.estimated_duration_minutes\} min · 这一轮只找 1 条线索/);
   assert.match(taskPage, /不用通读，先带着这一个问题/);
+  assert.match(taskPage, /className="material-exploration-contract"/);
+  assert.match(taskPage, /找到一条线索/);
+  assert.match(taskPage, /立即返回/);
   assert.match(taskPage, /从信里找一句/);
 });
 
