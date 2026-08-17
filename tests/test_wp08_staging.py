@@ -177,6 +177,18 @@ def test_contract_requires_three_valid_candidate_digests(tmp_path: Path):
         staging.load_contract(path)
 
 
+def test_active_candidate_binding_matches_deploy_preflight():
+    data = staging.load_contract()
+    script = staging.DEPLOY_SCRIPT.read_text()
+    candidate = str(data["candidate_commit"])
+    digests = data["candidate_image_digests"]
+
+    assert f'[[ "${{CANDIDATE_COMMIT:-}}" == "{candidate}" ]]' in script
+    assert isinstance(digests, dict)
+    for component in ("api", "web", "worker"):
+        assert str(digests[component]) in script
+
+
 def test_apply_requires_quote_and_rejects_over_budget(tmp_path: Path):
     data = staging.load_contract(contract(tmp_path))
     staging.validate_cost(data, require_quote=False)
