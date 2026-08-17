@@ -176,7 +176,13 @@ pw_learner run-code "async (page) => {
     if ('error' in geometry || geometry.nodes !== 8 || geometry.maxDistance > 1.5) {
       throw new Error(viewport.name + ': route nodes drifted off shared line geometry: ' + JSON.stringify(geometry));
     }
-    if (await page.locator('.button.primary:visible').count() !== 1) {
+    const primaryActionsInViewport = await page.locator('.button.primary:visible').evaluateAll((elements) =>
+      elements.filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight;
+      }).length,
+    );
+    if (primaryActionsInViewport !== 1) {
       throw new Error(viewport.name + ': route does not have one primary next action');
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
@@ -240,7 +246,12 @@ complete_stage() {
       const brief = page.locator('.task-brief');
       if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
       const briefText = await brief.innerText();
-      if (!briefText.includes('这一站只交付') || !briefText.includes('怎么完成') || !briefText.includes('怎样算完成？')) {
+      const briefIsClear = $stage_no === 1
+        ? briefText.includes('完成一张三句出发卡') && briefText.includes('你的出发卡')
+        : $stage_no === 2
+          ? briefText.includes('这一站只交付') && briefText.includes('需要提示？查看完成方法')
+          : briefText.includes('这一站只交付') && briefText.includes('怎么完成');
+      if (!briefIsClear || !briefText.includes('怎样算完成？')) {
         throw new Error('stage $stage_no task requirements are not visible on first entry');
       }
       const successCriteria = brief.locator('.task-success-criteria');
@@ -250,17 +261,31 @@ complete_stage() {
       if (await page.locator('.task-workspace').count() !== 0) {
         throw new Error('stage $stage_no response workspace appeared before learning input');
       }
-      if (await page.locator('.button.primary:visible').count() !== 1) {
+      const primaryActionsInViewport = await page.locator('.button.primary:visible').evaluateAll((elements) =>
+        elements.filter((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.bottom > 0 && rect.top < window.innerHeight;
+        }).length,
+      );
+      if (primaryActionsInViewport !== 1) {
         throw new Error('stage $stage_no does not have one primary next action');
       }
       if ($stage_no === 1) {
+        const outcomeCta = page.getByRole('link', {name: /选一个出发问题/});
+        if (await outcomeCta.count() !== 1) throw new Error('Day 0 first action is not visible');
+        await outcomeCta.click();
+        await page.locator('#day-zero-choice').waitFor({state: 'visible'});
         const dayZeroBriefing = page.locator('.day-zero-briefing');
-        if (await dayZeroBriefing.count() !== 1) throw new Error('Day 0 60-second briefing missing');
+        if (await dayZeroBriefing.count() !== 1) throw new Error('Day 0 departure briefing missing');
         const briefingText = await dayZeroBriefing.innerText();
-        if (!briefingText.includes('今天不是先答题，而是先看清地图') || !briefingText.includes('四个宝藏 · 三项真实能力评测')) {
-          throw new Error('Day 0 does not explain the journey before asking for output');
+        if (!briefingText.includes('一天结束时，你会带走什么') || !briefingText.includes('真实项目里，我要负责什么')) {
+          throw new Error('Day 0 does not offer a concrete reason to continue');
         }
-        const firstMaterialCta = dayZeroBriefing.getByRole('link', {name: /打开第 1 份材料/});
+        await page.locator('#day-zero-choice-work').check();
+        if (!await page.locator('#day-zero-choice-work').isChecked()) {
+          throw new Error('Day 0 outcome choice is not interactive');
+        }
+        const firstMaterialCta = dayZeroBriefing.getByRole('link', {name: /从第 1 条线索出发/});
         if (await firstMaterialCta.count() !== 1) throw new Error('Day 0 first-material action missing');
         if (await page.locator('.material-focus-prompt').count() !== 1) {
           throw new Error('Day 0 active material does not expose one reading question');
@@ -274,12 +299,17 @@ complete_stage() {
           if (await page.locator('.learning-material-card[open]').count() !== 1) {
             throw new Error(viewport.name + ': current material is not the only expanded card');
           }
+          const methodDetails = page.locator('.treasure-method-details');
+          if (await methodDetails.count() === 1) {
+            await methodDetails.evaluate((element) => { element.open = true; });
+          }
           const contractGeometry = await page.evaluate(() => {
             const columns = Array.from(document.querySelectorAll('.task-contract-columns > div'));
-            const links = Array.from(document.querySelectorAll('.task-brief a'));
+            const links = Array.from(document.querySelectorAll('.task-brief a'))
+              .filter((link) => link.getClientRects().length > 0);
             const columnOverflow = columns.some((column) => column.scrollWidth > column.clientWidth + 1);
             const escapedLink = links.some((link) => {
-              const parent = link.closest('.task-contract-columns > div, .task-success-criteria');
+              const parent = link.closest('.task-contract-columns > div, .task-success-criteria, .treasure-method-details');
               if (!parent) return true;
               const linkBox = link.getBoundingClientRect();
               const parentBox = parent.getBoundingClientRect();
@@ -287,8 +317,11 @@ complete_stage() {
             });
             return {columnOverflow, escapedLink, linkCount: links.length};
           });
-          if (contractGeometry.linkCount < 2 || contractGeometry.columnOverflow || contractGeometry.escapedLink) {
+          if (contractGeometry.linkCount < 1 || contractGeometry.columnOverflow || contractGeometry.escapedLink) {
             throw new Error(viewport.name + ': real-length task links collide or escape their contract cards: ' + JSON.stringify(contractGeometry));
+          }
+          if (await methodDetails.count() === 1) {
+            await methodDetails.evaluate((element) => { element.open = false; });
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
           if (overflow) throw new Error(viewport.name + ': task page has horizontal overflow');
@@ -332,11 +365,11 @@ complete_stage() {
           if (await brief.count() !== 1 || await workspace.count() !== 1) {
             throw new Error(viewport.name + ': visible task brief or response workspace missing after learning input');
           }
-          if (!(await brief.innerText()).includes('这一站只交付')) {
-            throw new Error(viewport.name + ': required deliverables are not visible before response');
+          if (!(await brief.innerText()).includes('你的出发卡')) {
+            throw new Error(viewport.name + ': departure card is not visible before response');
           }
-          if (!(await brief.innerText()).includes('怎么完成') || !(await brief.innerText()).includes('怎样算完成？')) {
-            throw new Error(viewport.name + ': task path or completion criteria entry is missing');
+          if (!(await brief.innerText()).includes('我最想弄清什么') || !(await brief.innerText()).includes('怎样算完成？')) {
+            throw new Error(viewport.name + ': departure prompts or completion criteria entry is missing');
           }
           const successCriteria = brief.locator('.task-success-criteria');
           if (await successCriteria.count() !== 1 || await successCriteria.getAttribute('open') !== null) {
@@ -356,8 +389,8 @@ complete_stage() {
         }
         await page.setViewportSize({width: 1280, height: 900});
       }
-      if (await page.getByRole('button', {name: /开始本主题实践|开始评测/}).count()) {
-        await page.getByRole('button', {name: /开始本主题实践|开始评测/}).click();
+      if (await page.getByRole('button', {name: /开始出发卡|开始本主题实践|开始评测/}).count()) {
+        await page.getByRole('button', {name: /开始出发卡|开始本主题实践|开始评测/}).click();
         await page.waitForURL('**#task-workspace');
         await page.locator('#submission-body').waitFor({state: 'visible'});
         const workspacePosition = await page.locator('#task-workspace').evaluate((element) => {

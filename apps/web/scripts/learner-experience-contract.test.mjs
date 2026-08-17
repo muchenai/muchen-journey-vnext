@@ -29,7 +29,7 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
   assert.match(taskPage, /<span>打开学习材料<\/span>/);
   assert.match(taskPage, /className="material-focus-prompt"/);
-  assert.match(taskPage, /打开前，先记住这一个问题/);
+  assert.match(taskPage, /不用通读，先带着这一个问题/);
 });
 
 test("the response workspace stays hidden until required input is complete", () => {
@@ -38,13 +38,14 @@ test("the response workspace stays hidden until required input is complete", () 
     /<section className="task-brief"[\s\S]*\{materialsReady \? <section id="task-workspace" className="task-workspace"[\s\S]*<SubmissionComposer/,
   );
   assert.match(taskPage, /开始\{practiceNoun\}/);
+  assert.match(taskPage, /isDayZero \? "选一个出发问题" : "打开当前线索"/);
   assert.doesNotMatch(taskPage, /沿着动作前进/);
   assert.doesNotMatch(taskPage, /当前固定任务版本不接收附件/);
 });
 
 test("the task contract leads with one deliverable and keeps secondary criteria on demand", () => {
   assert.match(taskPage, /<section className="task-brief"/);
-  assert.match(taskPage, /<h2 id="task-brief-title">\{assignment\.required_deliverables\[0\]/);
+  assert.match(taskPage, /isDayZero \? "完成一张三句出发卡" : assignment\.required_deliverables\[0\]/);
   assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
@@ -57,13 +58,25 @@ test("the task contract leads with one deliverable and keeps secondary criteria 
   assert.doesNotMatch(taskPage, /需要时查看方法与完成标准/);
 });
 
-test("Day 0 gives a 60-second mission briefing before the learner is asked to respond", () => {
+test("Day 0 begins with a concrete 10-second choice and a three-line departure card", () => {
   assert.match(taskPage, /className="day-zero-briefing"/);
-  assert.match(taskPage, /今天不是先答题，而是先看清地图/);
-  assert.match(taskPage, /看 \{requiredMaterials\.length\} 份出发材料/);
-  assert.match(taskPage, /写下一个想验证的问题/);
-  assert.match(taskPage, /四个宝藏 · 三项真实能力评测/);
+  assert.match(taskPage, /一天结束时，你会带走什么？/);
+  assert.match(taskPage, /这家公司为什么做 AI 数据？/);
+  assert.match(taskPage, /真实项目里，我要负责什么？/);
+  assert.match(taskPage, /我会怎样证明自己的判断力？/);
+  assert.match(taskPage, /带一个问题/);
+  assert.match(taskPage, /找一条线索/);
+  assert.match(taskPage, /做一个动作/);
+  assert.match(taskPage, /完成一张三句出发卡/);
+  assert.match(taskPage, /需要帮助？查看完整要求/);
+  assert.match(taskPage, /href=\{isDayZero \? "#day-zero-choice" : "#learning-materials-title"\}/);
   assert.match(taskPage, /href="#learning-materials-title"/);
+});
+
+test("long source materials are framed as one-answer exploration instead of required consumption", () => {
+  assert.match(taskPage, /完整材料约 \{material\.estimated_duration_minutes\} min · 本轮只找 1 个答案/);
+  assert.match(taskPage, /不用通读，先带着这一个问题/);
+  assert.match(taskPage, /从信里找一句/);
 });
 
 test("treasure one begins with a quick judgment and a three-line response map", () => {

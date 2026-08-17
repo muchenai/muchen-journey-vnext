@@ -36,14 +36,13 @@ button, textarea, input, select { font: inherit; }
 .skip-link {
   position: fixed;
   top: 8px;
-  left: 8px;
+  left: -10000px;
   z-index: 20;
   padding: 8px 12px;
   color: #fff;
   background: var(--action-primary);
-  transform: translateY(-160%);
 }
-.skip-link:focus-visible { transform: translateY(0); }
+.skip-link:focus-visible { left: 8px; }
 
 .site-header,
 .site-footer {
@@ -439,6 +438,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .mission-now { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 32px; margin: -64px 28px 0; padding: 22px 26px; color: #fff; background: linear-gradient(120deg, #2854d7, #147b78); border: 1px solid rgba(255,255,255,.24); border-radius: 22px; box-shadow: 0 18px 42px rgba(27, 55, 120, .24); }
 .mission-now .section-label { margin: 0; color: #cfe1ff; }
 .mission-now h2 { max-width: 28ch; margin: 4px 0 0; font-size: clamp(22px, 3vw, 30px); }
+.mission-now > .button { flex: 0 0 auto; color: #173e5c; background: #f5d777; }
 .mission-progress { display: grid; flex: 0 0 min(260px, 34%); gap: 8px; }
 .mission-progress > span { position: relative; display: block; height: 7px; overflow: hidden; background: rgba(255, 255, 255, .22); border-radius: 999px; }
 .mission-progress > span::after { position: absolute; inset: 0 auto 0 0; width: var(--mission-progress); background: #f5d777; border-radius: inherit; content: ""; transition: width 280ms ease; }
@@ -447,16 +447,21 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .day-zero-briefing-heading { display: flex; align-items: center; justify-content: space-between; gap: 28px; }
 .day-zero-briefing .section-label { margin: 0; color: #f5d777; }
 .day-zero-briefing h2 { max-width: 22ch; margin: 5px 0 0; font-size: clamp(26px, 4vw, 38px); }
+.day-zero-briefing-heading p:last-child { max-width: 58ch; margin: 9px 0 0; color: #c9d8df; }
 .day-zero-briefing .button { flex: 0 0 auto; color: #173e5c; background: #f5d777; }
-.day-zero-ready { color: #bce9df; font-size: 14px; }
-.day-zero-briefing ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.day-zero-briefing li { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 4px 11px; min-width: 0; padding: 16px; color: #c9d8df; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .11); border-radius: 16px; }
-.day-zero-briefing li[data-state="current"] { color: #fff; background: rgba(245, 215, 119, .12); border-color: rgba(245, 215, 119, .42); }
-.day-zero-briefing li[data-state="complete"] { color: #fff; background: rgba(32, 135, 127, .28); }
-.day-zero-briefing li > span { grid-row: 1 / 3; display: grid; width: 36px; height: 36px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 12px; font-size: 11px; font-weight: 850; }
-.day-zero-briefing li[data-state="locked"] > span { color: #c9d8df; background: rgba(255, 255, 255, .12); }
-.day-zero-briefing li strong { min-width: 0; }
-.day-zero-briefing li small { color: inherit; line-height: 1.45; opacity: .78; }
+.day-zero-outcome-choice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; border: 0; }
+.day-zero-outcome-choice legend { grid-column: 1 / -1; margin-bottom: 2px; color: #f5d777; font-size: 13px; font-weight: 800; }
+.day-zero-outcome-choice label { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 3px 11px; min-width: 0; padding: 17px; color: #fff; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .13); border-radius: 16px; cursor: pointer; }
+.day-zero-outcome-choice label:has(input:checked) { color: #173e5c; background: #fff8df; border-color: #f5d777; box-shadow: 0 0 0 5px rgba(245, 215, 119, .12); }
+.day-zero-outcome-choice label:has(input:focus-visible) { outline: 3px solid #fff; outline-offset: 3px; }
+.day-zero-outcome-choice input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.day-zero-outcome-choice label > span { grid-row: 1 / 3; display: grid; width: 36px; height: 36px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 12px; font-size: 11px; font-weight: 850; }
+.day-zero-outcome-choice label > strong { min-width: 0; line-height: 1.4; }
+.day-zero-outcome-choice label > small { color: inherit; line-height: 1.4; opacity: .72; }
+.day-zero-rhythm { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #c9d8df; font-size: 13px; font-weight: 700; }
+.day-zero-rhythm span { display: inline-flex; align-items: center; gap: 7px; }
+.day-zero-rhythm b { display: grid; width: 24px; height: 24px; place-items: center; color: #173e5c; background: #bce9df; border-radius: 8px; font-size: 10px; }
+.day-zero-rhythm i { color: #f5d777; font-style: normal; }
 .treasure-opening-choice { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 20px 28px; align-items: end; padding: clamp(24px, 5vw, 38px); color: #fff; background: radial-gradient(circle at 88% 12%, rgba(245, 215, 119, .2), transparent 27%), linear-gradient(135deg, #173e5c, #147b78); border-radius: 28px; box-shadow: 0 18px 48px rgba(16, 45, 69, .16); }
 .treasure-opening-choice .section-label { margin: 0; color: #f5d777; }
 .treasure-opening-choice h2 { margin: 5px 0 8px; font-size: clamp(28px, 4vw, 40px); }
@@ -497,6 +502,14 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .treasure-response-cues li > span { grid-row: 1 / 3; display: grid; width: 32px; height: 32px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 10px; font-size: 10px; font-weight: 850; }
 .treasure-response-cues li > strong { line-height: 1.35; }
 .treasure-response-cues li > small { color: #c9e9e5; line-height: 1.4; }
+.day-zero-departure-card { padding: 22px; color: #fff; background: linear-gradient(135deg, #173e5c, #2854d7); border-radius: 20px; }
+.day-zero-departure-card .section-label { margin: 0; color: #f5d777; }
+.day-zero-departure-card h3 { margin: 4px 0 0; }
+.day-zero-departure-card ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.day-zero-departure-card li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 3px 9px; min-width: 0; padding: 14px; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px; }
+.day-zero-departure-card li > span { grid-row: 1 / 3; display: grid; width: 32px; height: 32px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 10px; font-size: 10px; font-weight: 850; }
+.day-zero-departure-card li > strong { line-height: 1.35; }
+.day-zero-departure-card li > small { color: #c9e9e5; line-height: 1.4; }
 .treasure-method-details { margin-top: 18px; }
 .treasure-method-details summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 750; }
 .treasure-method-details[open] { padding: 16px 18px; background: #f4f8f7; border-radius: 14px; }
@@ -562,6 +575,8 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-locked > span { color: #20877f; font-size: 12px; font-weight: 750; }
 .learning-material-card summary strong,
 .learning-material-locked > strong { font-size: 20px; }
+.learning-material-card summary > small,
+.learning-material-locked > small { color: var(--text-muted); font-size: 12px; font-weight: 600; }
 .learning-material-card[open] summary { margin-bottom: 18px; }
 .learning-material-card[open] summary::after { content: "收起"; justify-self: end; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .learning-material-content { display: grid; width: 100%; min-width: 0; justify-items: start; gap: 18px; color: var(--text-secondary); line-height: 1.75; }
@@ -715,15 +730,17 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .task-hero-card .task-hero-label { margin-top: 24px; }
   .task-time { right: 24px; bottom: 22px; }
   .mission-now { align-items: stretch; flex-direction: column; gap: 18px; margin: -54px 14px 0; }
+  .mission-now > .button { width: 100%; }
   .mission-progress { flex-basis: auto; width: 100%; }
   .day-zero-briefing-heading { align-items: stretch; flex-direction: column; }
   .day-zero-briefing .button { width: 100%; }
-  .day-zero-briefing ol { grid-template-columns: 1fr; }
+  .day-zero-outcome-choice { grid-template-columns: 1fr; }
   .treasure-opening-choice { grid-template-columns: 1fr; align-items: stretch; }
   .treasure-opening-choice fieldset { grid-template-columns: 1fr; }
   .treasure-choice-feedback, .treasure-opening-choice > .button { grid-column: 1; }
   .treasure-opening-choice > .button { width: 100%; }
   .treasure-response-cues ol { grid-template-columns: 1fr; }
+  .day-zero-departure-card ol { grid-template-columns: 1fr; }
   .learning-material-list > li { grid-template-columns: 1fr; padding: 18px; }
   .learning-material-order { width: 34px; height: 34px; border-radius: 11px; }
   .material-focus-prompt { grid-template-columns: 34px minmax(0, 1fr); padding: 14px; }
