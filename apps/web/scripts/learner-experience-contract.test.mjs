@@ -66,6 +66,18 @@ test("Day 0 gives a 60-second mission briefing before the learner is asked to re
   assert.match(taskPage, /href="#learning-materials-title"/);
 });
 
+test("treasure one begins with a quick judgment and a three-line response map", () => {
+  assert.match(taskPage, /const isFirstTreasure =/);
+  assert.match(taskPage, /客户真正买的是什么？/);
+  assert.match(taskPage, /更多低价人力/);
+  assert.match(taskPage, /可验收的确定性交付/);
+  assert.match(taskPage, /先找证据，不用记住全文/);
+  assert.match(taskPage, /把答案放进这三格/);
+  assert.match(taskPage, /公司在解决什么问题？/);
+  assert.match(taskPage, /未来一周你会做什么？/);
+  assert.match(taskPage, /需要提示？查看完成方法/);
+});
+
 test("historical evidence stays available on demand", () => {
   assert.match(taskPage, /<summary>查看提交历史<\/summary>/);
 });

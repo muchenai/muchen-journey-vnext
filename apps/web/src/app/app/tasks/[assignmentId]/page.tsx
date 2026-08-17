@@ -38,7 +38,7 @@ function ContractLine({ value }: { value: string }) {
 
 const MATERIAL_FOCUS_BY_STAGE: Record<string, string> = {
   "DAY-0": "看完后，你只需要能说出：今天会经历什么，第一步从哪里开始？",
-  "TRE-001-COMPANY-VALUES": "找出一个你认同或质疑的观点，以及它能被怎样观察。",
+  "TRE-001-COMPANY-VALUES": "客户真正购买的，是更多人力，还是可验收的确定性交付？找到一句证据。",
   "TRE-002-AI-DATA-BASICS": "找出一个“表达很流畅，但结论未必可靠”的例子。",
   "TRE-003-PROJECT-AWARENESS": "找出新人进入真实项目后需要承担的一项具体责任。",
   "TRE-004-DELIVERY-FIT": "找出一个应该停下来提问，而不是自行猜测的边界。",
@@ -126,6 +126,7 @@ export default async function TaskPage({
   const isAssessment = assignment.journey_stage?.stage_kind === "ASSESSMENT";
   const isTreasure = assignment.journey_stage?.stage_kind === "TREASURE";
   const isDayZero = assignment.journey_stage?.stage_kind === "DAY_0";
+  const isFirstTreasure = assignment.journey_stage?.stable_key === "TRE-001-COMPANY-VALUES";
   const stageMarker = isDayZero ? "DAY 0 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
   const practiceNoun = isAssessment ? "评测" : "本主题实践";
   const taskContractText = [
@@ -138,7 +139,9 @@ export default async function TaskPage({
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
   const stageFocus = materialFocus(assignment.journey_stage?.stable_key, assignment.learner_outcome);
   const currentFocus = !materialsReady
-    ? `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
+    ? isFirstTreasure
+      ? "先做一个 10 秒判断，再打开第 1 条核心线索"
+      : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
     : canStart
       ? `看清挑战，开始${practiceNoun}`
       : submitCommand
@@ -211,6 +214,38 @@ export default async function TaskPage({
         </section>
       ) : null}
 
+      {isFirstTreasure && !materialsReady ? (
+        <section className="treasure-opening-choice" aria-labelledby="treasure-opening-choice-title">
+          <div>
+            <p className="section-label">10 秒先猜</p>
+            <h2 id="treasure-opening-choice-title">客户真正买的是什么？</h2>
+            <p>不用先读完资料。选一个，再去线索里验证。</p>
+          </div>
+          <fieldset>
+            <legend className="sr-only">选择你当前的判断</legend>
+            <label htmlFor="treasure-choice-labor">
+              <input id="treasure-choice-labor" name="treasure-opening-choice" type="radio" />
+              <span aria-hidden="true">A</span>
+              <strong>更多低价人力</strong>
+            </label>
+            <label htmlFor="treasure-choice-delivery">
+              <input id="treasure-choice-delivery" name="treasure-opening-choice" type="radio" />
+              <span aria-hidden="true">B</span>
+              <strong>可验收的确定性交付</strong>
+            </label>
+          </fieldset>
+          <p className="treasure-choice-feedback treasure-choice-feedback-labor" role="status">
+            这是行业最容易走回的旧路。打开线索，看看公司为什么选择另一条路。
+          </p>
+          <p className="treasure-choice-feedback treasure-choice-feedback-delivery" role="status">
+            带着这个判断打开线索：你需要找到一句能支持它的证据。
+          </p>
+          <a className="button primary compact" href="#learning-materials-title">
+            去线索里验证 <span aria-hidden="true">↓</span>
+          </a>
+        </section>
+      ) : null}
+
       {!isDayZero ? <nav className="task-flow" aria-label="这一站的完成路径">
         <ol>
           <li data-state={materialsReady ? "complete" : "current"}>
@@ -236,7 +271,13 @@ export default async function TaskPage({
           <div className="learning-materials-heading">
             <div>
               <p className="section-label">{isTreasure ? "宝藏线索" : isAssessment ? "评测输入" : "出发准备"}</p>
-              <h2 id="learning-materials-title">{isDayZero ? "先打开材料，再留下你的问题" : "每份材料，只找一个答案"}</h2>
+              <h2 id="learning-materials-title">
+                {isDayZero
+                  ? "先打开材料，再留下你的问题"
+                  : isFirstTreasure
+                    ? "先找证据，不用记住全文"
+                    : "每份材料，只找一个答案"}
+              </h2>
             </div>
             <strong>
               {completedRequiredMaterials}
@@ -383,35 +424,60 @@ export default async function TaskPage({
         <h2 id="task-brief-title">{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</h2>
         <p className="task-outcome">{materialsReady ? "把刚才找到的线索，变成你自己的判断。" : "先不用作答。带着上面的一个问题完成材料，再回来行动。"}</p>
 
-        <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
-          <h3 id="task-deliverables-title">这一站只交付</h3>
-          <ul className="checklist">
-            {assignment.required_deliverables.map((item) => (
-              <li key={item}><ContractLine value={item} /></li>
-            ))}
-          </ul>
-        </div>
+        {isFirstTreasure && materialsReady ? (
+          <div className="treasure-response-cues" aria-labelledby="task-deliverables-title">
+            <div>
+              <p className="section-label">3–5 句话就够</p>
+              <h3 id="task-deliverables-title">把答案放进这三格</h3>
+            </div>
+            <ol>
+              <li><span>01</span><strong>公司在解决什么问题？</strong><small>用你自己的话写一句</small></li>
+              <li><span>02</span><strong>你选择或质疑哪项命题？</strong><small>带上刚才找到的证据</small></li>
+              <li><span>03</span><strong>未来一周你会做什么？</strong><small>写一个别人看得见的动作</small></li>
+            </ol>
+          </div>
+        ) : (
+          <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
+            <h3 id="task-deliverables-title">这一站只交付</h3>
+            <ul className="checklist">
+              {assignment.required_deliverables.map((item) => (
+                <li key={item}><ContractLine value={item} /></li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-        <div className="task-supporting-rules task-contract-columns">
-          <div>
-            <h3><span aria-hidden="true">→</span> 怎么完成</h3>
+        {isFirstTreasure ? (
+          <details className="treasure-method-details">
+            <summary>需要提示？查看完成方法</summary>
             <ol className="checklist">
               {assignment.instructions.map((item) => (
                 <li key={item}><ContractLine value={item} /></li>
               ))}
             </ol>
-          </div>
-          {assignment.reference_materials.length > 0 ? (
+          </details>
+        ) : (
+          <div className="task-supporting-rules task-contract-columns">
             <div>
-              <h3>参考资料</h3>
-              <ul className="checklist">
-                {assignment.reference_materials.map((item) => (
-                  <li key={item}>{textWithSafeLinks(item)}</li>
+              <h3><span aria-hidden="true">→</span> 怎么完成</h3>
+              <ol className="checklist">
+                {assignment.instructions.map((item) => (
+                  <li key={item}><ContractLine value={item} /></li>
                 ))}
-              </ul>
+              </ol>
             </div>
-          ) : null}
-        </div>
+            {assignment.reference_materials.length > 0 ? (
+              <div>
+                <h3>参考资料</h3>
+                <ul className="checklist">
+                  {assignment.reference_materials.map((item) => (
+                    <li key={item}>{textWithSafeLinks(item)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
         <details className="task-success-criteria">
           <summary>怎样算完成？</summary>
           <p>{assignment.learner_outcome}</p>
