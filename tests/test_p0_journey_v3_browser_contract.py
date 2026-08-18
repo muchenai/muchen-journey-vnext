@@ -93,3 +93,10 @@ def test_browser_result_cannot_be_misreported_as_real_journey_uat() -> None:
         "human_uat=not_run",
     ):
         assert required in script
+
+
+def test_browser_gate_rejects_playwright_console_error_output() -> None:
+    script = (ROOT / "scripts/p0_journey_v3_browser.sh").read_text(encoding="utf-8")
+
+    assert "^Error:" in script
+    assert "Errors: [1-9][0-9]*" in script

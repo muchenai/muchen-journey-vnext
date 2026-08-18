@@ -629,7 +629,7 @@ pw_learner screenshot --filename "$evidence_dir/03-journey-details.png" --full-p
 pw_learner console error
 pw_reviewer console error
 pw_operator console error
-if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' "$learner_log" "$recovery_log" "$reviewer_log" "$operator_log"; then
+if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9][0-9]*)' "$learner_log" "$recovery_log" "$reviewer_log" "$operator_log"; then
     printf '%s\n' "P0_BROWSER_ERROR=console_error" >&2
     exit 2
 fi
