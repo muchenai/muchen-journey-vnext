@@ -47,7 +47,20 @@ const MATERIAL_FOCUS_BY_STAGE: Record<string, string> = {
   "ASM-003-DATA-CONSTRUCTION": "找出一份可交付数据必须保持一致的结构与校验点。",
 };
 
-function materialFocus(stageKey: string | undefined, learnerOutcome: string) {
+function materialFocus(
+  stageKey: string | undefined,
+  learnerOutcome: string,
+  materialTitle?: string,
+  materialIndex?: number,
+) {
+  if (stageKey === "DAY-0") {
+    if (/一封信/u.test(materialTitle ?? "")) {
+      return "从信里找一句：公司希望你怎样面对一件需要长期投入的事？";
+    }
+    return materialIndex === 0
+      ? "只看路线：今天先认识什么，之后会用哪三次挑战证明自己？"
+      : "只找一个答案：这份材料与你今天的哪一站有关？";
+  }
   return MATERIAL_FOCUS_BY_STAGE[stageKey ?? ""]
     ?? `读完后，试着用自己的话回答：${learnerOutcome}`;
 }
@@ -128,7 +141,7 @@ export default async function TaskPage({
   const isDayZero = assignment.journey_stage?.stage_kind === "DAY_0";
   const isFirstTreasure = assignment.journey_stage?.stable_key === "TRE-001-COMPANY-VALUES";
   const stageMarker = isDayZero ? "DAY 0 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
-  const practiceNoun = isAssessment ? "评测" : "本主题实践";
+  const practiceNoun = isAssessment ? "评测" : isDayZero ? "出发卡" : "本主题实践";
   const taskContractText = [
     ...assignment.instructions,
     ...assignment.required_deliverables,
@@ -137,11 +150,12 @@ export default async function TaskPage({
   const expectsExternalDocument = isAssessment
     || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
-  const stageFocus = materialFocus(assignment.journey_stage?.stable_key, assignment.learner_outcome);
   const currentFocus = !materialsReady
-    ? isFirstTreasure
-      ? "先做一个 10 秒判断，再打开第 1 条核心线索"
-      : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
+    ? isDayZero
+      ? "先选一个问题，再从第 1 份材料里找 1 条线索"
+      : isFirstTreasure
+        ? "先做一个 10 秒判断，再打开第 1 条核心线索"
+        : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
     : canStart
       ? `看清挑战，开始${practiceNoun}`
       : submitCommand
@@ -173,44 +187,60 @@ export default async function TaskPage({
           <p className="section-label">现在只做这一步</p>
           <h2 id="mission-now-title">{currentFocus}</h2>
         </div>
+        {!materialsReady && !isFirstTreasure ? (
+          <a
+            className="button primary compact"
+            href={isDayZero ? "#day-zero-choice" : "#learning-materials-title"}
+          >
+            {isDayZero ? "选一个出发问题" : "打开当前线索"} <span aria-hidden="true">↓</span>
+          </a>
+        ) : null}
         <div className="mission-progress" aria-label={`已完成 ${completedRequiredMaterials} / ${requiredMaterials.length} 份学习材料`}>
           <span style={{ "--mission-progress": `${requiredMaterials.length === 0 ? 100 : completedRequiredMaterials / requiredMaterials.length * 100}%` } as CSSProperties} />
           <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
         </div>
       </section>
 
-      {isDayZero ? (
+      {isDayZero && !materialsReady ? (
         <section className="day-zero-briefing" aria-labelledby="day-zero-briefing-title">
           <div className="day-zero-briefing-heading">
             <div>
-              <p className="section-label">60 秒启程</p>
-              <h2 id="day-zero-briefing-title">今天不是先答题，而是先看清地图</h2>
+              <p className="section-label">10 秒看懂今天</p>
+              <h2 id="day-zero-briefing-title">一天结束时，你会带走什么？</h2>
+              <p>不是背完一套资料，而是完成一条“认识 → 判断 → 行动”的路线。</p>
             </div>
-            {!materialsReady ? (
-              <a className="button primary compact" href="#learning-materials-title">
-                打开第 1 份材料 <span aria-hidden="true">↓</span>
-              </a>
-            ) : (
-              <strong className="day-zero-ready">出发准备完成 ✓</strong>
-            )}
           </div>
-          <ol>
-            <li data-state={materialsReady ? "complete" : "current"}>
+          <fieldset id="day-zero-choice" className="day-zero-outcome-choice">
+            <legend>先选一个你最想弄清的</legend>
+            <label htmlFor="day-zero-choice-company">
+              <input id="day-zero-choice-company" name="day-zero-outcome" type="radio" />
               <span aria-hidden="true">01</span>
-              <strong>看 {requiredMaterials.length} 份出发材料</strong>
-              <small>不用记住全部，只找一个答案</small>
-            </li>
-            <li data-state={materialsReady ? "current" : "locked"}>
+              <strong>这家公司为什么做 AI 数据？</strong>
+              <small>四个宝藏会给你线索</small>
+            </label>
+            <label htmlFor="day-zero-choice-work">
+              <input id="day-zero-choice-work" name="day-zero-outcome" type="radio" />
               <span aria-hidden="true">02</span>
-              <strong>写下一个想验证的问题</strong>
-              <small>没有标准答案，留下你的判断即可</small>
-            </li>
-            <li data-state={stageComplete ? "complete" : "locked"}>
+              <strong>真实项目里，我要负责什么？</strong>
+              <small>从项目、交付与边界里找答案</small>
+            </label>
+            <label htmlFor="day-zero-choice-proof">
+              <input id="day-zero-choice-proof" name="day-zero-outcome" type="radio" />
               <span aria-hidden="true">03</span>
-              <strong>开启后面的七站</strong>
-              <small>四个宝藏 · 三项真实能力评测</small>
-            </li>
-          </ol>
+              <strong>我会怎样证明自己的判断力？</strong>
+              <small>最后用三次真实挑战验证</small>
+            </label>
+          </fieldset>
+          <div className="day-zero-rhythm" aria-label="每一站的体验节奏">
+            <span><b>1</b> 带一个问题</span>
+            <i aria-hidden="true">→</i>
+            <span><b>2</b> 找一条线索</span>
+            <i aria-hidden="true">→</i>
+            <span><b>3</b> 做一个动作</span>
+          </div>
+          <a className="button primary compact" href="#learning-materials-title">
+            从第 1 条线索出发 <span aria-hidden="true">↓</span>
+          </a>
         </section>
       ) : null}
 
@@ -295,13 +325,21 @@ export default async function TaskPage({
               const isActive = index === activeMaterialIndex;
               const isLocked = !isComplete && !isActive;
               const itemClass = isComplete ? "is-complete" : isActive ? "is-active" : "is-locked";
+              const stageFocus = materialFocus(
+                assignment.journey_stage?.stable_key,
+                assignment.learner_outcome,
+                material.title,
+                index,
+              );
               const heading = (
                 <>
                   <span>
-                    {material.source_label} · {material.estimated_duration_minutes} min
-                    {material.required ? " · 核心线索" : " · 可选补给"}
+                    {material.source_label} · {material.required ? "核心线索" : "可选补给"}
                   </span>
                   <strong>{material.title}</strong>
+                  <small>
+                    原材料约 {material.estimated_duration_minutes} min · 这一轮只找 1 条线索
+                  </small>
                 </>
               );
 
@@ -322,9 +360,16 @@ export default async function TaskPage({
                         <div className="material-focus-prompt">
                           <span aria-hidden="true">?</span>
                           <div>
-                            <small>打开前，先记住这一个问题</small>
+                            <small>不用通读，先带着这一个问题</small>
                             <strong>{stageFocus}</strong>
                           </div>
+                        </div>
+                        <div className="material-exploration-contract" aria-label="这一轮的探索方式">
+                          <span><b>1</b> 带着问题</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>2</b> 找到一条线索</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>3</b> 立即返回</span>
                         </div>
                         {material.kind === "TEXT" ? (
                           <LearningMaterialBody value={material.body} />
@@ -336,7 +381,7 @@ export default async function TaskPage({
                             rel="noreferrer"
                             aria-label="打开学习材料"
                           >
-                            <span>打开学习材料</span>
+                            <span>打开材料，找 1 条线索</span>
                             <small>{new URL(material.url ?? "https://invalid.example").hostname}</small>
                             <i aria-hidden="true">↗</i>
                           </a>
@@ -359,8 +404,8 @@ export default async function TaskPage({
                               type="submit"
                             >
                               {material.required && pendingRequiredMaterials.length === 1
-                                ? `我找到答案了，开始${practiceNoun}`
-                                : "我找到答案了，继续"}
+                                ? `我找到 1 条线索，开始${practiceNoun}`
+                                : "我找到 1 条线索，继续"}
                             </button>
                           </form>
                         )}
@@ -421,10 +466,30 @@ export default async function TaskPage({
 
       <section className="task-brief" aria-labelledby="task-brief-title">
         <p className="section-label">{materialsReady ? (isAssessment ? "能力挑战" : "轮到你行动") : "材料看完后"}</p>
-        <h2 id="task-brief-title">{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</h2>
-        <p className="task-outcome">{materialsReady ? "把刚才找到的线索，变成你自己的判断。" : "先不用作答。带着上面的一个问题完成材料，再回来行动。"}</p>
+        <h2 id="task-brief-title">
+          {isDayZero ? "完成一张三句出发卡" : assignment.required_deliverables[0] ?? "留下这一站的学习证据"}
+        </h2>
+        <p className="task-outcome">
+          {isDayZero
+            ? "不用复述材料。写清你想弄懂什么、从哪里找答案、下一站先做什么。"
+            : materialsReady
+              ? "把刚才找到的线索，变成你自己的判断。"
+              : "先不用作答。带着上面的一个问题完成材料，再回来行动。"}
+        </p>
 
-        {isFirstTreasure && materialsReady ? (
+        {isDayZero ? (
+          <div className="day-zero-departure-card" aria-labelledby="task-deliverables-title">
+            <div>
+              <p className="section-label">三段就够</p>
+              <h3 id="task-deliverables-title">你的出发卡</h3>
+            </div>
+            <ol>
+              <li><span>01</span><strong>我最想弄清什么？</strong><small>从上面的三个问题里选一个</small></li>
+              <li><span>02</span><strong>我会去哪里找答案？</strong><small>写下一份材料或一个真实场景</small></li>
+              <li><span>03</span><strong>下一站先做什么？</strong><small>给自己一个可以立即开始的动作</small></li>
+            </ol>
+          </div>
+        ) : isFirstTreasure && materialsReady ? (
           <div className="treasure-response-cues" aria-labelledby="task-deliverables-title">
             <div>
               <p className="section-label">3–5 句话就够</p>
@@ -447,9 +512,9 @@ export default async function TaskPage({
           </div>
         )}
 
-        {isFirstTreasure ? (
+        {isFirstTreasure || isDayZero ? (
           <details className="treasure-method-details">
-            <summary>需要提示？查看完成方法</summary>
+            <summary>{isDayZero ? "需要帮助？查看完整要求" : "需要提示？查看完成方法"}</summary>
             <ol className="checklist">
               {assignment.instructions.map((item) => (
                 <li key={item}><ContractLine value={item} /></li>
@@ -494,7 +559,7 @@ export default async function TaskPage({
       <h2 id="task-workspace-title">
         {assignment.latest_revision_feedback
           ? "带着反馈，再走一步"
-          : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
+          : isDayZero ? "写下你的三句出发卡" : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
       </h2>
 
       {query.draft === "saved" ? (
@@ -565,7 +630,9 @@ export default async function TaskPage({
             attachments={assignment.available_attachments}
             submissionIdempotencyKey={randomUUID()}
             draftIdempotencyKey={randomUUID()}
-            responseSections={experience?.response_sections ?? []}
+            responseSections={isDayZero
+              ? ["我最想弄清的一件事", "我会从哪里找答案", "下一站我先做什么"]
+              : experience?.response_sections ?? []}
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
