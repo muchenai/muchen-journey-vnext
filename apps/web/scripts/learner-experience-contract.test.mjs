@@ -17,6 +17,7 @@ const learnerLayout = await readFile(
   new URL("../src/app/app/layout.tsx", import.meta.url),
   "utf8",
 );
+const styles = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
 test("the task page reveals one learning material at a time", () => {
@@ -27,7 +28,13 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /完成上一项后解锁/);
   assert.match(taskPage, /我找到 1 条线索，开始\$\{practiceNoun\}/);
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
-  assert.match(taskPage, /<span>打开学习材料<\/span>/);
+  assert.match(taskPage, /function MaterialOpenLink/);
+  assert.match(taskPage, /用企业飞书打开/);
+  assert.match(taskPage, /首次打开需登录/);
+  assert.match(taskPage, /<summary>打不开？<\/summary>/);
+  assert.match(taskPage, /请勿标记完成/);
+  assert.match(styles, /\.learning-material-card\[open\] > summary::after/);
+  assert.doesNotMatch(styles, /\.learning-material-card\[open\] summary::after/);
   assert.match(taskPage, /className="material-focus-prompt"/);
   assert.match(taskPage, /不用通读，先带着这一个问题/);
 });

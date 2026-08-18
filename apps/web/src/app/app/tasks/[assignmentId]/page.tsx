@@ -73,6 +73,39 @@ function materialLinks(value: string | null): string[] {
   return Array.from(new Set(links));
 }
 
+function isFeishuMaterial(href: string) {
+  return new URL(href).hostname.endsWith(".feishu.cn");
+}
+
+function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string; label?: string }) {
+  const requiresFeishu = isFeishuMaterial(href);
+  return (
+    <div className="material-open-action">
+      <a
+        className="button secondary compact material-open-link"
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={label}
+      >
+        <span>{requiresFeishu ? "用企业飞书打开" : label}</span>
+        <small>
+          {requiresFeishu ? "首次打开需登录" : new URL(href).hostname}
+        </small>
+        <i aria-hidden="true">↗</i>
+      </a>
+      {requiresFeishu ? (
+        <details className="material-access-help">
+          <summary>打不开？</summary>
+          <p>
+            使用重庆沐晨科技飞书账号；仍提示无权限时，请勿标记完成，联系内容负责人。
+          </p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function LearningMaterialBody({ value }: { value: string | null }) {
   const links = materialLinks(value);
   if (links.length === 0) {
@@ -82,18 +115,7 @@ function LearningMaterialBody({ value }: { value: string | null }) {
     <>
       <div className="material-link-actions">
         {links.map((href) => (
-          <a
-            className="button secondary compact material-open-link"
-            href={href}
-            key={href}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="打开学习材料"
-          >
-            <span>打开学习材料</span>
-            <small>{new URL(href).hostname}</small>
-            <i aria-hidden="true">↗</i>
-          </a>
+          <MaterialOpenLink href={href} key={href} />
         ))}
       </div>
       <details className="material-notes">
@@ -374,17 +396,10 @@ export default async function TaskPage({
                         {material.kind === "TEXT" ? (
                           <LearningMaterialBody value={material.body} />
                         ) : (
-                          <a
-                            className="button secondary compact material-open-link"
-                            href={material.url ?? "#"}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label="打开学习材料"
-                          >
-                            <span>打开材料，找 1 条线索</span>
-                            <small>{new URL(material.url ?? "https://invalid.example").hostname}</small>
-                            <i aria-hidden="true">↗</i>
-                          </a>
+                          <MaterialOpenLink
+                            href={material.url ?? "https://invalid.example"}
+                            label="打开材料，找 1 条线索"
+                          />
                         )}
                         {isComplete ? (
                           <span className="material-complete-label">已完成</span>
