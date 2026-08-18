@@ -261,3 +261,18 @@ P0-2 机器交付与 staging 交付现为 `PASS`，但产品验收仍是 `HUMAN_
 本轮产品返工不是继续增加解释，而是把黄金路径压缩为可行动节奏：Day 0 只要求新人先选一个真实问题，再从第一份材料找一条线索；所有学习材料显式呈现“带着问题 → 找到一条线索 → 立即返回”，并把按钮改为“我找到 1 条线索”；材料的原始时长只作为边界信息，不再暗示新人必须一次通读。当前修改只发生在 Learner Web 与本地浏览器合同，不改变已发布 Journey、任务正文、身份、角色或其他业务事实。
 
 验收仍需两层独立证据：先由 Computer Use 在隔离数据上走通八站、Reviewer 要求修订、Learner 再次提交、通过和最终结果，并检查桌面与 390px 画面；只有该版本不存在明显体验阻断后，才交给三名未接受口头提示的新人复验。真人复验仍必须分别记录 10 秒定位、60 秒首材料、是否需要提示、继续意愿和原话；在三名独立样本通过前不得关闭 P0-2。
+
+## 23. 隔离 Computer Use 全旅程复验
+
+2026-08-18，在本地隔离的合成 Journey V3、合成 Learner 与合成 Reviewer 上，通过 Safari Computer Use 完成 Day 0、四个宝藏、三项能力评测和最终结果，共 8 / 8 站。第一项能力评测覆盖“首次提交 → Reviewer 要求修订 → Learner 以新入口重新进入 → 看到反馈 → 再次提交 → Reviewer 通过”；第二项能力评测覆盖首次提交后直接通过；全程未使用真实邀请、真实身份或真实业务数据。
+
+最后一项能力评测提交后，本地 Reviewer 浏览器会话在点击最终结论时过期。该步没有伪装成浏览器成功：使用新生成的合成 Reviewer 会话，通过同一受控 API 合同提交 `APPROVE`，随后再由 Computer Use 刷新 Learner 页面并核验 8 / 8 与结果页。由此，本轮证据结论是 `COMPUTER_USE_LEARNER_PATH=PASS`、`COMPUTER_USE_REVIEWER_REVISION_PATH=PASS`、`FINAL_REVIEW_BROWSER_SESSION=EXPIRED_RECOVERED_VIA_SYNTHETIC_API`，不是“全程纯浏览器 Reviewer PASS”。
+
+桌面与 390 × 844 响应式视口均完成视觉检查：终点页呈现独立旅程画面、8 / 8 点亮、通行证盖章、四个宝藏与三项能力评测回看入口；宝藏页在 390px 下保持单列层级、完整任务路径和无横向溢出。证据截图为：
+
+- `output/playwright/p0-journey-v3/computer-use-assessment-revision-entry.png`
+- `output/playwright/p0-journey-v3/computer-use-final-result-desktop.png`
+- `output/playwright/p0-journey-v3/computer-use-final-result-mobile-390.png`
+- `output/playwright/p0-journey-v3/computer-use-treasure-mobile-390.png`
+
+因此 P0-2 当前状态推进为 `COMPUTER_USE_PASS / HUMAN_RETEST_REQUIRED`，仍不得关闭。下一门禁不是继续扩展功能，而是把同一候选交给三名未接受口头讲解的目标新人，逐人验证 10 秒定位、60 秒首材料、Day 0 是否明确、学习节奏是否仍显枯燥、是否愿意继续；任何共同阻断都回到单一 WIP 继续返工。
