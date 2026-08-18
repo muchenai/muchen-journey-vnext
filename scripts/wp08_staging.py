@@ -754,7 +754,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             )
     required = (
         "- audit\n          - deploy\n          - deploy-web\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_WEB_DB7BECF_ON_9E8A806_STAGING'",
+        "inputs.confirmation == 'DEPLOY_WEB_D55732B_ON_9E8A806_STAGING'",
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
