@@ -36,6 +36,7 @@ export function SubmissionComposer({
   responseSections,
   requiresReview,
   expectsExternalDocument,
+  taskActionUrl,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -48,6 +49,7 @@ export function SubmissionComposer({
   responseSections: string[];
   requiresReview: boolean;
   expectsExternalDocument: boolean;
+  taskActionUrl: string | null;
 }) {
   const initial = splitInitialBody(initialBody);
   const [body, setBody] = useState(initial.notes);
@@ -97,10 +99,25 @@ export function SubmissionComposer({
           <p className="section-label">交付通道</p>
           <h3 id="external-document-title">完成文档，再把链接交给 Reviewer</h3>
           <ol>
-            <li><span aria-hidden="true">01</span><strong>创建副本</strong><small>打开题面中的飞书文件，在飞书中创建自己的副本。</small></li>
+            <li>
+              <span aria-hidden="true">01</span>
+              <strong>创建副本</strong>
+              <small>先打开本主题题面，再在飞书中创建自己的副本。</small>
+              {taskActionUrl ? (
+                <a
+                  className="external-document-launch"
+                  href={taskActionUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  打开本主题题面 <i aria-hidden="true">↗</i>
+                </a>
+              ) : null}
+            </li>
             <li><span aria-hidden="true">02</span><strong>完成作答</strong><small>按照上方作答地图写完，不要修改原始题面。</small></li>
             <li><span aria-hidden="true">03</span><strong>交付链接</strong><small>从浏览器地址栏复制完整链接，粘贴到下方。</small></li>
           </ol>
+          {taskActionUrl ? <p className="external-document-login-hint">首次打开需使用企业飞书登录。</p> : null}
           <label htmlFor="evidence-url">你的飞书文档链接</label>
           <input
             id="evidence-url"

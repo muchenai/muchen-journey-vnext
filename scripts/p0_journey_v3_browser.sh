@@ -411,6 +411,29 @@ complete_stage() {
         if (!guidance.includes('创建自己的副本') || !guidance.includes('复制完整链接')) {
           throw new Error('stage $stage_no Feishu novice guidance missing');
         }
+        const challengeEntry = page.getByRole('link', {name: '打开本主题题面'});
+        if (await challengeEntry.count() !== 1) {
+          throw new Error('stage $stage_no primary challenge entry is hidden');
+        }
+        const challengeHref = await challengeEntry.getAttribute('href');
+        if (!challengeHref || !challengeHref.includes('P0LearnerChallenge')) {
+          throw new Error('stage $stage_no primary challenge entry targets the wrong source');
+        }
+        if ($stage_no === 6) {
+          for (const viewport of [
+            {name: 'desktop', width: 1280, height: 900},
+            {name: 'mobile', width: 390, height: 844},
+          ]) {
+            await page.setViewportSize({width: viewport.width, height: viewport.height});
+            const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+            if (overflow) throw new Error(viewport.name + ': challenge entry has horizontal overflow');
+            await page.screenshot({
+              path: '$evidence_dir/04-external-challenge-entry-' + viewport.name + '.png',
+              fullPage: true,
+            });
+          }
+          await page.setViewportSize({width: 1280, height: 900});
+        }
         await evidence.fill('https://example.feishu.cn/docx/p0-stage-$stage_no');
       }
       await page.locator('#submission-body').fill('第 ${stage_no} 站浏览器验证：我完成了固定输入，记录当前判断、可定位依据、风险边界以及下一步行动。');

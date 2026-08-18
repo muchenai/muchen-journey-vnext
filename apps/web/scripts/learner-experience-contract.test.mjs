@@ -6,6 +6,10 @@ const taskPage = await readFile(
   new URL("../src/app/app/tasks/[assignmentId]/page.tsx", import.meta.url),
   "utf8",
 );
+const submissionComposer = await readFile(
+  new URL("../src/app/app/tasks/[assignmentId]/submission-composer.tsx", import.meta.url),
+  "utf8",
+);
 const joinPage = await readFile(new URL("../src/app/join/page.tsx", import.meta.url), "utf8");
 const resultPage = await readFile(
   new URL("../src/app/app/result/page.tsx", import.meta.url),
@@ -32,6 +36,11 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /用企业飞书打开/);
   assert.match(taskPage, /首次打开需登录/);
   assert.match(taskPage, /<summary>打不开？<\/summary>/);
+  assert.match(taskPage, /const taskActionUrl = instructionLinks\.find\(isFeishuMaterial\)/);
+  assert.match(taskPage, /taskActionUrl=\{taskActionUrl\}/);
+  assert.match(submissionComposer, /打开本主题题面/);
+  assert.match(submissionComposer, /首次打开需使用企业飞书登录/);
+  assert.match(styles, /\.external-document-launch/);
   assert.match(taskPage, /请勿标记完成/);
   assert.match(styles, /\.learning-material-card\[open\] > summary::after/);
   assert.doesNotMatch(styles, /\.learning-material-card\[open\] summary::after/);
