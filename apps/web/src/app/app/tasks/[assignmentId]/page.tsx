@@ -171,6 +171,8 @@ export default async function TaskPage({
   ].join(" ");
   const expectsExternalDocument = isAssessment
     || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
+  const instructionLinks = assignment.instructions.flatMap(materialLinks);
+  const taskActionUrl = instructionLinks.find(isFeishuMaterial) ?? instructionLinks[0] ?? null;
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
   const currentFocus = !materialsReady
     ? isDayZero
@@ -652,6 +654,7 @@ export default async function TaskPage({
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
             expectsExternalDocument={expectsExternalDocument}
+            taskActionUrl={taskActionUrl}
           />
         </>
       ) : null}
