@@ -578,7 +578,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-card summary > small,
 .learning-material-locked > small { color: var(--text-muted); font-size: 12px; font-weight: 600; }
 .learning-material-card[open] summary { margin-bottom: 18px; }
-.learning-material-card[open] summary::after { content: "收起"; justify-self: end; color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.learning-material-card[open] > summary::after { content: "收起"; justify-self: end; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .learning-material-content { display: grid; width: 100%; min-width: 0; justify-items: start; gap: 18px; color: var(--text-secondary); line-height: 1.75; }
 .material-focus-prompt { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; padding: 15px 16px; color: #173e5c; background: #fff8df; border: 1px solid #f2df9a; border-radius: 14px; line-height: 1.45; }
 .material-focus-prompt > span { display: grid; width: 36px; height: 36px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 50%; font-size: 18px; font-weight: 900; }
@@ -591,9 +591,13 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .material-exploration-contract i { color: #efb43e; font-style: normal; }
 .learning-material-content .material-body { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
 .material-link-actions { display: grid; gap: 10px; }
+.material-open-action { display: grid; justify-items: start; gap: 7px; max-width: 100%; }
 .material-open-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; max-width: 100%; gap: 10px; overflow-wrap: anywhere; text-align: left; }
 .material-open-link small { overflow: hidden; color: var(--text-muted); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .material-open-link i { font-style: normal; }
+.material-access-help { max-width: 460px; color: var(--text-muted); font-size: 12px; }
+.material-access-help summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 750; }
+.material-access-help p { margin: 7px 0 0; line-height: 1.55; }
 .material-notes { width: 100%; }
 .material-notes summary { width: max-content; cursor: pointer; color: #20877f; font-size: 13px; font-weight: 700; }
 .material-notes[open] .material-body { margin-top: 12px; }
