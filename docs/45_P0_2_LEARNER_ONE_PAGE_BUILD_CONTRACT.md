@@ -290,3 +290,9 @@ PR #242 将 Day 0 与黄金路径节奏返工合入主线候选 `0b1a3f7def3f88c
 PR #244 将飞书学习材料入口调整为明确动作“用企业飞书打开”，并为首次登录与无权限场景提供按需展开的最短恢复提示；桌面与 390px 视口均完成真实浏览器视觉复验。修复合入主线候选 `db7becf5faec9427b00d3b3d7ab8ac4ebdf19579`，Mainline Candidate Gate `32137117124` 通过，registry 状态为 `VERIFIED`，Web digest 为 `sha256:58079d725ac584f9fab661435efabe97b789fa8fa824de1394a80407c6aeed9b`。
 
 本次 staging 仍采用 Web-only：只把 Web 升级至 `db7becf...`，API、Worker 保持健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。绑定与部署均不得执行 seed、创建邀请、修改身份或业务事实，也不得运行 Terraform plan/apply/import、DNS、WP-12B 或云资源变更。部署成功只证明页面与运行态成立；外部飞书材料实际访问仍须由同一 CU Enrollment 和之后的三名目标新人分别验证。
+
+## 26. 题面主入口候选与 staging 绑定
+
+PR #246 将能力评测作答区中原本埋在次级说明里的飞书题面提升为主动作“打开本主题题面”，并在动作旁保留首次企业飞书登录提示。完整八站合成浏览器旅程通过，桌面与 390px 视口均确认按钮可见、无横向溢出；该结果仅为机器/浏览器证据，`human_uat=not_run`。修复合入主线候选 `d55732bbd816c74104da9c696727366644adaf52`，Mainline Candidate Gate `32162667118` 通过，registry 状态为 `VERIFIED`，Web digest 为 `sha256:ad1f9bb00a5fa3aff17f4cad0544869a18f5b134302e4574801dc1b6763b5c09`。
+
+本次 staging 仍采用 Web-only：只把 Web 升级至 `d55732b...`，API、Worker 保持健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。绑定 PR 本身不部署、不执行 seed、不创建邀请、不修改 Journey、身份、角色或其他业务事实，也不运行 Terraform plan/apply/import、DNS、WP-12B 或云资源变更。部署后必须用同一 CU Enrollment 证明题面可打开并继续提交；随后才可交给三名目标新人复验。
