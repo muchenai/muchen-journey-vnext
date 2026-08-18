@@ -276,3 +276,11 @@ P0-2 机器交付与 staging 交付现为 `PASS`，但产品验收仍是 `HUMAN_
 - `output/playwright/p0-journey-v3/computer-use-treasure-mobile-390.png`
 
 因此 P0-2 当前状态推进为 `COMPUTER_USE_PASS / HUMAN_RETEST_REQUIRED`，仍不得关闭。下一门禁不是继续扩展功能，而是把同一候选交给三名未接受口头讲解的目标新人，逐人验证 10 秒定位、60 秒首材料、Day 0 是否明确、学习节奏是否仍显枯燥、是否愿意继续；任何共同阻断都回到单一 WIP 继续返工。
+
+## 24. Day 0 节奏候选与 staging 绑定
+
+PR #242 将 Day 0 与黄金路径节奏返工合入主线候选 `0b1a3f7def3f88cfa46c5c75620b0eaaaa0caba7`。Mainline Candidate Gate `32099026429` 通过，registry 状态为 `VERIFIED`；Web digest 为 `sha256:98e894901389d9ec97d9c11b5f3295c519363f5198be9aa7a04a105fba701832`。候选相对直接父提交只修改 Learner Web、浏览器合同与本证据文档，不包含 API、Worker、OpenAPI 或 migration 变化。
+
+本次 staging 合同继续采用 Web-only：Web 升级至 `0b1a3f7...`，API、Worker 保持健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。绑定 PR 本身不部署、不执行 migration 或 seed，不创建邀请、不发送消息，也不修改 Journey、身份、角色或其他业务事实；同时禁止 Terraform plan/apply/import、DNS、WP-12B 与云资源变更。
+
+只有绑定门禁通过后才允许一次 `phase=deploy-web`。部署失败不重试，并必须关闭临时 SSH。即使 staging 部署和浏览器复验通过，P0-2 仍为 `HUMAN_RETEST_REQUIRED`；三名目标新人必须面对同一候选分别给出 10 秒定位、60 秒首材料、是否需要提示、继续意愿与原话，机器或 Computer Use 结果不得代替真人结论。
