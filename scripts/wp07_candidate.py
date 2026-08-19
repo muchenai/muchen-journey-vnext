@@ -199,6 +199,11 @@ def source_check() -> dict[str, Any]:
         "docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121",
         "password: ${{ secrets.GITHUB_TOKEN }}",
         "make candidate-registry-push",
+        "make candidate-image-archives",
+        "artifacts/wp07-candidate/image-archives.json",
+        "artifacts/wp07-candidate/images/api.tar",
+        "artifacts/wp07-candidate/images/web.tar",
+        "artifacts/wp07-candidate/images/worker.tar",
         "always() && hashFiles('artifacts/wp07-candidate/release-manifest.json') != ''",
     )
     if any(item not in mainline for item in required_mainline) or ":latest" in mainline:

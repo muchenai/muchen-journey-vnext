@@ -69,11 +69,31 @@ else
   [[ "${WORKER_IMAGE#*@}" == "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da" ]] || fail "Worker digest differs from the Web-only baseline"
 fi
 
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  [[ "${IMAGE_TRANSPORT:-}" == "verified-archive" ]] || fail "full deploy must use verified image archives"
+  [[ "${API_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api:$CANDIDATE_COMMIT" ]] || fail "API runtime reference differs from candidate"
+  [[ "${WEB_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web:$CANDIDATE_COMMIT" ]] || fail "Web runtime reference differs from candidate"
+  [[ "${WORKER_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker:$CANDIDATE_COMMIT" ]] || fail "Worker runtime reference differs from candidate"
+  [[ "${API_LOCAL_IMAGE_DIGEST:-}" == "sha256:121dff5cf648026d4b406e4b544697d3961ef1820bc10f84e0eab81b6509258a" ]] || fail "API local image digest differs from candidate manifest"
+  [[ "${WEB_LOCAL_IMAGE_DIGEST:-}" == "sha256:b5837487c683d27687b857f9ee23359051939666560b2780ab5c067788ae98b0" ]] || fail "Web local image digest differs from candidate manifest"
+  [[ "${WORKER_LOCAL_IMAGE_DIGEST:-}" == "sha256:e2688e0ada8a0ced9790a2b9f8bdad11d431810032de29503461f730950d78dc" ]] || fail "Worker local image digest differs from candidate manifest"
+else
+  [[ "${IMAGE_TRANSPORT:-}" == "registry" ]] || fail "partial deploy must use registry transport"
+  [[ "${API_RUNTIME_IMAGE:-}" == "$API_IMAGE" ]] || fail "API runtime and registry references differ"
+  [[ "${WEB_RUNTIME_IMAGE:-}" == "$WEB_IMAGE" ]] || fail "Web runtime and registry references differ"
+  [[ "${WORKER_RUNTIME_IMAGE:-}" == "$WORKER_IMAGE" ]] || fail "Worker runtime and registry references differ"
+fi
+
 command -v docker >/dev/null || fail "docker is missing"
 docker compose version >/dev/null || fail "docker compose plugin is missing"
 for path in compose.yaml compose.migrate.yaml Caddyfile grant_runtime.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "$path must be a regular file"
 done
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  for path in release-manifest.json image-archives.json wp07_image_archive.py images/api.tar images/web.tar images/worker.tar; do
+    [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "verified archive file $path is missing"
+  done
+fi
 for path in api.env migration.env worker.env web.env edge.env; do
   [[ -f "$SECRETS/$path" && ! -L "$SECRETS/$path" ]] || fail "secret file $path is missing"
   [[ "$(stat -c '%a' "$SECRETS/$path")" == "600" ]] || fail "secret file $path must be mode 0600"
@@ -111,6 +131,26 @@ unset api_recipient_key worker_recipient_key
 grep -qx 'PRODUCTION_HOST=journey.muchenai.com' "$SECRETS/edge.env" || fail "production edge host differs"
 
 docker compose -f compose.yaml -f compose.migrate.yaml config --quiet
+
+load_verified_archive() {
+  local component=$1 runtime_reference=$2 expected_id=$3 actual_id revision
+  docker load --input "images/$component.tar" >/dev/null
+  actual_id=$(docker image inspect --format '{{.Id}}' "$runtime_reference")
+  revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$runtime_reference")
+  [[ "$actual_id" == "$expected_id" ]] || fail "$component loaded image digest differs"
+  [[ "$revision" == "$CANDIDATE_COMMIT" ]] || fail "$component loaded image revision differs"
+  printf 'WP08_IMAGE_ARCHIVE_LOAD component=%s result=PASS\n' "$component"
+}
+
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  python3 ./wp07_image_archive.py verify-files \
+    --release-manifest ./release-manifest.json \
+    --archive-manifest ./image-archives.json \
+    --archive-root ./images
+  load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"
+  load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"
+  load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"
+fi
 
 verify_web_only_runtime() {
   local release_dir=$1
@@ -349,9 +389,6 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   exit 0
 fi
 
-pull_with_bounded_retry full-api docker pull "$API_IMAGE"
-pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"
-pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api \
   python -c "from pathlib import Path; Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
 

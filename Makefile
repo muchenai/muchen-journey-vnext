@@ -14,7 +14,7 @@ WP07_PYTHON_IMAGE := python:3.14.6-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa0087
 WP08_LOCAL_DB_PORT ?= 35432
 WP08_LOCAL_API_PORT ?= 38000
 
-.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke browser-p0-journey-v3 browser-p0-identity
+.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push candidate-image-archives http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke browser-p0-journey-v3 browser-p0-identity
 
 bootstrap:
 	docker compose build api worker
@@ -187,6 +187,9 @@ candidate-registry-push: candidate-registry-check
 	python3 scripts/wp07_registry_push.py --component web --reference $(WP07_WEB_GHCR_IMAGE)
 	python3 scripts/wp07_registry_push.py --component worker --reference $(WP07_WORKER_GHCR_IMAGE)
 	python3 scripts/wp07_candidate.py registry --manifest $(WP07_ARTIFACT_DIR)/release-manifest.json --registry-image api=$(WP07_API_GHCR_IMAGE) --registry-image web=$(WP07_WEB_GHCR_IMAGE) --registry-image worker=$(WP07_WORKER_GHCR_IMAGE)
+
+candidate-image-archives:
+	python3 scripts/wp07_image_archive.py pack --release-manifest $(WP07_ARTIFACT_DIR)/release-manifest.json --output $(WP07_ARTIFACT_DIR)/images
 
 http-negative-check:
 	MJ_DB_PORT=$${MJ_DB_PORT:-$(WP08_LOCAL_DB_PORT)} MJ_API_PORT=$${MJ_API_PORT:-$(WP08_LOCAL_API_PORT)} docker compose up --build -d --wait db api
