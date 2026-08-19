@@ -8,13 +8,6 @@ import pytest
 import scripts.wp08_staging as staging
 
 
-def test_terraform_candidate_matches_staging_contract():
-    candidate = staging.load_contract()["candidate_commit"]
-    variables = (staging.ROOT / "infra" / "staging" / "variables.tf").read_text()
-
-    assert f'default = "{candidate}"' in variables
-
-
 def pull_helper_source() -> str:
     script = staging.DEPLOY_SCRIPT.read_text()
     start = script.index("pull_with_bounded_retry() {")

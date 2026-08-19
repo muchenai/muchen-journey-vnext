@@ -172,6 +172,22 @@ def config_schema() -> int:
     raise CandidateError("config schema version must be a literal integer")
 
 
+def validate_staging_candidate_binding(root: Path = ROOT) -> str:
+    contract_path = root / "config" / "wp08_staging.json"
+    variables_path = root / "infra" / "staging" / "variables.tf"
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        variables = variables_path.read_text(encoding="utf-8")
+    except (OSError, json.JSONDecodeError) as error:
+        raise CandidateError("staging candidate binding inputs are missing or invalid") from error
+    candidate = contract.get("candidate_commit")
+    if not isinstance(candidate, str) or not FULL_SHA.fullmatch(candidate):
+        raise CandidateError("staging candidate binding requires a full commit SHA")
+    if f'default = "{candidate}"' not in variables:
+        raise CandidateError("Terraform staging candidate differs from the machine contract")
+    return candidate
+
+
 def source_check() -> dict[str, Any]:
     for relative in (
         ".github/CODEOWNERS",
@@ -182,6 +198,8 @@ def source_check() -> dict[str, Any]:
         "contracts/openapi.json",
         "requirements.lock",
         "apps/web/package-lock.json",
+        "config/wp08_staging.json",
+        "infra/staging/variables.tf",
     ):
         if not (ROOT / relative).is_file():
             raise CandidateError(f"missing WP-07 source contract: {relative}")
@@ -237,11 +255,13 @@ def source_check() -> dict[str, Any]:
     missing = [item for item in TRACE_IDS if item not in evidence]
     if missing:
         raise CandidateError(f"missing WP-07 trace IDs: {missing}")
+    staging_candidate = validate_staging_candidate_binding()
     return {
         "openapi_sha256": sha256(ROOT / "contracts" / "openapi.json"),
         "migration": migration(),
         "config_schema_version": config_schema(),
         "trace_ids": list(TRACE_IDS),
+        "staging_candidate": staging_candidate,
     }
 
 

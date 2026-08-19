@@ -99,6 +99,36 @@ def test_manifest_inputs_are_literal_and_linear():
     assert config_schema() == 3
 
 
+def test_staging_candidate_binding_accepts_matching_terraform_default(tmp_path):
+    candidate_sha = "c" * 40
+    config = tmp_path / "config" / "wp08_staging.json"
+    variables = tmp_path / "infra" / "staging" / "variables.tf"
+    config.parent.mkdir(parents=True)
+    variables.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"candidate_commit": candidate_sha}), encoding="utf-8")
+    variables.write_text(
+        f'variable "candidate_commit" {{\n  default = "{candidate_sha}"\n}}\n',
+        encoding="utf-8",
+    )
+
+    assert candidate.validate_staging_candidate_binding(tmp_path) == candidate_sha
+
+
+def test_staging_candidate_binding_rejects_terraform_drift(tmp_path):
+    config = tmp_path / "config" / "wp08_staging.json"
+    variables = tmp_path / "infra" / "staging" / "variables.tf"
+    config.parent.mkdir(parents=True)
+    variables.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"candidate_commit": "c" * 40}), encoding="utf-8")
+    variables.write_text(
+        f'variable "candidate_commit" {{\n  default = "{"d" * 40}"\n}}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CandidateError, match="Terraform staging candidate differs"):
+        candidate.validate_staging_candidate_binding(tmp_path)
+
+
 def test_formal_catalog_is_bound_into_candidate_content_evidence():
     items = candidate.formal_catalog_versions()
     assert len(items) == 8
