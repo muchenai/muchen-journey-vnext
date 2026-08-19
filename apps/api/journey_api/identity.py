@@ -113,24 +113,26 @@ def clear_session_cookies(response: Response) -> None:
 
 
 def set_oauth_cookie(response: Response, browser_token: str, max_age: int) -> None:
+    secure = cookie_secure()
     response.set_cookie(
         OAUTH_COOKIE,
         browser_token,
         max_age=max_age,
         path="/auth/feishu",
-        secure=cookie_secure(),
+        secure=secure,
         httponly=True,
-        samesite="lax",
+        samesite="none" if secure else "lax",
     )
 
 
 def clear_oauth_cookie(response: Response) -> None:
+    secure = cookie_secure()
     response.delete_cookie(
         OAUTH_COOKIE,
         path="/auth/feishu",
-        secure=cookie_secure(),
+        secure=secure,
         httponly=True,
-        samesite="lax",
+        samesite="none" if secure else "lax",
     )
 
 
