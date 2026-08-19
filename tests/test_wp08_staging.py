@@ -8,6 +8,12 @@ import pytest
 import scripts.wp08_staging as staging
 
 
+def test_archive_runtime_image_builder_is_candidate_bound():
+    source = (staging.ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
+
+    assert 'f"{component.lower()}:{CANDIDATE}"' in source
+
+
 def pull_helper_source() -> str:
     script = staging.DEPLOY_SCRIPT.read_text()
     start = script.index("pull_with_bounded_retry() {")
