@@ -10,7 +10,6 @@ on:
         options:
           - audit
           - deploy
-          - deploy-web
           - inspect-runtime
           - diagnose-publication
           - repair-edge-route
@@ -37,10 +36,10 @@ jobs:
   deploy:
     name: WP-08 / physical staging
     if: >-
-      inputs.candidate == 'd55732bbd816c74104da9c696727366644adaf52' &&
+      inputs.candidate == '8a25fa8fee0b9c73fa056118a45a075ec6248509' &&
       ((inputs.phase == 'audit' && inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK') ||
-      (inputs.phase == 'deploy-web' && inputs.confirmation == 'DEPLOY_WEB_D55732B_ON_9E8A806_STAGING') ||
-      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_5D8B97E_STAGING') ||
+      (inputs.phase == 'deploy' && inputs.confirmation == 'DEPLOY_8A25FA8_TO_VOLCENGINE_STAGING') ||
+      (inputs.phase == 'inspect-runtime' && inputs.confirmation == 'INSPECT_RUNTIME_8A25FA8_STAGING') ||
       (inputs.phase == 'diagnose-publication' && inputs.confirmation == 'DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING') ||
       (inputs.phase == 'repair-edge-route' && inputs.confirmation == 'REPAIR_EDGE_ROUTE_EF0A512_STAGING') ||
       (inputs.phase == 'cleanup-failed-release' && inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'))
@@ -91,10 +90,10 @@ jobs:
       - name: Download exact verified candidate manifest
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-d55732bbd816c74104da9c696727366644adaf52
+          name: wp07-candidate-8a25fa8fee0b9c73fa056118a45a075ec6248509
           path: artifacts/wp07-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 32162667118
+          run-id: 32217644431
       - name: Verify immutable WP-08 contract
         run: |
           test "$GITHUB_REF" = refs/heads/main

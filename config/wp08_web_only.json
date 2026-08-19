@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "status": "ACTIVE",
+  "status": "RETIRED",
   "target_environment": "staging",
   "region_id": "cn-beijing",
   "candidate_commit": "d55732bbd816c74104da9c696727366644adaf52",

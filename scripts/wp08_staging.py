@@ -745,7 +745,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         job_guard = workflow[jobs_start:guard_end]
         retired_dispatches = (
             "inputs.phase == 'provision'",
-            "inputs.phase == 'deploy'",
+            "inputs.phase == 'deploy-web'",
             "inputs.phase == 'repair-runtime'",
         )
         if any(marker in job_guard for marker in retired_dispatches):
@@ -753,8 +753,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
                 "controlled Alpha candidate must not dispatch retired mutation phases"
             )
     required = (
-        "- audit\n          - deploy\n          - deploy-web\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_WEB_D55732B_ON_9E8A806_STAGING'",
+        "- audit\n          - deploy\n          - inspect-runtime",
+        "inputs.confirmation == 'DEPLOY_8A25FA8_TO_VOLCENGINE_STAGING'",
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
@@ -828,7 +828,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:.github/workflows/staging.yml"',
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
-        "INSPECT_RUNTIME_5D8B97E_STAGING",
+        "INSPECT_RUNTIME_8A25FA8_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
@@ -992,8 +992,8 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,bounded-web-only,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
-        " retired=provision,full-deploy,runtime-repair"
+        " dispatch=audit,bounded-full-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
+        " retired=provision,web-only,runtime-repair"
     )
 
 
