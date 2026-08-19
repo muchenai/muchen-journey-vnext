@@ -30,7 +30,7 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(
     monkeypatch, tmp_path: Path
 ):
     contract = copy.deepcopy(web_only.load_contract())
-    assert contract["status"] == "RETIRED"
+    assert contract["status"] == "ACTIVE"
     candidate_openapi = b'{"openapi":"historical-candidate"}\n'
     baseline = contract["runtime_baseline"]
     assert isinstance(baseline, dict)

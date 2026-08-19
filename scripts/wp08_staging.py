@@ -752,20 +752,33 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     workflow = path.read_text()
     jobs_start = workflow.find("jobs:\n")
     guard_end = workflow.find("    runs-on:", jobs_start)
+    web_only = json.loads(WEB_ONLY_CONTRACT.read_text())
+    active_web_only = web_only.get("status") == "ACTIVE"
     if jobs_start >= 0 and guard_end >= 0:
         job_guard = workflow[jobs_start:guard_end]
-        retired_dispatches = (
+        retired_dispatches = [
             "inputs.phase == 'provision'",
-            "inputs.phase == 'deploy-web'",
             "inputs.phase == 'repair-runtime'",
-        )
+        ]
+        if not active_web_only:
+            retired_dispatches.append("inputs.phase == 'deploy-web'")
         if any(marker in job_guard for marker in retired_dispatches):
             raise StagingError(
                 "controlled Alpha candidate must not dispatch retired mutation phases"
             )
+    phase_sequence = (
+        "- audit\n          - deploy-web\n          - inspect-runtime"
+        if active_web_only
+        else "- audit\n          - deploy\n          - inspect-runtime"
+    )
+    deployment_confirmation = (
+        "inputs.confirmation == 'DEPLOY_WEB_D55732B_ON_9E8A806_STAGING'"
+        if active_web_only
+        else "inputs.confirmation == 'DEPLOY_EB7C40B_TO_VOLCENGINE_STAGING'"
+    )
     required = (
-        "- audit\n          - deploy\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_EB7C40B_TO_VOLCENGINE_STAGING'",
+        phase_sequence,
+        deployment_confirmation,
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
@@ -1010,10 +1023,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     ):
         if forbidden in cleanup_step:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
+    deployment_mode = "web-only" if active_web_only else "bounded-full-deploy"
+    retired_modes = "provision,runtime-repair" if active_web_only else "provision,web-only,runtime-repair"
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,bounded-full-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
-        " retired=provision,web-only,runtime-repair"
+        f" dispatch=audit,{deployment_mode},runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
+        f" retired={retired_modes}"
     )
 
 
