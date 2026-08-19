@@ -99,6 +99,10 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           test "${{ inputs.candidate }}" = "$(jq -r .candidate_commit config/wp08_staging.json)"
           if [[ "${{ inputs.phase }}" == "deploy" ]]; then
+            python3 scripts/wp07_image_archive.py verify-files \
+              --release-manifest artifacts/wp07-candidate/release-manifest.json \
+              --archive-manifest artifacts/wp07-candidate/image-archives.json \
+              --archive-root artifacts/wp07-candidate/images
             candidate="${{ inputs.candidate }}"
             git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"
             git show "$candidate:deploy/staging/compose.yaml" | \
@@ -402,6 +406,15 @@ jobs:
             --mode "$mode"
           cp deploy/staging/compose.yaml deploy/staging/compose.migrate.yaml "$bundle/"
           cp deploy/staging/Caddyfile deploy/staging/grant_runtime.py deploy/staging/deploy.sh "$bundle/"
+          if [[ "$mode" == "full" ]]; then
+            install -d -m 0700 "$bundle/images"
+            cp artifacts/wp07-candidate/release-manifest.json "$bundle/"
+            cp artifacts/wp07-candidate/image-archives.json "$bundle/"
+            cp artifacts/wp07-candidate/images/api.tar "$bundle/images/"
+            cp artifacts/wp07-candidate/images/web.tar "$bundle/images/"
+            cp artifacts/wp07-candidate/images/worker.tar "$bundle/images/"
+            cp scripts/wp07_image_archive.py "$bundle/"
+          fi
           chmod 0755 "$bundle/deploy.sh"
           printf '%s\n' "$WP08_DEPLOY_SSH_PRIVATE_KEY" >"$RUNNER_TEMP/wp08-deploy-key"
           chmod 0600 "$RUNNER_TEMP/wp08-deploy-key"
@@ -414,9 +427,13 @@ jobs:
           ssh_opts=(-i "$RUNNER_TEMP/wp08-deploy-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp08-known-hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes)
           release="/srv/journey-next-staging/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
           ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
-          tar -C "$RUNNER_TEMP/wp08-deploy" -czf - . | ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
-          ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true"
-          printf '%s' "$GHCR_TOKEN" | ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          echo "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed"
+          tar -C "$RUNNER_TEMP/wp08-deploy" -czf - . | timeout --signal=TERM --kill-after=30s 12m ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
+          echo "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed"
+          if [[ "${{ inputs.phase }}" != "deploy" ]]; then
+            ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true"
+            printf '%s' "$GHCR_TOKEN" | ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          fi
           logout() {
             ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true"
           }

@@ -309,9 +309,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_IMAGE_PULL",
                 'SECRETS="$PWD/secrets"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet",
-                'pull_with_bounded_retry full-api docker pull "$API_IMAGE"',
-                'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"',
-                'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"',
+                "python3 ./wp07_image_archive.py verify-files",
+                'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"',
+                'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"',
+                'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api python -c \"from pathlib import Path; "
                 "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -408,9 +409,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text(
         valid.replace(
-            'pull_with_bounded_retry full-api docker pull "$API_IMAGE"\n'
-            'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"\n'
-            'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"\n'
+            "python3 ./wp07_image_archive.py verify-files\n"
+            'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n"
@@ -418,9 +420,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
             "run --rm --no-deps api alembic upgrade head",
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head\n"
-            'pull_with_bounded_retry full-api docker pull "$API_IMAGE"\n'
-            'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"\n'
-            'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"\n'
+            "python3 ./wp07_image_archive.py verify-files\n"
+            'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -491,7 +494,10 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/health/ready\n"
         "  edge:\n"
@@ -514,7 +520,10 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
 
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/ops\n"
         "  edge:\n"
@@ -524,7 +533,11 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
         staging.validate_staging_compose(compose)
 
     compose.write_text(
-        "services:\n  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
+        "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
+        "  web:\n    image: ${WEB_RUNTIME_IMAGE:?required}\n"
+        "  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
     )
     with pytest.raises(staging.StagingError, match="project GHCR digest"):
         staging.validate_staging_compose(compose)
@@ -550,7 +563,10 @@ def test_staging_web_requires_dynamic_per_request_csp_nonce(tmp_path: Path, monk
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/health/ready\n"
         "  edge:\n"
@@ -622,6 +638,12 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git show "$candidate:apps/worker/journey_worker/main.py"',
             "active_recipient_exists",
             'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+            "scripts/wp07_image_archive.py verify-files",
+            "artifacts/wp07-candidate/image-archives.json",
+            "artifacts/wp07-candidate/images/api.tar",
+            "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed",
+            "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed",
+            "timeout --signal=TERM --kill-after=30s 12m ssh",
             'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
             'git show "$candidate:scripts/wp08_prepare_deploy.py" | grep -Fq \'"DB_POOL_SIZE": "20"\'',
             'git show "$candidate:scripts/wp08_prepare_deploy.py" | grep -Fq \'"DB_MAX_OVERFLOW": "5"\'',

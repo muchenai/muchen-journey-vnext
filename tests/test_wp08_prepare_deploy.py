@@ -86,6 +86,14 @@ def test_prepare_writes_private_independent_environment_files(
     assert f"PRODUCTION_HOST={prepare.PRODUCTION_HOST}" in deployment
     for image in prepare.IMAGES.values():
         assert image in deployment
+    assert "IMAGE_TRANSPORT=verified-archive" in deployment
+    for digest in prepare.LOCAL_IMAGE_DIGESTS.values():
+        assert digest in deployment
+    for component in ("api", "web", "worker"):
+        assert (
+            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+            f"{component}:{prepare.CANDIDATE}"
+        ) in deployment
 
 
 def test_prepare_rejects_reused_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -138,6 +146,7 @@ def test_prepare_web_only_pins_runtime_baseline_and_candidate_web(
     assert f"BASELINE_CANDIDATE={prepare.WEB_ONLY_BASELINE}" in deployment
     for image in prepare.WEB_ONLY_IMAGES.values():
         assert image in deployment
+    assert "IMAGE_TRANSPORT=registry" in deployment
 
 
 def test_prepare_rejects_unknown_deploy_mode(

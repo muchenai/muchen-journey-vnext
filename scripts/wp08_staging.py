@@ -359,6 +359,9 @@ def validate_edge_mirror_workflow(path: Path = EDGE_MIRROR_WORKFLOW) -> None:
 
 def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
     compose = path.read_text()
+    for component in ("API", "WEB", "WORKER"):
+        if f"image: ${{{component}_RUNTIME_IMAGE:" not in compose:
+            raise StagingError("staging application images must use verified runtime references")
     if f"image: {EDGE_IMAGE}" not in compose:
         raise StagingError("staging edge must use the verified project GHCR digest")
     if "image: caddy:" in compose or "docker.io/library/caddy" in compose:
@@ -402,10 +405,11 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     compose_check = (
         "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet"
     )
-    image_pulls = (
-        'pull_with_bounded_retry full-api docker pull "$API_IMAGE"',
-        'pull_with_bounded_retry full-web docker pull "$WEB_IMAGE"',
-        'pull_with_bounded_retry full-worker docker pull "$WORKER_IMAGE"',
+    archive_loads = (
+        "python3 ./wp07_image_archive.py verify-files",
+        'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"',
+        'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"',
+        'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"',
     )
     container_ca_check = (
         "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
@@ -416,19 +420,20 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     )
     if any(
         command not in script
-        for command in (compose_check, *image_pulls, container_ca_check, migration)
+        for command in (compose_check, *archive_loads, container_ca_check, migration)
     ):
         raise StagingError("staging deploy preflight commands are incomplete")
     if not (
         script.index(compose_check)
-        < script.index(image_pulls[0])
-        < script.index(image_pulls[1])
-        < script.index(image_pulls[2])
+        < script.index(archive_loads[0])
+        < script.index(archive_loads[1])
+        < script.index(archive_loads[2])
+        < script.index(archive_loads[3])
         < script.index(container_ca_check)
         < script.index(migration)
     ):
         raise StagingError(
-            "staging deploy must validate Compose, pull all images, and verify "
+            "staging deploy must validate Compose, load all verified images, and verify "
             "container CA readability before database migration"
         )
     bounded_pull_contract = (
@@ -439,9 +444,6 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "COMMAND_TIMEOUT",
         "NON_RETRYABLE",
         "WP08_IMAGE_PULL",
-        "pull_with_bounded_retry full-api docker pull",
-        "pull_with_bounded_retry full-web docker pull",
-        "pull_with_bounded_retry full-worker docker pull",
         "pull_with_bounded_retry web-only docker pull",
         "pull_with_bounded_retry runtime-api docker pull",
         "pull_with_bounded_retry runtime-worker docker pull",
@@ -688,11 +690,22 @@ def validate_candidate(data: dict[str, object]) -> None:
             raise StagingError(f"{label} differs from the machine contract")
     for component in ("api", "web", "worker"):
         digest = str(expected_digests[component])
+        local_digest = str(images[component]["local_image_digest"])
         immutable = (
             "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
             f"{component}@{digest}"
         )
-        if immutable not in prepare or digest not in deploy:
+        runtime = (
+            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+            f"{component}:{commit}"
+        )
+        if (
+            immutable not in prepare
+            or runtime not in prepare
+            or digest not in deploy
+            or local_digest not in prepare
+            or local_digest not in deploy
+        ):
             raise StagingError(f"{component} deploy binding differs from the machine contract")
 
 
@@ -806,6 +819,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:scripts/wp08_web_runtime_check.py"',
         'git show "$candidate:apps/worker/journey_worker/main.py"',
         'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+        "scripts/wp07_image_archive.py verify-files",
+        "artifacts/wp07-candidate/image-archives.json",
+        "artifacts/wp07-candidate/images/api.tar",
+        "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed",
+        "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed",
+        "timeout --signal=TERM --kill-after=30s 12m ssh",
         '"DB_POOL_SIZE": "20"',
         '"DB_MAX_OVERFLOW": "5"',
         '"DB_POOL_SIZE": "2"',

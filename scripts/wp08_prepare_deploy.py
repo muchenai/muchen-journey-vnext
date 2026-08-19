@@ -23,6 +23,11 @@ IMAGES = {
     "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:37be63127506838c11b961da337d5124c6e85e0b76f1bf4340faad14902338bc",
     "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:373f3c77adf7059a37ed832620615182375b7a4af2465ed4eb82cc5a861dc538",
 }
+LOCAL_IMAGE_DIGESTS = {
+    "API_LOCAL_IMAGE_DIGEST": "sha256:121dff5cf648026d4b406e4b544697d3961ef1820bc10f84e0eab81b6509258a",
+    "WEB_LOCAL_IMAGE_DIGEST": "sha256:b5837487c683d27687b857f9ee23359051939666560b2780ab5c067788ae98b0",
+    "WORKER_LOCAL_IMAGE_DIGEST": "sha256:e2688e0ada8a0ced9790a2b9f8bdad11d431810032de29503461f730950d78dc",
+}
 WEB_ONLY_IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d",
     "WEB_IMAGE": IMAGES["WEB_IMAGE"],
@@ -151,6 +156,26 @@ def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
     )
     runtime_release = CANDIDATE if mode == "full" else WEB_ONLY_BASELINE
     selected_images = IMAGES if mode == "full" else WEB_ONLY_IMAGES
+    if mode == "full":
+        runtime_images = {
+            f"{component}_RUNTIME_IMAGE": (
+                "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+                f"{component.lower()}:{CANDIDATE}"
+            )
+            for component in ("API", "WEB", "WORKER")
+        }
+        transport = {
+            "IMAGE_TRANSPORT": "verified-archive",
+            **runtime_images,
+            **LOCAL_IMAGE_DIGESTS,
+        }
+    else:
+        transport = {
+            "IMAGE_TRANSPORT": "registry",
+            "API_RUNTIME_IMAGE": selected_images["API_IMAGE"],
+            "WEB_RUNTIME_IMAGE": selected_images["WEB_IMAGE"],
+            "WORKER_RUNTIME_IMAGE": selected_images["WORKER_IMAGE"],
+        }
     shared_api = {
         "APP_ENV": "staging",
         "APP_RELEASE": runtime_release,
@@ -239,6 +264,7 @@ def prepare(output: Path, host: str, port: int, *, mode: str = "full") -> None:
             "STAGING_HOST": STAGING_HOST,
             "PRODUCTION_HOST": PRODUCTION_HOST,
             **selected_images,
+            **transport,
         },
     )
     private_paths = (
