@@ -3,6 +3,7 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from fastapi import Response
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -14,7 +15,15 @@ from journey_api.feishu_oauth import (
     get_feishu_oauth_client,
 )
 from journey_api.fixtures import OPERATOR_ID, ORGANIZATION_ID
-from journey_api.identity import OAUTH_COOKIE, SESSION_COOKIE, credential_hash, utc_now
+from journey_api import identity
+from journey_api.identity import (
+    OAUTH_COOKIE,
+    SESSION_COOKIE,
+    clear_oauth_cookie,
+    credential_hash,
+    set_oauth_cookie,
+    utc_now,
+)
 from journey_api.main import app
 from journey_api.models import (
     AuditEntry,
@@ -86,6 +95,36 @@ def client_for(label: str) -> TestClient:
 def assert_ok(response):
     assert response.status_code < 400, response.text
     return response.json()["data"]
+
+
+@pytest.mark.parametrize(
+    ("secure", "expected_same_site"),
+    [(False, "SameSite=lax"), (True, "SameSite=none")],
+)
+def test_oauth_cookie_supports_cross_site_provider_return(
+    monkeypatch: pytest.MonkeyPatch,
+    secure: bool,
+    expected_same_site: str,
+) -> None:
+    monkeypatch.setattr(identity, "cookie_secure", lambda: secure)
+    response = Response()
+
+    set_oauth_cookie(response, "browser-token", max_age=600)
+
+    cookie = response.headers["set-cookie"]
+    assert "journey_next_oauth=browser-token" in cookie
+    assert "HttpOnly" in cookie
+    assert "Path=/auth/feishu" in cookie
+    assert expected_same_site in cookie
+    assert ("Secure" in cookie) is secure
+
+    cleared = Response()
+    clear_oauth_cookie(cleared)
+    cleared_cookie = cleared.headers["set-cookie"]
+    assert "journey_next_oauth=" in cleared_cookie
+    assert "Path=/auth/feishu" in cleared_cookie
+    assert expected_same_site in cleared_cookie
+    assert ("Secure" in cleared_cookie) is secure
 
 
 def create_link(role: Role, target_user_id: uuid.UUID) -> dict[str, object]:
