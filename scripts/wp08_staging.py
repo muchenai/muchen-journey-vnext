@@ -767,7 +767,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
             )
     required = (
         "- audit\n          - deploy\n          - inspect-runtime",
-        "inputs.confirmation == 'DEPLOY_8A25FA8_TO_VOLCENGINE_STAGING'",
+        "inputs.confirmation == 'DEPLOY_EB7C40B_TO_VOLCENGINE_STAGING'",
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
@@ -847,7 +847,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:.github/workflows/staging.yml"',
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
-        "INSPECT_RUNTIME_8A25FA8_STAGING",
+        "INSPECT_RUNTIME_EB7C40B_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
