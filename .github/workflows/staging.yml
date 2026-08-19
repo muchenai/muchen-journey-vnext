@@ -428,7 +428,11 @@ jobs:
           release="/srv/journey-next-staging/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
           ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
           echo "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed"
-          tar -C "$RUNNER_TEMP/wp08-deploy" -czf - . | timeout --signal=TERM --kill-after=30s 12m ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
+          if ! tar -C "$RUNNER_TEMP/wp08-deploy" -czf - . | timeout --signal=TERM --kill-after=30s 20m ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"; then
+            timeout --signal=TERM --kill-after=30s 2m ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "rm -rf -- '$release'"
+            echo "WP08_BUNDLE_TRANSFER=FAIL cleanup=exact-release" >&2
+            exit 1
+          fi
           echo "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed"
           if [[ "${{ inputs.phase }}" != "deploy" ]]; then
             ssh "${ssh_opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true"
