@@ -688,6 +688,9 @@ def validate_candidate(data: dict[str, object]) -> None:
     for source, marker, label in required_markers:
         if marker not in source:
             raise StagingError(f"{label} differs from the machine contract")
+    runtime_image_builder = 'f"{component.lower()}:{CANDIDATE}"'
+    if runtime_image_builder not in prepare:
+        raise StagingError("archive runtime image builder differs from the machine contract")
     for component in ("api", "web", "worker"):
         digest = str(expected_digests[component])
         local_digest = str(images[component]["local_image_digest"])
@@ -695,13 +698,8 @@ def validate_candidate(data: dict[str, object]) -> None:
             "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
             f"{component}@{digest}"
         )
-        runtime = (
-            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
-            f"{component}:{commit}"
-        )
         if (
             immutable not in prepare
-            or runtime not in prepare
             or digest not in deploy
             or local_digest not in prepare
             or local_digest not in deploy
