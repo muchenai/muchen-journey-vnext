@@ -14,19 +14,19 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-CANDIDATE = "d55732bbd816c74104da9c696727366644adaf52"
+CANDIDATE = "29b793d470c8d4f2f53b9c50bb4fbf98c07fe1f5"
 WEB_ONLY_BASELINE = "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4"
 STAGING_HOST = "staging-vnext.muchenai.com"
 PRODUCTION_HOST = "journey.muchenai.com"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:1ad9ebc30efbae2e76ea7d5ac482123a8e2de2b282b7de5d0dbb222532b87dec",
-    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:ad1f9bb00a5fa3aff17f4cad0544869a18f5b134302e4574801dc1b6763b5c09",
-    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:bd486a4480db049838c6a98841748872e883bffae061d3d4db6252e1f270ce35",
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:f9526175cd7f51ccc1171ee959c4a16376382b4cf5048cb70b13c3c4fcce799b",
+    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:a252347d612733ec1722a0576c87b69dbd04e35e9075c06fa28d71766319175f",
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:111e1aa14e970c0827b3d4cbf09c1e7d0d4802a04c7b1a3e680e7ba11a460653",
 }
 LOCAL_IMAGE_DIGESTS = {
-    "API_LOCAL_IMAGE_DIGEST": "sha256:e7ec1e7fa840dc8418de002181db80351b22708ba23485bf0dc7fb16b224b65c",
-    "WEB_LOCAL_IMAGE_DIGEST": "sha256:969f1438d27d9a28e0632f648aabdcf3415a314543d9d4edcaf8d01b3184783d",
-    "WORKER_LOCAL_IMAGE_DIGEST": "sha256:b15b3c4210d8f29e6a1dc9213b727e6dddcae7e2e8aa45bdec26a2e318e0bc4a",
+    "API_LOCAL_IMAGE_DIGEST": "sha256:69e18d984613fe99994c35cf7918911ae6d3842347d93b80bd816fa8d0b20703",
+    "WEB_LOCAL_IMAGE_DIGEST": "sha256:3454d6e224ec2d9787dba85813f8d34ac814a1b6e3215f55b9884275c27bd878",
+    "WORKER_LOCAL_IMAGE_DIGEST": "sha256:f6ad2f9436a1f8887d7b83f6b5077693c1c6277d3728f0f30d06eb52ddc50b2b",
 }
 WEB_ONLY_IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d",
