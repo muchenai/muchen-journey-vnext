@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { identityPageRequest, ReviewItem } from "@/lib/server/api";
+import { LiveStatusSignal } from "@/app/live-status-signal";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,21 @@ export default async function ReviewQueuePage({
     "/api/v1/reviews",
     "REVIEWER",
   );
+  const queueStatusKey = queue.items
+    .map((item) => `${item.id}:${item.status}:${item.submission_version_no}`)
+    .join("|");
   return (
     <section className="content-narrow review-queue-page">
       <p className="eyebrow">主管工作台</p>
       <h1>现在先评谁？</h1>
       <p className="lede">只显示明确分配给当前主管、且属于当前组织的待处理评审。</p>
+      <LiveStatusSignal
+        statusKey={queueStatusKey}
+        active
+        title={queue.items.length > 0 ? `有 ${queue.items.length} 项等待处理` : "当前没有新提交"}
+        detail="无需手动刷新；页面会自动检查新人提交。"
+        changedMessage="有新的提交或评审状态变化，队列已更新。"
+      />
       {query.finalized ? (
         <p className="success-text" role="status">
           {query.finalized === "approved" ? "通过结论已定稿，任务已完成。" : "修订结论已定稿，新人已进入修订状态。"}

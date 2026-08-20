@@ -57,6 +57,20 @@ function textLines(data: FormData, key: string, maxItems: number): string[] {
   return lines;
 }
 
+function optionalTextLines(data: FormData, key: string, maxItems: number): string[] {
+  const raw = data.get(key);
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  const lines = raw.split("\n").map((item) => item.trim()).filter(Boolean);
+  if (
+    lines.length > maxItems
+    || new Set(lines).size !== lines.length
+    || lines.some((item) => item.length > 500)
+  ) {
+    throw new Error(`${key} 必须是不超过 ${maxItems} 行且每行不超过 500 字的不重复内容。`);
+  }
+  return lines;
+}
+
 function boundedInteger(data: FormData, key: string, min: number, max: number): number {
   const value = Number(data.get(key));
   if (!Number.isSafeInteger(value) || value < min || value > max) {
@@ -113,7 +127,7 @@ function taskContentFromForm(data: FormData): TaskContentInput {
     reviewer_calibration_note: requiredText(data, "reviewer_calibration_note", 10, 1_000),
     allowed_attachment_types: [],
     max_attachment_size_bytes: 0,
-    reference_materials: [],
+    reference_materials: optionalTextLines(data, "reference_materials", 20),
     learning_materials: learningMaterials,
     estimated_duration_minutes: boundedInteger(data, "estimated_duration_minutes", 1, 480),
     rubric: {
