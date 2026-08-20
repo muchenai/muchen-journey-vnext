@@ -71,7 +71,7 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         ],
         "completion_criteria": [
             "固定输入已完成，判断与证据可以对应",
-            f"提交前对照示例答案完成自检：{answer_url}",
+            "提交后可以查看示例答案并完成自检",
         ],
         "required_deliverables": [
             "一份飞书文档链接" if requires_external_document else "一份不少于四十字的结构化记录"
@@ -81,7 +81,7 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         "reviewer_calibration_note": "仅用于机器验证交互闭环，不代表真人 Reviewer 校准。",
         "allowed_attachment_types": [],
         "max_attachment_size_bytes": 0,
-        "reference_materials": [],
+        "reference_materials": [f"参考答案：{answer_url}"],
         "learning_materials": [
             {
                 "key": f"material-{stable_key.lower()}",

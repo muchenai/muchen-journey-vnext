@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutSession } from "@/app/actions";
 import { CurrentAction, hasVNextSession, learnerPageRequest } from "@/lib/server/api";
+import { LiveStatusSignal } from "@/app/live-status-signal";
 import { JourneyMap } from "./journey-map";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function LearnerHome({
     action.action_type,
   );
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
+  const waitingForReview = action.action_type === "WAIT_FOR_REVIEW";
   const primaryActionLabel = opensResult
     ? "打开旅程收获"
     : action.action_type === "REVISE_SUBMISSION"
@@ -52,6 +54,16 @@ export default async function LearnerHome({
           </div>
         </section>
       ) : null}
+      <LiveStatusSignal
+        statusKey={`${action.action_type}:${action.resource_id ?? "none"}:${action.title}`}
+        active={waitingForReview}
+        title="提交成功，已交给主管评审"
+        detail="无需手动刷新；页面会自动检查评分状态。"
+        changedMessage="评分完成，旅程已经更新。"
+        initialMessage={action.action_type === "REVISE_SUBMISSION"
+          ? "评分完成，Reviewer 已返回修订建议。"
+          : null}
+      />
       {action.journey ? <JourneyMap journey={action.journey} /> : null}
       <article
         id="next-action"

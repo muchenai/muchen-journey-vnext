@@ -261,6 +261,15 @@ complete_stage() {
       if (await page.locator('.task-workspace').count() !== 0) {
         throw new Error('stage $stage_no response workspace appeared before learning input');
       }
+      if (await page.getByText('查看提交后的参考答案', {exact: true}).count() !== 0) {
+        throw new Error('stage $stage_no answer entry appeared before submission');
+      }
+      if (await page.locator('a[href*="P0LearnerAnswer"]').count() !== 0) {
+        throw new Error('stage $stage_no answer URL leaked before submission');
+      }
+      if (await page.getByText('参考答案将在提交后开放', {exact: true}).count() !== 1) {
+        throw new Error('stage $stage_no answer lock is not visible');
+      }
       const primaryActionsInViewport = await page.locator('.button.primary:visible').evaluateAll((elements) =>
         elements.filter((element) => {
           const rect = element.getBoundingClientRect();
@@ -389,8 +398,8 @@ complete_stage() {
         }
         await page.setViewportSize({width: 1280, height: 900});
       }
-      if (await page.getByRole('button', {name: /开始出发卡|开始本主题实践|开始评测/}).count()) {
-        await page.getByRole('button', {name: /开始出发卡|开始本主题实践|开始评测/}).click();
+      if (await page.getByRole('button', {name: /开始出发卡|开始启程|开始宝藏小任务|开始能力评测/}).count()) {
+        await page.getByRole('button', {name: /开始出发卡|开始启程|开始宝藏小任务|开始能力评测/}).click();
         await page.waitForURL('**#task-workspace');
         await page.locator('#submission-body').waitFor({state: 'visible'});
         const workspacePosition = await page.locator('#task-workspace').evaluate((element) => {
@@ -451,6 +460,12 @@ complete_stage() {
         await page.waitForURL('**/app/tasks/**');
         await page.waitForLoadState('networkidle');
         if (await page.locator('.task-hero-card').count() !== 1) throw new Error('completed stage revisit lost task context');
+        const answerDisclosure = page.getByText('查看提交后的参考答案', {exact: true});
+        if (await answerDisclosure.count() !== 1) throw new Error('submitted stage answer entry missing');
+        await answerDisclosure.click();
+        if (await page.locator('a[href*="P0LearnerAnswer"]').count() !== 1) {
+          throw new Error('submitted stage answer URL did not unlock');
+        }
         await page.goto('$base_url/app');
         await page.waitForLoadState('networkidle');
       }

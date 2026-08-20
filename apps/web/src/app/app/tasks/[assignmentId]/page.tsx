@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
 const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
+const POST_SUBMISSION_REFERENCE = /答案|参考解答|评分参考|answer/iu;
 
 function textWithSafeLinks(value: string | null) {
   if (!value) return null;
@@ -163,7 +164,10 @@ export default async function TaskPage({
   const isDayZero = assignment.journey_stage?.stage_kind === "DAY_0";
   const isFirstTreasure = assignment.journey_stage?.stable_key === "TRE-001-COMPANY-VALUES";
   const stageMarker = isDayZero ? "DAY 0 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
-  const practiceNoun = isAssessment ? "评测" : isDayZero ? "出发卡" : "本主题实践";
+  const learningStepTitle = "学习材料";
+  const actionStepTitle = isAssessment ? "能力评测" : isDayZero ? "启程" : "宝藏小任务";
+  const completionStepTitle = isAssessment ? "主管评审" : "阶段完成";
+  const practiceNoun = actionStepTitle;
   const taskContractText = [
     ...assignment.instructions,
     ...assignment.required_deliverables,
@@ -173,6 +177,12 @@ export default async function TaskPage({
     || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
   const instructionLinks = assignment.instructions.flatMap(materialLinks);
   const taskActionUrl = instructionLinks.find(isFeishuMaterial) ?? instructionLinks[0] ?? null;
+  const postSubmissionReferences = assignment.reference_materials.filter((item) =>
+    POST_SUBMISSION_REFERENCE.test(item),
+  );
+  const supportingReferences = assignment.reference_materials.filter((item) =>
+    !POST_SUBMISSION_REFERENCE.test(item),
+  );
   const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
   const currentFocus = !materialsReady
     ? isDayZero
@@ -199,7 +209,10 @@ export default async function TaskPage({
           </p>
         </div>
         <p className="task-hero-label">{stageMarker}</p>
-        <h1>{assignment.task_title}</h1>
+        <h1>{assignment.journey_stage?.title ?? assignment.task_title}</h1>
+        {assignment.journey_stage?.title !== assignment.task_title ? (
+          <p className="task-specific-title">当前任务 · {assignment.task_title}</p>
+        ) : null}
         <p>{assignment.journey_stage?.short_description ?? assignment.task_purpose}</p>
         <div className="task-time" aria-label={`预计 ${assignment.estimated_duration_minutes} 分钟`}>
           <i aria-hidden="true" /> {assignment.estimated_duration_minutes} min
@@ -304,17 +317,17 @@ export default async function TaskPage({
         <ol>
           <li data-state={materialsReady ? "complete" : "current"}>
             <span>{materialsReady ? "✓" : "01"}</span>
-            <strong>收集线索</strong>
+            <strong>{learningStepTitle}</strong>
             <small>{requiredMaterials.length} 份必读</small>
           </li>
           <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
             <span>{stageComplete ? "✓" : "02"}</span>
-            <strong>完成挑战</strong>
+            <strong>{actionStepTitle}</strong>
             <small>{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</small>
           </li>
           <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
             <span>{stageComplete ? "✓" : "03"}</span>
-            <strong>{isAssessment ? "真人评审" : "点亮路标"}</strong>
+            <strong>{completionStepTitle}</strong>
             <small>{isAssessment ? "提交后等待真人评审" : "提交后路线自动更新"}</small>
           </li>
         </ol>
@@ -548,11 +561,11 @@ export default async function TaskPage({
                 ))}
               </ol>
             </div>
-            {assignment.reference_materials.length > 0 ? (
+            {supportingReferences.length > 0 ? (
               <div>
                 <h3>参考资料</h3>
                 <ul className="checklist">
-                  {assignment.reference_materials.map((item) => (
+                  {supportingReferences.map((item) => (
                     <li key={item}>{textWithSafeLinks(item)}</li>
                   ))}
                 </ul>
@@ -691,6 +704,27 @@ export default async function TaskPage({
             </article>
           ))}
         </details>
+      ) : null}
+
+      {postSubmissionReferences.length > 0 ? (
+        assignment.submission ? (
+          <details className="post-submission-answers">
+            <summary>查看提交后的参考答案</summary>
+            <ul className="checklist">
+              {postSubmissionReferences.map((item) => (
+                <li key={item}>{textWithSafeLinks(item)}</li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <section className="answer-locked" aria-label="参考答案尚未开放">
+            <span aria-hidden="true">◇</span>
+            <div>
+              <strong>参考答案将在提交后开放</strong>
+              <small>先留下你自己的判断；系统确认提交成功后才能查看。</small>
+            </div>
+          </section>
+        )
       ) : null}
 
       {assignment.rubric.dimensions.length > 0 ? <details className="task-contract">

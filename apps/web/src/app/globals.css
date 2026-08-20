@@ -93,6 +93,23 @@ h2 { font-size: 24px; line-height: 1.25; }
 .button.secondary { color: var(--text-primary); background: var(--surface-raised); border-color: var(--border-default); }
 .button:disabled { cursor: wait; opacity: 0.68; }
 .button.compact { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+.learner-journey-page .button.primary,
+.learner-task-page .button.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #2854d7, #173eaf);
+  border-color: #163da9;
+  box-shadow: 0 10px 24px rgba(40, 84, 215, .28);
+}
+.learner-journey-page .button.primary:hover,
+.learner-task-page .button.primary:hover {
+  background: linear-gradient(135deg, #2148bc, #12358f);
+  box-shadow: 0 12px 28px rgba(40, 84, 215, .34);
+  transform: translateY(-1px);
+}
+.live-status-signal { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; padding: 16px 18px; color: #174d4a; background: #edf8f4; border: 1px solid #b9ddd2; border-radius: 16px; }
+.live-status-signal > span { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; color: #fff; background: #20877f; border-radius: 999px; font-weight: 900; }
+.live-status-signal > div { display: grid; gap: 2px; }
+.live-status-signal small { color: #496763; }
 
 .notice, .status-card, .panel, .queue-item { background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: 12px; }
 .notice { padding: 16px 20px; color: var(--text-secondary); }
@@ -487,6 +504,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-flow li[data-state="complete"] > span { background: #20877f; }
 .task-flow strong, .task-flow small { min-width: 0; overflow-wrap: anywhere; }
 .task-flow small { color: var(--text-muted); line-height: 1.35; }
+.task-specific-title { display: inline-flex; width: fit-content; margin: 14px 0 0; padding: 8px 12px; color: #d9ebe9; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 14px; font-weight: 750; }
 .task-workspace, .task-brief, .task-contract, .learning-experience, .learning-materials { min-width: 0; padding: clamp(24px, 5vw, 42px); background: #fff; border: 1px solid #d8e3df; border-radius: 24px; }
 .task-workspace { scroll-margin-top: 24px; }
 .task-brief > h2 { max-width: 28ch; margin-bottom: 8px; }
@@ -608,6 +626,13 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learning-material-locked { display: grid; gap: 2px; }
 .learning-material-locked small { margin-top: 10px; }
 .learning-material-list form { margin: 0; }
+.answer-locked, .post-submission-answers { min-width: 0; padding: 20px 22px; background: #f7f8fb; border: 1px solid #dfe4ec; border-radius: 18px; }
+.answer-locked { display: flex; align-items: center; gap: 14px; color: var(--text-secondary); }
+.answer-locked > span { display: grid; flex: 0 0 auto; width: 36px; height: 36px; place-items: center; color: #fff; background: #98a2b3; border-radius: 12px; }
+.answer-locked > div { display: grid; gap: 3px; }
+.answer-locked small { color: var(--text-muted); }
+.post-submission-answers summary { cursor: pointer; color: #174d4a; font-weight: 850; }
+.post-submission-answers[open] summary { margin-bottom: 14px; }
 .material-complete-label { display: inline-block; color: #18794e; font-size: 14px; font-weight: 800; }
 .response-map { margin: 16px 0 20px; padding: 20px; background: #edf5ff; border: 1px solid #d6e4ff; border-radius: 16px; }
 .response-map .section-label { margin: 0; }

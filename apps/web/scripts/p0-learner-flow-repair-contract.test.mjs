@@ -12,6 +12,18 @@ const submissionComposer = await readFile(
 );
 const actions = await readFile(new URL("../src/app/actions.ts", import.meta.url), "utf8");
 const learnerHome = await readFile(new URL("../src/app/app/page.tsx", import.meta.url), "utf8");
+const reviewerQueue = await readFile(
+  new URL("../src/app/review/page.tsx", import.meta.url),
+  "utf8",
+);
+const liveStatusSignal = await readFile(
+  new URL("../src/app/live-status-signal.tsx", import.meta.url),
+  "utf8",
+);
+const contentDraftForm = await readFile(
+  new URL("../src/app/content/content-draft-form.tsx", import.meta.url),
+  "utf8",
+);
 const journeyMap = await readFile(
   new URL("../src/app/app/journey-map.tsx", import.meta.url),
   "utf8",
@@ -24,10 +36,39 @@ const styles = await readFile(new URL("../src/app/globals.css", import.meta.url)
 
 test("the station shows a three-step path instead of an undefined quiz", () => {
   assert.match(taskPage, /aria-label="这一站的完成路径"/);
-  assert.match(taskPage, /收集线索/);
-  assert.match(taskPage, /完成挑战/);
+  assert.match(taskPage, /const learningStepTitle = "学习材料"/);
+  assert.match(taskPage, /isAssessment \? "能力评测"/);
+  assert.match(taskPage, /: "宝藏小任务"/);
+  assert.match(taskPage, /isAssessment \? "主管评审" : "阶段完成"/);
   assert.match(taskPage, /提交后等待真人评审/);
-  assert.doesNotMatch(taskPage, /小测|小任务/);
+});
+
+test("learner and reviewer status pages refresh while visible and announce changes", () => {
+  assert.match(learnerHome, /<LiveStatusSignal/);
+  assert.match(learnerHome, /提交成功，已交给主管评审/);
+  assert.match(learnerHome, /评分完成，旅程已经更新/);
+  assert.match(reviewerQueue, /<LiveStatusSignal/);
+  assert.match(reviewerQueue, /有新的提交或评审状态变化/);
+  assert.match(liveStatusSignal, /const REFRESH_INTERVAL_MS = 12_000/);
+  assert.match(liveStatusSignal, /document\.visibilityState !== "visible"/);
+  assert.match(liveStatusSignal, /router\.refresh\(\)/);
+  assert.match(liveStatusSignal, /aria-live="polite"/);
+});
+
+test("answer references are accepted by the editor but hidden until submission", () => {
+  assert.match(contentDraftForm, /name="reference_materials"/);
+  assert.match(contentDraftForm, /提交后开放的参考答案/);
+  assert.match(actions, /reference_materials: optionalTextLines/);
+  assert.match(taskPage, /POST_SUBMISSION_REFERENCE/);
+  assert.match(taskPage, /assignment\.submission \? \(/);
+  assert.match(taskPage, /参考答案将在提交后开放/);
+  assert.match(taskPage, /查看提交后的参考答案/);
+});
+
+test("learner primary actions have one unmistakable visual treatment", () => {
+  assert.match(styles, /\.learner-journey-page \.button\.primary/);
+  assert.match(styles, /\.learner-task-page \.button\.primary/);
+  assert.match(styles, /linear-gradient\(135deg, #2854d7, #173eaf\)/);
 });
 
 test("Feishu-document work has a visible submission entry and novice guidance", () => {
