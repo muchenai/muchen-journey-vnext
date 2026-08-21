@@ -170,7 +170,9 @@ export default async function TaskPage({
   const practiceNoun = actionStepTitle;
   const taskBriefHeading = isDayZero
     ? "完成一张三句出发卡"
-    : assignment.required_deliverables[0] ?? "留下这一站的学习证据";
+    : isAssessment
+      ? "完成这次能力评测"
+      : "完成这一站的宝藏小任务";
   const taskContractText = [
     ...assignment.instructions,
     ...assignment.required_deliverables,

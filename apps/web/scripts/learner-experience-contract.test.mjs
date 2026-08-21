@@ -63,7 +63,9 @@ test("the task contract leads with one deliverable and keeps secondary criteria 
   assert.match(taskPage, /<section className="task-brief"/);
   assert.match(taskPage, /const taskBriefHeading = isDayZero/);
   assert.match(taskPage, /\? "完成一张三句出发卡"/);
-  assert.match(taskPage, /: assignment\.required_deliverables\[0\]/);
+  assert.match(taskPage, /\? "完成这次能力评测"/);
+  assert.match(taskPage, /: "完成这一站的宝藏小任务"/);
+  assert.doesNotMatch(taskPage, /taskBriefHeading[\s\S]{0,160}assignment\.required_deliverables\[0\]/);
   assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
   assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
