@@ -61,8 +61,17 @@ test("unused and exchanged invites can be distinguished and revoked without pers
   assert.match(actions, /export async function revokeLearnerInvite/);
   assert.match(actions, /expected_revision: requiredRevision\(data\)/);
   assert.match(panel, /EXCHANGED_PENDING_CONFIRMATION: "已兑换，待确认身份"/);
-  assert.match(panel, /\["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"\]\.includes\(invite\.status\)/);
+  assert.match(panel, /\["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"\]\.includes\(effectiveStatus\)/);
   assert.doesNotMatch(panel, /invite_token/);
+});
+
+test("ops derives expired display state from time without mutating invitation facts", () => {
+  assert.match(panel, /function visibleInviteStatus\(invite: OpsInvite, observedAtMs: number\)/);
+  assert.match(panel, /invite\.status === "ACTIVE" && new Date\(invite\.expires_at\)\.getTime\(\) <= observedAtMs/);
+  assert.match(panel, /const effectiveStatus = visibleInviteStatus\(invite, observedAtMs\)/);
+  assert.match(panel, /STATUS_LABELS\[effectiveStatus\]/);
+  assert.match(panel, /setInterval\(\(\) => setObservedAtMs\(Date\.now\(\)\), 30_000\)/);
+  assert.doesNotMatch(panel, /invite\.status\s*=(?!=)/);
 });
 
 test("operator can freeze future invites without deleting accepted facts", () => {

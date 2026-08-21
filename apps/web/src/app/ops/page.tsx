@@ -119,6 +119,7 @@ export default async function OpsPage({
           identityAccess={identityAccess.items}
           tasks={tasks.items}
           journeys={formalJourneys.items}
+          observedAt={new Date().toISOString()}
         />
       </section>
 
