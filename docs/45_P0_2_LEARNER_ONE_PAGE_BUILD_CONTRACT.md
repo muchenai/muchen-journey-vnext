@@ -307,6 +307,8 @@ PR #259 通过 Fast Gate 后以 squash 方式合入主线候选 `8b5e40c654484df
 
 该候选的 staging Web-only 确认短语固定为 `DEPLOY_WEB_8B5E40C_ON_9E8A806_STAGING`，使人工授权文本、候选 SHA 与保留的 API/Worker 基线可机器核对，禁止沿用上一候选的确认短语。
 
+首次 Web-only 尝试 `32455769220` 在不可变合同核验阶段 fail-closed，尚未打开 SSH 或修改运行态。根因为候选 registry/local 六项摘要未在 `wp08_prepare_deploy.py` 与 `deploy.sh` 中同步完整；修复要求机器合同同时核对 candidate manifest、准备脚本和部署脚本，而非只核对 Web 摘要。
+
 staging 绑定继续采用组件级 Web-only：只把 Web 从 `d55732b...` 升级至 `29b793d...`，API、Worker 保持已由 Run `32241285113` 证明的健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。候选仓库中历史 API 源码差异不进入 Web 镜像，也不在本次部署中安装；接口兼容仍由冻结 OpenAPI SHA、migration/Worker 路径、API/Worker 镜像摘要和部署前后真实运行态共同 fail-closed 核验。绑定本身不部署、不执行 seed、不创建邀请、不发送消息，也不修改任何业务事实。
 
 只有绑定 PR 经门禁合入后，才允许对候选 `29b793d...` 单独取得一次 `phase=deploy-web` 授权；失败不重试并必须关闭临时 SSH。部署成功后必须先用真实浏览器验证提交后的状态自动更新、Reviewer 队列更新、答案提交前锁定/提交后可见以及桌面与 390px 主动作层级，再执行七个不可变正式内容版本的受控创建与摘要核验。机器或浏览器结果仍不得替代下一轮三名真人证据。
