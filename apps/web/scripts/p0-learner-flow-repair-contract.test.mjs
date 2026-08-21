@@ -43,6 +43,18 @@ test("the station shows a three-step path instead of an undefined quiz", () => {
   assert.match(taskPage, /提交后等待真人评审/);
 });
 
+test("pending review is never presented as a completed station", () => {
+  assert.match(taskPage, /const stageComplete = assignment\.status === "COMPLETED"/);
+  assert.match(taskPage, /\["SUBMITTED", "IN_REVIEW"\]\.includes\(assignment\.status\)/);
+  assert.match(taskPage, /等待 Reviewer 开始评审/);
+  assert.match(taskPage, /Reviewer 正在评审/);
+  assert.match(taskPage, /提交成功，正在等待 Reviewer 开始评审/);
+  assert.doesNotMatch(
+    taskPage,
+    /const stageComplete = assignment\.submission !== null && assignment\.allowed_commands\.length === 0/,
+  );
+});
+
 test("learner and reviewer status pages refresh while visible and announce changes", () => {
   assert.match(learnerHome, /<LiveStatusSignal/);
   assert.match(learnerHome, /提交成功，已交给主管评审/);

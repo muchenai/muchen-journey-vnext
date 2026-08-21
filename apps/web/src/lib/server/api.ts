@@ -69,7 +69,14 @@ export type LearningExperience = {
 
 export type Assignment = {
   id: string;
-  status: string;
+  status:
+    | "AVAILABLE"
+    | "IN_PROGRESS"
+    | "SUBMITTED"
+    | "IN_REVIEW"
+    | "NEEDS_REVISION"
+    | "COMPLETED"
+    | "CANCELLED";
   revision: number;
   allowed_commands: string[];
   stable_task_key: string;
