@@ -309,30 +309,6 @@ complete_stage() {
           if (await page.locator('.learning-material-card[open]').count() !== 1) {
             throw new Error(viewport.name + ': current material is not the only expanded card');
           }
-          const methodDetails = page.locator('.treasure-method-details');
-          if (await methodDetails.count() === 1) {
-            await methodDetails.evaluate((element) => { element.open = true; });
-          }
-          const contractGeometry = await page.evaluate(() => {
-            const columns = Array.from(document.querySelectorAll('.task-contract-columns > div'));
-            const links = Array.from(document.querySelectorAll('.task-brief a'))
-              .filter((link) => link.getClientRects().length > 0);
-            const columnOverflow = columns.some((column) => column.scrollWidth > column.clientWidth + 1);
-            const escapedLink = links.some((link) => {
-              const parent = link.closest('.task-contract-columns > div, .task-success-criteria, .treasure-method-details');
-              if (!parent) return true;
-              const linkBox = link.getBoundingClientRect();
-              const parentBox = parent.getBoundingClientRect();
-              return linkBox.left < parentBox.left - 1 || linkBox.right > parentBox.right + 1;
-            });
-            return {columnOverflow, escapedLink, linkCount: links.length};
-          });
-          if (contractGeometry.linkCount < 1 || contractGeometry.columnOverflow || contractGeometry.escapedLink) {
-            throw new Error(viewport.name + ': real-length task links collide or escape their contract cards: ' + JSON.stringify(contractGeometry));
-          }
-          if (await methodDetails.count() === 1) {
-            await methodDetails.evaluate((element) => { element.open = false; });
-          }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
           if (overflow) throw new Error(viewport.name + ': task page has horizontal overflow');
           await page.screenshot({
@@ -380,6 +356,30 @@ complete_stage() {
           }
           if (!(await brief.innerText()).includes('我最想弄清什么') || !(await brief.innerText()).includes('怎样算完成？')) {
             throw new Error(viewport.name + ': departure prompts or completion criteria entry is missing');
+          }
+          const methodDetails = page.locator('.treasure-method-details');
+          if (await methodDetails.count() === 1) {
+            await methodDetails.evaluate((element) => { element.open = true; });
+          }
+          const contractGeometry = await page.evaluate(() => {
+            const columns = Array.from(document.querySelectorAll('.task-contract-columns > div'));
+            const links = Array.from(document.querySelectorAll('.task-brief a'))
+              .filter((link) => link.getClientRects().length > 0);
+            const columnOverflow = columns.some((column) => column.scrollWidth > column.clientWidth + 1);
+            const escapedLink = links.some((link) => {
+              const parent = link.closest('.task-contract-columns > div, .task-success-criteria, .treasure-method-details');
+              if (!parent) return true;
+              const linkBox = link.getBoundingClientRect();
+              const parentBox = parent.getBoundingClientRect();
+              return linkBox.left < parentBox.left - 1 || linkBox.right > parentBox.right + 1;
+            });
+            return {columnOverflow, escapedLink, linkCount: links.length};
+          });
+          if (contractGeometry.linkCount < 1 || contractGeometry.columnOverflow || contractGeometry.escapedLink) {
+            throw new Error(viewport.name + ': unlocked task links collide or escape their contract cards: ' + JSON.stringify(contractGeometry));
+          }
+          if (await methodDetails.count() === 1) {
+            await methodDetails.evaluate((element) => { element.open = false; });
           }
           const successCriteria = brief.locator('.task-success-criteria');
           if (await successCriteria.count() !== 1 || await successCriteria.getAttribute('open') !== null) {
