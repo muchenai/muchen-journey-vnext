@@ -188,7 +188,10 @@ export default async function TaskPage({
   const supportingReferences = assignment.reference_materials.filter((item) =>
     !POST_SUBMISSION_REFERENCE.test(item),
   );
-  const stageComplete = assignment.submission !== null && assignment.allowed_commands.length === 0;
+  const stageComplete = assignment.status === "COMPLETED";
+  const awaitingReview = ["SUBMITTED", "IN_REVIEW"].includes(assignment.status);
+  const needsRevision = assignment.status === "NEEDS_REVISION";
+  const actionComplete = assignment.submission !== null && !needsRevision;
   const currentFocus = !materialsReady
     ? isDayZero
       ? "先选一个问题，再从第 1 份材料里找 1 条线索"
@@ -197,9 +200,13 @@ export default async function TaskPage({
         : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
     : canStart
       ? `看清挑战，开始${practiceNoun}`
-      : submitCommand
-        ? isAssessment ? "完成作答并交给 Reviewer" : "留下这一站的学习证据"
-        : stageComplete ? "这一站已经完成" : "等待下一步开放";
+      : needsRevision
+        ? "根据 Reviewer 反馈完成修订"
+        : submitCommand
+          ? isAssessment ? "完成作答并交给 Reviewer" : "留下这一站的学习证据"
+          : awaitingReview
+            ? assignment.status === "IN_REVIEW" ? "Reviewer 正在评审" : "等待 Reviewer 开始评审"
+            : stageComplete ? "这一站已经完成" : "等待下一步开放";
 
   return (
     <article className="learner-task-page" data-stage-kind={assignment.journey_stage?.stage_kind ?? "TASK"}>
@@ -325,12 +332,12 @@ export default async function TaskPage({
             <strong>{learningStepTitle}</strong>
             <small>{requiredMaterials.length} 份必读</small>
           </li>
-          <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
-            <span>{stageComplete ? "✓" : "02"}</span>
+          <li data-state={actionComplete ? "complete" : materialsReady ? "current" : "locked"}>
+            <span>{actionComplete ? "✓" : "02"}</span>
             <strong>{actionStepTitle}</strong>
             <small>{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</small>
           </li>
-          <li data-state={stageComplete ? "complete" : materialsReady ? "current" : "locked"}>
+          <li data-state={stageComplete ? "complete" : awaitingReview ? "current" : "locked"}>
             <span>{stageComplete ? "✓" : "03"}</span>
             <strong>{completionStepTitle}</strong>
             <small>{isAssessment ? "提交后等待真人评审" : "提交后路线自动更新"}</small>
@@ -700,7 +707,15 @@ export default async function TaskPage({
         </>
       ) : null}
 
-      {assignment.allowed_commands.length === 0 ? (
+      {awaitingReview ? (
+        <p className="notice" role="status">
+          {assignment.status === "IN_REVIEW"
+            ? "Reviewer 已开始评审。结果完成后，旅程会自动更新。"
+            : "提交成功，正在等待 Reviewer 开始评审。你可以先离开，结果完成后旅程会自动更新。"}
+        </p>
+      ) : stageComplete ? (
+        <p className="notice" role="status">这一站已经完成。返回旅程，继续前往下一站。</p>
+      ) : assignment.allowed_commands.length === 0 ? (
         <p className="notice">这一站暂时没有可执行动作。</p>
       ) : null}
       </section> : null}
