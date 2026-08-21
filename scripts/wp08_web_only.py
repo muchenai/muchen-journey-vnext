@@ -122,7 +122,6 @@ def load_contract(path: Path = CONTRACT) -> dict[str, object]:
     }:
         raise WebOnlyError("candidate allowed paths differ from the reviewed set")
     if not isinstance(compatibility, list) or set(compatibility) != {
-        "apps/api/",
         "apps/worker/",
         "contracts/openapi.json",
         "migrations/",
@@ -222,6 +221,10 @@ def check_repository(data: dict[str, object]) -> None:
 
     compatibility = data["baseline_compatibility_paths"]
     assert isinstance(compatibility, list)
+    # Only the Web image is installed. Historical API source changes in the
+    # candidate repository are not part of that image; the deployed API stays
+    # pinned by digest and its public compatibility remains guarded by the
+    # frozen OpenAPI hash below.
     runtime_changes = [
         item
         for item in str(

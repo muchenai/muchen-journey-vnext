@@ -296,3 +296,13 @@ PR #244 将飞书学习材料入口调整为明确动作“用企业飞书打开
 PR #246 将能力评测作答区中原本埋在次级说明里的飞书题面提升为主动作“打开本主题题面”，并在动作旁保留首次企业飞书登录提示。完整八站合成浏览器旅程通过，桌面与 390px 视口均确认按钮可见、无横向溢出；该结果仅为机器/浏览器证据，`human_uat=not_run`。修复合入主线候选 `d55732bbd816c74104da9c696727366644adaf52`，Mainline Candidate Gate `32162667118` 通过，registry 状态为 `VERIFIED`，Web digest 为 `sha256:ad1f9bb00a5fa3aff17f4cad0544869a18f5b134302e4574801dc1b6763b5c09`。
 
 本次 staging 仍采用 Web-only：只把 Web 升级至 `d55732b...`，API、Worker 保持健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。绑定 PR 本身不部署、不执行 seed、不创建邀请、不修改 Journey、身份、角色或其他业务事实，也不运行 Terraform plan/apply/import、DNS、WP-12B 或云资源变更。部署后必须用同一 CU Enrollment 证明题面可打开并继续提交；随后才可交给三名目标新人复验。
+
+## 27. 内容状态反馈与答案门禁候选
+
+三名真人反馈确认：提交后等待状态不会自动更新，Learner 不知道 Reviewer 是否已评分；Reviewer 也不知道新人何时提交；页面动作样式与装饰元素混淆，步骤名称不一致，并且参考答案可能在提交前暴露。本轮只修复这些直接阻碍继续意愿的 Learner/Reviewer Web 体验：等待态与 Reviewer 队列按可见页面有界刷新，明确呈现“提交成功/评分完成”；统一主动作视觉和步骤名称；参考答案由服务端在提交事实存在后才渲染，提交前只显示锁定提示。没有修改 Journey、TaskVersion、身份、角色、邀请或既有提交/评审事实。
+
+PR #257 通过 Fast Gate 后以 squash 方式合入主线候选 `29b793d470c8d4f2f53b9c50bb4fbf98c07fe1f5`；Mainline Candidate Gate `32380469400` 成功，registry 状态为 `VERIFIED`，Web digest 为 `sha256:a252347d612733ec1722a0576c87b69dbd04e35e9075c06fa28d71766319175f`。候选直接父提交为 `203e5b46762610257142b0de2cedf6138c0e54d3`，本轮差异仅包含 Learner/Reviewer/Content Editor Web、Web 合同和隔离浏览器夹具。
+
+staging 绑定继续采用组件级 Web-only：只把 Web 从 `d55732b...` 升级至 `29b793d...`，API、Worker 保持已由 Run `32241285113` 证明的健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。候选仓库中历史 API 源码差异不进入 Web 镜像，也不在本次部署中安装；接口兼容仍由冻结 OpenAPI SHA、migration/Worker 路径、API/Worker 镜像摘要和部署前后真实运行态共同 fail-closed 核验。绑定本身不部署、不执行 seed、不创建邀请、不发送消息，也不修改任何业务事实。
+
+只有绑定 PR 经门禁合入后，才允许对候选 `29b793d...` 单独取得一次 `phase=deploy-web` 授权；失败不重试并必须关闭临时 SSH。部署成功后必须先用真实浏览器验证提交后的状态自动更新、Reviewer 队列更新、答案提交前锁定/提交后可见以及桌面与 390px 主动作层级，再执行七个不可变正式内容版本的受控创建与摘要核验。机器或浏览器结果仍不得替代下一轮三名真人证据。

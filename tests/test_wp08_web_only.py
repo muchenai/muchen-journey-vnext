@@ -92,6 +92,18 @@ def test_contract_rejects_widened_allowed_paths(tmp_path: Path):
         web_only.load_contract(contract)
 
 
+def test_runtime_compatibility_matches_the_deployed_component_boundary():
+    contract = web_only.load_contract()
+    compatibility = contract["baseline_compatibility_paths"]
+    assert isinstance(compatibility, list)
+    assert "apps/api/" not in compatibility
+    assert set(compatibility) == {
+        "apps/worker/",
+        "contracts/openapi.json",
+        "migrations/",
+    }
+
+
 def test_contract_accepts_runtime_browser_check_as_reviewed_web_evidence():
     contract = web_only.load_contract()
     allowed = contract["candidate_commit_allowed_paths"]
