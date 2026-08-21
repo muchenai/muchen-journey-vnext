@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import scripts.wp08_prepare_deploy as prepare
 import scripts.wp08_staging as staging
 
 
@@ -192,7 +193,11 @@ def test_active_candidate_binding_matches_deploy_preflight():
     assert f'[[ "${{CANDIDATE_COMMIT:-}}" == "{candidate}" ]]' in script
     assert isinstance(digests, dict)
     for component in ("api", "web", "worker"):
+        key = f"{component.upper()}_IMAGE"
+        local_key = f"{component.upper()}_LOCAL_IMAGE_DIGEST"
+        assert prepare.IMAGES[key].endswith(f"@{digests[component]}")
         assert str(digests[component]) in script
+        assert prepare.LOCAL_IMAGE_DIGESTS[local_key] in script
 
 
 def test_apply_requires_quote_and_rejects_over_budget(tmp_path: Path):

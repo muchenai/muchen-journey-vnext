@@ -19,14 +19,14 @@ WEB_ONLY_BASELINE = "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4"
 STAGING_HOST = "staging-vnext.muchenai.com"
 PRODUCTION_HOST = "journey.muchenai.com"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:f9526175cd7f51ccc1171ee959c4a16376382b4cf5048cb70b13c3c4fcce799b",
+    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:08ba29f391fa752700e0092492ff313f13221830140b73a9b0a813f2b5edcf2b",
     "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:aea8f5905a416bd981ea4c9d2acd16a5c951f9f995ee746ed59c8d334a7f48f8",
-    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:111e1aa14e970c0827b3d4cbf09c1e7d0d4802a04c7b1a3e680e7ba11a460653",
+    "WORKER_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:29b4cd82dfeb21947cb842d84bef0131d22734729f98a31cb5e8a7f369217d56",
 }
 LOCAL_IMAGE_DIGESTS = {
-    "API_LOCAL_IMAGE_DIGEST": "sha256:69e18d984613fe99994c35cf7918911ae6d3842347d93b80bd816fa8d0b20703",
-    "WEB_LOCAL_IMAGE_DIGEST": "sha256:3454d6e224ec2d9787dba85813f8d34ac814a1b6e3215f55b9884275c27bd878",
-    "WORKER_LOCAL_IMAGE_DIGEST": "sha256:f6ad2f9436a1f8887d7b83f6b5077693c1c6277d3728f0f30d06eb52ddc50b2b",
+    "API_LOCAL_IMAGE_DIGEST": "sha256:0a6eba06b2155def5d5533a5f9bc8144aeda2c08a20339477df3f7316b75a0a1",
+    "WEB_LOCAL_IMAGE_DIGEST": "sha256:93bce4100b0f9b5e74c547bb1464b48ca6797e53f793636f0794fca632449657",
+    "WORKER_LOCAL_IMAGE_DIGEST": "sha256:921b3f6e85bd5c70d1c8c476bb8979b1d1c2afacc7b793a3b16837e4c9b7def1",
 }
 WEB_ONLY_IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d",
