@@ -168,6 +168,9 @@ export default async function TaskPage({
   const actionStepTitle = isAssessment ? "能力评测" : isDayZero ? "启程" : "宝藏小任务";
   const completionStepTitle = isAssessment ? "主管评审" : "阶段完成";
   const practiceNoun = actionStepTitle;
+  const taskBriefHeading = isDayZero
+    ? "完成一张三句出发卡"
+    : assignment.required_deliverables[0] ?? "留下这一站的学习证据";
   const taskContractText = [
     ...assignment.instructions,
     ...assignment.required_deliverables,
@@ -494,17 +497,40 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      <section className="task-brief" aria-labelledby="task-brief-title">
-        <p className="section-label">{materialsReady ? (isAssessment ? "能力挑战" : "轮到你行动") : "材料看完后"}</p>
-        <h2 id="task-brief-title">
-          {isDayZero ? "完成一张三句出发卡" : assignment.required_deliverables[0] ?? "留下这一站的学习证据"}
-        </h2>
+      {!materialsReady ? (
+        <section className="task-next-unlock" aria-labelledby="task-next-unlock-title">
+          <span aria-hidden="true">→</span>
+          <div>
+            <p className="section-label">完成材料后解锁</p>
+            <h2 id="task-next-unlock-title">{taskBriefHeading}</h2>
+            <p>
+              {isAssessment
+                ? "完成飞书作答，再交给 Reviewer。"
+                : "用刚找到的线索，完成一个短小任务。"}
+            </p>
+            <details className="task-success-criteria">
+              <summary>怎样算完成？</summary>
+              <p>{assignment.learner_outcome}</p>
+              <ul className="checklist">
+                {assignment.completion_criteria.map((item) => (
+                  <li key={item}><ContractLine value={item} /></li>
+                ))}
+              </ul>
+            </details>
+            {postSubmissionReferences.length > 0 ? (
+              <small>参考答案将在提交后开放。</small>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {materialsReady ? <section className="task-brief" aria-labelledby="task-brief-title">
+        <p className="section-label">{isAssessment ? "能力挑战" : "轮到你行动"}</p>
+        <h2 id="task-brief-title">{taskBriefHeading}</h2>
         <p className="task-outcome">
           {isDayZero
             ? "不用复述材料。写清你想弄懂什么、从哪里找答案、下一站先做什么。"
-            : materialsReady
-              ? "把刚才找到的线索，变成你自己的判断。"
-              : "先不用作答。带着上面的一个问题完成材料，再回来行动。"}
+            : "把刚才找到的线索，变成你自己的判断。"}
         </p>
 
         {isDayZero ? (
@@ -582,7 +608,7 @@ export default async function TaskPage({
             ))}
           </ul>
         </details>
-      </section>
+      </section> : null}
 
       {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">{assignment.latest_revision_feedback ? "Reviewer 已回应" : "你的行动"}</p>
@@ -706,7 +732,7 @@ export default async function TaskPage({
         </details>
       ) : null}
 
-      {postSubmissionReferences.length > 0 ? (
+      {materialsReady && postSubmissionReferences.length > 0 ? (
         assignment.submission ? (
           <details className="post-submission-answers">
             <summary>查看提交后的参考答案</summary>
@@ -727,7 +753,7 @@ export default async function TaskPage({
         )
       ) : null}
 
-      {assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
+      {materialsReady && assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
         <summary>评审会看什么</summary>
         <ul className="checklist">
           {assignment.rubric.dimensions.map((dimension) => (

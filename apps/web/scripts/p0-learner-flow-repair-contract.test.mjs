@@ -117,6 +117,10 @@ test("long links wrap and the three-step path becomes vertical on mobile", () =>
 test("the learner sees a single current focus and visible response map", () => {
   assert.match(taskPage, /className="mission-now"/);
   assert.match(taskPage, /现在只做这一步/);
+  assert.match(taskPage, /className="task-next-unlock"/);
+  assert.match(taskPage, /完成材料后解锁/);
+  assert.match(taskPage, /materialsReady \? <section className="task-brief"/);
+  assert.match(styles, /\.task-next-unlock/);
   assert.match(submissionComposer, /<section className="response-map"/);
   assert.doesNotMatch(submissionComposer, /<details className="response-map"/);
 });
