@@ -243,20 +243,21 @@ complete_stage() {
       await page.getByRole('link', {name: '开始', exact: true}).click();
       await page.waitForURL('**/app/tasks/**');
       await page.waitForLoadState('networkidle');
-      const brief = page.locator('.task-brief');
-      if (await brief.count() !== 1) throw new Error('stage $stage_no task brief missing');
-      const briefText = await brief.innerText();
-      const briefIsClear = $stage_no === 1
-        ? briefText.includes('完成一张三句出发卡') && briefText.includes('你的出发卡')
-        : $stage_no === 2
-          ? briefText.includes('这一站只交付') && briefText.includes('需要提示？查看完成方法')
-          : briefText.includes('这一站只交付') && briefText.includes('怎么完成');
-      if (!briefIsClear || !briefText.includes('怎样算完成？')) {
-        throw new Error('stage $stage_no task requirements are not visible on first entry');
+      const nextUnlock = page.locator('.task-next-unlock');
+      if (await nextUnlock.count() !== 1) throw new Error('stage $stage_no next unlock preview missing');
+      const nextUnlockText = await nextUnlock.innerText();
+      const nextUnlockIsClear = $stage_no === 1
+        ? nextUnlockText.includes('完成一张三句出发卡')
+        : nextUnlockText.includes('完成材料后解锁');
+      if (!nextUnlockIsClear || !nextUnlockText.includes('怎样算完成？')) {
+        throw new Error('stage $stage_no next unlock is not clear on first entry');
       }
-      const successCriteria = brief.locator('.task-success-criteria');
+      const successCriteria = nextUnlock.locator('.task-success-criteria');
       if (await successCriteria.count() !== 1 || await successCriteria.getAttribute('open') !== null) {
         throw new Error('stage $stage_no completion criteria are not progressively disclosed');
+      }
+      if (await page.locator('.task-brief').count() !== 0) {
+        throw new Error('stage $stage_no full future task brief appeared before learning input');
       }
       if (await page.locator('.task-workspace').count() !== 0) {
         throw new Error('stage $stage_no response workspace appeared before learning input');
@@ -267,8 +268,8 @@ complete_stage() {
       if (await page.locator('a[href*="P0LearnerAnswer"]').count() !== 0) {
         throw new Error('stage $stage_no answer URL leaked before submission');
       }
-      if (await page.getByText('参考答案将在提交后开放', {exact: true}).count() !== 1) {
-        throw new Error('stage $stage_no answer lock is not visible');
+      if (await page.locator('.answer-locked').count() !== 0) {
+        throw new Error('stage $stage_no future answer panel appeared before learning input');
       }
       const primaryActionsInViewport = await page.locator('.button.primary:visible').evaluateAll((elements) =>
         elements.filter((element) => {

@@ -507,6 +507,12 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-specific-title { display: inline-flex; width: fit-content; margin: 14px 0 0; padding: 8px 12px; color: #d9ebe9; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 14px; font-weight: 750; }
 .task-workspace, .task-brief, .task-contract, .learning-experience, .learning-materials { min-width: 0; padding: clamp(24px, 5vw, 42px); background: #fff; border: 1px solid #d8e3df; border-radius: 24px; }
 .task-workspace { scroll-margin-top: 24px; }
+.task-next-unlock { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; align-items: start; padding: 20px 22px; color: #173e5c; background: linear-gradient(135deg, #eef7f5, #f8fbff); border: 1px solid #cfe1dc; border-radius: 20px; }
+.task-next-unlock > span { display: grid; width: 40px; height: 40px; place-items: center; color: #173e5c; background: #f5d777; border-radius: 13px; font-size: 18px; font-weight: 900; }
+.task-next-unlock .section-label { margin: 0; }
+.task-next-unlock h2 { margin: 3px 0 5px; font-size: clamp(21px, 3vw, 27px); }
+.task-next-unlock p { max-width: 52ch; margin: 0; color: var(--text-secondary); }
+.task-next-unlock > div > small { display: block; margin-top: 12px; color: var(--text-muted); }
 .task-brief > h2 { max-width: 28ch; margin-bottom: 8px; }
 .task-outcome { max-width: 64ch; color: var(--text-secondary); font-size: 17px; }
 .task-brief-deliverables { padding: 20px 22px; background: #f4f8f7; border: 1px solid #dce8e5; border-radius: 18px; }
