@@ -200,6 +200,16 @@ def test_active_candidate_binding_matches_deploy_preflight():
         assert prepare.LOCAL_IMAGE_DIGESTS[local_key] in script
 
 
+def test_active_candidate_local_digests_match_verified_archive():
+    expected = {
+        "API_LOCAL_IMAGE_DIGEST": "sha256:c1e5d77115fbab2052593b0105458cdc4cfe2735e036afb74e1f66d837224120",
+        "WEB_LOCAL_IMAGE_DIGEST": "sha256:fa8b6d6956783986eb5f06eb1a76fc084ef77fb596816649bd4314826a4bfb0e",
+        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:b95e1fb49300f8717a3072e0b583642a2b13503ead327a1d73e487f9261d08f8",
+    }
+
+    assert prepare.LOCAL_IMAGE_DIGESTS == expected
+
+
 def test_apply_requires_quote_and_rejects_over_budget(tmp_path: Path):
     data = staging.load_contract(contract(tmp_path))
     staging.validate_cost(data, require_quote=False)
