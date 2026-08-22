@@ -609,7 +609,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "          - repair-edge-route",
             "          - cleanup-failed-release",
                 "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
-                "inputs.confirmation == 'DEPLOY_WEB_B7F078F_ON_9E8A806_STAGING'",
+                "inputs.confirmation == 'DEPLOY_WEB_D560F04_ON_9E8A806_STAGING'",
             "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
