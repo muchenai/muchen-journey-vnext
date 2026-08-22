@@ -234,7 +234,11 @@ export default async function TaskPage({
             : stageComplete ? "这一站已经完成" : "等待下一步开放";
 
   return (
-    <article className="learner-task-page" data-stage-kind={assignment.journey_stage?.stage_kind ?? "TASK"}>
+    <article
+      className="learner-task-page"
+      data-stage-kind={assignment.journey_stage?.stage_kind ?? "TASK"}
+      data-stage-key={assignment.journey_stage?.stable_key ?? assignment.stable_task_key}
+    >
       <header className="task-hero-card">
         <div className="task-identity">
           <span aria-hidden="true">

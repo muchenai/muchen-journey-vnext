@@ -105,6 +105,9 @@ test("long source materials are framed as one-answer exploration instead of requ
 
 test("treasure one begins with a quick judgment and a three-line response map", () => {
   assert.match(taskPage, /const isFirstTreasure =/);
+  assert.match(taskPage, /data-stage-key=\{assignment\.journey_stage\?\.stable_key/);
+  assert.match(styles, /data-stage-key="TRE-001-COMPANY-VALUES"/);
+  assert.match(styles, /treasure-evidence-compass-v1\.webp/);
   assert.match(taskPage, /客户真正买的是什么？/);
   assert.match(taskPage, /更多低价人力/);
   assert.match(taskPage, /可验收的确定性交付/);
