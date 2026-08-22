@@ -650,6 +650,17 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .feedback-callout > span { display: grid; width: 40px; height: 40px; place-items: center; color: #fff; background: #2854d7; border-radius: 50%; font-size: 22px; }
 .feedback-callout h3 { margin: 0 0 5px; }
 .feedback-callout p { margin: 0; }
+.revision-feedback { color: #173e5c; background: linear-gradient(135deg, #fff8df, #eef8f6); border: 1px solid #ead38b; border-left: 5px solid #efb43e; border-radius: 18px; }
+.revision-feedback .section-label { margin: 0 0 4px; color: #9a6700; }
+.revision-feedback > span { color: #173e5c; background: #f5d777; }
+.revision-path { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+.revision-path li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 12px; background: rgba(255, 255, 255, .74); border-radius: 12px; }
+.revision-path b { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; color: #fff; background: #2854d7; border-radius: 8px; font-size: 10px; }
+.revision-path span { overflow-wrap: anywhere; font-size: 13px; font-weight: 750; }
+.revision-edit-ready { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; padding: 14px 16px; color: #164c49; background: #e9f7f3; border: 1px solid #b9e1d7; border-radius: 14px; }
+.revision-edit-ready > span { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; color: #fff; background: #20877f; border-radius: 50%; font-weight: 850; }
+.revision-edit-ready div { display: grid; gap: 2px; }
+.revision-edit-ready small { color: #376a67; }
 .admission-form { margin-top: 18px; padding: 18px; background: #f4f8f7; border-radius: 14px; }
 .admission-score-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .admission-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 14px 16px; color: #164c49; background: #e6f5f1; border-radius: 12px; }
@@ -793,7 +804,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .task-flow ol { grid-template-columns: 1fr; }
   .task-flow li:not(:last-child)::after { top: auto; right: auto; bottom: -7px; left: 27px; width: 2px; height: 7px; }
   .task-contract-columns { grid-template-columns: 1fr; }
-  .response-map ol, .external-document-path ol { grid-template-columns: 1fr; }
+  .response-map ol, .external-document-path ol, .revision-path { grid-template-columns: 1fr; }
   .treasure-collection { grid-template-columns: 1fr 1fr; }
   .result-hero { min-height: 520px; align-content: end; padding: 28px 24px; border-radius: 28px; background-position: 44% center; }
   .result-hero h1 { font-size: clamp(42px, 13vw, 56px); line-height: 1.02; }

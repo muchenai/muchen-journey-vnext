@@ -236,7 +236,11 @@ export default async function TaskPage({
           <p className="section-label">现在只做这一步</p>
           <h2 id="mission-now-title">{currentFocus}</h2>
         </div>
-        {!materialsReady && !isFirstTreasure ? (
+        {needsRevision ? (
+          <a className="button primary compact" href="#task-workspace">
+            查看反馈并修改 <span aria-hidden="true">↓</span>
+          </a>
+        ) : !materialsReady && !isFirstTreasure ? (
           <a
             className="button primary compact"
             href={isDayZero ? "#day-zero-choice" : "#learning-materials-title"}
@@ -638,11 +642,17 @@ export default async function TaskPage({
       ) : null}
 
       {assignment.latest_revision_feedback ? (
-        <section className="feedback-callout" aria-labelledby="revision-feedback-title">
+        <section className="feedback-callout revision-feedback" aria-labelledby="revision-feedback-title">
           <span aria-hidden="true">↳</span>
           <div>
-          <h3 id="revision-feedback-title">Reviewer 留给你的下一步</h3>
-          <p>{assignment.latest_revision_feedback}</p>
+            <p className="section-label">这不是重新开始</p>
+            <h3 id="revision-feedback-title">Reviewer 希望你调整这里</h3>
+            <p>{assignment.latest_revision_feedback}</p>
+            <ol className="revision-path" aria-label="完成修订的三个步骤">
+              <li><b>1</b><span>打开上次答案</span></li>
+              <li><b>2</b><span>只改反馈指出的部分</span></li>
+              <li><b>3</b><span>提交新版本</span></li>
+            </ol>
           </div>
         </section>
       ) : null}

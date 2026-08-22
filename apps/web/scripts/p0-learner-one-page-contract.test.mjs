@@ -13,7 +13,7 @@ const styles = readFileSync(new URL("../src/app/globals.css", import.meta.url), 
 test("the essential task remains visible while secondary criteria stay on demand", () => {
   assert.match(taskPage, /<section className="task-brief"/);
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
-  assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
+  assert.ok(taskPage.indexOf('className="task-brief"') < taskPage.indexOf('id="task-workspace"'));
   assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
   assert.match(taskPage, /怎么完成<\/h3>/);
   assert.match(taskPage, /<details className="task-success-criteria">/);

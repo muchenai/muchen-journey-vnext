@@ -55,6 +55,19 @@ test("pending review is never presented as a completed station", () => {
   );
 });
 
+test("revision gives the learner an immediate route back to their own work", () => {
+  assert.match(taskPage, /needsRevision \? \(/);
+  assert.match(taskPage, /href="#task-workspace"/);
+  assert.match(taskPage, /查看反馈并修改/);
+  assert.match(taskPage, /Reviewer 希望你调整这里/);
+  assert.match(taskPage, /只改反馈指出的部分/);
+  assert.match(submissionComposer, /const isRevision = command === "submit_revision"/);
+  assert.match(submissionComposer, /isRevision && initial\.evidenceUrl/);
+  assert.match(submissionComposer, /打开我上次提交的文档/);
+  assert.match(submissionComposer, /上次提交已经为你载入/);
+  assert.match(submissionComposer, /只改需要调整的部分，不必从头重做/);
+});
+
 test("learner and reviewer status pages refresh while visible and announce changes", () => {
   assert.match(learnerHome, /<LiveStatusSignal/);
   assert.match(learnerHome, /提交成功，已交给主管评审/);
@@ -86,7 +99,7 @@ test("learner primary actions have one unmistakable visual treatment", () => {
 test("Feishu-document work has a visible submission entry and novice guidance", () => {
   assert.match(taskPage, /const expectsExternalDocument =/);
   assert.match(taskPage, /const expectsExternalDocument = isAssessment/);
-  assert.match(submissionComposer, /id="external-document-title">完成文档，再把链接交给 Reviewer/);
+  assert.match(submissionComposer, /isRevision \? "修改原文档，再提交新版本" : "完成文档，再把链接交给 Reviewer"/);
   assert.match(submissionComposer, /在飞书中创建自己的副本/);
   assert.match(submissionComposer, /从浏览器地址栏复制完整链接/);
   assert.match(submissionComposer, /name="evidence_url"/);
@@ -124,6 +137,7 @@ test("long links wrap and the three-step path becomes vertical on mobile", () =>
   assert.match(styles, /\.contract-line[^}]*overflow-wrap: anywhere/);
   assert.match(styles, /\.task-contract-columns > div[^}]*min-width: 0/);
   assert.match(styles, /\.task-flow ol \{ grid-template-columns: 1fr; \}/);
+  assert.match(styles, /\.response-map ol, \.external-document-path ol, \.revision-path \{ grid-template-columns: 1fr; \}/);
 });
 
 test("the learner sees a single current focus and visible response map", () => {

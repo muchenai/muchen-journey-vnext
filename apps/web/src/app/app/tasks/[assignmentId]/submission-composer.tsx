@@ -52,6 +52,10 @@ export function SubmissionComposer({
   taskActionUrl: string | null;
 }) {
   const initial = splitInitialBody(initialBody);
+  const isRevision = command === "submit_revision";
+  const documentLaunchUrl = isRevision && initial.evidenceUrl
+    ? initial.evidenceUrl
+    : taskActionUrl;
   const [body, setBody] = useState(initial.notes);
   const [evidenceUrl, setEvidenceUrl] = useState(initial.evidenceUrl);
   const [submitState, submitAction, submitPending] = useActionState(
@@ -82,6 +86,15 @@ export function SubmissionComposer({
         name="evidence_url_required"
         value={expectsExternalDocument ? "true" : "false"}
       />
+      {isRevision ? (
+        <div className="revision-edit-ready" role="status">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <strong>上次提交已经为你载入</strong>
+            <small>保留正确的部分，只修改 Reviewer 指出的内容。</small>
+          </div>
+        </div>
+      ) : null}
       <section className="response-map" aria-labelledby="response-map-title">
           <p className="section-label">作答地图</p>
           <h3 id="response-map-title">按这三步，把想法变成证据</h3>
@@ -97,27 +110,45 @@ export function SubmissionComposer({
       {expectsExternalDocument ? (
         <section className="external-document-path" aria-labelledby="external-document-title">
           <p className="section-label">交付通道</p>
-          <h3 id="external-document-title">完成文档，再把链接交给 Reviewer</h3>
+          <h3 id="external-document-title">
+            {isRevision ? "修改原文档，再提交新版本" : "完成文档，再把链接交给 Reviewer"}
+          </h3>
           <ol>
             <li>
               <span aria-hidden="true">01</span>
-              <strong>创建副本</strong>
-              <small>先打开本主题题面，再在飞书中创建自己的副本。</small>
-              {taskActionUrl ? (
+              <strong>{isRevision ? "继续修改" : "创建副本"}</strong>
+              <small>
+                {isRevision
+                  ? "打开你上次提交的文档，按 Reviewer 反馈修改。"
+                  : "先打开本主题题面，再在飞书中创建自己的副本。"}
+              </small>
+              {documentLaunchUrl ? (
                 <a
                   className="external-document-launch"
-                  href={taskActionUrl}
+                  href={documentLaunchUrl}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  打开本主题题面 <i aria-hidden="true">↗</i>
+                  {isRevision ? "打开我上次提交的文档" : "打开本主题题面"} <i aria-hidden="true">↗</i>
                 </a>
               ) : null}
             </li>
-            <li><span aria-hidden="true">02</span><strong>完成作答</strong><small>按照上方作答地图写完，不要修改原始题面。</small></li>
-            <li><span aria-hidden="true">03</span><strong>交付链接</strong><small>从浏览器地址栏复制完整链接，粘贴到下方。</small></li>
+            <li>
+              <span aria-hidden="true">02</span>
+              <strong>{isRevision ? "完成修订" : "完成作答"}</strong>
+              <small>{isRevision ? "只改需要调整的部分，不必从头重做。" : "按照上方作答地图写完，不要修改原始题面。"}</small>
+            </li>
+            <li>
+              <span aria-hidden="true">03</span>
+              <strong>交付链接</strong>
+              <small>
+                {isRevision
+                  ? "确认下方链接仍能打开，再提交给 Reviewer。"
+                  : "从浏览器地址栏复制完整链接，粘贴到下方。"}
+              </small>
+            </li>
           </ol>
-          {taskActionUrl ? <p className="external-document-login-hint">首次打开需使用企业飞书登录。</p> : null}
+          {documentLaunchUrl ? <p className="external-document-login-hint">首次打开需使用企业飞书登录。</p> : null}
           <label htmlFor="evidence-url">你的飞书文档链接</label>
           <input
             id="evidence-url"

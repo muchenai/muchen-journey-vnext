@@ -479,6 +479,53 @@ complete_revision() {
       if (!body.includes('根据反馈修订任务')) throw new Error('revision state missing');
       await page.getByRole('link', {name: '查看反馈并修订', exact: true}).click();
       await page.waitForLoadState('networkidle');
+      const mission = await page.locator('.mission-now').innerText();
+      if (!mission.includes('根据 Reviewer 反馈完成修订') || !mission.includes('查看反馈并修改')) {
+        throw new Error('revision page does not expose one immediate next action');
+      }
+      const feedback = await page.locator('.revision-feedback').innerText();
+      if (!feedback.includes('Reviewer 希望你调整这里') || !feedback.includes('请按维度反馈补充证据后再次提交')) {
+        throw new Error('reviewer feedback is not visible and concrete');
+      }
+      if (!feedback.includes('打开上次答案') || !feedback.includes('只改反馈指出的部分') || !feedback.includes('提交新版本')) {
+        throw new Error('revision path is not explained in three bounded steps');
+      }
+      const priorDocument = page.getByRole('link', {name: '打开我上次提交的文档'});
+      if (await priorDocument.count() !== 1 || !(await priorDocument.getAttribute('href'))?.includes('/docx/p0-stage-6')) {
+        throw new Error('revision does not reopen the learner own submitted document');
+      }
+      if ((await page.locator('#evidence-url').inputValue()) !== 'https://example.feishu.cn/docx/p0-stage-6') {
+        throw new Error('revision did not preserve the submitted evidence URL');
+      }
+      for (const viewport of [
+        {name: 'desktop', width: 1280, height: 900},
+        {name: 'mobile', width: 390, height: 844},
+      ]) {
+        await page.setViewportSize({width: viewport.width, height: viewport.height});
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+        if (overflow) throw new Error(viewport.name + ': revision page has horizontal overflow');
+        const nextAction = page.getByRole('link', {name: '查看反馈并修改'});
+        if (await nextAction.count() !== 1 || !await nextAction.isVisible()) {
+          throw new Error(viewport.name + ': revision next action is not visible');
+        }
+        await page.screenshot({
+          path: '$evidence_dir/05-revision-' + viewport.name + '.png',
+          fullPage: true,
+        });
+      }
+      await page.setViewportSize({width: 1280, height: 900});
+      await page.getByRole('link', {name: '查看反馈并修改'}).click();
+      await page.locator('#task-workspace').waitFor({state: 'visible'});
+      const workspacePosition = await page.locator('#task-workspace').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return {top: box.top, viewport: window.innerHeight};
+      });
+      if (workspacePosition.top < -1 || workspacePosition.top >= workspacePosition.viewport) {
+        throw new Error('revision action did not keep the edit workspace in view: ' + JSON.stringify(workspacePosition));
+      }
+      if (!(await page.locator('.revision-edit-ready').innerText()).includes('上次提交已经为你载入')) {
+        throw new Error('revision editor does not confirm that prior work is preserved');
+      }
       const input = page.locator('#submission-body');
       await input.fill((await input.inputValue()) + ' 修订补充：新增一条可复核证据，并明确判断失效时的停止条件。');
       await Promise.all([
