@@ -4,6 +4,7 @@ import test from "node:test";
 
 const taskPage = readFileSync(new URL("../src/app/app/tasks/[assignmentId]/page.tsx", import.meta.url), "utf8");
 const learnerHome = readFileSync(new URL("../src/app/app/page.tsx", import.meta.url), "utf8");
+const learnerActions = readFileSync(new URL("../src/app/actions.ts", import.meta.url), "utf8");
 const routeMap = readFileSync(new URL("../src/app/app/journey-map.tsx", import.meta.url), "utf8");
 const globalError = readFileSync(new URL("../src/app/error.tsx", import.meta.url), "utf8");
 const joinPage = readFileSync(new URL("../src/app/join/page.tsx", import.meta.url), "utf8");
@@ -27,6 +28,16 @@ test("learner copy removes repeated locking and stage labels", () => {
   }
   assert.match(learnerHome, /const primaryActionLabel/);
   assert.doesNotMatch(learnerHome, />进入这一站<\/Link>/);
+});
+
+test("stage completion is seen before the learner chooses the next station", () => {
+  assert.match(learnerActions, /redirect\("\/app\?transition=submitted"\)/);
+  assert.doesNotMatch(learnerActions, /transition=submitted#next-action/);
+  assert.match(learnerHome, /className="button transition-action"/);
+  assert.match(learnerHome, /进入下一站/);
+  assert.match(learnerHome, /query\.transition === "submitted" && \(opensTask \|\| opensResult\) \? null/);
+  assert.match(styles, /\.journey-transition \{[^}]*order: -2/);
+  assert.match(styles, /\.journey-transition \.transition-action/);
 });
 
 test("Day 0 opens with one achievable action instead of an eighty-minute burden", () => {

@@ -52,6 +52,14 @@ export default async function LearnerHome({
                   : "你的提交与版本已经保留，等待真人反馈。"}
             </p>
           </div>
+          {opensTask || opensResult ? (
+            <Link
+              className="button transition-action"
+              href={opensResult ? "/app/result" : `/app/tasks/${action.resource_id}`}
+            >
+              {opensResult ? "查看旅程收获" : "进入下一站"}
+            </Link>
+          ) : null}
         </section>
       ) : null}
       <LiveStatusSignal
@@ -65,37 +73,39 @@ export default async function LearnerHome({
           : null}
       />
       {action.journey ? <JourneyMap journey={action.journey} /> : null}
-      <article
-        id="next-action"
-        className={`${action.journey ? "current-stage-card" : "status-card"}${opensTask || opensResult ? "" : " is-waiting"}`}
-      >
-        <div>
-          <span className="stage-pulse" aria-hidden="true" />
-          <p className="eyebrow">{action.stage}</p>
-          <h2>{action.title}</h2>
-          {action.journey ? (
-            <p className="current-stage-guidance">
-              {opensTask
-                ? action.action_type === "REVISE_SUBMISSION"
-                  ? "反馈已经回到原任务，沿着缺口继续走。"
-                  : "当前位置和唯一下一步都在这里。"
-                : opensResult
-                  ? "八站证据已经汇合，打开看看你带走了什么。"
-                  : "你的版本已经保存，Reviewer 的回应会把你带回这一站。"}
-            </p>
-          ) : null}
-        </div>
-        {opensTask || opensResult ? (
-          <Link
-            className="button primary"
-            href={opensResult ? "/app/result" : `/app/tasks/${action.resource_id}`}
-          >
-            {primaryActionLabel}
-          </Link>
-        ) : (
-          <span className="waiting-mark" aria-label="等待下一步">···</span>
-        )}
-      </article>
+      {query.transition === "submitted" && (opensTask || opensResult) ? null : (
+        <article
+          id="next-action"
+          className={`${action.journey ? "current-stage-card" : "status-card"}${opensTask || opensResult ? "" : " is-waiting"}`}
+        >
+          <div>
+            <span className="stage-pulse" aria-hidden="true" />
+            <p className="eyebrow">{action.stage}</p>
+            <h2>{action.title}</h2>
+            {action.journey ? (
+              <p className="current-stage-guidance">
+                {opensTask
+                  ? action.action_type === "REVISE_SUBMISSION"
+                    ? "反馈已经回到原任务，沿着缺口继续走。"
+                    : "当前位置和唯一下一步都在这里。"
+                  : opensResult
+                    ? "八站证据已经汇合，打开看看你带走了什么。"
+                    : "你的版本已经保存，Reviewer 的回应会把你带回这一站。"}
+              </p>
+            ) : null}
+          </div>
+          {opensTask || opensResult ? (
+            <Link
+              className="button primary"
+              href={opensResult ? "/app/result" : `/app/tasks/${action.resource_id}`}
+            >
+              {primaryActionLabel}
+            </Link>
+          ) : (
+            <span className="waiting-mark" aria-label="等待下一步">···</span>
+          )}
+        </article>
+      )}
       {!action.journey ? null : (
         <details className="journey-support">
           <summary>为什么是这一步</summary>
