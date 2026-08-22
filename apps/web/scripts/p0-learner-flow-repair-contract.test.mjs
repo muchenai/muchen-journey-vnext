@@ -122,10 +122,11 @@ test("Feishu-document work has a visible submission entry and novice guidance", 
   assert.match(reviewDetail, /if \(!isFeishuHost\) return part/);
 });
 
-test("material and submission transitions preserve the learner context", () => {
+test("material transitions preserve context while submissions show completion first", () => {
   assert.match(actions, /redirect\(`\/app\/tasks\/\$\{assignmentId\}#task-workspace`\)/);
   assert.match(actions, /#\$\{anchor\}/);
-  assert.match(actions, /\/app\?transition=submitted#next-action/);
+  assert.match(actions, /redirect\("\/app\?transition=submitted"\)/);
+  assert.doesNotMatch(actions, /transition=submitted#next-action/);
   assert.match(styles, /\.skip-link\s*\{[^}]*left: -10000px/);
   assert.match(styles, /\.skip-link:focus-visible\s*\{[^}]*left: 8px/);
   assert.doesNotMatch(styles, /\.skip-link:focus\s*\{/);
@@ -134,6 +135,7 @@ test("material and submission transitions preserve the learner context", () => {
   assert.match(learnerHome, /已经交给 Reviewer/);
   assert.match(learnerHome, /八个路标都已点亮/);
   assert.match(learnerHome, /打开旅程收获，看看你带走了什么/);
+  assert.match(learnerHome, /className="button transition-action"/);
 });
 
 test("completed stages remain available for review without unlocking future stages", () => {

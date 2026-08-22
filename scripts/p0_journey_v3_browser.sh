@@ -240,7 +240,11 @@ pw_operator screenshot --filename "$evidence_dir/01-invite-statuses.png" --full-
 complete_stage() {
     stage_no=$1
     pw_learner run-code "async (page) => {
-      await page.getByRole('link', {name: '开始', exact: true}).click();
+      const transitionEntry = page.getByRole('link', {name: '进入下一站', exact: true});
+      const stageEntry = await transitionEntry.count()
+        ? transitionEntry
+        : page.getByRole('link', {name: '开始', exact: true});
+      await stageEntry.click();
       await page.waitForURL('**/app/tasks/**');
       await page.waitForLoadState('networkidle');
       const nextUnlock = page.locator('.task-next-unlock');
@@ -453,6 +457,31 @@ complete_stage() {
       const transition = await page.locator('.journey-transition').innerText();
       if (!transition.includes('这一站已保存')) throw new Error('stage $stage_no transition feedback missing');
       if ($stage_no === 1) {
+        for (const viewport of [
+          {name: 'desktop', width: 1280, height: 900},
+          {name: 'mobile', width: 390, height: 844},
+        ]) {
+          await page.setViewportSize({width: viewport.width, height: viewport.height});
+          const transitionPosition = await page.locator('.journey-transition').evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return {top: box.top, bottom: box.bottom, viewport: window.innerHeight, scrollY: window.scrollY};
+          });
+          if (transitionPosition.top < -1 || transitionPosition.bottom > transitionPosition.viewport || transitionPosition.scrollY > 1) {
+            throw new Error(viewport.name + ': completion feedback is skipped: ' + JSON.stringify(transitionPosition));
+          }
+          const nextStation = page.getByRole('link', {name: '进入下一站'});
+          if (await nextStation.count() !== 1 || !await nextStation.isVisible()) {
+            throw new Error(viewport.name + ': completion feedback has no visible next-station action');
+          }
+          if (await page.locator('.current-stage-card').count() !== 0) {
+            throw new Error(viewport.name + ': completion view repeats the current-stage action');
+          }
+          await page.screenshot({
+            path: '$evidence_dir/02-completion-next-station-' + viewport.name + '.png',
+            fullPage: false,
+          });
+        }
+        await page.setViewportSize({width: 1280, height: 900});
         const completedLink = page.locator('.journey-route-map-wide .route-node-link.route-node-visual-completed').first();
         if (await completedLink.count() !== 1) throw new Error('completed stage cannot be revisited');
         const completedOrb = completedLink.locator('.route-node-orb');
@@ -671,7 +700,7 @@ complete_review approve
 pw_learner reload
 pw_learner run-code "async (page) => {
   const resultPage = page.waitForURL('**/app/result');
-  await page.getByRole('link', {name: '打开旅程收获', exact: true}).evaluate((element) => element.click());
+  await page.getByRole('link', {name: '查看旅程收获', exact: true}).evaluate((element) => element.click());
   await resultPage;
   await page.waitForLoadState('networkidle');
   const visibleBody = await page.locator('body').innerText();

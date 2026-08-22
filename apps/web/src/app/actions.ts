@@ -497,7 +497,7 @@ export async function submitAssignment(
     return submissionError(error);
   }
   revalidatePath("/app");
-  redirect("/app?transition=submitted#next-action");
+  redirect("/app?transition=submitted");
 }
 
 export async function saveSubmissionDraft(
