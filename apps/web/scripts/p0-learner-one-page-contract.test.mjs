@@ -29,6 +29,14 @@ test("learner copy removes repeated locking and stage labels", () => {
   assert.doesNotMatch(learnerHome, />进入这一站<\/Link>/);
 });
 
+test("Day 0 opens with one achievable action instead of an eighty-minute burden", () => {
+  assert.match(taskPage, /const taskTimeLabel = isDayZero\s*\? "先找 1 条线索"/);
+  assert.match(taskPage, /const taskTimeAriaLabel = isDayZero\s*\? "当前动作：先找一条线索"/);
+  assert.match(taskPage, /aria-label=\{taskTimeAriaLabel\}/);
+  assert.match(taskPage, /\{taskTimeLabel\}/);
+  assert.doesNotMatch(taskPage, /aria-label=\{`预计 \$\{assignment\.estimated_duration_minutes\} 分钟`\}/);
+});
+
 test("route nodes expose their shared-coordinate anchor for geometry checks", () => {
   assert.match(routeMap, /className="route-node-anchor"/);
   assert.match(routeMap, /data-route-index=\{index\}/);

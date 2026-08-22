@@ -173,6 +173,12 @@ export default async function TaskPage({
     : isAssessment
       ? "完成这次能力评测"
       : "完成这一站的宝藏小任务";
+  const taskTimeLabel = isDayZero
+    ? "先找 1 条线索"
+    : `${assignment.estimated_duration_minutes} min`;
+  const taskTimeAriaLabel = isDayZero
+    ? "当前动作：先找一条线索"
+    : `预计 ${assignment.estimated_duration_minutes} 分钟`;
   const taskContractText = [
     ...assignment.instructions,
     ...assignment.required_deliverables,
@@ -228,8 +234,8 @@ export default async function TaskPage({
           <p className="task-specific-title">当前任务 · {assignment.task_title}</p>
         ) : null}
         <p>{assignment.journey_stage?.short_description ?? assignment.task_purpose}</p>
-        <div className="task-time" aria-label={`预计 ${assignment.estimated_duration_minutes} 分钟`}>
-          <i aria-hidden="true" /> {assignment.estimated_duration_minutes} min
+        <div className="task-time" aria-label={taskTimeAriaLabel}>
+          <i aria-hidden="true" /> {taskTimeLabel}
         </div>
       </header>
 
