@@ -94,7 +94,8 @@ test("Day 0 begins with a concrete 10-second choice and a three-line departure c
 });
 
 test("long source materials are framed as one-answer exploration instead of required consumption", () => {
-  assert.match(taskPage, /原材料约 \{material\.estimated_duration_minutes\} min · 这一轮只找 1 条线索/);
+  assert.match(taskPage, /本轮建议 \{explorationMinutes/);
+  assert.match(taskPage, /原材料约 \$\{material\.estimated_duration_minutes\} min/);
   assert.match(taskPage, /不用通读，先带着这一个问题/);
   assert.match(taskPage, /className="material-exploration-contract"/);
   assert.match(taskPage, /找到一条线索/);

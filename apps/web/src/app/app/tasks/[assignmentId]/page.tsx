@@ -44,7 +44,7 @@ const MATERIAL_FOCUS_BY_STAGE: Record<string, string> = {
   "TRE-003-PROJECT-AWARENESS": "找出新人进入真实项目后需要承担的一项具体责任。",
   "TRE-004-DELIVERY-FIT": "找出一个应该停下来提问，而不是自行猜测的边界。",
   "ASM-001-RULE-BREAKDOWN": "找出做判断时最容易漏掉的一条规则。",
-  "ASM-002-MODEL-JUDGEMENT": "找出支持你选择 A 或 B 的关键证据。",
+  "ASM-002-MODEL-JUDGEMENT": "找出一个必须用具体证据才能判断的回答信号。",
   "ASM-003-DATA-CONSTRUCTION": "找出一份可交付数据必须保持一致的结构与校验点。",
 };
 
@@ -62,6 +62,14 @@ function materialFocus(
       ? "只看路线：今天先认识什么，之后会用哪三次挑战证明自己？"
       : "只找一个答案：这份材料与你今天的哪一站有关？";
   }
+  if (stageKey === "ASM-002-MODEL-JUDGEMENT") {
+    if (/视频/u.test(materialTitle ?? "")) {
+      return "找出一个看起来合理、但仍必须核对证据才能下结论的回答信号。";
+    }
+    if (/理由|书写/u.test(materialTitle ?? "")) {
+      return "记下一种写法：先给出可以或不可以，再用一条具体证据说明理由。";
+    }
+  }
   return MATERIAL_FOCUS_BY_STAGE[stageKey ?? ""]
     ?? `读完后，试着用自己的话回答：${learnerOutcome}`;
 }
@@ -76,6 +84,10 @@ function materialLinks(value: string | null): string[] {
 
 function isFeishuMaterial(href: string) {
   return new URL(href).hostname.endsWith(".feishu.cn");
+}
+
+function explorationMinutes(estimatedMinutes: number, isDayZero: boolean) {
+  return Math.min(estimatedMinutes, isDayZero ? 8 : 12);
 }
 
 function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string; label?: string }) {
@@ -173,6 +185,11 @@ export default async function TaskPage({
     : isAssessment
       ? "完成这次能力评测"
       : "完成这一站的宝藏小任务";
+  const completedTaskBriefHeading = isDayZero
+    ? "三句出发卡"
+    : isAssessment
+      ? "能力评测题面"
+      : "宝藏小任务";
   const taskTimeLabel = isDayZero
     ? "先找 1 条线索"
     : `${assignment.estimated_duration_minutes} min`;
@@ -261,6 +278,35 @@ export default async function TaskPage({
           <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
         </div>
       </section>
+
+      {stageComplete ? (
+        <section className="feedback-callout completion-feedback stage-completion-hero" aria-labelledby="completion-feedback-title">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p className="section-label">{latestReviewPassed ? "已通过" : "已完成"}</p>
+            <h3 id="completion-feedback-title">
+              {latestReviewPassed
+                ? "你的判断已经被确认"
+                : isDayZero
+                  ? "你的出发卡已经保存"
+                  : isTreasure
+                    ? "这枚宝藏已经收入旅程"
+                    : "这一站已经完成"}
+            </h3>
+            <p>
+              {latestPassFeedback
+                ?? (isDayZero
+                  ? "第一站已经点亮；你的问题和下一步会继续留在这段旅程里。"
+                  : isTreasure
+                    ? "你的学习证据已经保存，可以回到地图继续下一站。"
+                    : "这一站的证据已经保存，可以继续下一站。")}
+            </p>
+            <a className="button primary compact" href="/app">
+              回到旅程地图 <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </section>
+      ) : null}
 
       {isDayZero && !materialsReady ? (
         <section className="day-zero-briefing" aria-labelledby="day-zero-briefing-title">
@@ -399,7 +445,11 @@ export default async function TaskPage({
                   </span>
                   <strong>{material.title}</strong>
                   <small>
-                    原材料约 {material.estimated_duration_minutes} min · 这一轮只找 1 条线索
+                    本轮建议 {explorationMinutes(material.estimated_duration_minutes, isDayZero)} min
+                    {material.estimated_duration_minutes > explorationMinutes(material.estimated_duration_minutes, isDayZero)
+                      ? ` · 原材料约 ${material.estimated_duration_minutes} min`
+                      : ""}
+                    {" · 只找 1 条线索"}
                   </small>
                 </>
               );
@@ -473,7 +523,7 @@ export default async function TaskPage({
         </section>
       ) : null}
 
-      {isTreasure && materialsReady ? (
+      {isTreasure && materialsReady && !stageComplete ? (
         <section className="treasure-unlocked" aria-labelledby="treasure-unlocked-title">
           <span className="treasure-seal" aria-hidden="true">✦</span>
           <div>
@@ -546,10 +596,16 @@ export default async function TaskPage({
       ) : null}
 
       {materialsReady ? <section className="task-brief" aria-labelledby="task-brief-title">
-        <p className="section-label">{isAssessment ? "能力挑战" : "轮到你行动"}</p>
-        <h2 id="task-brief-title">{taskBriefHeading}</h2>
+        <p className="section-label">
+          {stageComplete ? "回看这一站" : isAssessment ? "能力挑战" : "轮到你行动"}
+        </p>
+        <h2 id="task-brief-title">
+          {stageComplete ? completedTaskBriefHeading : taskBriefHeading}
+        </h2>
         <p className="task-outcome">
-          {isDayZero
+          {stageComplete
+            ? "任务、标准与历史版本都保留在这里，随时可以回来查看。"
+            : isDayZero
             ? "不用复述材料。写清你想弄懂什么、从哪里找答案、下一站先做什么。"
             : "把刚才找到的线索，变成你自己的判断。"}
         </p>
@@ -633,11 +689,15 @@ export default async function TaskPage({
 
       {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">
-        {latestReviewPassed ? "Reviewer 已确认" : needsRevision ? "Reviewer 已回应" : "你的行动"}
+        {stageComplete ? "路标已点亮" : needsRevision ? "Reviewer 已回应" : "你的行动"}
       </p>
       <h2 id="task-workspace-title">
-        {latestReviewPassed
-          ? "这一站，已经完成"
+        {stageComplete
+          ? isDayZero
+            ? "启程记录已保存"
+            : isTreasure
+              ? "这枚宝藏已经找到"
+              : "这一站，已经完成"
           : needsRevision
             ? "带着反馈，再走一步"
           : isDayZero ? "写下你的三句出发卡" : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
@@ -653,19 +713,7 @@ export default async function TaskPage({
         <p className="success-text" role="status">未绑定附件已删除。</p>
       ) : null}
 
-      {latestReviewPassed ? (
-        <section className="feedback-callout completion-feedback" aria-labelledby="completion-feedback-title">
-          <span aria-hidden="true">✓</span>
-          <div>
-            <p className="section-label">已通过</p>
-            <h3 id="completion-feedback-title">你的判断已经被确认</h3>
-            <p>{latestPassFeedback ?? "Reviewer 已确认这一站完成，可以继续下一站。"}</p>
-            <a className="button primary compact" href="/app">
-              继续下一站 <span aria-hidden="true">→</span>
-            </a>
-          </div>
-        </section>
-      ) : needsRevision && assignment.latest_revision_feedback ? (
+      {needsRevision && assignment.latest_revision_feedback ? (
         <section className="feedback-callout revision-feedback" aria-labelledby="revision-feedback-title">
           <span aria-hidden="true">↳</span>
           <div>
