@@ -71,12 +71,12 @@ test("revision gives the learner an immediate route back to their own work", () 
 test("a passed revision replaces the old revision callout with the final outcome", () => {
   assert.match(taskPage, /latestReviewPassed = stageComplete && latestVersion\?\.decision === "PASS"/);
   assert.match(taskPage, /latestPassFeedback = latestReviewPassed \? latestVersion\.feedback : null/);
-  assert.match(taskPage, /latestReviewPassed \? "Reviewer 已确认" : needsRevision \? "Reviewer 已回应"/);
-  assert.match(taskPage, /latestReviewPassed[\s\S]*"这一站，已经完成"/);
-  assert.match(taskPage, /className="feedback-callout completion-feedback"/);
+  assert.match(taskPage, /stageComplete \? "路标已点亮" : needsRevision \? "Reviewer 已回应"/);
+  assert.match(taskPage, /stageComplete[\s\S]*"这一站，已经完成"/);
+  assert.match(taskPage, /className="feedback-callout completion-feedback stage-completion-hero"/);
   assert.match(taskPage, /你的判断已经被确认/);
   assert.match(taskPage, /needsRevision && assignment\.latest_revision_feedback/);
-  assert.match(taskPage, /继续下一站/);
+  assert.match(taskPage, /回到旅程地图/);
   assert.match(styles, /\.completion-feedback/);
 });
 
@@ -161,4 +161,33 @@ test("the learner sees a single current focus and visible response map", () => {
   assert.match(styles, /\.task-next-unlock/);
   assert.match(submissionComposer, /<section className="response-map"/);
   assert.doesNotMatch(submissionComposer, /<details className="response-map"/);
+});
+
+test("formal model-judgement materials ask concrete questions that match the task", () => {
+  assert.match(taskPage, /if \(stageKey === "ASM-002-MODEL-JUDGEMENT"\)/);
+  assert.match(taskPage, /看起来合理、但仍必须核对证据才能下结论的回答信号/);
+  assert.match(taskPage, /先给出可以或不可以，再用一条具体证据说明理由/);
+  assert.doesNotMatch(taskPage, /找出支持你选择 A 或 B 的关键证据/);
+});
+
+test("completed stations become achievement views instead of stale action prompts", () => {
+  assert.match(taskPage, /stageComplete \? "回看这一站"/);
+  assert.match(taskPage, /stageComplete \? completedTaskBriefHeading/);
+  assert.match(taskPage, /isTreasure && materialsReady && !stageComplete/);
+  assert.match(taskPage, /stageComplete \? "路标已点亮"/);
+  assert.match(taskPage, /这枚宝藏已经收入旅程/);
+  assert.match(taskPage, /回到旅程地图/);
+  assert.ok(
+    taskPage.indexOf('className="feedback-callout completion-feedback stage-completion-hero"')
+      < taskPage.indexOf('className="task-flow"'),
+    "completed-stage payoff must appear before historical materials and task details",
+  );
+  assert.match(styles, /\.stage-completion-hero \{/);
+});
+
+test("long materials lead with a bounded exploration time without hiding source length", () => {
+  assert.match(taskPage, /function explorationMinutes/);
+  assert.match(taskPage, /本轮建议 \{explorationMinutes/);
+  assert.match(taskPage, /原材料约 \$\{material\.estimated_duration_minutes\} min/);
+  assert.doesNotMatch(taskPage, /原材料约 \{material\.estimated_duration_minutes\} min · 这一轮只找 1 条线索/);
 });

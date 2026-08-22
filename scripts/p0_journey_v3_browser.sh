@@ -652,7 +652,11 @@ pw_learner run-code "async (page) => {
   if (!completionText.includes('你的判断已经被确认') || !completionText.includes('本阶段证据完整，可以继续下一站')) {
     throw new Error('approved revision does not expose the final reviewer outcome');
   }
-  await page.getByRole('link', {name: '继续下一站'}).click();
+  await page.screenshot({path: '$evidence_dir/06-completed-stage-desktop.png', fullPage: true});
+  await page.setViewportSize({width: 390, height: 844});
+  await page.screenshot({path: '$evidence_dir/06-completed-stage-mobile.png', fullPage: true});
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.getByRole('link', {name: '回到旅程地图'}).click();
   await page.waitForURL('**/app');
   await page.waitForLoadState('networkidle');
 }"
