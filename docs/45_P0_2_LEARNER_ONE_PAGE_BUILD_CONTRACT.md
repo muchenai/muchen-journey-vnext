@@ -312,3 +312,9 @@ PR #259 通过 Fast Gate 后以 squash 方式合入主线候选 `8b5e40c654484df
 staging 绑定继续采用组件级 Web-only：只把 Web 从 `d55732b...` 升级至 `29b793d...`，API、Worker 保持已由 Run `32241285113` 证明的健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。候选仓库中历史 API 源码差异不进入 Web 镜像，也不在本次部署中安装；接口兼容仍由冻结 OpenAPI SHA、migration/Worker 路径、API/Worker 镜像摘要和部署前后真实运行态共同 fail-closed 核验。绑定本身不部署、不执行 seed、不创建邀请、不发送消息，也不修改任何业务事实。
 
 只有绑定 PR 经门禁合入后，才允许对候选 `29b793d...` 单独取得一次 `phase=deploy-web` 授权；失败不重试并必须关闭临时 SSH。部署成功后必须先用真实浏览器验证提交后的状态自动更新、Reviewer 队列更新、答案提交前锁定/提交后可见以及桌面与 390px 主动作层级，再执行七个不可变正式内容版本的受控创建与摘要核验。机器或浏览器结果仍不得替代下一轮三名真人证据。
+
+## 28. Learner 修订重新进入候选
+
+真人 Reviewer 已在 staging 对现有能力评测给出“要求修订”。浏览器自查发现旧页面虽然保存了业务事实，却没有把“看反馈、打开原答案、只改问题部分、再次提交”组织成一条可执行路径。PR #268 将该路径收敛为 Learner 可见的单一下一步：任务首屏直接跳到反馈与工作区，展示 Reviewer 原反馈和三步修订路径；修订工作区自动载入上次提交内容与原飞书文档链接，不要求从头重做。桌面与 390px 截图均完成视觉复核，八站合成浏览器闭环已证明旧会话失效、重新进入、修订、再次提交、Reviewer 通过与最终结果；该证据明确标记为机器/浏览器证据，不能替代真人 Learner 复验。
+
+主线候选 `1e057704fb6a8f728f0ae47c24bf3ebd02cae52d` 的 Mainline Candidate Gate `32541427278` 已通过，Web registry digest 固定为 `sha256:06c582c1875587388a1fe69a123209c53978a1bfa68298329fcac39048fd9e52`。本次 staging 合同继续采用 Web-only：只更新 Web，API、Worker 保持健康基线 `9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4`，migration 保持 `0021_p0_identity_principal`。绑定 PR 本身不部署、不执行 seed、不创建邀请、不发送消息，也不修改 Journey、身份、角色或其他业务事实。只有绑定门禁通过并取得一次独立 staging 部署授权后，才允许使用确认词 `DEPLOY_WEB_1E05770_ON_9E8A806_STAGING` 派发一次 `deploy-web`；失败不重试。部署后必须由原 Learner 真实验证“看到反馈→打开原文档→再次提交”，机器结果不得冒充真人通过。
