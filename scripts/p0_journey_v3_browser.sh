@@ -625,8 +625,33 @@ pw_learner screenshot --filename "$evidence_dir/02-revision-required.png" --full
 complete_revision
 complete_review approve
 
-# Remaining assessments prove repeated reviewer progression.
 pw_learner reload
+pw_learner run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  const completedAssessment = page.getByRole('link', {name: /已完成：评测一｜规则拆解/});
+  if (await completedAssessment.count() !== 1) {
+    throw new Error('approved revision did not advance the learner journey');
+  }
+  await completedAssessment.click();
+  await page.waitForURL('**/app/tasks/**');
+  await page.waitForLoadState('networkidle');
+  if (await page.locator('.revision-feedback').count() !== 0) {
+    throw new Error('approved revision still presents the old revision callout');
+  }
+  const completion = page.locator('.completion-feedback');
+  if (await completion.count() !== 1) {
+    throw new Error('approved revision has no visible completion feedback');
+  }
+  const completionText = await completion.innerText();
+  if (!completionText.includes('你的判断已经被确认') || !completionText.includes('本阶段证据完整，可以继续下一站')) {
+    throw new Error('approved revision does not expose the final reviewer outcome');
+  }
+  await page.getByRole('link', {name: '继续下一站'}).click();
+  await page.waitForURL('**/app');
+  await page.waitForLoadState('networkidle');
+}"
+
+# Remaining assessments prove repeated reviewer progression.
 complete_stage 7
 complete_review approve
 pw_learner reload

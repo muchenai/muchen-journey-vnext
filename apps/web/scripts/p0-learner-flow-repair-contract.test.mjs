@@ -68,6 +68,18 @@ test("revision gives the learner an immediate route back to their own work", () 
   assert.match(submissionComposer, /只改需要调整的部分，不必从头重做/);
 });
 
+test("a passed revision replaces the old revision callout with the final outcome", () => {
+  assert.match(taskPage, /latestReviewPassed = stageComplete && latestVersion\?\.decision === "PASS"/);
+  assert.match(taskPage, /latestPassFeedback = latestReviewPassed \? latestVersion\.feedback : null/);
+  assert.match(taskPage, /latestReviewPassed \? "Reviewer 已确认" : needsRevision \? "Reviewer 已回应"/);
+  assert.match(taskPage, /latestReviewPassed[\s\S]*"这一站，已经完成"/);
+  assert.match(taskPage, /className="feedback-callout completion-feedback"/);
+  assert.match(taskPage, /你的判断已经被确认/);
+  assert.match(taskPage, /needsRevision && assignment\.latest_revision_feedback/);
+  assert.match(taskPage, /继续下一站/);
+  assert.match(styles, /\.completion-feedback/);
+});
+
 test("learner and reviewer status pages refresh while visible and announce changes", () => {
   assert.match(learnerHome, /<LiveStatusSignal/);
   assert.match(learnerHome, /提交成功，已交给主管评审/);
