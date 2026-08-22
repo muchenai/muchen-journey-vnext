@@ -191,6 +191,8 @@ export default async function TaskPage({
   const stageComplete = assignment.status === "COMPLETED";
   const awaitingReview = ["SUBMITTED", "IN_REVIEW"].includes(assignment.status);
   const needsRevision = assignment.status === "NEEDS_REVISION";
+  const latestReviewPassed = stageComplete && latestVersion?.decision === "PASS";
+  const latestPassFeedback = latestReviewPassed ? latestVersion.feedback : null;
   const actionComplete = assignment.submission !== null && !needsRevision;
   const currentFocus = !materialsReady
     ? isDayZero
@@ -624,10 +626,14 @@ export default async function TaskPage({
       </section> : null}
 
       {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
-      <p className="section-label">{assignment.latest_revision_feedback ? "Reviewer 已回应" : "你的行动"}</p>
+      <p className="section-label">
+        {latestReviewPassed ? "Reviewer 已确认" : needsRevision ? "Reviewer 已回应" : "你的行动"}
+      </p>
       <h2 id="task-workspace-title">
-        {assignment.latest_revision_feedback
-          ? "带着反馈，再走一步"
+        {latestReviewPassed
+          ? "这一站，已经完成"
+          : needsRevision
+            ? "带着反馈，再走一步"
           : isDayZero ? "写下你的三句出发卡" : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
       </h2>
 
@@ -641,7 +647,19 @@ export default async function TaskPage({
         <p className="success-text" role="status">未绑定附件已删除。</p>
       ) : null}
 
-      {assignment.latest_revision_feedback ? (
+      {latestReviewPassed ? (
+        <section className="feedback-callout completion-feedback" aria-labelledby="completion-feedback-title">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p className="section-label">已通过</p>
+            <h3 id="completion-feedback-title">你的判断已经被确认</h3>
+            <p>{latestPassFeedback ?? "Reviewer 已确认这一站完成，可以继续下一站。"}</p>
+            <a className="button primary compact" href="/app">
+              继续下一站 <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </section>
+      ) : needsRevision && assignment.latest_revision_feedback ? (
         <section className="feedback-callout revision-feedback" aria-labelledby="revision-feedback-title">
           <span aria-hidden="true">↳</span>
           <div>
@@ -723,7 +741,7 @@ export default async function TaskPage({
             ? "Reviewer 已开始评审。结果完成后，旅程会自动更新。"
             : "提交成功，正在等待 Reviewer 开始评审。你可以先离开，结果完成后旅程会自动更新。"}
         </p>
-      ) : stageComplete ? (
+      ) : stageComplete && !latestReviewPassed ? (
         <p className="notice" role="status">这一站已经完成。返回旅程，继续前往下一站。</p>
       ) : assignment.allowed_commands.length === 0 ? (
         <p className="notice">这一站暂时没有可执行动作。</p>
