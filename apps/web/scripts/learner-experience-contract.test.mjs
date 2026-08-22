@@ -68,12 +68,12 @@ test("the task contract leads with one deliverable and keeps secondary criteria 
   assert.doesNotMatch(taskPage, /taskBriefHeading[\s\S]{0,160}assignment\.required_deliverables\[0\]/);
   assert.match(taskPage, /<h3 id="task-deliverables-title">这一站只交付<\/h3>/);
   assert.match(taskPage, /assignment\.required_deliverables\.map/);
-  assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
+  assert.ok(taskPage.indexOf('className="task-brief"') < taskPage.indexOf('id="task-workspace"'));
   assert.match(taskPage, /className="task-supporting-rules task-contract-columns"/);
   assert.match(taskPage, /怎么完成<\/h3>/);
   assert.match(taskPage, /className="task-success-criteria"/);
   assert.match(taskPage, /<summary>怎样算完成？<\/summary>/);
-  assert.ok(taskPage.indexOf("task-brief") < taskPage.indexOf("task-workspace"));
+  assert.ok(taskPage.indexOf('className="task-brief"') < taskPage.indexOf('id="task-workspace"'));
   assert.doesNotMatch(taskPage, /<details className="task-supporting-rules"/);
   assert.doesNotMatch(taskPage, /需要时查看方法与完成标准/);
 });
