@@ -202,9 +202,9 @@ def test_active_candidate_binding_matches_deploy_preflight():
 
 def test_active_candidate_local_digests_match_verified_archive():
     expected = {
-        "API_LOCAL_IMAGE_DIGEST": "sha256:404f9ea78f66eb4c637d8c70185e41d5a20c882651f98deaf7751fc8f9407999",
-        "WEB_LOCAL_IMAGE_DIGEST": "sha256:fa1ced6b624ff8cf8e4160484c9bcb9a0135f31d5c581537a5d0270c61b2d753",
-        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:b7f9cb6842e1784a4e8387b5bd3889050e62bfcb688e6b19af85c022618be688",
+        "API_LOCAL_IMAGE_DIGEST": "sha256:11ce12d31a93ab5953b89f7d911cc7b92aa9fe20178d552503aec26732bfec7b",
+        "WEB_LOCAL_IMAGE_DIGEST": "sha256:2f5090a28037ce13af6808e6a1fc67f0fb903a3544f3406e330f3527de57e0c7",
+        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:c89d1aefb21e74df597dc08d329b144aea28eee3184eefde917395c28a5cc848",
     }
 
     assert prepare.LOCAL_IMAGE_DIGESTS == expected
@@ -619,7 +619,7 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "          - repair-edge-route",
             "          - cleanup-failed-release",
                 "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
-                "inputs.confirmation == 'DEPLOY_WEB_3305007_ON_9E8A806_STAGING'",
+                "inputs.confirmation == 'DEPLOY_WEB_53076AD_ON_9E8A806_STAGING'",
             "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",

@@ -772,7 +772,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         else "- audit\n          - deploy\n          - inspect-runtime"
     )
     deployment_confirmation = (
-        "inputs.confirmation == 'DEPLOY_WEB_3305007_ON_9E8A806_STAGING'"
+        "inputs.confirmation == 'DEPLOY_WEB_53076AD_ON_9E8A806_STAGING'"
         if active_web_only
         else "inputs.confirmation == 'DEPLOY_EB7C40B_TO_VOLCENGINE_STAGING'"
     )
