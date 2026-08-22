@@ -50,7 +50,7 @@ pull_with_bounded_retry() {
 }
 
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "e4771bb3923817ae5026dde32582537551cc90a9" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "33050078ebbaee37d325c45206cb4d556d72772c" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
@@ -60,10 +60,10 @@ for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${WEB_IMAGE#*@}" == "sha256:bd6385153c2c5be3bc94043b3931eb880eb08ee084a119a28a7589fe701e2aca" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:291375b4fe921094952bdaa3a1a9d4547fe1ddb2944e77b08f5a08e06720bf65" ]] || fail "Web digest differs from candidate manifest"
 if [[ "$DEPLOY_MODE" == "full" ]]; then
-  [[ "${API_IMAGE#*@}" == "sha256:4aac0a1a06f0fb02dc8e56271acc58d04161659dc487820771443dbef7b2738e" ]] || fail "API digest differs from candidate manifest"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:2e3189aa777c3d75977270098a85c3f403f2a37da2b19c176e99ef90c7fc3722" ]] || fail "Worker digest differs from candidate manifest"
+  [[ "${API_IMAGE#*@}" == "sha256:fc21dc7d2ac8f8998dad9d4ae7bcf7428e4dc1c3f4f708c95f349e6c4f681cb4" ]] || fail "API digest differs from candidate manifest"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:6cb316e1ef7fcfd1f678f26d3c410a4d9426c3f6379b30ceafaaf00fe630524a" ]] || fail "Worker digest differs from candidate manifest"
 else
   [[ "${API_IMAGE#*@}" == "sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d" ]] || fail "API digest differs from the Web-only baseline"
   [[ "${WORKER_IMAGE#*@}" == "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da" ]] || fail "Worker digest differs from the Web-only baseline"
@@ -74,9 +74,9 @@ if [[ "$DEPLOY_MODE" == "full" ]]; then
   [[ "${API_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api:$CANDIDATE_COMMIT" ]] || fail "API runtime reference differs from candidate"
   [[ "${WEB_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web:$CANDIDATE_COMMIT" ]] || fail "Web runtime reference differs from candidate"
   [[ "${WORKER_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker:$CANDIDATE_COMMIT" ]] || fail "Worker runtime reference differs from candidate"
-  [[ "${API_LOCAL_IMAGE_DIGEST:-}" == "sha256:55d46ff59f5e7a210f1650d573c32cc4aab5a57ad9b835cc2bf55bc489682ff1" ]] || fail "API local image digest differs from candidate manifest"
-  [[ "${WEB_LOCAL_IMAGE_DIGEST:-}" == "sha256:2ea5263ddf5e23d422c162cfb54fac41a3864455ccf86c937bb8773e16d62466" ]] || fail "Web local image digest differs from candidate manifest"
-  [[ "${WORKER_LOCAL_IMAGE_DIGEST:-}" == "sha256:a6d322e7236b6e90e57a211b5080c14a2ab31bd6ae4d72f0ee17e53a23ca302a" ]] || fail "Worker local image digest differs from candidate manifest"
+  [[ "${API_LOCAL_IMAGE_DIGEST:-}" == "sha256:404f9ea78f66eb4c637d8c70185e41d5a20c882651f98deaf7751fc8f9407999" ]] || fail "API local image digest differs from candidate manifest"
+  [[ "${WEB_LOCAL_IMAGE_DIGEST:-}" == "sha256:fa1ced6b624ff8cf8e4160484c9bcb9a0135f31d5c581537a5d0270c61b2d753" ]] || fail "Web local image digest differs from candidate manifest"
+  [[ "${WORKER_LOCAL_IMAGE_DIGEST:-}" == "sha256:b7f9cb6842e1784a4e8387b5bd3889050e62bfcb688e6b19af85c022618be688" ]] || fail "Worker local image digest differs from candidate manifest"
 else
   [[ "${IMAGE_TRANSPORT:-}" == "registry" ]] || fail "partial deploy must use registry transport"
   [[ "${API_RUNTIME_IMAGE:-}" == "$API_IMAGE" ]] || fail "API runtime and registry references differ"
