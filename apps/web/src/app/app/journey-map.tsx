@@ -65,6 +65,9 @@ function RouteMapSvg({
         const contents = (
           <>
             <title>{hint}</title>
+            {node.status !== "LOCKED" ? (
+              <circle className="route-node-hit-area" r={isCurrent ? 32 : 28} />
+            ) : null}
             {isAssessment ? (
               <rect
                 className="route-node-orb"

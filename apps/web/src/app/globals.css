@@ -414,6 +414,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .route-node-visual-completed .route-node-orb { fill: #f7e4a2; }
 .route-node-visual-current .route-node-orb { fill: #efb43e; stroke-width: 6; filter: drop-shadow(0 0 9px rgba(239, 180, 62, .42)); }
 .route-node-visual-locked { opacity: .58; }
+.route-node-hit-area { fill: transparent; pointer-events: all; }
 .route-node-label { fill: currentColor; font-size: 12px; font-weight: 700; }
 .route-node-link { color: #fff; cursor: pointer; text-decoration: none; }
 .route-node-link:hover .route-node-orb,

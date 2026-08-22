@@ -41,6 +41,8 @@ test("route nodes expose their shared-coordinate anchor for geometry checks", ()
   assert.match(routeMap, /className="route-node-anchor"/);
   assert.match(routeMap, /data-route-index=\{index\}/);
   assert.match(routeMap, /transform=\{`translate\(\$\{x\} \$\{y\}\)`\}/);
+  assert.match(routeMap, /<circle className="route-node-hit-area" r=\{isCurrent \? 32 : 28\} \/>/);
+  assert.match(styles, /\.route-node-hit-area \{[^}]*fill: transparent[^}]*pointer-events: all/);
 });
 
 test("learner failure surfaces provide bounded recovery without raw API JSON", () => {

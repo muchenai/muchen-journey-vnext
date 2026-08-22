@@ -628,11 +628,17 @@ complete_review approve
 pw_learner reload
 pw_learner run-code "async (page) => {
   await page.waitForLoadState('networkidle');
-  const completedAssessment = page.getByRole('link', {name: /已完成：评测一｜规则拆解/});
+  const completedAssessment = page.getByRole('link', {name: /已完成：规则拆解/});
   if (await completedAssessment.count() !== 1) {
     throw new Error('approved revision did not advance the learner journey');
   }
-  await completedAssessment.click();
+  const visibleCompletedStage = page
+    .locator('.journey-route-map-wide a')
+    .filter({hasText: '规则拆解'});
+  if (await visibleCompletedStage.count() !== 1) {
+    throw new Error('approved revision is not revisitable from the visible route');
+  }
+  await visibleCompletedStage.click();
   await page.waitForURL('**/app/tasks/**');
   await page.waitForLoadState('networkidle');
   if (await page.locator('.revision-feedback').count() !== 0) {
