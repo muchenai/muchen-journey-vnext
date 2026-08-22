@@ -620,6 +620,12 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
             "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
             "id: terraform_init",
+            "max_attempts=3",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=START",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=PASS",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=RETRY next_in_seconds=%s",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=FAIL retries_exhausted=true",
+            "WP08_TERRAFORM_VALIDATE result=PASS",
             'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
             'git show "$candidate:deploy/staging/compose.yaml"',
@@ -761,6 +767,14 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
         staging.validate_workflow(workflow)
 
     workflow.write_text(source.replace("WP08_SURFACE_ATTEMPT", "missing-surface-attempt-contract"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("max_attempts=3", "max_attempts=4"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("retries_exhausted=true", "retries_exhausted=false"))
     with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
         staging.validate_workflow(workflow)
 

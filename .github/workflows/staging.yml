@@ -160,15 +160,30 @@ jobs:
         id: terraform_init
         working-directory: infra/staging
         run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
-            -backend-config="key=terraform/wp08-staging.tfstate" \
-            -backend-config="region=cn-beijing" \
-            -backend-config="skip_credentials_validation=true" \
-            -backend-config="skip_region_validation=true" \
-            -backend-config="skip_requesting_account_id=true" \
-            -backend-config="skip_s3_checksum=true"
+          max_attempts=3
+          for attempt in $(seq 1 "$max_attempts"); do
+            printf 'WP08_TERRAFORM_INIT attempt=%s/%s result=START\n' "$attempt" "$max_attempts"
+            if terraform init \
+              -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+              -backend-config="key=terraform/wp08-staging.tfstate" \
+              -backend-config="region=cn-beijing" \
+              -backend-config="skip_credentials_validation=true" \
+              -backend-config="skip_region_validation=true" \
+              -backend-config="skip_requesting_account_id=true" \
+              -backend-config="skip_s3_checksum=true"; then
+              printf 'WP08_TERRAFORM_INIT attempt=%s/%s result=PASS\n' "$attempt" "$max_attempts"
+              break
+            fi
+            if (( attempt == max_attempts )); then
+              printf 'WP08_TERRAFORM_INIT attempt=%s/%s result=FAIL retries_exhausted=true\n' "$attempt" "$max_attempts"
+              exit 1
+            fi
+            next_in_seconds=$((attempt * 5))
+            printf 'WP08_TERRAFORM_INIT attempt=%s/%s result=RETRY next_in_seconds=%s\n' "$attempt" "$max_attempts" "$next_in_seconds"
+            sleep "$next_in_seconds"
+          done
           terraform validate
+          printf 'WP08_TERRAFORM_VALIDATE result=PASS\n'
       - name: Audit frozen ECS to RDS allowlist binding
         if: inputs.phase == 'audit'
         run: |
