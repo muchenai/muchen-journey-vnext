@@ -22,6 +22,13 @@ export default async function LearnerHome({
   );
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
   const waitingForReview = action.action_type === "WAIT_FOR_REVIEW";
+  const currentJourneyNode = action.journey?.nodes.find(
+    (node) => node.status === "CURRENT",
+  );
+  const beginsDayZero =
+    opensTask &&
+    action.action_type === "START_OR_CONTINUE_TASK" &&
+    currentJourneyNode?.stage_kind === "DAY_0";
   const primaryActionLabel = opensResult
     ? "打开旅程收获"
     : action.action_type === "REVISE_SUBMISSION"
@@ -87,6 +94,8 @@ export default async function LearnerHome({
                 {opensTask
                   ? action.action_type === "REVISE_SUBMISSION"
                     ? "反馈已经回到原任务，沿着缺口继续走。"
+                    : beginsDayZero
+                      ? "先带着一个真实问题出发，后面的每份材料都会给你一条线索。"
                     : "当前位置和唯一下一步都在这里。"
                   : opensResult
                     ? "八站证据已经汇合，打开看看你带走了什么。"
