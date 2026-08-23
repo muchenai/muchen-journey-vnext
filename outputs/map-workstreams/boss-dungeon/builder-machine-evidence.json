@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "target_contract": "outputs/map-workstreams/boss-dungeon/contract.json",
+  "golden_path": "boss-dungeon-first-verifiable-decision",
+  "observed_on": "2026-08-23",
+  "environment": {
+    "target": "http://127.0.0.1:4387/prototypes/boss-dungeon/index.html",
+    "server": "python3 -m http.server 4387 --bind 127.0.0.1",
+    "browser": "existing-local-playwright-chromium",
+    "browser_config_read_only": "/Users/liumowen/Documents/Muchen Journey2.0/output/playwright/wp25/cli.config.json",
+    "chrome_installed": false,
+    "production_mutation_executed": false
+  },
+  "builder_verdict": "MACHINE_PASS_PENDING_INDEPENDENT_EVALUATION",
+  "automated_contract_tests": {
+    "command": "node --test prototypes/boss-dungeon/contract.test.mjs",
+    "passed": 5,
+    "failed": 0
+  },
+  "viewport_runs": [
+    {
+      "width": 390,
+      "height": 844,
+      "natural_path_end": "local-decision-receipt-visible",
+      "document_scroll_width": 390,
+      "horizontal_overflow": false,
+      "entry_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/390-entry.png",
+      "receipt_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/390-receipt.png"
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "natural_path_end": "local-decision-receipt-visible",
+      "document_scroll_width": 768,
+      "horizontal_overflow": false,
+      "entry_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/768-entry.png",
+      "receipt_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/768-receipt.png"
+    },
+    {
+      "width": 1280,
+      "height": 900,
+      "natural_path_end": "local-decision-receipt-visible",
+      "document_scroll_width": 1280,
+      "horizontal_overflow": false,
+      "entry_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/1280-entry.png",
+      "receipt_screenshot": "outputs/map-workstreams/boss-dungeon/evidence/1280-receipt.png"
+    }
+  ],
+  "interaction_checks": {
+    "single_visible_primary_action_at_entry": true,
+    "safety_validation_blocks_unconfirmed_entry": true,
+    "team_validation_requires_role_and_constraints": true,
+    "decision_validation_requires_option_evidence_constraint_and_20_character_rationale": true,
+    "keyboard_enter_submission": true,
+    "programmatic_focus_on_state_change": true,
+    "minimum_observed_primary_action_height_css_px_at_390": 52.796875,
+    "reentry_restored_team_state": true,
+    "reduced_motion_media_emulated": true,
+    "reduced_motion_scroll_behavior": "auto",
+    "console_errors": 0,
+    "external_or_api_requests": 0
+  },
+  "semantic_snapshots": [
+    "outputs/map-workstreams/boss-dungeon/evidence/390-safety-validation.yml",
+    "outputs/map-workstreams/boss-dungeon/evidence/390-reentry-team.yml",
+    "outputs/map-workstreams/boss-dungeon/evidence/390-decision-receipt.yml"
+  ],
+  "governance_checks": {
+    "all_company_client_person_and_assessment_content_marked_synthetic": true,
+    "shared_fact_writes": false,
+    "fact_ai_advice_human_choice_and_system_status_separated": true,
+    "real_employment_or_performance_conclusion_generated": false,
+    "human_evidence_collected": false,
+    "release_authorized": false
+  },
+  "known_machine_limit": "机器证据不能证明首次体验者的方向感、内容价值、角色与约束理解、可追溯表达质量或继续意愿。"
+}
