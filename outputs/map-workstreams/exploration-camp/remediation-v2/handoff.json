@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "handoff_id": "exploration-camp-private-invite-orientation-v2-controller-handoff",
+  "map": "exploration-camp",
+  "golden_path_id": "exploration-camp-first-meaningful-action",
+  "frozen_baseline_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+  "contract_state": "IMPLEMENTATION_READY_CONTRACT_ONLY",
+  "evaluator_verdict": "BLOCKED_NO_RUNNABLE_TARGET",
+  "ready_for_human": false,
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "controller_runtime_writes": [
+    "apps/web/src/app/join/page.tsx",
+    "apps/web/src/app/join/invite-token-exchange-form.tsx",
+    "apps/web/src/app/join/private-invite-orientation.tsx",
+    "apps/web/src/app/join/private-invite-orientation.module.css",
+    "apps/web/scripts/exploration-camp-private-invite-orientation-contract.test.mjs"
+  ],
+  "next_action": "Implement the exact runtime write set, execute acceptance.md, then request a new independent read-only runtime evaluation.",
+  "candidate_list_mutation_allowed": false
+}

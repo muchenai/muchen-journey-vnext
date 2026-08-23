@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "owner": "muchen-journey-program-control",
+  "writes": [
+    {
+      "path": "apps/web/src/app/join/page.tsx",
+      "operation": "MODIFY",
+      "scope": "derive join orientation phase, render server-side orientation before the form, and associate the identity-confirm form with the orientation description"
+    },
+    {
+      "path": "apps/web/src/app/join/invite-token-exchange-form.tsx",
+      "operation": "MODIFY",
+      "scope": "accept the orientation description id and apply aria-describedby to both exchange form states"
+    },
+    {
+      "path": "apps/web/src/app/join/private-invite-orientation.tsx",
+      "operation": "ADD",
+      "scope": "render non-interactive five-map, Exploration Camp, and phase-aware next-action content"
+    },
+    {
+      "path": "apps/web/src/app/join/private-invite-orientation.module.css",
+      "operation": "ADD",
+      "scope": "style only the join orientation component without global or homepage selectors"
+    },
+    {
+      "path": "apps/web/scripts/exploration-camp-private-invite-orientation-contract.test.mjs",
+      "operation": "ADD",
+      "scope": "enforce content, source order, one-action, accessibility association, and protected-file boundaries"
+    }
+  ],
+  "must_not_write": [
+    "apps/web/src/app/page.tsx",
+    "apps/web/scripts/product-entry-contract.test.mjs",
+    "apps/web/src/app/globals.css",
+    "apps/web/src/app/actions.ts",
+    "apps/web/src/lib/server/api.ts",
+    "contracts/openapi.json",
+    "migrations/",
+    "config/",
+    "outputs/muchen-journey-candidates/"
+  ]
+}
