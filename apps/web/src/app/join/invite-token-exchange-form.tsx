@@ -4,6 +4,8 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { exchangeInvite } from "@/app/actions";
 
+import { JoinSubmitButton } from "./join-submit-button";
+
 let capturedToken = "";
 
 function readFragmentToken(): string {
@@ -24,7 +26,7 @@ function subscribeToFragment(onChange: () => void): () => void {
   };
 }
 
-export function InviteTokenExchangeForm() {
+export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientationDescriptionId: string }) {
   const token = useSyncExternalStore(subscribeToFragment, readFragmentToken, () => "");
 
   useEffect(() => {
@@ -37,14 +39,40 @@ export function InviteTokenExchangeForm() {
   }, [token]);
 
   if (!token) {
-    return <p className="notice">请使用完整邀请链接进入。</p>;
+    return (
+      <form
+        action={exchangeInvite}
+        className="join-token-form"
+        aria-describedby={orientationDescriptionId}
+      >
+        <label htmlFor="invite-token">粘贴完整邀请链接</label>
+        <p id="invite-token-hint">只用于验证本次邀请；链接中的凭证不会留在浏览器地址栏。</p>
+        <input
+          id="invite-token"
+          name="token"
+          type="text"
+          minLength={32}
+          maxLength={2048}
+          autoComplete="off"
+          aria-describedby="invite-token-hint"
+          placeholder="https://…/join#token=…"
+          spellCheck={false}
+          required
+        />
+        <JoinSubmitButton idleLabel="验证专属邀请" pendingLabel="正在验证…" />
+      </form>
+    );
   }
 
   return (
-    <form action={exchangeInvite}>
+    <form
+      action={exchangeInvite}
+      className="join-token-form"
+      aria-describedby={orientationDescriptionId}
+    >
       <input type="hidden" name="token" value={token} />
-      <p className="status-meta">通行证已安全读取。</p>
-      <button className="button primary" type="submit">打开通行证</button>
+        <p className="join-ready-copy"><strong>邀请已读取</strong><span>验证后还会由你本人确认身份。</span></p>
+      <JoinSubmitButton idleLabel="验证专属邀请" pendingLabel="正在验证…" />
     </form>
   );
 }

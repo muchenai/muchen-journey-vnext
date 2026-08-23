@@ -1,0 +1,146 @@
+.orientation {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  margin: 26px 0 0;
+  overflow-wrap: anywhere;
+  color: #eef8f5;
+}
+
+.eyebrow,
+.title,
+.description,
+.nextAction {
+  margin: 0;
+}
+
+.eyebrow {
+  color: #f3d47c;
+  font-size: .72rem;
+  font-weight: 850;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.title {
+  max-width: 12ch;
+  color: #fff;
+  font-size: clamp(1.7rem, 4vw, 2.55rem);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+}
+
+.description {
+  max-width: 32rem;
+  color: #cfe3e0;
+  line-height: 1.65;
+}
+
+.route {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route::before {
+  position: absolute;
+  top: 15px;
+  right: 9%;
+  left: 9%;
+  height: 1px;
+  background: rgba(207, 227, 224, .28);
+  content: "";
+}
+
+.route li {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 7px;
+  color: rgba(207, 227, 224, .56);
+  text-align: center;
+}
+
+.route li > span {
+  z-index: 1;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  background: #244c5c;
+  border: 1px solid rgba(207, 227, 224, .4);
+  border-radius: 50%;
+  font-size: .65rem;
+  font-weight: 850;
+}
+
+.route li > strong {
+  font-size: .68rem;
+  line-height: 1.25;
+}
+
+.route .current {
+  color: #fff;
+}
+
+.route .current > span {
+  color: #173e5c;
+  background: #efc85d;
+  border-color: #fff0be;
+  box-shadow: 0 0 0 7px rgba(239, 200, 93, .12);
+}
+
+.reward {
+  display: grid;
+  gap: 2px;
+  padding: 13px 16px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 16px;
+}
+
+.reward span {
+  color: #9dc8c4;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.reward strong {
+  color: #fff;
+}
+
+.nextAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: #dcebe8;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.nextAction span[aria-hidden] {
+  color: #efc85d;
+}
+
+@media (max-width: 640px) {
+  .orientation {
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .title {
+    max-width: none;
+  }
+
+  .route li > strong {
+    display: none;
+  }
+}
