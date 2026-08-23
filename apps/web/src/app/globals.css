@@ -352,7 +352,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .learner-journey-page { display: grid; gap: 18px; max-width: 1040px; margin: 0 auto; }
 .journey-map { position: relative; isolation: isolate; overflow: hidden; min-height: min(680px, calc(100svh - 216px)); padding: clamp(28px, 5vw, 54px); color: #fff; background: #0b293e; border: 1px solid rgba(255, 255, 255, .12); border-radius: 38px; box-shadow: 0 30px 78px rgba(15, 45, 64, .28); }
 .journey-map::before { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(5, 23, 37, .93) 0%, rgba(6, 31, 44, .78) 52%, rgba(7, 31, 46, .32) 100%), linear-gradient(0deg, rgba(5, 21, 34, .84), transparent 45%); content: ""; }
-.journey-map-world { z-index: -2; object-fit: cover; object-position: center; }
+.journey-map-world { position: absolute; inset: 0; z-index: -2; background: url("/images/exploration-camp-hero-v2.png") center / cover no-repeat; }
 .journey-map .journey-whisper { color: #bce9df; }
 .journey-map-heading { position: relative; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .journey-map-heading h1 { max-width: 10ch; margin: 0; font-size: clamp(36px, 5.2vw, 58px); letter-spacing: -.05em; }

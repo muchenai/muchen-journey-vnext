@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { JourneyProgress } from "@/lib/server/api";
@@ -113,13 +112,7 @@ export function JourneyMap({
 }) {
   return (
     <section className="journey-map" aria-labelledby="journey-map-title">
-      <Image
-        className="journey-map-world"
-        src="/images/exploration-camp-hero-v2.png"
-        alt=""
-        fill
-        sizes="(max-width: 1072px) calc(100vw - 32px), 1040px"
-      />
+      <span className="journey-map-world" aria-hidden="true" />
       <header className="journey-map-heading">
         <div>
           <p className="journey-whisper">探索营 · Map 01 / 05</p>

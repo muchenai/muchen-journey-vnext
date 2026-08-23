@@ -51,6 +51,8 @@ test("all eight formal stages have short route labels and progressive disclosure
 
 test("strict CSP cannot strip route coordinates", () => {
   assert.doesNotMatch(component, /style=\{/);
+  assert.doesNotMatch(component, /next\/image|<Image\b/);
+  assert.match(css, /\.journey-map-world[^}]*background: url\("\/images\/exploration-camp-hero-v2\.png"\)/);
   assert.match(component, /viewBox=\{viewBox\}/);
   assert.match(component, /<polyline points=\{points\.map/);
 });
