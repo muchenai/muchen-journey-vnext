@@ -2,21 +2,37 @@
   "schema_version": 1,
   "reviewed_on": "2026-08-23",
   "controller": "muchen-journey-program-control",
-  "integration_scope": "five-map-isolated-candidates-only",
-  "shared_home_included": false,
+  "integration_scope": "shared-home-and-five-map-frozen-candidates",
+  "shared_home_included": true,
   "formal_product_integration": false,
   "release_authorized": false,
   "production_mutation_executed": false,
   "shared_platform_commit": "d32eef0",
+  "controller_verdict": "NEXT_ROUND_INTEGRATED_HUMAN_GATES_OPEN",
+  "shared_home": {
+    "source_commit": "a525d68",
+    "integration_commit": "4df67ff",
+    "candidate_ref": "outputs/controller-integration/shared-home-r2/candidate-manifest.json",
+    "evaluator_ref": "outputs/controller-integration/shared-home-r2/evaluator-report.json",
+    "evaluator_verdict": "READY_FOR_HUMAN",
+    "human_gate": "NOT_RUN",
+    "controller_decision": "MERGED_AS_FROZEN_R2_CONTROLLER_CANDIDATE"
+  },
   "maps": [
     {
       "map": "exploration-camp",
       "order": 1,
-      "source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
-      "evaluator_verdict": "MACHINE_FAIL",
+      "initial_source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+      "initial_evaluator_verdict": "MACHINE_FAIL",
+      "remediation_contract_commit": "82b92f5",
+      "source_commit": "6e4a4d0",
+      "integration_commit": "6e4a4d0",
+      "candidate_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/candidate-manifest.json",
+      "evaluator_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/evaluator-report.json",
+      "evaluator_verdict": "READY_FOR_HUMAN",
       "human_gate": "NOT_RUN",
-      "controller_decision": "HELD_NOT_MERGED",
-      "reason": "P1: private invitation bypasses the five-map orientation required by the current learner outcome."
+      "controller_decision": "MERGED_AS_FROZEN_R3_CANDIDATE",
+      "reason": "The private invitation now exposes the whole five-map orientation before the first action and independently reaches the first required material."
     },
     {
       "map": "newcomer-village",
@@ -25,6 +41,8 @@
       "integration_commit": "e795248",
       "evaluator_verdict": "READY_FOR_HUMAN",
       "human_gate": "NOT_RUN",
+      "human_validation_package": "READY_NOT_RUN",
+      "human_validation_integration_commit": "ce0245b",
       "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
     },
     {
@@ -33,7 +51,9 @@
       "source_commit": "2e9561968d35676d09b3eacfe06b994276846e27",
       "integration_commit": "affe3b7",
       "evaluator_verdict": "READY_FOR_HUMAN",
-      "human_gate": "NOT_INFERRED",
+      "human_gate": "NOT_RUN",
+      "human_validation_package": "READY_NOT_RUN",
+      "human_validation_integration_commit": "99feda8",
       "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
     },
     {
@@ -43,18 +63,23 @@
       "integration_commit": "9a5bd3e",
       "evaluator_verdict": "READY_FOR_HUMAN",
       "human_gate": "NOT_RUN",
+      "human_validation_package": "READY_NOT_RUN",
+      "human_validation_integration_commit": "8523d80",
       "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
     },
     {
       "map": "boss-dungeon",
       "order": 5,
-      "source_commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
-      "integration_commit": "b43fdcb",
-      "reported_evaluator_verdict": "READY_FOR_HUMAN",
-      "authoritative_contract_status": "ACTIVE_DRAFT",
-      "human_gate": "UNTOUCHED",
-      "controller_decision": "MERGED_AS_ACTIVE_DRAFT_ONLY",
-      "reason": "The committed contract was not reconciled to READY_FOR_HUMAN and the commit contains no evaluator report."
+      "initial_source_commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+      "initial_integration_commit": "b43fdcb",
+      "source_commit": "4bba347",
+      "integration_commit": "75446a2",
+      "candidate_ref": "outputs/map-workstreams/boss-dungeon/candidates/boss-dungeon-first-verifiable-decision-20260823-r2/candidate-freeze.json",
+      "evaluator_ref": "outputs/map-workstreams/boss-dungeon/candidates/boss-dungeon-first-verifiable-decision-20260823-r2/evaluator-report.json",
+      "evaluator_verdict": "READY_FOR_HUMAN",
+      "human_gate": "NOT_RUN",
+      "controller_decision": "MERGED_AS_FROZEN_R2_ISOLATED_CANDIDATE",
+      "reason": "The versioned R2 contract, runtime, evaluator report, and responsive evidence are hash-frozen with P0=0 and P1=0."
     }
   ]
 }
