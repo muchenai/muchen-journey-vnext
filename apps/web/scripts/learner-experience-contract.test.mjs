@@ -156,6 +156,11 @@ test("join and result pages keep operational explanations below the primary expe
   assert.match(resultPage, /Journey 8 \/ 8/);
   assert.match(resultPage, /className="treasure-collection"/);
   assert.match(resultPage, /className="ability-collection"/);
+  assert.match(resultPage, /function stageDisplayTitle\(title: string\)/);
+  assert.match(resultPage, /宝藏\[一二三四\]/);
+  assert.match(resultPage, /\(\?:能力\)\?评测\[一二三\]/);
+  assert.match(resultPage, /treasureNodes\.map\(\(node, index\)/);
+  assert.doesNotMatch(resultPage, /const treasureLabels =/);
   assert.match(resultPage, /learnerPageRequest<CurrentAction>\("\/api\/v1\/me\/current-action"\)/);
   assert.match(resultPage, /aria-label="回看启程"/);
   assert.match(resultPage, /aria-label=\{`回看宝藏/);
