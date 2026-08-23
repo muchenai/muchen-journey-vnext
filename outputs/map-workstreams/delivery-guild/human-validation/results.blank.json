@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "artifact_type": "HUMAN_VALIDATION_RESULTS_TEMPLATE",
+  "status": "NOT_RUN",
+  "map": "delivery-guild",
+  "golden_path_id": "delivery-guild-first-bounded-evidence-draft",
+  "frozen_candidate_commit": "9b222163ca5137acd2f1d726a8686c6675eb5089",
+  "contains_real_person_data": false,
+  "participant_slots": [
+    {
+      "participant_id": "participant-01",
+      "eligibility_status": "NOT_RUN",
+      "consent_status": "NOT_RUN",
+      "session_status": "NOT_RUN",
+      "viewport_css_width": null,
+      "task_boundary_comprehension": {
+        "task_goal_observed": "NOT_RUN",
+        "one_non_goal_observed": "NOT_RUN",
+        "allowed_data_observed": "NOT_RUN",
+        "done_condition_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "responsibility_comprehension": {
+        "learner_accountability_observed": "NOT_RUN",
+        "ai_assistance_boundary_observed": "NOT_RUN",
+        "human_reviewer_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "first_draft_within_3_minutes": {
+        "elapsed_seconds": null,
+        "draft_confirmation_visible": "NOT_RUN",
+        "browser_local_pending_observed": "NOT_RUN",
+        "not_shared_evidence_observed": "NOT_RUN",
+        "human_review_next_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "clarity_and_willingness": {
+        "task_boundary_clarity_1_to_5": null,
+        "willingness_to_continue_1_to_5": null,
+        "result": "NOT_RUN"
+      },
+      "zero_facilitator_rescue": {
+        "rescue_intervention_count": null,
+        "result": "NOT_RUN"
+      },
+      "privacy_safe_evidence_refs": []
+    },
+    {
+      "participant_id": "participant-02",
+      "eligibility_status": "NOT_RUN",
+      "consent_status": "NOT_RUN",
+      "session_status": "NOT_RUN",
+      "viewport_css_width": null,
+      "task_boundary_comprehension": {
+        "task_goal_observed": "NOT_RUN",
+        "one_non_goal_observed": "NOT_RUN",
+        "allowed_data_observed": "NOT_RUN",
+        "done_condition_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "responsibility_comprehension": {
+        "learner_accountability_observed": "NOT_RUN",
+        "ai_assistance_boundary_observed": "NOT_RUN",
+        "human_reviewer_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "first_draft_within_3_minutes": {
+        "elapsed_seconds": null,
+        "draft_confirmation_visible": "NOT_RUN",
+        "browser_local_pending_observed": "NOT_RUN",
+        "not_shared_evidence_observed": "NOT_RUN",
+        "human_review_next_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "clarity_and_willingness": {
+        "task_boundary_clarity_1_to_5": null,
+        "willingness_to_continue_1_to_5": null,
+        "result": "NOT_RUN"
+      },
+      "zero_facilitator_rescue": {
+        "rescue_intervention_count": null,
+        "result": "NOT_RUN"
+      },
+      "privacy_safe_evidence_refs": []
+    },
+    {
+      "participant_id": "participant-03",
+      "eligibility_status": "NOT_RUN",
+      "consent_status": "NOT_RUN",
+      "session_status": "NOT_RUN",
+      "viewport_css_width": null,
+      "task_boundary_comprehension": {
+        "task_goal_observed": "NOT_RUN",
+        "one_non_goal_observed": "NOT_RUN",
+        "allowed_data_observed": "NOT_RUN",
+        "done_condition_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "responsibility_comprehension": {
+        "learner_accountability_observed": "NOT_RUN",
+        "ai_assistance_boundary_observed": "NOT_RUN",
+        "human_reviewer_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "first_draft_within_3_minutes": {
+        "elapsed_seconds": null,
+        "draft_confirmation_visible": "NOT_RUN",
+        "browser_local_pending_observed": "NOT_RUN",
+        "not_shared_evidence_observed": "NOT_RUN",
+        "human_review_next_observed": "NOT_RUN",
+        "result": "NOT_RUN"
+      },
+      "clarity_and_willingness": {
+        "task_boundary_clarity_1_to_5": null,
+        "willingness_to_continue_1_to_5": null,
+        "result": "NOT_RUN"
+      },
+      "zero_facilitator_rescue": {
+        "rescue_intervention_count": null,
+        "result": "NOT_RUN"
+      },
+      "privacy_safe_evidence_refs": []
+    }
+  ],
+  "aggregate": {
+    "valid_target_learner_count": 0,
+    "task_boundary_comprehension": "NOT_RUN",
+    "responsibility_comprehension": "NOT_RUN",
+    "first_draft_within_3_minutes": "NOT_RUN",
+    "task_boundary_clarity_median": null,
+    "willingness_to_continue_median": null,
+    "zero_facilitator_rescue": "NOT_RUN",
+    "human_gate": "NOT_RUN"
+  }
+}
