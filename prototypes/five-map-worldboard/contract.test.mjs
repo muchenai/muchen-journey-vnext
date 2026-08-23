@@ -9,7 +9,7 @@ test("the worldboard is isolated and non-interactive", () => {
   assert.match(board, /不属于任何正式黄金路径/);
   assert.match(board, /均为可撤销的视觉假设/);
   assert.doesNotMatch(board, /<a\b|<button\b|<form\b|href="\/(?:app|join)/);
-  assert.match(board, /href="\.\.\/shared\/five-map-visual-tokens\.css"/);
+  assert.match(board, /href="five-map-visual-tokens\.css"/);
 });
 
 test("the canonical five maps appear once in the route rail and in order", () => {

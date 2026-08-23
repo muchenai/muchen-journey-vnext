@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "candidate_id": "shared-home-whole-journey-entry",
+  "contract_ref": "outputs/controller-integration/shared-home/contract.json",
+  "evaluated_on": "2026-08-23",
+  "machine_verdict": "READY_FOR_HUMAN",
+  "checks": [
+    {
+      "id": "whole-product-dominates",
+      "result": "PASS",
+      "evidence": "The DOM and first viewport lead with the People AI system promise and the five-map world before the person-state card."
+    },
+    {
+      "id": "one-truthful-cta-per-state",
+      "result": "PASS",
+      "evidence": "All four states rendered exactly one .home-primary-action; invitation states post to the existing exchange action and returning states open /app without prefetch."
+    },
+    {
+      "id": "five-map-continuity",
+      "result": "PASS",
+      "evidence": "Order, names, missions, current map, and stable keys are rendered from config/muchen_journey_product.json plus the server-owned current-action projection."
+    },
+    {
+      "id": "three-viewport-first-action",
+      "result": "PASS",
+      "evidence": "390x844, 768x1024, and 1280x900 each showed the promise, current state, and CTA in the first viewport with document width equal to viewport width."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "result": "PASS",
+      "evidence": "Keyboard focus, 52px touch target, reduced motion, expired session, invalid-link recovery, re-entry, and zero-console-error checks passed."
+    },
+    {
+      "id": "controller-boundary",
+      "result": "PASS",
+      "evidence": "The candidate changes only registered homepage runtime/test selectors and controller-owned prototype/evidence files; no shared fact source or release configuration was changed."
+    }
+  ],
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "real_invite_created": false,
+  "compatibility_notes": [
+    "Before a non-Exploration Journey becomes authoritative, apply controller-proposal.md so /app removes its hard-coded Exploration Camp labels."
+  ]
+}
