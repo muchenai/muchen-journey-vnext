@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Muchen Journey 五地图隔离视觉世界板，不连接正式路径或真实数据。">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/five-map-visual-tokens.css">
+  <title>Muchen Journey · 五地图视觉世界板</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #151d2c;
+      --muted: #687184;
+      --line: rgba(42, 52, 73, .14);
+      --canvas: #f4f3ef;
+      --paper: #fffef9;
+      --shadow: 0 24px 70px rgba(24, 33, 50, .11);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--canvas); }
+    body { min-height: 100vh; margin: 0; color: var(--ink); background: radial-gradient(circle at 10% 0, #fff8df, transparent 26rem), radial-gradient(circle at 92% 4%, #e5eff4, transparent 30rem), var(--canvas); font: 16px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    h1, h2, h3, p { margin-top: 0; }
+
+    .isolation { padding: 9px 18px; color: #e8edf2; background: #17212f; font-size: 12px; font-weight: 760; letter-spacing: .07em; text-align: center; }
+    .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 90px; }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .brand { font-size: 18px; font-weight: 850; }
+    .board-state { color: #536075; font-size: 11px; font-weight: 820; letter-spacing: .12em; text-transform: uppercase; }
+
+    .intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); gap: 42px; align-items: end; margin: 62px 0 48px; }
+    .eyebrow { margin-bottom: 12px; color: #276a70; font-size: 12px; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
+    .intro h1 { max-width: 11ch; margin-bottom: 0; font-size: clamp(52px, 7vw, 86px); line-height: .98; letter-spacing: -.065em; }
+    .intro-copy { max-width: 36ch; margin: 0 0 6px auto; color: var(--muted); font-size: 17px; }
+    .intro-copy strong { color: var(--ink); }
+
+    .journey-rail { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0 0 30px; padding: 22px 24px; background: rgba(255, 254, 249, .72); border: 1px solid var(--line); border-radius: 24px; list-style: none; }
+    .journey-rail::before { position: absolute; top: 40px; right: 9%; left: 9%; border-top: 2px dashed #a4acb7; content: ""; }
+    .journey-rail li { position: relative; z-index: 1; display: grid; justify-items: center; gap: 8px; text-align: center; }
+    .rail-dot { display: grid; width: 38px; height: 38px; place-items: center; color: #fff; background: #40566a; border: 5px solid var(--paper); border-radius: 50%; box-shadow: 0 0 0 1px #a4acb7; font-size: 10px; font-weight: 900; }
+    .journey-rail strong { font-size: 13px; }
+    .journey-rail small { color: var(--muted); font-size: 10px; }
+
+    .world-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; }
+    .map-card { overflow: hidden; min-width: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); }
+    .map-card:nth-child(1), .map-card:nth-child(2) { grid-column: span 6; }
+    .map-card:nth-child(n+3) { grid-column: span 4; }
+    .map-art { position: relative; isolation: isolate; overflow: hidden; height: 250px; }
+    .map-copy { padding: 25px 26px 28px; }
+    .map-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .map-meta span { font-size: 11px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+    .map-meta small { color: var(--muted); font-size: 11px; }
+    .map-copy h2 { margin-bottom: 9px; font-size: 28px; letter-spacing: -.035em; }
+    .map-copy > p { min-height: 52px; margin-bottom: 20px; color: var(--muted); font-size: 14px; }
+    .palette { display: flex; gap: 7px; }
+    .palette i { display: block; width: 24px; height: 24px; border: 4px solid rgba(255, 255, 255, .72); border-radius: 50%; box-shadow: 0 0 0 1px rgba(31, 42, 58, .13); }
+
+    .camp .map-art { background: linear-gradient(150deg, var(--mj-map-exploration-camp-path), var(--mj-map-exploration-camp-surface)); }
+    .camp .map-art::before { position: absolute; right: -30px; bottom: -145px; width: 390px; height: 390px; border: 2px solid rgba(255,255,255,.24); border-radius: 50%; box-shadow: 0 0 0 42px rgba(255,255,255,.035), 0 0 0 84px rgba(255,255,255,.025); content: ""; }
+    .camp .map-art::after { position: absolute; top: 52px; left: 48px; width: 155px; height: 98px; border-bottom: 3px dashed rgba(255,255,255,.62); border-radius: 50%; transform: rotate(-14deg); content: ""; }
+    .camp .symbol { position: absolute; top: 85px; left: 172px; display: grid; width: 46px; height: 46px; place-items: center; color: #173e5c; background: #efb43e; border: 6px solid #fff1bd; border-radius: 50%; font-size: 12px; font-weight: 900; }
+
+    .village .map-art { background: linear-gradient(var(--mj-map-newcomer-village-canvas) 0 54%, var(--mj-map-newcomer-village-path) 54%); }
+    .village .sun { position: absolute; top: 28px; right: 44px; width: 56px; height: 56px; background: var(--mj-map-newcomer-village-accent); border-radius: 50%; }
+    .village .road { position: absolute; bottom: -46px; left: 43%; width: 110px; height: 210px; background: #ecd9a7; clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%); }
+    .village .house { position: absolute; bottom: 35px; width: 76px; height: 67px; background: #f5ebcf; border: 4px solid #315d49; border-radius: 4px 4px 9px 9px; }
+    .village .house::before { position: absolute; top: -36px; left: -10px; width: 88px; height: 43px; background: #c66f4b; clip-path: polygon(50% 0, 100% 83%, 0 83%); content: ""; }
+    .village .house.one { left: 18%; }
+    .village .house.two { right: 18%; bottom: 51px; transform: scale(.82); }
+
+    .academy .map-art { background: radial-gradient(circle at 72% 22%, rgba(255,255,255,.2), transparent 6rem), linear-gradient(150deg, var(--mj-map-ai-academy-path), var(--mj-map-ai-academy-surface)); }
+    .academy .tower { position: absolute; right: 50%; bottom: 0; width: 74px; height: 162px; background: #dce5ff; clip-path: polygon(50% 0, 100% 32%, 84% 100%, 16% 100%, 0 32%); transform: translateX(50%); }
+    .academy .tower::before { position: absolute; top: 58px; left: 27px; width: 20px; height: 20px; background: #6b70c8; border-radius: 50%; content: ""; }
+    .academy .star { position: absolute; width: 8px; height: 8px; background: #f6d77b; border-radius: 50%; box-shadow: 0 0 0 5px rgba(246,215,123,.08); }
+    .academy .star.one { top: 52px; left: 48px; }
+    .academy .star.two { top: 92px; right: 43px; }
+    .academy .star.three { top: 36px; right: 108px; }
+
+    .guild .map-art { background: linear-gradient(150deg, var(--mj-map-delivery-guild-path), var(--mj-map-delivery-guild-surface)); }
+    .guild .bridge { position: absolute; right: 30px; bottom: 40px; left: 30px; height: 20px; background: #e0a054; border-radius: 5px; box-shadow: 0 38px 0 #d9d0bd; }
+    .guild .bridge::before, .guild .bridge::after { position: absolute; bottom: -72px; width: 20px; height: 94px; background: #31282d; content: ""; }
+    .guild .bridge::before { left: 28px; }
+    .guild .bridge::after { right: 28px; }
+    .guild .crate { position: absolute; bottom: 99px; width: 54px; height: 54px; background: #d98450; border: 4px solid #f1bc70; }
+    .guild .crate.one { left: 54px; }
+    .guild .crate.two { right: 54px; transform: rotate(8deg); }
+
+    .boss .map-art { background: radial-gradient(circle at 50% 56%, rgba(220,90,95,.34), transparent 7rem), linear-gradient(145deg, var(--mj-map-boss-dungeon-surface), var(--mj-map-boss-dungeon-accent-ink)); }
+    .boss .portal { position: absolute; top: 38px; left: 50%; width: 128px; height: 178px; border: 18px solid #5e3745; border-bottom: 0; border-radius: 68px 68px 0 0; transform: translateX(-50%); box-shadow: 0 0 36px rgba(222,74,74,.25); }
+    .boss .portal::before { position: absolute; inset: 8px 10px 0; background: linear-gradient(#d44c51, #321d31); border-radius: 48px 48px 0 0; content: ""; }
+    .boss .peak { position: absolute; bottom: 0; width: 130px; height: 110px; background: #17151f; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .boss .peak.left { left: -22px; }
+    .boss .peak.right { right: -22px; }
+
+    .camp .palette i:nth-child(1), .journey-rail li:nth-child(1) .rail-dot { background: var(--mj-map-exploration-camp-path); }
+    .camp .palette i:nth-child(2) { background: var(--mj-map-exploration-camp-surface); }
+    .camp .palette i:nth-child(3) { background: var(--mj-map-exploration-camp-accent); }
+    .village .palette i:nth-child(1), .journey-rail li:nth-child(2) .rail-dot { background: var(--mj-map-newcomer-village-surface); }
+    .village .palette i:nth-child(2) { background: var(--mj-map-newcomer-village-path); }
+    .village .palette i:nth-child(3) { background: var(--mj-map-newcomer-village-accent); }
+    .academy .palette i:nth-child(1), .journey-rail li:nth-child(3) .rail-dot { background: var(--mj-map-ai-academy-path); }
+    .academy .palette i:nth-child(2) { background: var(--mj-map-ai-academy-surface); }
+    .academy .palette i:nth-child(3) { background: var(--mj-map-ai-academy-accent); }
+    .guild .palette i:nth-child(1), .journey-rail li:nth-child(4) .rail-dot { background: var(--mj-map-delivery-guild-path); }
+    .guild .palette i:nth-child(2) { background: var(--mj-map-delivery-guild-surface); }
+    .guild .palette i:nth-child(3) { background: var(--mj-map-delivery-guild-accent); }
+    .boss .palette i:nth-child(1), .journey-rail li:nth-child(5) .rail-dot { background: var(--mj-map-boss-dungeon-surface); }
+    .boss .palette i:nth-child(2) { background: var(--mj-map-boss-dungeon-path); }
+    .boss .palette i:nth-child(3) { background: var(--mj-map-boss-dungeon-accent); }
+
+    .boundary { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; margin-top: 30px; padding: 24px 28px; color: #dbe3ea; background: #17212f; border-radius: 24px; }
+    .boundary strong { color: #f4cd70; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .boundary p { margin: 0; font-size: 13px; }
+
+    @media (max-width: 900px) {
+      .intro { grid-template-columns: 1fr; gap: 22px; margin-top: 44px; }
+      .intro-copy { margin-left: 0; }
+      .map-card:nth-child(n) { grid-column: span 6; }
+      .map-card:last-child { grid-column: 4 / span 6; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 24px, 1180px); padding-top: 20px; }
+      .brand-row { align-items: flex-start; flex-direction: column; gap: 3px; }
+      .intro { margin: 36px 0 30px; }
+      .intro h1 { font-size: 54px; }
+      .journey-rail { grid-template-columns: 1fr; gap: 3px; padding: 18px; }
+      .journey-rail::before { top: 37px; bottom: 37px; left: 36px; width: 0; border-top: 0; border-left: 2px dashed #a4acb7; }
+      .journey-rail li { grid-template-columns: 38px minmax(0, 1fr) auto; min-height: 48px; align-items: center; justify-items: start; gap: 12px; text-align: left; }
+      .journey-rail small { justify-self: end; }
+      .map-card:nth-child(n), .map-card:last-child { grid-column: 1 / -1; }
+      .map-art { height: 220px; }
+      .boundary { grid-template-columns: 1fr; gap: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="isolation">隔离视觉资产 · 不属于任何正式黄金路径 · 不连接真实状态、内容或数据</div>
+  <main class="shell">
+    <header class="brand-row">
+      <span class="brand">Muchen Journey</span>
+      <span class="board-state">Five-map visual worldboard · Draft 01</span>
+    </header>
+
+    <section class="intro" aria-labelledby="worldboard-title">
+      <div>
+        <p class="eyebrow">完整产品 · 共享视觉方向</p>
+        <h1 id="worldboard-title">五张地图，要像同一个世界。</h1>
+      </div>
+      <p class="intro-copy"><strong>本轮只回答一个问题：</strong>新人能否仅凭色彩、形状与场景轮廓，感到自己在持续前进，而不是切换到五个互不相干的产品。</p>
+    </section>
+
+    <ol class="journey-rail" aria-label="Muchen Journey 五地图视觉顺序">
+      <li><span class="rail-dot">01</span><strong>探索营</strong><small>深海启程</small></li>
+      <li><span class="rail-dot">02</span><strong>新手村</strong><small>温暖抵达</small></li>
+      <li><span class="rail-dot">03</span><strong>AI学院</strong><small>认知升高</small></li>
+      <li><span class="rail-dot">04</span><strong>交付线工会</strong><small>协作成事</small></li>
+      <li><span class="rail-dot">05</span><strong>BOSS副本</strong><small>真实演练</small></li>
+    </ol>
+
+    <section class="world-grid" aria-label="五地图视觉假设卡">
+      <article class="map-card camp">
+        <div class="map-art" role="img" aria-label="探索营的深海蓝绿、曲线路标与暖金起点视觉假设"><span class="symbol">01</span></div>
+        <div class="map-copy"><div class="map-meta"><span>Map 01</span><small>正式候选等待真人</small></div><h2>探索营</h2><p>深海蓝绿、曲线路标和一枚暖金起点，表达“先找到方向，再迈出第一步”。</p><div class="palette" aria-label="探索营色板"><i></i><i></i><i></i></div></div>
+      </article>
+
+      <article class="map-card village">
+        <div class="map-art" role="img" aria-label="新手村的村口、小屋、道路与暖绿色视觉假设"><span class="sun"></span><span class="road"></span><span class="house one"></span><span class="house two"></span></div>
+        <div class="map-copy"><div class="map-meta"><span>Map 02</span><small>隔离视觉草稿</small></div><h2>新手村</h2><p>从冷静探索过渡到有路、有屋、有人烟的暖绿色，表达“抵达与同行”的可能方向。</p><div class="palette" aria-label="新手村色板"><i></i><i></i><i></i></div></div>
+      </article>
+
+      <article class="map-card academy">
+        <div class="map-art" role="img" aria-label="AI学院的高塔、星点与靛蓝色视觉假设"><span class="tower"></span><span class="star one"></span><span class="star two"></span><span class="star three"></span></div>
+        <div class="map-copy"><div class="map-meta"><span>Map 03</span><small>视觉假设</small></div><h2>AI学院</h2><p>高塔、星点与靛蓝空间，暂时表达“把认知抬高”的视觉张力，不定义课程或任务。</p><div class="palette" aria-label="AI学院色板"><i></i><i></i><i></i></div></div>
+      </article>
+
+      <article class="map-card guild">
+        <div class="map-art" role="img" aria-label="交付线工会的桥梁、货箱与铜红色视觉假设"><span class="bridge"></span><span class="crate one"></span><span class="crate two"></span></div>
+        <div class="map-copy"><div class="map-meta"><span>Map 04</span><small>视觉假设</small></div><h2>交付线工会</h2><p>桥梁、货箱与铜红色结构，暂时表达“协作把事情交付出去”，不定义组织机制。</p><div class="palette" aria-label="交付线工会色板"><i></i><i></i><i></i></div></div>
+      </article>
+
+      <article class="map-card boss">
+        <div class="map-art" role="img" aria-label="BOSS副本的入口、山峰与暗红色视觉假设"><span class="portal"></span><span class="peak left"></span><span class="peak right"></span></div>
+        <div class="map-copy"><div class="map-meta"><span>Map 05</span><small>视觉假设</small></div><h2>BOSS副本</h2><p>入口、山峰与暗红能量，承接“模拟真实项目演练”的已知目的，不定义胜负或奖励。</p><div class="palette" aria-label="BOSS副本色板"><i></i><i></i><i></i></div></div>
+      </article>
+    </section>
+
+    <aside class="boundary"><strong>Draft Boundary</strong><p>除五地图顺序与 BOSS 副本“模拟真实项目演练”外，其余文案、色彩和场景均为可撤销的视觉假设；不得据此创建正式路径、内容、积分、奖励或数据状态。</p></aside>
+  </main>
+</body>
+</html>

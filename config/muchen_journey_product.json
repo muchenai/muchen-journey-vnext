@@ -1,0 +1,238 @@
+{
+  "schema_version": 2,
+  "product_id": "muchen-journey",
+  "product_name": "Muchen Journey",
+  "product_category": "people-ai-growth-platform",
+  "north_star": "company-wide-five-map-people-ai-growth-system",
+  "permanent_goal": {
+    "objective": "Build an attractive company-wide People AI growth system in which every person can understand where they are, take a meaningful next action, preserve evidence of growth, and continue across all five maps.",
+    "completion_requires": [
+      "all-five-maps-have-validated-core-paths",
+      "cross-map-identity-capability-and-evidence-continuity",
+      "machine-and-human-acceptance",
+      "explicit-release-authorization"
+    ]
+  },
+  "operating_model": {
+    "mode": "five-map-parallel-workstreams",
+    "program_controller": "muchen-journey-program-control",
+    "continuous_integration": true,
+    "one_active_golden_path_per_map": true,
+    "human_gate_blocks_release_only": true,
+    "human_gate_blocks_other_workstreams": false,
+    "shared_changes_require_controller_merge": true,
+    "production_mutation_requires_explicit_authorization": true,
+    "active_workstreams": [
+      "exploration-camp",
+      "newcomer-village",
+      "ai-academy",
+      "delivery-guild",
+      "boss-dungeon"
+    ],
+    "controller_integration_workstreams": [
+      {
+        "id": "shared-home-whole-journey-entry",
+        "state": "ISOLATED_DRAFT_BUILD",
+        "owner": "muchen-journey-program-control",
+        "contract_ref": "outputs/controller-integration/shared-home/contract.json"
+      }
+    ]
+  },
+  "shared_platform": {
+    "owner": "muchen-journey-program-control",
+    "responsibilities": [
+      "whole-journey-home-and-five-map-navigation",
+      "person-profile-and-cohort-membership",
+      "capability-graph-and-growth-plan",
+      "evidence-ledger-and-assessment-history",
+      "journey-orchestration-and-cross-map-transitions",
+      "identity-session-permission-privacy-and-audit",
+      "shared-design-tokens-and-accessibility-contracts",
+      "content-versioning-and-review-contracts",
+      "integration-candidates-release-and-rollback"
+    ],
+    "map_workstream_write_boundaries": [
+      "docs/maps/<map-key>/",
+      "prototypes/<map-key>/",
+      "outputs/map-workstreams/<map-key>/",
+      "controller-assigned-runtime-module"
+    ],
+    "controller_only_surfaces": [
+      "/",
+      "global-navigation",
+      "shared-domain-schema",
+      "shared-api-contracts",
+      "shared-design-system",
+      "release-configuration"
+    ],
+    "change_rule": "A map workstream may propose a shared change but may not merge or publish it; the program controller owns compatibility review and integration."
+  },
+  "people_ai_governance": {
+    "development_not_automated_employment_decision": true,
+    "human_accountability_required": true,
+    "purpose_limitation_required": true,
+    "minimum_necessary_access_required": true,
+    "learner_evidence_is_auditable": true,
+    "prohibited_automatic_decisions": [
+      "hire",
+      "promotion",
+      "termination",
+      "compensation",
+      "performance-rating"
+    ]
+  },
+  "current_map": "exploration-camp",
+  "current_golden_path": {
+    "id": "exploration-camp-first-meaningful-action",
+    "map": "exploration-camp",
+    "learner_outcome": "A first-time invited learner understands the whole five-map journey, recognizes Exploration Camp as the current starting map, and independently reaches the first required learning material with a clear desire to continue.",
+    "starts_at": "private-invitation-entry",
+    "ends_at": "first-required-learning-material-opened",
+    "routes": [
+      "/",
+      "/join",
+      "/app"
+    ],
+    "machine_acceptance": [
+      {
+        "id": "single-primary-action",
+        "criterion": "Each actionable screen exposes exactly one truthful primary action and no competing learner entry."
+      },
+      {
+        "id": "three-viewport-continuity",
+        "criterion": "The path works without horizontal overflow or hidden primary actions at 390, 768, and 1280 CSS pixels."
+      },
+      {
+        "id": "input-before-output",
+        "criterion": "The learner reaches approved required material before any task asks for an output."
+      },
+      {
+        "id": "interaction-and-recovery",
+        "criterion": "Keyboard, touch, reduced motion, loading, error, and re-entry states preserve a clear next action without console errors."
+      }
+    ],
+    "human_acceptance": [
+      {
+        "id": "orientation-10-seconds",
+        "criterion": "Without facilitator explanation, first-time learners can state that Muchen Journey contains five maps, that they are starting in Exploration Camp, and what to do next within 10 seconds.",
+        "threshold": "3/3 target learners"
+      },
+      {
+        "id": "first-action-60-seconds",
+        "criterion": "Without facilitator explanation, first-time learners independently open the first required learning material within 60 seconds.",
+        "threshold": "3/3 target learners"
+      },
+      {
+        "id": "clarity-and-continuation",
+        "criterion": "Learners rate both progress clarity and willingness to continue to the next station.",
+        "threshold": "median >= 4/5 for both questions"
+      },
+      {
+        "id": "zero-facilitator-rescue",
+        "criterion": "No facilitator explains the entry, route, terminology, or next action during the measured path.",
+        "threshold": "0 interventions"
+      }
+    ],
+    "stop_rule": "A READY_FOR_HUMAN candidate is frozen and cannot be promoted or released without valid human evidence. Other map workstreams may continue only within isolated, non-dependent boundaries while the program controller preserves this candidate.",
+    "source_refs": [
+      "docs/33_WP17_LEARNER_EXPERIENCE_PROTOTYPE.md",
+      "docs/37_WP25_WP30_LEARNING_PRODUCTIZATION_WORK_PACKAGES.md",
+      "docs/38_WP25_P0_EXPERIENCE_CONTENT_FREEZE.md",
+      "docs/41_PEOPLE_AI_PROGRAM_AND_PLATFORM_CONTRACT.md"
+    ]
+  },
+  "maps": [
+    {
+      "order": 1,
+      "key": "exploration-camp",
+      "name": "探索营",
+      "mission": "建立旅程方向感、成长意图和第一份可核对的能力基线。",
+      "people_ai_output": "person-growth-baseline",
+      "workstream": {
+        "phase": "AWAITING_HUMAN",
+        "contract_status": "ACTIVE",
+        "golden_path_status": "READY_FOR_HUMAN",
+        "owned_contract_ref": "config/muchen_journey_product.json#/current_golden_path",
+        "may_promote_without_human_pass": false
+      }
+    },
+    {
+      "order": 2,
+      "key": "newcomer-village",
+      "name": "新手村",
+      "mission": "完成公司、岗位、协作方式与基本工作习惯的真实融入。",
+      "people_ai_output": "role-and-collaboration-readiness",
+      "workstream": {
+        "phase": "ISOLATED_DRAFT_BUILD",
+        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
+        "golden_path_status": "TO_DEFINE",
+        "owned_contract_ref": "outputs/map-workstreams/newcomer-village/contract.json",
+        "may_promote_without_human_pass": false
+      }
+    },
+    {
+      "order": 3,
+      "key": "ai-academy",
+      "name": "AI学院",
+      "mission": "通过课程、练习与测评形成可解释的 AI 能力成长记录。",
+      "people_ai_output": "ai-capability-profile",
+      "workstream": {
+        "phase": "ISOLATED_DRAFT_BUILD",
+        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
+        "golden_path_status": "TO_DEFINE",
+        "owned_contract_ref": "outputs/map-workstreams/ai-academy/contract.json",
+        "may_promote_without_human_pass": false
+      }
+    },
+    {
+      "order": 4,
+      "key": "delivery-guild",
+      "name": "交付线工会",
+      "mission": "在真实交付协作中积累项目证据、反馈、复盘与导师评价。",
+      "people_ai_output": "delivery-capability-evidence",
+      "workstream": {
+        "phase": "ISOLATED_DRAFT_BUILD",
+        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
+        "golden_path_status": "TO_DEFINE",
+        "owned_contract_ref": "outputs/map-workstreams/delivery-guild/contract.json",
+        "may_promote_without_human_pass": false
+      }
+    },
+    {
+      "order": 5,
+      "key": "boss-dungeon",
+      "name": "BOSS副本",
+      "mission": "通过模拟真实大型项目综合验证判断、协作、交付和复盘能力。",
+      "purpose": "模拟真实项目演练",
+      "people_ai_output": "integrated-project-readiness-evidence",
+      "workstream": {
+        "phase": "ISOLATED_DRAFT_BUILD",
+        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
+        "golden_path_status": "TO_DEFINE",
+        "owned_contract_ref": "outputs/map-workstreams/boss-dungeon/contract.json",
+        "may_promote_without_human_pass": false
+      }
+    }
+  ],
+  "integration_acceptance": [
+    "every-map-change-respects-shared-contracts",
+    "shared-identity-capability-and-evidence-remain-continuous",
+    "no-map-claims-human-pass-from-machine-evidence",
+    "cross-map-home-and-navigation-have-one-source-of-truth",
+    "privacy-permission-and-audit-gates-pass",
+    "program-controller-creates-the-only-release-candidate"
+  ],
+  "completion_semantics": {
+    "full_product_requires_all_maps": true,
+    "single_map_release_proves_full_product_complete": false,
+    "runtime_live_proves_product_validated": false,
+    "machine_checks_prove_human_experience": false,
+    "parallel_draft_proves_map_ready": false,
+    "exploration_camp_journey_v3_scope": "exploration-camp-content-version"
+  },
+  "decision": {
+    "status": "OWNER_CONFIRMED",
+    "recorded_on": "2026-08-23",
+    "note": "Muchen Journey now serves the company-wide People AI cultivation and growth system. Five map workstreams may develop in parallel under one program controller; human gates block promotion and release of their candidate, not unrelated program progress."
+  }
+}

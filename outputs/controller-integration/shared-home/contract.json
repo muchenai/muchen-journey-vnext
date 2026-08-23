@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "id": "shared-home-whole-journey-entry",
+  "owner": "muchen-journey-program-control",
+  "state": "ISOLATED_DRAFT_BUILD",
+  "surface": "/",
+  "person_outcome": "A visitor or returning learner understands that Muchen Journey is a company-wide five-map People AI growth system, recognizes their current state, and takes one truthful next action without mistaking Exploration Camp for the whole product.",
+  "starts_at": "whole-journey-home-opened",
+  "ends_at": "correct-state-specific-next-context-opened",
+  "routes": [
+    "/",
+    "/join",
+    "/app"
+  ],
+  "experience_states": [
+    {
+      "id": "visitor-without-session",
+      "primary_action": "我已有专属邀请",
+      "required_behavior": "Reveal a real invitation-link validation action without sending the visitor to an empty or dead /join state."
+    },
+    {
+      "id": "learner-with-active-session",
+      "primary_action": "继续当前旅程",
+      "required_behavior": "Open the learner growth hub or current map using verified session state."
+    },
+    {
+      "id": "learner-with-expired-session",
+      "primary_action": "使用重新进入链接",
+      "required_behavior": "Explain preserved progress and the operator-assisted recovery path without a loop."
+    },
+    {
+      "id": "learner-with-next-map-unlocked",
+      "primary_action": "进入下一张地图",
+      "required_behavior": "Show the completed map, the unlocked next map, and the evidence continuity between them."
+    }
+  ],
+  "machine_acceptance": [
+    {
+      "id": "whole-product-dominates",
+      "criterion": "The first viewport presents the five-map People AI journey as the product; Exploration Camp appears as the current starting position, not the product identity."
+    },
+    {
+      "id": "one-truthful-cta-per-state",
+      "criterion": "Each supported state exposes exactly one executable primary action with no dead /join or /app transition."
+    },
+    {
+      "id": "five-map-continuity",
+      "criterion": "The ordered maps and their growth outcomes are visible from one shared source of truth and do not conflict with map contracts."
+    },
+    {
+      "id": "three-viewport-first-action",
+      "criterion": "At 390, 768, and 1280 CSS pixels the product promise, current state, and primary action are visible without horizontal overflow."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "criterion": "Keyboard, touch, reduced motion, loading, error, expired-session, and re-entry states retain a clear action without console errors or unsolicited authentication prefetch."
+    },
+    {
+      "id": "controller-boundary",
+      "criterion": "The candidate changes only controller-owned homepage files and does not create a second Person, Capability, Evidence, Progress, Identity, or map-state source."
+    }
+  ],
+  "human_acceptance": [
+    {
+      "id": "whole-journey-orientation-10-seconds",
+      "criterion": "Without explanation, first-time participants can state that the product contains five connected growth maps, identify Exploration Camp as the current start, and name the next action within 10 seconds.",
+      "threshold": "3/3 target participants"
+    },
+    {
+      "id": "not-mistaken-for-exploration-only",
+      "criterion": "Participants do not describe Muchen Journey as only Exploration Camp or only an onboarding course.",
+      "threshold": "3/3 target participants"
+    },
+    {
+      "id": "state-correct-action-60-seconds",
+      "criterion": "Each participant independently takes the correct CTA for their assigned visitor or returning-learner state within 60 seconds.",
+      "threshold": "3/3 target participants per tested state"
+    },
+    {
+      "id": "world-attraction-and-continuation",
+      "criterion": "Participants rate both visual attraction and willingness to continue into the current map.",
+      "threshold": "median >= 4/5 for both questions"
+    }
+  ],
+  "owned_runtime_files": [
+    "apps/web/src/app/page.tsx",
+    "homepage-specific selectors in apps/web/src/app/globals.css",
+    "apps/web/scripts/product-entry-contract.test.mjs",
+    "prototypes/five-map-worldboard/",
+    "outputs/controller-integration/shared-home/"
+  ],
+  "read_only_dependencies": [
+    "apps/web/src/app/join/",
+    "apps/web/src/app/app/",
+    "apps/web/src/lib/server/api.ts",
+    "config/muchen_journey_product.json"
+  ],
+  "integration_rule": "Build and evaluate in an isolated worktree. Do not merge into the frozen Exploration Camp candidate or publish; hand the candidate to program control with evidence and compatibility notes."
+}
