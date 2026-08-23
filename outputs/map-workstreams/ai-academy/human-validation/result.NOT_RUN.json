@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "result_type": "AI_ACADEMY_HUMAN_VALIDATION_RESULT",
+  "candidate_id": "ai-academy-first-explainable-practice-evidence-20260823-r1",
+  "candidate_commit": "2e9561968d35676d09b3eacfe06b994276846e27",
+  "golden_path_id": "ai-academy-first-explainable-practice-evidence",
+  "status": "NOT_RUN",
+  "verdict": null,
+  "participant_count": 0,
+  "criteria": [
+    {
+      "id": "goal-requirement-connection",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "3/3 target learners within 20 seconds"
+    },
+    {
+      "id": "method-recall",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "3/3 target learners name at least 3 of 4 parts before practice"
+    },
+    {
+      "id": "meaningful-first-practice",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "3/3 target learners complete independently and would reuse"
+    },
+    {
+      "id": "evidence-boundary-comprehension",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "3/3 target learners explain what the record proves and does not prove"
+    },
+    {
+      "id": "clarity-and-continuation",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "median >= 4/5 for goal clarity, evidence clarity, and willingness to continue"
+    },
+    {
+      "id": "zero-facilitator-rescue",
+      "status": "NOT_RUN",
+      "observed": null,
+      "threshold": "0 interventions"
+    }
+  ],
+  "content_value_diagnostic": {
+    "status": "NOT_RUN",
+    "median_rating_1_to_5": null,
+    "note": "Supplemental diagnostic only; it does not replace or modify any contract threshold."
+  },
+  "human_evidence_present": false,
+  "integration_authorized": false,
+  "release_authorized": false
+}

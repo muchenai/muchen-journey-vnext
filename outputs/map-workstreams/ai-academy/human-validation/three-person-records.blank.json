@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "package_type": "AI_ACADEMY_THREE_PERSON_HUMAN_VALIDATION_RECORDS",
+  "candidate_id": "ai-academy-first-explainable-practice-evidence-20260823-r1",
+  "candidate_commit": "2e9561968d35676d09b3eacfe06b994276846e27",
+  "golden_path_id": "ai-academy-first-explainable-practice-evidence",
+  "status": "NOT_RUN",
+  "privacy": {
+    "direct_identifiers_allowed": false,
+    "real_business_content_allowed": false,
+    "learner_practice_original_text_allowed": false,
+    "recording_rule": "Store only participant-safe, de-identified observations and paraphrases required by the contract."
+  },
+  "protocol": {
+    "participants_required": 3,
+    "first_time_target_learners_required": true,
+    "prior_design_involvement_allowed": false,
+    "independent_clean_browser_session_required": true,
+    "facilitator_explanation_allowed": false,
+    "candidate_must_remain_frozen": true,
+    "entry": "http://127.0.0.1:4173/ai-academy/",
+    "timing_origin": "page-first-visible",
+    "rating_scale": {
+      "minimum": 1,
+      "maximum": 5
+    }
+  },
+  "sessions": [
+    {
+      "participant_slot": "P1",
+      "status": "NOT_RUN",
+      "eligibility": {
+        "target_learner_profile_match": null,
+        "prior_design_involvement": null,
+        "independent_clean_browser_session": null
+      },
+      "timing_raw_seconds": {
+        "goal_requirement_connection_statement": null,
+        "learning_input_opened": null,
+        "practice_started": null,
+        "evidence_visible": null,
+        "session_total": null
+      },
+      "goal_requirement_connection": {
+        "paraphrase_deidentified": null,
+        "observer_confirms_connection": null
+      },
+      "method_recall": {
+        "named_parts": [],
+        "captured_before_practice": null
+      },
+      "meaningful_first_practice": {
+        "completed_independently": null,
+        "would_reuse_for_similar_work": null,
+        "reuse_reason_deidentified": null
+      },
+      "content_value": {
+        "rating_1_to_5": null,
+        "reason_deidentified": null
+      },
+      "evidence_boundary": {
+        "what_record_proves_deidentified": null,
+        "what_record_does_not_prove_deidentified": null,
+        "observer_confirms_both_boundaries": null
+      },
+      "ratings_1_to_5": {
+        "goal_clarity": null,
+        "evidence_clarity": null,
+        "willingness_to_continue": null
+      },
+      "facilitator": {
+        "intervention_count": null,
+        "interventions": []
+      },
+      "participant_safe_notes": null
+    },
+    {
+      "participant_slot": "P2",
+      "status": "NOT_RUN",
+      "eligibility": {
+        "target_learner_profile_match": null,
+        "prior_design_involvement": null,
+        "independent_clean_browser_session": null
+      },
+      "timing_raw_seconds": {
+        "goal_requirement_connection_statement": null,
+        "learning_input_opened": null,
+        "practice_started": null,
+        "evidence_visible": null,
+        "session_total": null
+      },
+      "goal_requirement_connection": {
+        "paraphrase_deidentified": null,
+        "observer_confirms_connection": null
+      },
+      "method_recall": {
+        "named_parts": [],
+        "captured_before_practice": null
+      },
+      "meaningful_first_practice": {
+        "completed_independently": null,
+        "would_reuse_for_similar_work": null,
+        "reuse_reason_deidentified": null
+      },
+      "content_value": {
+        "rating_1_to_5": null,
+        "reason_deidentified": null
+      },
+      "evidence_boundary": {
+        "what_record_proves_deidentified": null,
+        "what_record_does_not_prove_deidentified": null,
+        "observer_confirms_both_boundaries": null
+      },
+      "ratings_1_to_5": {
+        "goal_clarity": null,
+        "evidence_clarity": null,
+        "willingness_to_continue": null
+      },
+      "facilitator": {
+        "intervention_count": null,
+        "interventions": []
+      },
+      "participant_safe_notes": null
+    },
+    {
+      "participant_slot": "P3",
+      "status": "NOT_RUN",
+      "eligibility": {
+        "target_learner_profile_match": null,
+        "prior_design_involvement": null,
+        "independent_clean_browser_session": null
+      },
+      "timing_raw_seconds": {
+        "goal_requirement_connection_statement": null,
+        "learning_input_opened": null,
+        "practice_started": null,
+        "evidence_visible": null,
+        "session_total": null
+      },
+      "goal_requirement_connection": {
+        "paraphrase_deidentified": null,
+        "observer_confirms_connection": null
+      },
+      "method_recall": {
+        "named_parts": [],
+        "captured_before_practice": null
+      },
+      "meaningful_first_practice": {
+        "completed_independently": null,
+        "would_reuse_for_similar_work": null,
+        "reuse_reason_deidentified": null
+      },
+      "content_value": {
+        "rating_1_to_5": null,
+        "reason_deidentified": null
+      },
+      "evidence_boundary": {
+        "what_record_proves_deidentified": null,
+        "what_record_does_not_prove_deidentified": null,
+        "observer_confirms_both_boundaries": null
+      },
+      "ratings_1_to_5": {
+        "goal_clarity": null,
+        "evidence_clarity": null,
+        "willingness_to_continue": null
+      },
+      "facilitator": {
+        "intervention_count": null,
+        "interventions": []
+      },
+      "participant_safe_notes": null
+    }
+  ]
+}
