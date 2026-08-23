@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "target": "newcomer-village-first-real-integration-action",
+  "route": "http://127.0.0.1:4395/prototypes/newcomer-village/index.html",
+  "captured_on": "2026-08-23",
+  "browser": "existing local Playwright Chromium via read-only controller-provided config",
+  "synthetic_fixture_only": true,
+  "screenshots": [
+    {
+      "file": "1280-arrival.png",
+      "viewport_width": 1280,
+      "pixel_height": 1084,
+      "sha256": "f79a489e543013b43898025e75ba34637847ec72f000d7f360caac75795ff8a7"
+    },
+    {
+      "file": "1280-receipt.png",
+      "viewport_width": 1280,
+      "pixel_height": 1208,
+      "sha256": "8c822a50957ae717825a64ba44aec0642ecb0ca7c2f14519f0a4e5f122e04bb1"
+    },
+    {
+      "file": "768-context.png",
+      "viewport_width": 768,
+      "pixel_height": 1300,
+      "sha256": "70b357d8ae8d42202f9cfb3795f19e25cf9d1d318253af83e058295beb5345b8"
+    },
+    {
+      "file": "768-action.png",
+      "viewport_width": 768,
+      "pixel_height": 1184,
+      "sha256": "9a97985287e6352dfc703b9a65a76d38dc0293d229d86dbcc287b814be1b4264"
+    },
+    {
+      "file": "390-arrival.png",
+      "viewport_width": 390,
+      "pixel_height": 1410,
+      "sha256": "83282ce3adb5fe88d491a728ca1df2f387306deee6177b68a949338574e2cffd"
+    },
+    {
+      "file": "390-receipt.png",
+      "viewport_width": 390,
+      "pixel_height": 1530,
+      "sha256": "cdffa2aa0e9438173c1e5e322fa01774883936339a14be0627ba28c26b9d99df"
+    }
+  ],
+  "checks": {
+    "contract_tests": "6/6 PASS",
+    "document_overflow_390": "390 == 390",
+    "document_overflow_768": "768 == 768",
+    "document_overflow_1280": "1280 == 1280",
+    "validation_errors": "PASS",
+    "unfinished_draft_reload": "PASS at action-plan and evidence-capture",
+    "keyboard_path": "PASS for primary progression and radio selection",
+    "touch_equivalence": "native controls with minimum 50px primary target; no gesture-only action",
+    "reduced_motion": "PASS; animation and transition duration 0.00001s",
+    "console": "0 errors, 0 warnings",
+    "network": "only index.html, shared visual token CSS, map CSS, and map JS static GETs; no application data request"
+  },
+  "human_evidence": "NOT_RUN"
+}

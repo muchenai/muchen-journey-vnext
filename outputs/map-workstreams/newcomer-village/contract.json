@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "contract_type": "MAP_GOLDEN_PATH",
+  "id": "newcomer-village-first-real-integration-action",
+  "map": "newcomer-village",
+  "map_name": "新手村",
+  "map_order": 2,
+  "phase": "ISOLATED_DRAFT_BUILD",
+  "candidate_status": "READY_FOR_HUMAN",
+  "candidate_frozen": true,
+  "machine_acceptance_status": "PASS",
+  "learner_outcome": "A newcomer reads an explicitly sourced growth-baseline and role/organization context snapshot, chooses and completes one bounded real integration action, then leaves a reviewable draft of role-readiness or collaboration-habit evidence without writing any shared fact source.",
+  "starts_at": "isolated-arrival-with-authorized-context-snapshot",
+  "ends_at": "local-evidence-draft-receipt-after-self-attested-real-action",
+  "routes": [
+    "/prototypes/newcomer-village/index.html"
+  ],
+  "states": [
+    {
+      "id": "arrival",
+      "purpose": "Orient the learner to Map 02 and disclose isolation, source, and human-gate status.",
+      "primary_action": "读取我的融入起点"
+    },
+    {
+      "id": "context-review",
+      "purpose": "Read the Exploration Camp baseline and role/organization context before choosing an action.",
+      "primary_action": "选择第一项真实行动"
+    },
+    {
+      "id": "action-plan",
+      "purpose": "Choose one bounded real-world action and state when it will happen.",
+      "primary_action": "生成行动卡"
+    },
+    {
+      "id": "action-check",
+      "purpose": "Keep the action card visible while the learner completes the action outside the prototype.",
+      "primary_action": "我已真实完成，留下证据"
+    },
+    {
+      "id": "evidence-capture",
+      "purpose": "Capture minimum, non-sensitive observations that support role readiness or a collaboration habit.",
+      "primary_action": "生成证据草稿"
+    },
+    {
+      "id": "receipt",
+      "purpose": "Show exactly what would be handed to the shared Evidence Ledger after authorization and human review.",
+      "primary_action": "重新演练"
+    }
+  ],
+  "input_contract": {
+    "shared_sources_are_read_only": true,
+    "prototype_source": "synthetic-fixture-only",
+    "required_inputs": [
+      {
+        "key": "person-growth-baseline",
+        "owner": "muchen-journey-program-control",
+        "display_requirement": "Show source status and explicitly state that Exploration Camp human validation has not been inferred."
+      },
+      {
+        "key": "role-and-organization-context",
+        "owner": "muchen-journey-program-control",
+        "display_requirement": "Show role, organization, and collaboration fields only from an authorized source; the prototype must use visibly synthetic placeholders."
+      }
+    ]
+  },
+  "first_real_action_options": [
+    {
+      "id": "align-role-expectation",
+      "label": "与角色负责人确认一项当前优先事项及完成标准",
+      "evidence_kind": "role-readiness"
+    },
+    {
+      "id": "confirm-collaboration-rhythm",
+      "label": "与一位协作伙伴确认更新渠道、节奏与需要提前同步的风险",
+      "evidence_kind": "collaboration-habit"
+    },
+    {
+      "id": "restate-team-decision",
+      "label": "阅读一条近期团队决策记录，并向相关角色复述自己的下一步",
+      "evidence_kind": "collaboration-habit"
+    }
+  ],
+  "output_contract": {
+    "people_ai_output": "role-and-collaboration-readiness",
+    "prototype_output": "ephemeral-local-evidence-draft",
+    "shared_write_permitted": false,
+    "minimum_fields": [
+      "selected_action",
+      "counterpart_role_not_name",
+      "observed_expectation_or_habit",
+      "next_repeatable_behavior",
+      "learner_self_attestation"
+    ],
+    "prohibited_content": [
+      "real-person-name",
+      "customer-name",
+      "confidential-project-detail",
+      "automated-employment-decision",
+      "unverified-talent-conclusion"
+    ]
+  },
+  "machine_acceptance": [
+    {
+      "id": "truthful-single-primary-action",
+      "criterion": "Every actionable state exposes exactly one enabled primary action, and clicking alone never claims that the real-world action or shared evidence write succeeded."
+    },
+    {
+      "id": "context-before-action",
+      "criterion": "The learner must view both input groups, their source status, and the Exploration Camp human-gate warning before choosing an action."
+    },
+    {
+      "id": "real-action-before-evidence",
+      "criterion": "Evidence capture stays unavailable until the learner selects an action, provides a time plan, and explicitly self-attests that the real-world action occurred."
+    },
+    {
+      "id": "evidence-minimum-and-privacy",
+      "criterion": "The receipt contains all minimum evidence fields, uses counterpart role rather than a person name, carries a local-draft label, and states that nothing was written to shared sources."
+    },
+    {
+      "id": "three-viewport-continuity",
+      "criterion": "The complete path has no horizontal overflow or hidden primary action at 390, 768, and 1280 CSS pixels."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "criterion": "Keyboard and touch-equivalent controls, reduced motion, validation errors, reload recovery of an unfinished local draft, and restart behavior preserve one clear next action without console errors."
+    },
+    {
+      "id": "shared-fact-boundary",
+      "criterion": "The isolated prototype performs no network request, identity mutation, shared Person/Capability/Evidence/Progress write, invitation creation, or production action."
+    }
+  ],
+  "human_acceptance": [
+    {
+      "id": "orientation-and-source-boundary",
+      "protocol": "Without facilitator explanation, ask first-time target newcomers what information came from Exploration Camp, what came from role/organization context, and whether either source has been written by this prototype.",
+      "threshold": "3/3 correctly distinguish the two inputs and say the prototype does not write shared facts."
+    },
+    {
+      "id": "independent-action-selection",
+      "protocol": "Observe first-time target newcomers from arrival through a specific action card without hints.",
+      "threshold": "3/3 independently choose a relevant action, counterpart role, and time plan within 3 minutes; 0 facilitator rescues."
+    },
+    {
+      "id": "real-integration-action",
+      "protocol": "Within one working day, verify with the participant that the selected interaction actually occurred; do not treat prototype clicks as proof.",
+      "threshold": "3/3 complete one real interaction with an appropriate work counterpart."
+    },
+    {
+      "id": "reviewable-evidence",
+      "protocol": "A human reviewer checks the participant-authored draft for minimum fields, specificity, privacy, and whether it supports role readiness or a collaboration habit without becoming an employment decision.",
+      "threshold": "3/3 drafts are accepted without requesting private names or confidential details."
+    },
+    {
+      "id": "clarity-and-willingness",
+      "protocol": "After receipt, ask for 1-5 ratings on progress clarity and willingness to repeat the collaboration habit.",
+      "threshold": "Median >= 4/5 on both questions."
+    }
+  ],
+  "evidence_targets": {
+    "machine": [
+      "390-arrival-and-receipt-screenshots",
+      "768-context-and-action-screenshots",
+      "1280-arrival-and-receipt-screenshots",
+      "browser-traversal-log",
+      "console-and-network-summary",
+      "contract-test-output"
+    ],
+    "human": [
+      "participant-profile-and-sample-size",
+      "unprompted-protocol-observation",
+      "real-action-confirmation-without-sensitive-content",
+      "human-review-outcome",
+      "clarity-and-willingness-ratings"
+    ]
+  },
+  "human_gate": {
+    "status": "NOT_RUN",
+    "machine_evidence_may_substitute": false,
+    "ready_for_human_freezes_candidate": true,
+    "promotion_requires_program_controller": true
+  },
+  "prohibited_claims": [
+    "Exploration Camp human validation passed",
+    "a prototype click proves a real integration action",
+    "the evidence draft was saved to the shared Evidence Ledger",
+    "role readiness is an employment, promotion, compensation, termination, or performance-rating decision",
+    "this map or the full Muchen Journey is released or complete"
+  ],
+  "authority_refs": [
+    "config/muchen_journey_product.json#/maps/1",
+    "docs/41_PEOPLE_AI_PROGRAM_AND_PLATFORM_CONTRACT.md"
+  ]
+}
