@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823-r3",
+  "evaluated_on": "2026-08-23",
+  "evaluation_role": "INDEPENDENT_READ_ONLY",
+  "source_commit": "6e4a4d0",
+  "verdict": "READY_FOR_HUMAN",
+  "p0_p1_findings": [],
+  "integrity": {
+    "result": "PASS",
+    "checked_from_git_objects": true,
+    "runtime_files": "5/5",
+    "evidence_files": "6/6",
+    "dirty_integration_worktree_used_as_candidate": false
+  },
+  "golden_path": {
+    "start": "private-invitation-entry",
+    "end": "first-required-learning-material-opened",
+    "result": "PASS",
+    "fresh_browser_session": true,
+    "viewport": "390x844",
+    "independent_result": "A fresh synthetic private invitation naturally reached the first required material with the learner output still locked."
+  },
+  "machine_criteria": [
+    {
+      "id": "single-primary-action",
+      "result": "PASS",
+      "evidence": "The orientation block is non-interactive; invitation phases, /app, and the material endpoint each preserve one truthful primary action."
+    },
+    {
+      "id": "three-viewport-continuity",
+      "result": "PASS",
+      "evidence": "Frozen 390/768/1280 evidence has no horizontal overflow or obscured primary action; the fresh 390 session independently reproduced the endpoint."
+    },
+    {
+      "id": "input-before-output",
+      "result": "PASS",
+      "evidence": "The required material is visible and the output area explicitly remains locked until material completion."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "result": "PASS",
+      "evidence": "Fragment clearing, JOIN/REENTRY truthfulness, reduced motion, invalid recovery, refresh behavior, and zero console errors/warnings are supported by frozen and fresh evidence."
+    }
+  ],
+  "human_gate": {
+    "status": "NOT_RUN",
+    "machine_evidence_substituted": false,
+    "record": "outputs/controller-integration/exploration-private-invite-orientation-v2/human-validation/results.json"
+  },
+  "promotion_authorized": false,
+  "release_authorized": false,
+  "production_mutation_executed": false
+}
