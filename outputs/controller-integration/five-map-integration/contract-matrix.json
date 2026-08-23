@@ -2,7 +2,7 @@
   "schema_version": 1,
   "reviewed_on": "2026-08-23",
   "controller": "muchen-journey-program-control",
-  "integration_scope": "shared-home-and-five-map-frozen-candidates",
+  "integration_scope": "shared-home-golden-path-and-five-map-frozen-candidates",
   "shared_home_included": true,
   "formal_product_integration": false,
   "release_authorized": false,
@@ -11,12 +11,14 @@
   "controller_verdict": "NEXT_ROUND_INTEGRATED_HUMAN_GATES_OPEN",
   "shared_home": {
     "source_commit": "a525d68",
-    "integration_commit": "4df67ff",
-    "candidate_ref": "outputs/controller-integration/shared-home-r2/candidate-manifest.json",
-    "evaluator_ref": "outputs/controller-integration/shared-home-r2/evaluator-report.json",
+    "integration_commit": "1883b17",
+    "candidate_evidence_commit": "95f2e89",
+    "evaluator_commit": "f2514aa",
+    "candidate_ref": "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+    "evaluator_ref": "outputs/controller-integration/golden-path-r4/evaluator-report.json",
     "evaluator_verdict": "READY_FOR_HUMAN",
     "human_gate": "NOT_RUN",
-    "controller_decision": "MERGED_AS_FROZEN_R2_CONTROLLER_CANDIDATE"
+    "controller_decision": "MERGED_AS_FROZEN_R4_COMPOSITE_CONTROLLER_CANDIDATE"
   },
   "maps": [
     {
@@ -25,14 +27,16 @@
       "initial_source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
       "initial_evaluator_verdict": "MACHINE_FAIL",
       "remediation_contract_commit": "82b92f5",
-      "source_commit": "6e4a4d0",
-      "integration_commit": "6e4a4d0",
-      "candidate_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/candidate-manifest.json",
-      "evaluator_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/evaluator-report.json",
+      "source_commit": "1883b17",
+      "integration_commit": "1883b17",
+      "candidate_evidence_commit": "95f2e89",
+      "evaluator_commit": "f2514aa",
+      "candidate_ref": "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+      "evaluator_ref": "outputs/controller-integration/golden-path-r4/evaluator-report.json",
       "evaluator_verdict": "READY_FOR_HUMAN",
       "human_gate": "NOT_RUN",
-      "controller_decision": "MERGED_AS_FROZEN_R3_CANDIDATE",
-      "reason": "The private invitation now exposes the whole five-map orientation before the first action and independently reaches the first required material."
+      "controller_decision": "MERGED_AS_FROZEN_R4_COMPOSITE_CANDIDATE",
+      "reason": "The self-contained controller candidate naturally connects the whole-journey home, private invitation, current Exploration Camp station, and first required material from one clean source commit."
     },
     {
       "map": "newcomer-village",
@@ -80,6 +84,14 @@
       "human_gate": "NOT_RUN",
       "controller_decision": "MERGED_AS_FROZEN_R2_ISOLATED_CANDIDATE",
       "reason": "The versioned R2 contract, runtime, evaluator report, and responsive evidence are hash-frozen with P0=0 and P1=0."
+    }
+  ],
+  "controller_closed_findings": [
+    {
+      "priority": "P1",
+      "finding": "Strict CSP rejected next/image fill inline styles and caused the current-station artwork to push the primary CTA below the first viewport at medium and wide widths.",
+      "resolution_commit": "dda2e14",
+      "verification": "Frozen R4 evidence shows the CSS-rendered world map, one above-the-fold CTA at 390/768/1280, no horizontal overflow, and a fresh-session console with zero errors and warnings."
     }
   ]
 }

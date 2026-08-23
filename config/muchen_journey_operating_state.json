@@ -48,21 +48,23 @@
     "integration_strategy": "CONTINUOUS_CONTROLLER_MERGE",
     "controller_integration_workstreams": {
       "shared-home-whole-journey-entry": {
-        "state": "READY_FOR_HUMAN_FROZEN_R2",
+        "state": "READY_FOR_HUMAN_FROZEN_R4_COMPOSITE",
         "contract_ref": "outputs/controller-integration/shared-home/contract.json",
         "thread_id": "01a02d34-c450-71b1-bb07-55fdf347f3fd",
         "worktree": "/Users/liumowen/.codex/worktrees/07af/Muchen Journey2.0",
         "source_commit": "a525d68",
-        "integration_commit": "4df67ff",
-        "candidate_ref": "outputs/controller-integration/shared-home-r2/candidate-manifest.json",
-        "evaluator_ref": "outputs/controller-integration/shared-home-r2/evaluator-report.json",
+        "integration_commit": "1883b17",
+        "candidate_evidence_commit": "95f2e89",
+        "evaluator_commit": "f2514aa",
+        "candidate_ref": "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+        "evaluator_ref": "outputs/controller-integration/golden-path-r4/evaluator-report.json",
         "evaluator_verdict": "READY_FOR_HUMAN",
         "human_gate": "NOT_RUN",
         "release_authorized": false
       }
     },
     "map_workstreams": {
-      "exploration-camp": "READY_FOR_HUMAN_FROZEN_R3_HUMAN_PACKAGE_READY_NOT_RUN",
+      "exploration-camp": "READY_FOR_HUMAN_FROZEN_R4_COMPOSITE_HUMAN_PACKAGE_READY_NOT_RUN",
       "newcomer-village": "READY_FOR_HUMAN_FROZEN_HUMAN_PACKAGE_READY_NOT_RUN",
       "ai-academy": "READY_FOR_HUMAN_FROZEN_HUMAN_PACKAGE_READY_NOT_RUN",
       "delivery-guild": "READY_FOR_HUMAN_FROZEN_HUMAN_PACKAGE_READY_NOT_RUN",
@@ -80,11 +82,13 @@
         "initial_blocker": "The natural private-invitation path bypassed the only five-map orientation surface before the first required material.",
         "remediation_contract_source_commit": "710a386",
         "remediation_contract_integration_commit": "82b92f5",
-        "runtime_integration_commit": "6e4a4d0",
-        "candidate_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/candidate-manifest.json",
-        "evaluator_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/evaluator-report.json",
+        "runtime_integration_commit": "1883b17",
+        "candidate_evidence_commit": "95f2e89",
+        "evaluator_commit": "f2514aa",
+        "candidate_ref": "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+        "evaluator_ref": "outputs/controller-integration/golden-path-r4/evaluator-report.json",
         "evaluator_verdict": "READY_FOR_HUMAN",
-        "integration_decision": "MERGED_AS_FROZEN_R3_CANDIDATE",
+        "integration_decision": "MERGED_AS_FROZEN_R4_COMPOSITE_CANDIDATE",
         "human_gate": "NOT_RUN",
         "formal_product_promoted": false,
         "release_authorized": false
@@ -148,23 +152,33 @@
         "formal_product_integration": false
       }
     ],
+    "controller_closed_findings": [
+      {
+        "priority": "P1",
+        "finding": "The Exploration Camp journey art used next/image fill under a strict CSP, causing an inline-style console error and pushing the primary CTA below the first viewport at 768 and 1280 pixels.",
+        "resolution_commit": "dda2e14",
+        "verification": "CSS-background rendering, CTA visible in the first viewport at 390/768/1280, and zero console errors or warnings in a fresh production-mode session."
+      }
+    ],
     "production_mutation_executed": false
   },
   "current_product_candidate": {
-    "candidate_id": "exploration-private-invite-orientation-v2-20260823-r3",
+    "candidate_id": "controller-golden-path-home-to-first-material-20260823-r4",
     "map": "exploration-camp",
-    "golden_path": "exploration-camp-first-meaningful-action",
+    "golden_path": "shared-home-to-exploration-first-required-material",
     "state": "AWAITING_HUMAN",
     "machine_verdict": "READY_FOR_HUMAN",
     "controller_review_verdict": "READY_FOR_HUMAN",
-    "controller_review_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/evaluator-report.json",
-    "source_commit": "6e4a4d0",
+    "controller_review_ref": "outputs/controller-integration/golden-path-r4/evaluator-report.json",
+    "source_commit": "1883b17",
+    "candidate_evidence_commit": "95f2e89",
+    "evaluator_commit": "f2514aa",
     "p0_p1_findings": 0,
     "human_gate": "NOT_RUN",
     "frozen_on": "2026-08-23",
-    "manifest_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/candidate-manifest.json",
-    "human_evidence_template_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2/human-validation/session-sheet.md",
-    "human_evidence_record_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2/human-validation/results.json",
+    "manifest_ref": "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+    "human_evidence_template_ref": "outputs/controller-integration/golden-path-r4/human-validation/session-sheet.md",
+    "human_evidence_record_ref": "outputs/controller-integration/golden-path-r4/human-validation/results.json",
     "release_authorized": false
   },
   "next_safe_work": {
@@ -173,15 +187,15 @@
     "may_depend_on_unvalidated_interaction_assumptions": false,
     "artifacts": [
       "outputs/controller-integration/five-map-integration/contract-matrix.json",
-      "outputs/controller-integration/shared-home-r2/candidate-manifest.json",
-      "outputs/controller-integration/exploration-private-invite-orientation-v2-r3/candidate-manifest.json",
+      "outputs/controller-integration/golden-path-r4/candidate-manifest.json",
+      "outputs/controller-integration/golden-path-r4/evaluator-report.json",
       "outputs/map-workstreams/newcomer-village/human-validation/",
       "outputs/map-workstreams/ai-academy/human-validation/",
       "outputs/map-workstreams/delivery-guild/human-validation/",
       "outputs/map-workstreams/boss-dungeon/candidates/boss-dungeon-first-verifiable-decision-20260823-r2/"
     ],
     "next_decisions": [
-      "Run the shared-home and Exploration Camp first-time-human gates against their pinned frozen candidates.",
+      "Run the shared-home-to-first-required-material first-time-human gate against the pinned R4 composite candidate.",
       "Run separate human gates for Newcomer Village, AI Academy, Delivery Guild, and BOSS Dungeon; none blocks unrelated permanent-goal work.",
       "Before a non-Exploration Journey becomes authoritative in /app, remove the hard-coded Exploration Camp eyebrow described in the shared-home controller proposal.",
       "Do not promote or release any candidate from machine evidence alone."
