@@ -21,6 +21,10 @@ const learnerLayout = await readFile(
   new URL("../src/app/app/layout.tsx", import.meta.url),
   "utf8",
 );
+const learnerHome = await readFile(
+  new URL("../src/app/app/page.tsx", import.meta.url),
+  "utf8",
+);
 const styles = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
@@ -91,6 +95,19 @@ test("Day 0 begins with a concrete 10-second choice and a three-line departure c
   assert.match(taskPage, /需要帮助？查看完整要求/);
   assert.match(taskPage, /href=\{isDayZero \? "#day-zero-choice" : "#learning-materials-title"\}/);
   assert.match(taskPage, /href="#learning-materials-title"/);
+});
+
+test("the Day 0 current action explains its value before the learner opens it", () => {
+  assert.match(learnerHome, /node\.status === "CURRENT"/);
+  assert.match(learnerHome, /currentJourneyNode\?\.stage_kind === "DAY_0"/);
+  assert.match(
+    learnerHome,
+    /先带着一个真实问题出发，后面的每份材料都会给你一条线索。/,
+  );
+  assert.ok(
+    learnerHome.indexOf("先带着一个真实问题出发") <
+      learnerHome.indexOf('<details className="journey-support">'),
+  );
 });
 
 test("long source materials are framed as one-answer exploration instead of required consumption", () => {
