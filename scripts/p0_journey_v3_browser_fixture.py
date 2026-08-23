@@ -14,14 +14,14 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 
 STAGES = (
-    ("DAY-0", "启程"),
-    ("TRE-001-COMPANY-VALUES", "公司价值"),
-    ("TRE-002-AI-DATA-BASICS", "AI 与模型"),
-    ("TRE-003-PROJECT-AWARENESS", "项目认知"),
-    ("TRE-004-DELIVERY-FIT", "交付边界"),
-    ("ASM-001-RULE-BREAKDOWN", "规则拆解"),
-    ("ASM-002-MODEL-JUDGEMENT", "模型判断"),
-    ("ASM-003-DATA-CONSTRUCTION", "数据构造"),
+    ("DAY-0", "Day 0｜启程"),
+    ("TRE-001-COMPANY-VALUES", "宝藏一｜公司价值"),
+    ("TRE-002-AI-DATA-BASICS", "宝藏二｜AI 与数据基础"),
+    ("TRE-003-PROJECT-AWARENESS", "宝藏三｜项目认知"),
+    ("TRE-004-DELIVERY-FIT", "宝藏四｜交付边界"),
+    ("ASM-001-RULE-BREAKDOWN", "评测一｜规则拆解"),
+    ("ASM-002-MODEL-JUDGEMENT", "评测二｜模型判断"),
+    ("ASM-003-DATA-CONSTRUCTION", "评测三｜数据构造"),
 )
 
 
@@ -62,7 +62,7 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
     requires_external_document = stable_key.startswith("ASM-")
     return {
         "expected_revision": revision,
-        "title": f"{title} · P0 浏览器验证",
+        "title": title,
         "purpose": "验证新人可以先完成学习输入，再留下当前阶段的结构化证据并继续旅程。",
         "learner_outcome": "新人能够辨认当前位置、完成输入并提交一份与当前主题对应的证据。",
         "instructions": [
