@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "evaluation_role": "INDEPENDENT_READ_ONLY_MAP_EVALUATOR",
+  "evaluated_on": "2026-08-23",
+  "verdict": "READY_FOR_HUMAN",
+  "target": {
+    "map": "ai-academy",
+    "workstream": "ai-academy",
+    "golden_path_id": "ai-academy-first-explainable-practice-evidence",
+    "starts_at": "synthetic-personal-goal-and-role-requirement-visible",
+    "ends_at": "explainable-practice-evidence-visible",
+    "entry": "http://127.0.0.1:4173/ai-academy/",
+    "route": "/ai-academy/"
+  },
+  "machine_acceptance": [
+    {
+      "id": "single-primary-action",
+      "result": "PASS",
+      "evidence": "Every naturally traversed step exposed one visible primary action; unavailable later steps were not interactive."
+    },
+    {
+      "id": "input-before-output",
+      "result": "PASS",
+      "evidence": "The practice form was absent until the evaluator expanded and acknowledged all four learning-input parts."
+    },
+    {
+      "id": "meaningful-practice",
+      "result": "PASS",
+      "evidence": "An empty submission produced field-specific errors and no evidence; four disclosed minimum-length inputs were required before the final record appeared."
+    },
+    {
+      "id": "explainable-bounded-evidence",
+      "result": "PASS",
+      "evidence": "The final state echoed four learner inputs without model scoring and visibly denied course, mastery, role-readiness, performance, promotion, and employment conclusions."
+    },
+    {
+      "id": "three-viewport-continuity",
+      "result": "PASS",
+      "evidence": "Independent first-time traversals reached the exact end at 390, 768, and 1280 CSS pixels; document scroll width equaled viewport width at each size."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "result": "PASS",
+      "evidence": "Keyboard Enter, 54px primary targets, reduced-motion emulation, validation errors, invalid-fixture recovery, restart, and reload-to-empty-state checks passed with zero console errors on normal and schema-error recovery paths."
+    }
+  ],
+  "smallest_representative_evidence": [
+    "outputs/map-workstreams/ai-academy/browser-evidence/390-step-1.png",
+    "outputs/map-workstreams/ai-academy/browser-evidence/390-step-4.png",
+    "outputs/map-workstreams/ai-academy/browser-evidence/768-step-4.png",
+    "outputs/map-workstreams/ai-academy/browser-evidence/1280-step-4.png",
+    "outputs/map-workstreams/ai-academy/browser-evidence/manifest.json"
+  ],
+  "p0_blockers": [],
+  "p1_blockers": [],
+  "non_blocking_backlog": [],
+  "shared_platform_assessment": {
+    "duplicate_shared_facts_observed": false,
+    "identity_or_session_used": false,
+    "shared_write_observed": false,
+    "integration_assessed": false
+  },
+  "human_gate": {
+    "status": "UNTOUCHED",
+    "criteria_remaining": [
+      "goal-requirement-connection",
+      "method-recall",
+      "meaningful-first-practice",
+      "evidence-boundary-comprehension",
+      "clarity-and-continuation",
+      "zero-facilitator-rescue"
+    ],
+    "machine_evidence_does_not_prove": [
+      "unprompted comprehension",
+      "content usefulness",
+      "transfer to real work",
+      "willingness to continue",
+      "facilitator independence"
+    ]
+  },
+  "candidate": {
+    "must_remain_frozen": true,
+    "controller_handoff": "CONTRACT_AND_COMPATIBILITY_REVIEW_ONLY",
+    "integration_or_release_authorized": false
+  },
+  "next_action": "Run the frozen candidate with three target learners using the exact unprompted protocol in human-validation-plan.md; preserve participant-safe evidence and do not alter the candidate during the measured sessions."
+}

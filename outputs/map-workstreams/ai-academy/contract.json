@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "contract_type": "ISOLATED_MAP_GOLDEN_PATH",
+  "map": "ai-academy",
+  "map_name": "AI学院",
+  "map_order": 3,
+  "phase": "ISOLATED_DRAFT_BUILD",
+  "status": "READY_FOR_HUMAN",
+  "machine_evaluation": {
+    "verdict": "READY_FOR_HUMAN",
+    "evaluated_on": "2026-08-23",
+    "p0_blockers": [],
+    "p1_blockers": [],
+    "human_validation": "NOT_INFERRED",
+    "candidate_frozen": true,
+    "evidence_ref": "outputs/map-workstreams/ai-academy/evaluator-report.json"
+  },
+  "formal_golden_path_promoted": false,
+  "depends_on_current_human_result": false,
+  "people_ai_output": "ai-capability-profile",
+  "shared_facts_policy": {
+    "person": "READ_ONLY_SYNTHETIC_FIXTURE",
+    "capability": "READ_ONLY_SYNTHETIC_FIXTURE",
+    "evidence": "NO_SHARED_WRITE",
+    "progress": "NO_SHARED_WRITE",
+    "identity": "NO_IDENTITY_OR_SESSION",
+    "persistence": "NONE"
+  },
+  "active_golden_path": {
+    "id": "ai-academy-first-explainable-practice-evidence",
+    "learner_outcome": "A learner can connect one personal capability goal to one role AI capability need, complete the first learning input, apply it in one meaningful structured exercise, and inspect an explainable record of exactly what they practiced without receiving an employment or formal mastery judgment.",
+    "starts_at": "synthetic-personal-goal-and-role-requirement-visible",
+    "ends_at": "explainable-practice-evidence-visible",
+    "entry": "http://127.0.0.1:4173/ai-academy/",
+    "route": "/ai-academy/",
+    "steps": [
+      {
+        "id": "goal",
+        "label": "看见目标",
+        "required_action": "Acknowledge the connection between the synthetic personal goal and synthetic role requirement."
+      },
+      {
+        "id": "input",
+        "label": "完成输入",
+        "required_action": "Read the first learning input and reveal its four-part method."
+      },
+      {
+        "id": "practice",
+        "label": "完成练习",
+        "required_action": "Write a concrete response for outcome, context, constraints, and verification in the synthetic practice scenario."
+      },
+      {
+        "id": "evidence",
+        "label": "查看证据",
+        "required_action": "Inspect the deterministic practice record and its limitations."
+      }
+    ],
+    "content_policy": {
+      "fixture": "SYNTHETIC",
+      "approved_formal_course": false,
+      "approved_talent_judgment": false,
+      "fixture_label_required_on_every_step": true
+    },
+    "machine_acceptance": [
+      {
+        "id": "single-primary-action",
+        "criterion": "Each step exposes exactly one enabled primary action; later steps remain unavailable until the required prior action is complete."
+      },
+      {
+        "id": "input-before-output",
+        "criterion": "The learner must open and acknowledge the complete learning input before the practice form is available."
+      },
+      {
+        "id": "meaningful-practice",
+        "criterion": "Evidence cannot be generated until all four structured response fields contain non-whitespace learner input meeting the disclosed minimum lengths."
+      },
+      {
+        "id": "explainable-bounded-evidence",
+        "criterion": "The final record shows the learner's four inputs and deterministic completion checks while explicitly denying formal course, mastery, role-readiness, performance, promotion, or employment conclusions."
+      },
+      {
+        "id": "three-viewport-continuity",
+        "criterion": "The complete path works at 390, 768, and 1280 CSS pixels without horizontal overflow or a hidden primary action."
+      },
+      {
+        "id": "interaction-and-recovery",
+        "criterion": "Keyboard, touch-sized targets, reduced motion, validation errors, and restart behavior preserve one clear next action without console errors."
+      }
+    ],
+    "human_acceptance": [
+      {
+        "id": "goal-requirement-connection",
+        "criterion": "Without facilitator explanation, target learners can state how the displayed personal goal relates to the displayed role AI requirement within 20 seconds.",
+        "threshold": "3/3 target learners"
+      },
+      {
+        "id": "method-recall",
+        "criterion": "After the learning input, target learners can name the four parts they need to provide before starting the exercise.",
+        "threshold": "3/3 target learners name at least 3 of 4 parts"
+      },
+      {
+        "id": "meaningful-first-practice",
+        "criterion": "Without facilitator rescue, target learners complete the exercise with a response they say they would actually reuse for a similar work task.",
+        "threshold": "3/3 target learners"
+      },
+      {
+        "id": "evidence-boundary-comprehension",
+        "criterion": "Target learners can explain both what the record proves and one thing it does not prove.",
+        "threshold": "3/3 target learners"
+      },
+      {
+        "id": "clarity-and-continuation",
+        "criterion": "Learners rate goal clarity, evidence clarity, and willingness to continue.",
+        "threshold": "median >= 4/5 for all three questions"
+      },
+      {
+        "id": "zero-facilitator-rescue",
+        "criterion": "No facilitator explains terminology, route, exercise requirements, or evidence meaning during the measured path.",
+        "threshold": "0 interventions"
+      }
+    ],
+    "stop_rule": "Machine acceptance may move only this isolated candidate to READY_FOR_HUMAN. The candidate must then be frozen; no human pass, integration, release, or People AI conclusion may be inferred."
+  },
+  "write_boundary": [
+    "docs/maps/ai-academy/",
+    "prototypes/ai-academy/",
+    "outputs/map-workstreams/ai-academy/"
+  ],
+  "prohibited_claims": [
+    "synthetic content is an approved company course",
+    "exercise completion proves capability mastery or role readiness",
+    "machine evidence proves learner comprehension or motivation",
+    "the map is integrated, promoted, released, or production connected"
+  ],
+  "source_refs": [
+    "config/muchen_journey_product.json#/maps/2",
+    "docs/41_PEOPLE_AI_PROGRAM_AND_PLATFORM_CONTRACT.md"
+  ]
+}

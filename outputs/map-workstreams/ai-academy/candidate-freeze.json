@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "candidate_id": "ai-academy-first-explainable-practice-evidence-20260823-r1",
+  "map": "ai-academy",
+  "golden_path_id": "ai-academy-first-explainable-practice-evidence",
+  "status": "READY_FOR_HUMAN",
+  "frozen_on": "2026-08-23",
+  "human_validation": "NOT_INFERRED",
+  "integration_authorized": false,
+  "release_authorized": false,
+  "artifacts": [
+    {
+      "path": "prototypes/ai-academy/index.html",
+      "sha256": "db2aee7a041ad7db2245b8b151fca4b9fb0e5b734af73c693de7fa24ae842a78"
+    },
+    {
+      "path": "prototypes/ai-academy/styles.css",
+      "sha256": "fa83a5fe3ea05433240992e60f296cc8b3549874de6901a4b056e18a3550a8a2"
+    },
+    {
+      "path": "prototypes/ai-academy/app.js",
+      "sha256": "5da4052a2df2e79be7b659fab840b5e0b4c2b49569a76889a39596b9d9658554"
+    },
+    {
+      "path": "prototypes/ai-academy/synthetic-fixture.json",
+      "sha256": "79255c347b586b71a8516e5e79f88835926ab889d0cbdfea2eddc6de63f7a2af"
+    },
+    {
+      "path": "outputs/map-workstreams/ai-academy/contract.json",
+      "sha256": "11a59b5f6c823a6f487934096a9df9e6bf8b496c8af1a4b063c8ebb9f5943c95"
+    }
+  ],
+  "mutation_rule": "Any change to a frozen artifact creates a new candidate and requires complete machine reevaluation before human testing."
+}
