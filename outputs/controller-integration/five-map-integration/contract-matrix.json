@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-08-23",
+  "controller": "muchen-journey-program-control",
+  "integration_scope": "five-map-isolated-candidates-only",
+  "shared_home_included": false,
+  "formal_product_integration": false,
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "shared_platform_commit": "d32eef0",
+  "maps": [
+    {
+      "map": "exploration-camp",
+      "order": 1,
+      "source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+      "evaluator_verdict": "MACHINE_FAIL",
+      "human_gate": "NOT_RUN",
+      "controller_decision": "HELD_NOT_MERGED",
+      "reason": "P1: private invitation bypasses the five-map orientation required by the current learner outcome."
+    },
+    {
+      "map": "newcomer-village",
+      "order": 2,
+      "source_commit": "14cc8b31936597f846c9b48bdaa36f7658155e61",
+      "integration_commit": "e795248",
+      "evaluator_verdict": "READY_FOR_HUMAN",
+      "human_gate": "NOT_RUN",
+      "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
+    },
+    {
+      "map": "ai-academy",
+      "order": 3,
+      "source_commit": "2e9561968d35676d09b3eacfe06b994276846e27",
+      "integration_commit": "affe3b7",
+      "evaluator_verdict": "READY_FOR_HUMAN",
+      "human_gate": "NOT_INFERRED",
+      "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
+    },
+    {
+      "map": "delivery-guild",
+      "order": 4,
+      "source_commit": "9b222163ca5137acd2f1d726a8686c6675eb5089",
+      "integration_commit": "9a5bd3e",
+      "evaluator_verdict": "READY_FOR_HUMAN",
+      "human_gate": "NOT_RUN",
+      "controller_decision": "MERGED_AS_FROZEN_ISOLATED_CANDIDATE"
+    },
+    {
+      "map": "boss-dungeon",
+      "order": 5,
+      "source_commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+      "integration_commit": "b43fdcb",
+      "reported_evaluator_verdict": "READY_FOR_HUMAN",
+      "authoritative_contract_status": "ACTIVE_DRAFT",
+      "human_gate": "UNTOUCHED",
+      "controller_decision": "MERGED_AS_ACTIVE_DRAFT_ONLY",
+      "reason": "The committed contract was not reconciled to READY_FOR_HUMAN and the commit contains no evaluator report."
+    }
+  ]
+}

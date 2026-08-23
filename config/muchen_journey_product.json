@@ -134,6 +134,15 @@
       }
     ],
     "stop_rule": "A READY_FOR_HUMAN candidate is frozen and cannot be promoted or released without valid human evidence. Other map workstreams may continue only within isolated, non-dependent boundaries while the program controller preserves this candidate.",
+    "controller_review": {
+      "reviewed_on": "2026-08-23",
+      "verdict": "MACHINE_FAIL",
+      "severity": "P1",
+      "source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+      "blocker": "The natural private-invitation path starts at /join and reaches the first required material without exposing the five-map orientation required by the learner outcome.",
+      "candidate_merge_allowed": false,
+      "release_authorized": false
+    },
     "source_refs": [
       "docs/33_WP17_LEARNER_EXPERIENCE_PROTOTYPE.md",
       "docs/37_WP25_WP30_LEARNING_PRODUCTIZATION_WORK_PACKAGES.md",
@@ -149,9 +158,9 @@
       "mission": "建立旅程方向感、成长意图和第一份可核对的能力基线。",
       "people_ai_output": "person-growth-baseline",
       "workstream": {
-        "phase": "AWAITING_HUMAN",
-        "contract_status": "ACTIVE",
-        "golden_path_status": "READY_FOR_HUMAN",
+        "phase": "CONTROLLER_REVIEW_BLOCKED",
+        "contract_status": "P1_PRIVATE_INVITE_ORIENTATION_BLOCKER",
+        "golden_path_status": "MACHINE_FAIL",
         "owned_contract_ref": "config/muchen_journey_product.json#/current_golden_path",
         "may_promote_without_human_pass": false
       }
@@ -163,9 +172,9 @@
       "mission": "完成公司、岗位、协作方式与基本工作习惯的真实融入。",
       "people_ai_output": "role-and-collaboration-readiness",
       "workstream": {
-        "phase": "ISOLATED_DRAFT_BUILD",
-        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
-        "golden_path_status": "TO_DEFINE",
+        "phase": "ISOLATED_AWAITING_HUMAN",
+        "contract_status": "FROZEN_CANDIDATE",
+        "golden_path_status": "READY_FOR_HUMAN",
         "owned_contract_ref": "outputs/map-workstreams/newcomer-village/contract.json",
         "may_promote_without_human_pass": false
       }
@@ -177,9 +186,9 @@
       "mission": "通过课程、练习与测评形成可解释的 AI 能力成长记录。",
       "people_ai_output": "ai-capability-profile",
       "workstream": {
-        "phase": "ISOLATED_DRAFT_BUILD",
-        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
-        "golden_path_status": "TO_DEFINE",
+        "phase": "ISOLATED_AWAITING_HUMAN",
+        "contract_status": "FROZEN_CANDIDATE",
+        "golden_path_status": "READY_FOR_HUMAN",
         "owned_contract_ref": "outputs/map-workstreams/ai-academy/contract.json",
         "may_promote_without_human_pass": false
       }
@@ -191,9 +200,9 @@
       "mission": "在真实交付协作中积累项目证据、反馈、复盘与导师评价。",
       "people_ai_output": "delivery-capability-evidence",
       "workstream": {
-        "phase": "ISOLATED_DRAFT_BUILD",
-        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
-        "golden_path_status": "TO_DEFINE",
+        "phase": "ISOLATED_AWAITING_HUMAN",
+        "contract_status": "FROZEN_CANDIDATE",
+        "golden_path_status": "READY_FOR_HUMAN",
         "owned_contract_ref": "outputs/map-workstreams/delivery-guild/contract.json",
         "may_promote_without_human_pass": false
       }
@@ -207,8 +216,8 @@
       "people_ai_output": "integrated-project-readiness-evidence",
       "workstream": {
         "phase": "ISOLATED_DRAFT_BUILD",
-        "contract_status": "PROGRAM_SCOPE_CONFIRMED",
-        "golden_path_status": "TO_DEFINE",
+        "contract_status": "ACTIVE_DRAFT",
+        "golden_path_status": "MACHINE_PASS_CONTRACT_RECONCILIATION_REQUIRED",
         "owned_contract_ref": "outputs/map-workstreams/boss-dungeon/contract.json",
         "may_promote_without_human_pass": false
       }

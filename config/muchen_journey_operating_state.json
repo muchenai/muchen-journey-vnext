@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "snapshot_kind": "repository-evidence-catalog-not-live-health",
+  "catalog_updated_on": "2026-08-23",
+  "latest_evidence_on": "2026-08-11",
+  "live_health_checked": false,
+  "staging": {
+    "state": "STAGING_DEPLOYED_EVIDENCE_RECORDED",
+    "candidate_commit": "ff53052847a268d025bceb93c3eab37986d50219",
+    "content_state": "EXPLORATION_CAMP_JOURNEY_V3_PUBLISHED",
+    "evidence_refs": [
+      "config/wp08_staging.json",
+      "docs/runbooks/WP08_VOLCENGINE_STAGING.md"
+    ]
+  },
+  "production": {
+    "state": "CONTROLLED_ALPHA_LIVE_EVIDENCE_RECORDED",
+    "candidate_commit": "ff53052847a268d025bceb93c3eab37986d50219",
+    "release_scope": "EXPLORATION_CAMP_CONTROLLED_ALPHA",
+    "evidence_refs": [
+      "config/wp15_wartime_cutover.json",
+      "docs/40_WP15_WARTIME_PRODUCTION_CUTOVER_EVIDENCE.md"
+    ]
+  },
+  "full_release_gate": "NO_GO",
+  "human_product_validation": "NOT_COMPLETE",
+  "permanent_product_goal": {
+    "status": "ACTIVE",
+    "objective": "Complete a company-wide People AI growth system whose five maps preserve shared identity, capability, evidence, feedback, and momentum and whose core paths pass machine and human acceptance.",
+    "ordered_maps": [
+      "探索营",
+      "新手村",
+      "AI学院",
+      "交付线工会",
+      "BOSS副本"
+    ],
+    "parallel_map_workstreams_enabled": true,
+    "one_active_golden_path_per_map": true,
+    "human_gate_blocks_program_progress": false,
+    "human_gate_blocks_candidate_release": true,
+    "continuous_integration_controller": "muchen-journey-program-control",
+    "production_mutation_authorized": false
+  },
+  "program_control": {
+    "state": "FIVE_MAP_CANDIDATES_CONTROLLER_REVIEWED",
+    "contract_ref": "docs/41_PEOPLE_AI_PROGRAM_AND_PLATFORM_CONTRACT.md",
+    "shared_platform_owner": "muchen-journey-program-control",
+    "integration_strategy": "CONTINUOUS_CONTROLLER_MERGE",
+    "controller_integration_workstreams": {
+      "shared-home-whole-journey-entry": {
+        "state": "ACTIVE",
+        "contract_ref": "outputs/controller-integration/shared-home/contract.json",
+        "thread_id": "01a02d34-c450-71b1-bb07-55fdf347f3fd",
+        "worktree": "/Users/liumowen/.codex/worktrees/07af/Muchen Journey2.0"
+      }
+    },
+    "map_workstreams": {
+      "exploration-camp": "MACHINE_FAIL_P1_PRIVATE_INVITE_ORIENTATION",
+      "newcomer-village": "READY_FOR_HUMAN_FROZEN_ISOLATED",
+      "ai-academy": "READY_FOR_HUMAN_FROZEN_ISOLATED",
+      "delivery-guild": "READY_FOR_HUMAN_FROZEN_ISOLATED",
+      "boss-dungeon": "ACTIVE_DRAFT_MACHINE_PASS_CONTRACT_RECONCILIATION_REQUIRED"
+    },
+    "task_registry": [
+      {
+        "map": "exploration-camp",
+        "thread_id": "01a02d18-e443-7582-91e5-469ee80e38e9",
+        "worktree": "/Users/liumowen/.codex/worktrees/c082/Muchen Journey2.0",
+        "state": "COMPLETED_HELD",
+        "source_commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+        "evaluator_verdict": "MACHINE_FAIL",
+        "integration_decision": "HELD_NOT_MERGED",
+        "integration_blocker": "The natural private-invitation path bypasses the only five-map orientation surface before the first required material."
+      },
+      {
+        "map": "newcomer-village",
+        "thread_id": "01a02d18-e443-7582-91e5-46b7fac7bbca",
+        "worktree": "/Users/liumowen/.codex/worktrees/1195/Muchen Journey2.0",
+        "state": "COMPLETED_MERGED_ISOLATED",
+        "source_commit": "14cc8b31936597f846c9b48bdaa36f7658155e61",
+        "integration_commit": "e795248",
+        "evaluator_verdict": "READY_FOR_HUMAN",
+        "human_gate": "NOT_RUN",
+        "formal_product_integration": false
+      },
+      {
+        "map": "ai-academy",
+        "thread_id": "01a02d18-e441-7c40-8269-ec41fa6f7593",
+        "worktree": "/Users/liumowen/.codex/worktrees/671e/Muchen Journey2.0",
+        "state": "COMPLETED_MERGED_ISOLATED",
+        "source_commit": "2e9561968d35676d09b3eacfe06b994276846e27",
+        "integration_commit": "affe3b7",
+        "evaluator_verdict": "READY_FOR_HUMAN",
+        "human_gate": "NOT_INFERRED",
+        "formal_product_integration": false
+      },
+      {
+        "map": "delivery-guild",
+        "thread_id": "01a02d18-e448-7b20-82b1-ebd73680d257",
+        "worktree": "/Users/liumowen/.codex/worktrees/5124/Muchen Journey2.0",
+        "state": "COMPLETED_MERGED_ISOLATED",
+        "source_commit": "9b222163ca5137acd2f1d726a8686c6675eb5089",
+        "integration_commit": "9a5bd3e",
+        "evaluator_verdict": "READY_FOR_HUMAN",
+        "human_gate": "NOT_RUN",
+        "formal_product_integration": false
+      },
+      {
+        "map": "boss-dungeon",
+        "thread_id": "01a02d18-e443-7582-91e5-467fbf2ea254",
+        "worktree": "/Users/liumowen/.codex/worktrees/4da1/Muchen Journey2.0",
+        "state": "COMPLETED_MERGED_DRAFT",
+        "source_commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+        "integration_commit": "b43fdcb",
+        "reported_evaluator_verdict": "READY_FOR_HUMAN",
+        "authoritative_contract_status": "ACTIVE_DRAFT",
+        "integration_decision": "MERGED_AS_ACTIVE_DRAFT_ONLY",
+        "integration_blocker": "The committed contract still says ACTIVE_DRAFT and no evaluator report is included in the candidate commit.",
+        "formal_product_integration": false
+      }
+    ],
+    "production_mutation_executed": false
+  },
+  "current_product_candidate": {
+    "candidate_id": "exploration-camp-first-meaningful-action-20260823-r1",
+    "map": "exploration-camp",
+    "golden_path": "exploration-camp-first-meaningful-action",
+    "state": "AWAITING_HUMAN",
+    "machine_verdict": "READY_FOR_HUMAN",
+    "controller_review_verdict": "MACHINE_FAIL",
+    "controller_review_ref": "a9381f0944fb4c8c852c115e3bc708363ac67a37:outputs/map-workstreams/exploration-camp/evaluator-report.md",
+    "controller_blocker": "Private invitations start at /join and do not expose the five-map orientation required by the current learner outcome before the first material opens.",
+    "human_gate": "NOT_RUN",
+    "frozen_on": "2026-08-23",
+    "manifest_ref": "outputs/muchen-journey-candidates/exploration-camp-first-meaningful-action-20260823-r1.json",
+    "human_evidence_template_ref": "outputs/muchen-journey-candidates/exploration-camp-first-meaningful-action-20260823-r1-human-gate.json",
+    "human_evidence_validator_ref": "scripts/muchen_human_gate.py",
+    "release_authorized": false
+  },
+  "next_safe_work": {
+    "state": "CONTROLLER_INTEGRATION_REVIEW_COMPLETE",
+    "formal_golden_path_promoted": false,
+    "may_depend_on_unvalidated_interaction_assumptions": false,
+    "artifacts": [
+      "outputs/controller-integration/five-map-integration/contract-matrix.json",
+      "outputs/map-workstreams/newcomer-village/contract.json",
+      "outputs/map-workstreams/ai-academy/contract.json",
+      "outputs/map-workstreams/delivery-guild/contract.json",
+      "outputs/map-workstreams/boss-dungeon/contract.json"
+    ],
+    "next_decisions": [
+      "Complete the independent shared-home controller candidate without modifying map candidates.",
+      "Create a new Exploration Camp candidate that preserves private-invite security while exposing five-map orientation before the first required material.",
+      "Reconcile the BOSS Dungeon authoritative contract and committed evaluator evidence before treating it as READY_FOR_HUMAN.",
+      "Run separate human gates for the frozen Newcomer Village, AI Academy, and Delivery Guild candidates; none blocks unrelated program work."
+    ],
+    "production_mutation_executed": false
+  }
+}
