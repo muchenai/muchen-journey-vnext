@@ -202,9 +202,9 @@ def test_active_candidate_binding_matches_deploy_preflight():
 
 def test_active_candidate_local_digests_match_verified_archive():
     expected = {
-        "API_LOCAL_IMAGE_DIGEST": "sha256:11ce12d31a93ab5953b89f7d911cc7b92aa9fe20178d552503aec26732bfec7b",
-        "WEB_LOCAL_IMAGE_DIGEST": "sha256:2f5090a28037ce13af6808e6a1fc67f0fb903a3544f3406e330f3527de57e0c7",
-        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:c89d1aefb21e74df597dc08d329b144aea28eee3184eefde917395c28a5cc848",
+        "API_LOCAL_IMAGE_DIGEST": "sha256:8cea7f00ba3f071b244751b0eb26caae7dc8c5df0a5417f3e3cd0215e4db5c36",
+        "WEB_LOCAL_IMAGE_DIGEST": "sha256:00edb4b400c90270968311e079667adcefc17808c87b3a65fc2a88ffb8194783",
+        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:e298c94beb079115423bfd44d2fb3dd249f659620ea60d0d5166b642c3eaa3ed",
     }
 
     assert prepare.LOCAL_IMAGE_DIGESTS == expected
