@@ -25,6 +25,14 @@ const learnerHome = await readFile(
   new URL("../src/app/app/page.tsx", import.meta.url),
   "utf8",
 );
+const journeyMap = await readFile(
+  new URL("../src/app/app/journey-map.tsx", import.meta.url),
+  "utf8",
+);
+const stageTitle = await readFile(
+  new URL("../src/app/app/stage-title.ts", import.meta.url),
+  "utf8",
+);
 const styles = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
@@ -156,9 +164,11 @@ test("join and result pages keep operational explanations below the primary expe
   assert.match(resultPage, /Journey 8 \/ 8/);
   assert.match(resultPage, /className="treasure-collection"/);
   assert.match(resultPage, /className="ability-collection"/);
-  assert.match(resultPage, /function stageDisplayTitle\(title: string\)/);
-  assert.match(resultPage, /宝藏\[一二三四\]/);
-  assert.match(resultPage, /\(\?:能力\)\?评测\[一二三\]/);
+  assert.match(resultPage, /import \{ stageDisplayTitle \} from "\.\.\/stage-title"/);
+  assert.match(stageTitle, /function stageDisplayTitle\(title: string\)/);
+  assert.match(stageTitle, /Day\\s\*0/);
+  assert.match(stageTitle, /宝藏\[一二三四\]/);
+  assert.match(stageTitle, /\(\?:能力\)\?评测\[一二三\]/);
   assert.match(resultPage, /treasureNodes\.map\(\(node, index\)/);
   assert.doesNotMatch(resultPage, /const treasureLabels =/);
   assert.match(resultPage, /learnerPageRequest<CurrentAction>\("\/api\/v1\/me\/current-action"\)/);
@@ -169,6 +179,15 @@ test("join and result pages keep operational explanations below the primary expe
   assert.ok(resultPage.indexOf("下一步") < resultPage.indexOf("结论分层"));
   assert.doesNotMatch(resultPage, /04 · 通知状态|05 · 不可变时间线/);
   assert.doesNotMatch(resultPage, /系统只整理固定证据/);
+});
+
+test("the map and result share the published Journey stage titles", () => {
+  assert.match(journeyMap, /import \{ stageDisplayTitle \} from "\.\/stage-title"/);
+  assert.match(journeyMap, /stageDisplayTitle\(node\.title\)/);
+  assert.doesNotMatch(journeyMap, /const ROUTE_LABELS/);
+  assert.doesNotMatch(journeyMap, /AI 与模型/);
+  assert.match(resultPage, /stageDisplayTitle\(node\.title\)/);
+  assert.match(resultPage, /stageDisplayTitle\(evaluation\.stage_title\)/);
 });
 
 test("the golden path starts as a journey instead of a generic session shortcut", () => {

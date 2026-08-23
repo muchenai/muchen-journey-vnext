@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { stageDisplayTitle } from "../stage-title";
+
 import { learnerPageRequest } from "@/lib/server/api";
 import type { CurrentAction, Result, Timeline } from "@/lib/server/api";
 
@@ -21,10 +23,6 @@ const admissionLabels: Record<string, string> = {
   DEFER: "暂缓，补充观察",
   NOT_ADMIT: "本次不准入",
 };
-
-function stageDisplayTitle(title: string) {
-  return title.replace(/^(?:宝藏[一二三四]|(?:能力)?评测[一二三])\s*[｜：]\s*/u, "");
-}
 
 function timelineDetail(eventType: string, details: Timeline["items"][number]["details"]) {
   if (eventType === "SUBMISSION_VERSION_CREATED") {

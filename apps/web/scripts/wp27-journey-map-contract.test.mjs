@@ -6,6 +6,10 @@ const component = readFileSync(
   new URL("../src/app/app/journey-map.tsx", import.meta.url),
   "utf8",
 );
+const stageTitle = readFileSync(
+  new URL("../src/app/app/stage-title.ts", import.meta.url),
+  "utf8",
+);
 const css = readFileSync(
   new URL("../src/app/globals.css", import.meta.url),
   "utf8",
@@ -23,19 +27,13 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);
 });
 
-test("all eight formal stages have short route labels and progressive disclosure", () => {
-  for (const stableKey of [
-    "DAY-0",
-    "TRE-001-COMPANY-VALUES",
-    "TRE-002-AI-DATA-BASICS",
-    "TRE-003-PROJECT-AWARENESS",
-    "TRE-004-DELIVERY-FIT",
-    "ASM-001-RULE-BREAKDOWN",
-    "ASM-002-MODEL-JUDGEMENT",
-    "ASM-003-DATA-CONSTRUCTION",
-  ]) {
-    assert.match(component, new RegExp(`"${stableKey}"`));
-  }
+test("published stages use runtime short labels and progressive disclosure", () => {
+  assert.match(component, /import \{ stageDisplayTitle \} from "\.\/stage-title"/);
+  assert.match(component, /stageDisplayTitle\(node\.title\)/);
+  assert.match(stageTitle, /Day\\s\*0/);
+  assert.match(stageTitle, /宝藏\[一二三四\]/);
+  assert.match(stageTitle, /\(\?:能力\)\?评测\[一二三\]/);
+  assert.doesNotMatch(component, /const ROUTE_LABELS/);
   assert.match(component, /<title>\{hint\}<\/title>/);
   assert.match(component, /className="journey-route-accessible"/);
 });

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { stageDisplayTitle } from "./stage-title";
+
 import { JourneyProgress } from "@/lib/server/api";
 
 const KIND_LABELS = {
@@ -13,17 +15,6 @@ const STATUS_LABELS = {
   CURRENT: "当前阶段",
   LOCKED: "未开放",
 } as const;
-
-const ROUTE_LABELS: Record<string, string> = {
-  "DAY-0": "启程",
-  "TRE-001-COMPANY-VALUES": "公司价值",
-  "TRE-002-AI-DATA-BASICS": "AI 与模型",
-  "TRE-003-PROJECT-AWARENESS": "项目认知",
-  "TRE-004-DELIVERY-FIT": "交付边界",
-  "ASM-001-RULE-BREAKDOWN": "规则拆解",
-  "ASM-002-MODEL-JUDGEMENT": "模型判断",
-  "ASM-003-DATA-CONSTRUCTION": "数据构造",
-};
 
 const ROUTE_POINTS = {
   wide: [
@@ -81,7 +72,7 @@ function RouteMapSvg({
               <circle className="route-node-orb" r={isCurrent ? 17 : 10} />
             )}
             <text className="route-node-label" textAnchor="middle" y={isCurrent ? 43 : 36}>
-              {ROUTE_LABELS[node.stable_key] ?? node.title}
+              {stageDisplayTitle(node.title)}
             </text>
           </>
         );
