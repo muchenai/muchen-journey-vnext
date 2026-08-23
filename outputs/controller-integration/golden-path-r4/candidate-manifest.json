@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "candidate_id": "controller-golden-path-home-to-first-material-20260823-r4",
+  "candidate_kind": "CONTROLLER_INTEGRATION_PATH",
+  "supersedes_candidate_ids": [
+    "shared-home-whole-journey-entry-r2",
+    "exploration-private-invite-orientation-v2-20260823-r3"
+  ],
+  "map": "exploration-camp",
+  "golden_path_id": "shared-home-to-exploration-first-required-material",
+  "authoritative_contract_ref": "config/muchen_journey_product.json#/current_golden_path",
+  "state": "FROZEN_AWAITING_INDEPENDENT_EVALUATION",
+  "source_commit": "1883b17f1f7f64415b8c12647e0f7be3c1d04c9f",
+  "builder_machine_verdict": "MACHINE_PASS",
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "fixture_classification": "SYNTHETIC_NO_REAL_PII",
+  "starts_at": "shared-whole-journey-home-visitor",
+  "ends_at": "first-required-learning-material-opened",
+  "routes": [
+    "/",
+    "/join",
+    "/app",
+    "/app/tasks/:assignmentId#first-learning-input"
+  ],
+  "creates_second_golden_path": false,
+  "frozen_on": "2026-08-23",
+  "frozen_runtime_files": {
+    "apps/web/src/app/page.tsx": "70b6833a8f4085756845a656b45559e00de5ee856d82a44bee849ec110a42cf9",
+    "apps/web/src/app/actions.ts": "cd6ff8df69943f3bfc130b26b1d05e63b1951b824a54452ca9496d819a248024",
+    "apps/web/src/lib/server/api.ts": "e8fb97a12e9d095842e165e8372f51fb91fbff8e7a02e9c54e1ace8f2339b8be",
+    "apps/web/src/app/layout.tsx": "3bf5d58fcd4d749b3210857cf7aa9d4d316d7981aaec445a7ab9421f23217040",
+    "apps/web/src/lib/muchen-journey-product.generated.json": "d0f437e8dd059d1340ac1d0e2c9bc84003c4093d8458befe06e657821becee33",
+    "apps/web/src/app/join/page.tsx": "275b9e39d43b0b5f9fc9f94b80548cd5526bb6ac025a9bdea94af1fa0775a101",
+    "apps/web/src/app/join/invite-token-exchange-form.tsx": "72f45338e8f86dac88d53dc48564ba3ac317f6f06b8c9381cdb8ed60b2259ae3",
+    "apps/web/src/app/join/join-submit-button.tsx": "c25e12cd7a9c10ffd9e55622d34eb31185e6edc9ee80973166336b0686f49073",
+    "apps/web/src/app/join/private-invite-orientation.tsx": "8266f695ebf02ad3818a218567440de0e97d19d165ea6abd918d2888d3183c6c",
+    "apps/web/src/app/join/private-invite-orientation.module.css": "0704829b063a0db9c3b5ede248eb405d99ccadbdfd23724b12e2d4de2219148d",
+    "apps/web/src/app/app/page.tsx": "b051c003ec80426df42f25903df6d46332b6da1078fce29530ca578d493567fb",
+    "apps/web/src/app/app/journey-map.tsx": "0c67ab30c225e03d8c2ad37ea0892871af70ca54c9bb98d3cf6a40119a79167d",
+    "apps/web/src/app/app/tasks/[assignmentId]/page.tsx": "b295c31da0a23890e3eaa28f8ce5d647dc02422f4cd62b662cea333cb1e0aa06",
+    "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx": "9cef640a1045e5f9cf04a11958ee2a3194879df725f4d35480f83fd8798f8a81",
+    "apps/web/src/app/globals.css": "f5697335e108d557cb011e63e72dc9a22cfa0482d6128c3dedb887ce6eddb335",
+    "apps/web/public/images/exploration-camp-hero-v2.png": "b88c124d47f759da2b76b0c796bb358a574d4a23b5860c25dfb41ccd4c63651e"
+  },
+  "frozen_evidence_files": {
+    "outputs/controller-integration/golden-path-r4/evidence/home-390.png": "04841ff6a1f579ece30151b1dd4ee1350081be5dd052d2ab0d68d998533c3971",
+    "outputs/controller-integration/golden-path-r4/evidence/home-768.png": "3da55e68717a9c5c0c74ba2fb7d1dfee2eef836a798f84d42a6ae8ef7c4c1b9b",
+    "outputs/controller-integration/golden-path-r4/evidence/home-1280.png": "3a4b14ccc11c778e28673ffb4e126c4be100e6d08f1d78f517f0ef79f4992aa9",
+    "outputs/controller-integration/golden-path-r4/evidence/join-390.png": "8792905c66ac8ca11e67d2c6934f04dbcf3058d47866319288f429b763b14bf7",
+    "outputs/controller-integration/golden-path-r4/evidence/app-390.png": "31cca9a304448ec477f769bf8e40139733104719bc79ad799fe7982974e7a5e1",
+    "outputs/controller-integration/golden-path-r4/evidence/app-768.png": "9630db47b0eb48ea8406bda9cd1d94014334435d25c507706af19fc593c2acaf",
+    "outputs/controller-integration/golden-path-r4/evidence/app-1280.png": "5777e72a71814faadad8098fa5a85561ce353f37113c56154d4d9297a7d0ea54",
+    "outputs/controller-integration/golden-path-r4/evidence/first-material-390.png": "93deb34114ce11660b624397cbb42f5555ad73c9b9d3b3a9a28f014a982a0a3d"
+  },
+  "machine_acceptance_ref": "outputs/controller-integration/golden-path-r4/machine-acceptance.json",
+  "human_validation_record": "outputs/controller-integration/golden-path-r4/human-validation/results.json"
+}
+
