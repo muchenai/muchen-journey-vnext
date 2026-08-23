@@ -1,0 +1,79 @@
+{
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "session": "boss-r2-builder",
+  "session_fresh": true,
+  "observed_on": "2026-08-23",
+  "target": "http://127.0.0.1:4392/prototypes/boss-dungeon/index.html?reset=1",
+  "browser_config_read_only": "/Users/liumowen/Documents/Muchen Journey2.0/output/playwright/wp25/cli.config.json",
+  "chrome_installed": false,
+  "runs": [
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "start": "briefing",
+      "end": "receipt",
+      "entry_document_width": 390,
+      "receipt_document_width": 390,
+      "visible_primary_actions_at_entry": 1,
+      "minimum_primary_action_height": 52.796875,
+      "validation_errors_observed": [
+        "safety",
+        "team",
+        "decision"
+      ],
+      "keyboard_submission": true,
+      "reentry_stage": "receipt",
+      "screenshot_entry": "390-entry.png",
+      "screenshot_receipt": "390-receipt.png"
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 900
+      },
+      "start": "briefing",
+      "end": "receipt",
+      "entry_document_width": 768,
+      "receipt_document_width": 768,
+      "visible_primary_actions_at_entry": 1,
+      "minimum_primary_action_height": 52.796875,
+      "reentry_stage": "receipt",
+      "screenshot_entry": "768-entry.png",
+      "screenshot_receipt": "768-receipt.png"
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "start": "briefing",
+      "end": "receipt",
+      "entry_document_width": 1280,
+      "receipt_document_width": 1280,
+      "visible_primary_actions_at_entry": 1,
+      "minimum_primary_action_height": 52.796875,
+      "reentry_stage": "receipt",
+      "screenshot_entry": "1280-entry.png",
+      "screenshot_receipt": "1280-receipt.png"
+    }
+  ],
+  "meaningful_input": {
+    "prior_evidence_count": 4,
+    "target_capability_count": 3,
+    "decision": "受控核心演示",
+    "evidence_reference": "E-SYN-03 · 人工复核",
+    "constraint_reference": "隐私 · 合成数据与人工复核"
+  },
+  "loading_state_observed": true,
+  "fact_advice_human_choice_and_system_status_separated": true,
+  "reduced_motion": {
+    "matches": true,
+    "scroll_behavior": "auto",
+    "focused_heading": "safety-title"
+  },
+  "console_errors": [],
+  "external_requests": [],
+  "result": "PASS"
+}

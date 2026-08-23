@@ -1,0 +1,14 @@
+{
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "observed_on": "2026-08-23",
+  "command": "node --test prototypes/boss-dungeon/contract.test.mjs",
+  "fresh_process": true,
+  "passed": 5,
+  "failed": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "duration_ms": 49.422917,
+  "evaluation_target_sha256": "71d018bd10d9071ffcff6f27e1c87f05c10107858c35ce7c8fc8f936daa4562c",
+  "result": "PASS"
+}

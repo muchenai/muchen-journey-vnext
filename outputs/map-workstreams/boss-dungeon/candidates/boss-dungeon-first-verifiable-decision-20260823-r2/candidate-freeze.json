@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "manifest_type": "READY_FOR_HUMAN_CANDIDATE_FREEZE",
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "map": "boss-dungeon",
+  "golden_path": "boss-dungeon-first-verifiable-decision",
+  "status": "FROZEN_READY_FOR_HUMAN",
+  "frozen_on": "2026-08-23",
+  "freeze_reason": "Independent evaluator verdict READY_FOR_HUMAN with complete contract, browser, responsive, interaction, recovery, reduced-motion, console, request, and visual evidence; P0=0 and P1=0.",
+  "previous_candidate_preserved": {
+    "commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+    "status": "ACTIVE_DRAFT",
+    "contract_sha256": "efd9e472370c8c2a6d368eecc98fcfd987e6c36695b02853a4f879bf44187a97",
+    "fact_mutated": false
+  },
+  "immutable_runtime": [
+    {
+      "path": "prototypes/boss-dungeon/index.html",
+      "sha256": "75c74630355574fca4b7d4e8577742e73e4a1ccc796d18a951b5488520120661"
+    },
+    {
+      "path": "prototypes/boss-dungeon/styles.css",
+      "sha256": "7a3702b0bb1034c254051951bb6f46a231aaad34856be36f53c227c7b1cb2bc4"
+    },
+    {
+      "path": "prototypes/boss-dungeon/app.js",
+      "sha256": "de2d72fc948b2f81913a6fec20ff583b78a96a1ddba61377c8fd376b26c794aa"
+    },
+    {
+      "path": "prototypes/boss-dungeon/contract.test.mjs",
+      "sha256": "d5ae32694b509f34ee87126c5d5d1e543f85e66919af1a4c72b4a5e0c6e968ba"
+    }
+  ],
+  "immutable_candidate_artifacts": [
+    {
+      "path": "evaluation-target.json",
+      "sha256": "71d018bd10d9071ffcff6f27e1c87f05c10107858c35ce7c8fc8f936daa4562c"
+    },
+    {
+      "path": "evaluator-report.json",
+      "sha256": "f23a03a1ee1a7cc0d3ae76c8ccd9339347085d063e9d338ec4740fc39d69dec5"
+    },
+    {
+      "path": "contract.json",
+      "sha256": "e7bca9403b577ffb25ac150edec79ffc707ec84a136cb9dea12f826b5535ca0e"
+    },
+    {
+      "path": "evidence/contract-test-summary.json",
+      "sha256": "c1ad4d9fd220a91a439b7bd6b6e9b0701b5d2c1826b772b35eacd6e3332f950d"
+    },
+    {
+      "path": "evidence/builder-browser-summary.json",
+      "sha256": "8cf098cfc8466f81d50ea125c1e157d6bdb8454eef8acd6d692ce3b87b0dcb7a"
+    },
+    {
+      "path": "evidence/390-entry.png",
+      "sha256": "f4931a69e9fa81a605b2676d8fdd42c9c7acea93f61a8716934a58febf6f8822"
+    },
+    {
+      "path": "evidence/390-receipt.png",
+      "sha256": "48e90065b18ab4eb1e4520e9779d1c776cdf1b91491dd16dd9c1d7c0f437f5a1"
+    },
+    {
+      "path": "evidence/768-entry.png",
+      "sha256": "90a6eb7bfa8e5c6ba0daf20cb47cb39becd3325221b4af3ffea4cbce41f9b099"
+    },
+    {
+      "path": "evidence/768-receipt.png",
+      "sha256": "a9045705684a7170060434122bd6097268697b1e01fa299c2655aa853ac7c0f3"
+    },
+    {
+      "path": "evidence/1280-entry.png",
+      "sha256": "8b5f3a10f5338ba5833f81cb69017fbc8c0abdc70b41440016ee7226c7d3a361"
+    },
+    {
+      "path": "evidence/1280-receipt.png",
+      "sha256": "e6c2c0cf21b929b8dd4c1c23ae7bb3e74ef6ae73da51f168241044f8a2a65e81"
+    }
+  ],
+  "machine_gate": {
+    "verdict": "READY_FOR_HUMAN",
+    "p0_count": 0,
+    "p1_count": 0,
+    "evidence_complete": true
+  },
+  "human_gate": {
+    "status": "UNTOUCHED",
+    "evidence": "NOT_RUN",
+    "criteria_status": [
+      "orientation-and-safety:NOT_RUN",
+      "evidence-to-decision-traceability:NOT_RUN",
+      "role-and-constraint-comprehension:NOT_RUN",
+      "clarity-and-willingness:NOT_RUN"
+    ],
+    "machine_evidence_substituted": false
+  },
+  "blocked_actions": [
+    "candidate-runtime-mutation",
+    "candidate-contract-rewrite",
+    "promotion",
+    "controller-integration",
+    "release",
+    "production-mutation",
+    "human-pass-inference"
+  ],
+  "allowed_next_action": "Run the contract-defined human acceptance protocol against this frozen candidate. Any later product or evidence change must create a new candidate version and preserve this manifest.",
+  "shared_surfaces_untouched": [
+    "/",
+    "apps/web/src/app/page.tsx",
+    "homepage-specific-css",
+    "apps/web/scripts/product-entry-contract.test.mjs",
+    "person",
+    "capability",
+    "evidence",
+    "progress",
+    "identity",
+    "shared-api",
+    "shared-design-system",
+    "release-configuration"
+  ]
+}

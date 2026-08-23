@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "report_type": "INDEPENDENT_MAP_GOLDEN_PATH_EVALUATION",
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "map": "boss-dungeon",
+  "golden_path": "boss-dungeon-first-verifiable-decision",
+  "evaluated_on": "2026-08-23",
+  "verdict": "READY_FOR_HUMAN",
+  "evaluation_target": {
+    "path": "evaluation-target.json",
+    "sha256": "71d018bd10d9071ffcff6f27e1c87f05c10107858c35ce7c8fc8f936daa4562c",
+    "status_at_evaluation": "READY_FOR_INDEPENDENT_EVALUATION"
+  },
+  "independence": {
+    "session": "boss-r2-evaluator",
+    "fresh_browser_session": true,
+    "builder_conclusions_accepted_without_reproduction": false,
+    "candidate_or_runtime_writes_during_evaluation": false,
+    "report_materialized_after_read_only_pass": true
+  },
+  "binding": {
+    "product_doctor": "PASS",
+    "product_status": "PASS",
+    "starts_at": "synthetic-capability-briefing",
+    "ends_at": "local-decision-receipt-visible",
+    "route": "prototypes/boss-dungeon/index.html",
+    "runtime_hashes_match_target": true
+  },
+  "contract_test": {
+    "command": "node --test prototypes/boss-dungeon/contract.test.mjs",
+    "fresh_process": true,
+    "passed": 5,
+    "failed": 0,
+    "duration_ms": 168.341667,
+    "result": "PASS"
+  },
+  "browser_acceptance": {
+    "browser": "existing-local-playwright-chromium",
+    "browser_config_read_only": "/Users/liumowen/Documents/Muchen Journey2.0/output/playwright/wp25/cli.config.json",
+    "chrome_installed": false,
+    "viewports": [
+      {
+        "width": 390,
+        "height": 844,
+        "natural_path": "PASS",
+        "document_scroll_width": 390,
+        "one_primary_action_per_actionable_state": true,
+        "safety_team_and_decision_validation_blocked_incomplete_input": true,
+        "keyboard_submission": true,
+        "reentry": "receipt"
+      },
+      {
+        "width": 768,
+        "height": 900,
+        "natural_path": "PASS",
+        "document_scroll_width": 768,
+        "one_primary_action_per_actionable_state": true,
+        "reentry": "receipt"
+      },
+      {
+        "width": 1280,
+        "height": 900,
+        "natural_path": "PASS",
+        "document_scroll_width": 1280,
+        "one_primary_action_per_actionable_state": true,
+        "reentry": "receipt"
+      }
+    ],
+    "independent_decision": {
+      "choice": "取消演示",
+      "evidence": "E-SYN-04 · 决策留痕",
+      "constraint": "时间 · 48小时后受控演示",
+      "ai_suggestion_overrode_human_choice": false,
+      "receipt_traceable": true
+    },
+    "role_count": 4,
+    "constraint_count": 3,
+    "minimum_observed_primary_action_height_css_px": 52.796875,
+    "loading_state_observed": true,
+    "reduced_motion": {
+      "matches": true,
+      "scroll_behavior": "auto",
+      "focused_heading": "safety-title"
+    },
+    "console_errors": [],
+    "external_requests": []
+  },
+  "machine_criteria": [
+    {
+      "id": "exact-natural-path",
+      "result": "PASS"
+    },
+    {
+      "id": "synthetic-and-governance-labeling",
+      "result": "PASS"
+    },
+    {
+      "id": "evidence-before-decision",
+      "result": "PASS"
+    },
+    {
+      "id": "roles-and-constraints-before-decision",
+      "result": "PASS"
+    },
+    {
+      "id": "verifiable-decision-input",
+      "result": "PASS"
+    },
+    {
+      "id": "fact-advice-choice-separation",
+      "result": "PASS"
+    },
+    {
+      "id": "three-viewport-continuity",
+      "result": "PASS"
+    },
+    {
+      "id": "interaction-and-recovery",
+      "result": "PASS"
+    }
+  ],
+  "visual_review": {
+    "narrative_continuity": "PASS",
+    "hierarchy": "PASS",
+    "overflow_or_overlap": "NONE_OBSERVED",
+    "hidden_required_action": "NONE_OBSERVED",
+    "misleading_completion": "NONE_OBSERVED",
+    "fact_advice_human_choice_and_system_status_separated": true
+  },
+  "blockers": {
+    "p0": [],
+    "p1": [],
+    "non_blocking_backlog": []
+  },
+  "human_acceptance": [
+    {
+      "id": "orientation-and-safety",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "evidence-to-decision-traceability",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "role-and-constraint-comprehension",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clarity-and-willingness",
+      "status": "NOT_RUN"
+    }
+  ],
+  "human_gate": {
+    "status": "UNTOUCHED",
+    "evidence": "NOT_RUN",
+    "machine_evidence_substituted": false
+  },
+  "handoff": {
+    "candidate_must_remain_frozen": true,
+    "promotion_authorized": false,
+    "release_authorized": false,
+    "controller_integration_authorized": false,
+    "next_action": "Run the four contract-defined human acceptance checks with 3/3 target learners and zero facilitator rescue; preserve this candidate unchanged until the result exists."
+  }
+}
