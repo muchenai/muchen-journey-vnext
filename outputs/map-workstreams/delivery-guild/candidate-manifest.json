@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "artifact_type": "FROZEN_MAP_CANDIDATE_MANIFEST",
+  "map": "delivery-guild",
+  "golden_path_id": "delivery-guild-first-bounded-evidence-draft",
+  "status": "READY_FOR_HUMAN",
+  "frozen_on": "2026-08-23",
+  "human_gate": "NOT_RUN",
+  "formal_integration": false,
+  "release_authorized": false,
+  "candidate_files": [
+    {
+      "path": "outputs/map-workstreams/delivery-guild/contract.json",
+      "sha256": "807ba48fda8d56db721c5e63aafd4e1cf9b2e7b61c17aeb922552c5c40c44d6e"
+    },
+    {
+      "path": "prototypes/delivery-guild/index.html",
+      "sha256": "7bc6a23382a1793a80f5bccb035578e653848bd0b665db5dc1a670d5a72d707a"
+    },
+    {
+      "path": "prototypes/delivery-guild/contract.test.mjs",
+      "sha256": "caaaa2b449ec3b4d5b700f8a407949a561f6b9d80e556ad0a9b01d2ebf7e07de"
+    }
+  ],
+  "representative_evidence": [
+    {
+      "viewport_css_px": 390,
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-390-end.png",
+      "sha256": "79d26be965d1bdd115050a816c2ba52a993d2f6e463d75f85b26d242da619ccb"
+    },
+    {
+      "viewport_css_px": 768,
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-768-end.png",
+      "sha256": "7e6bc1c2216896403642a31d22845b328d5f951cd9069e72a26472a1b41fbf07"
+    },
+    {
+      "viewport_css_px": 1280,
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-1280-end.png",
+      "sha256": "5cc7450e440732a8498439696acc8c213703da8c3a169e9c2c4bfa7fa267c78f"
+    }
+  ],
+  "freeze_rule": "Do not modify candidate_files until valid human evidence passes or fails this candidate."
+}
