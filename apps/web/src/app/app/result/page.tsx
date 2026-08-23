@@ -22,7 +22,9 @@ const admissionLabels: Record<string, string> = {
   NOT_ADMIT: "本次不准入",
 };
 
-const treasureLabels = ["公司价值", "AI 与模型", "项目认知", "交付边界"];
+function stageDisplayTitle(title: string) {
+  return title.replace(/^(?:宝藏[一二三四]|(?:能力)?评测[一二三])\s*[｜：]\s*/u, "");
+}
 
 function timelineDetail(eventType: string, details: Timeline["items"][number]["details"]) {
   if (eventType === "SUBMISSION_VERSION_CREATED") {
@@ -99,33 +101,28 @@ export default async function ResultPage() {
           <span className="result-pass-stamp" aria-label="四枚宝藏与三项能力证据已确认">Journey 8 / 8</span>
         </div>
         <div className="treasure-collection" aria-label="已完成四个宝藏主题">
-          {treasureLabels.map((label, index) => {
-            const node = treasureNodes[index];
-            const card = (
-              <article>
-                <span aria-hidden="true">✦</span>
-                <small>宝藏 {index + 1}</small>
-                <strong>{label}</strong>
-              </article>
-            );
-            return node ? (
+          {treasureNodes.map((node, index) => {
+            const title = stageDisplayTitle(node.title);
+            return (
               <Link
                 className="result-revisit-link"
                 href={`/app/tasks/${node.assignment_id}`}
-                aria-label={`回看宝藏 ${index + 1}：${label}`}
-                key={label}
+                aria-label={`回看宝藏 ${index + 1}：${title}`}
+                key={node.assignment_id}
               >
-                {card}
+                <article>
+                  <span aria-hidden="true">✦</span>
+                  <small>宝藏 {index + 1}</small>
+                  <strong>{title}</strong>
+                </article>
               </Link>
-            ) : (
-              <div key={label}>{card}</div>
             );
           })}
         </div>
         <div className="ability-collection" aria-label="已通过三项能力评测">
           {result.journey_evaluations.map((evaluation, index) => {
             const node = assessmentNodes.get(evaluation.stage_key);
-            const title = evaluation.stage_title.replace(/^能力评测[一二三]：/, "");
+            const title = stageDisplayTitle(evaluation.stage_title);
             const card = (
               <article>
                 <span>{String(index + 1).padStart(2, "0")}</span>
@@ -205,7 +202,7 @@ export default async function ResultPage() {
               {result.journey_evaluations.map((evaluation, index) => (
                 <article key={evaluation.id}>
                   <span>0{index + 1}</span>
-                  <h3>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</h3>
+                  <h3>{stageDisplayTitle(evaluation.stage_title)}</h3>
                   <p>{evaluation.overall_feedback}</p>
                   <details>
                     <summary>展开评审证据</summary>
