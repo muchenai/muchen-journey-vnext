@@ -79,43 +79,43 @@ export default async function TaskPage({
               const isComplete = material.completed_at !== null;
               const isCurrentMaterial = material.key === nextMaterialKey;
               return (
-              <li
-                className={isComplete ? "is-complete" : isCurrentMaterial ? "is-current" : "is-locked"}
-                key={material.key}
-              >
-                <div className="learning-material-order" aria-hidden="true">
-                  {isComplete ? "✓" : String(index + 1).padStart(2, "0")}
-                </div>
-                <article>
-                  <p>
-                    {material.source_label} · {material.estimated_duration_minutes} min
-                    {material.required ? " · 必读" : " · 选读"}
-                  </p>
-                  <h3>{material.title}</h3>
-                  {isCurrentMaterial ? (
-                    material.kind === "TEXT" ? <div>{material.body}</div> : (
-                      <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
-                        打开 {new URL(material.url ?? "https://invalid.example").hostname}
-                      </a>
-                    )
-                  ) : null}
-                  {isComplete ? (
-                    <span className="material-complete-label">已完成</span>
-                  ) : isCurrentMaterial ? (
-                    <form action={completeLearningMaterial}>
-                      <input type="hidden" name="assignment_id" value={assignment.id} />
-                      <input type="hidden" name="task_version" value={assignment.task_version} />
-                      <input type="hidden" name="material_key" value={material.key} />
-                      <input type="hidden" name="idempotency_key" value={randomUUID()} />
-                      <button className="button primary compact" type="submit">
-                        完成本材料
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="material-locked-label">完成上一份后开放</span>
-                  )}
-                </article>
-              </li>
+                <li
+                  className={isComplete ? "is-complete" : isCurrentMaterial ? "is-current" : "is-locked"}
+                  key={material.key}
+                >
+                  <div className="learning-material-order" aria-hidden="true">
+                    {isComplete ? "✓" : String(index + 1).padStart(2, "0")}
+                  </div>
+                  <article>
+                    <p>
+                      {material.source_label} · {material.estimated_duration_minutes} min
+                      {material.required ? " · 必读" : " · 选读"}
+                    </p>
+                    <h3>{material.title}</h3>
+                    {isCurrentMaterial ? (
+                      material.kind === "TEXT" ? <div>{material.body}</div> : (
+                        <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
+                          打开 {new URL(material.url ?? "https://invalid.example").hostname}
+                        </a>
+                      )
+                    ) : null}
+                    {isComplete ? (
+                      <span className="material-complete-label">已完成</span>
+                    ) : isCurrentMaterial ? (
+                      <form action={completeLearningMaterial}>
+                        <input type="hidden" name="assignment_id" value={assignment.id} />
+                        <input type="hidden" name="task_version" value={assignment.task_version} />
+                        <input type="hidden" name="material_key" value={material.key} />
+                        <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                        <button className="button primary compact" type="submit">
+                          完成本材料
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="material-locked-label">完成上一份后开放</span>
+                    )}
+                  </article>
+                </li>
               );
             })}
           </ol>
