@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { logoutSession } from "@/app/actions";
 import { CurrentAction, hasVNextSession, learnerPageRequest } from "@/lib/server/api";
 import { JourneyMap } from "./journey-map";
@@ -15,28 +13,38 @@ export default async function LearnerHome() {
     action.action_type,
   );
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
+  const currentNode = action.journey?.nodes.find((node) => node.status === "CURRENT");
+  const opensFirstMaterial = opensTask && currentNode?.position === 0;
+  const taskHref = `/app/tasks/${action.resource_id}${
+    opensFirstMaterial ? "#first-learning-input" : ""
+  }`;
 
   return (
     <section className={action.journey ? "learner-journey-page" : "content-narrow"}>
-      {action.journey ? <JourneyMap journey={action.journey} /> : null}
-      <article className={action.journey ? "current-stage-card" : "status-card"}>
-        <div>
-          <span className="stage-pulse" aria-hidden="true" />
+      {action.journey ? (
+        <JourneyMap
+          journey={action.journey}
+          current={{
+            position: currentNode?.position ?? 0,
+            title: currentNode?.title ?? action.title,
+            reason: action.reason,
+            href: opensTask ? taskHref : opensResult ? "/app/result" : null,
+            actionLabel: opensResult
+              ? "打开旅程结果"
+              : opensFirstMaterial
+                ? "打开第一份必读材料"
+                : opensTask
+                  ? "进入这一站"
+                  : null,
+          }}
+        />
+      ) : (
+        <article className="status-card">
           <p className="eyebrow">{action.stage}</p>
           <h2>{action.title}</h2>
           <p>{action.reason}</p>
-        </div>
-        {opensTask || opensResult ? (
-          <Link
-            className="button primary"
-            href={opensResult ? "/app/result" : `/app/tasks/${action.resource_id}`}
-          >
-            {opensResult ? "打开旅程结果" : "进入这一站"}
-          </Link>
-        ) : (
-          <span className="waiting-mark" aria-label="等待下一步">···</span>
-        )}
-      </article>
+        </article>
+      )}
       {!action.journey ? null : (
         <p className="journey-support">
           {action.responsible_party} · {action.feedback_expectation}

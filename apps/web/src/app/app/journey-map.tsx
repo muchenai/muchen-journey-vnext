@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { JourneyProgress } from "@/lib/server/api";
@@ -83,16 +84,7 @@ function RouteMapSvg({
           </>
         );
 
-        return node.status === "CURRENT" ? (
-          <g key={node.stable_key} transform={`translate(${x} ${y})`}>
-            <a
-              className={`route-node-visual route-node-link ${stateClass}`}
-              href={`/app/tasks/${node.assignment_id}`}
-            >
-              {contents}
-            </a>
-          </g>
-        ) : (
+        return (
           <g
             className={`route-node-visual ${stateClass}`}
             key={node.stable_key}
@@ -106,18 +98,47 @@ function RouteMapSvg({
   );
 }
 
-export function JourneyMap({ journey }: { journey: JourneyProgress }) {
+export function JourneyMap({
+  journey,
+  current,
+}: {
+  journey: JourneyProgress;
+  current: {
+    position: number;
+    title: string;
+    reason: string;
+    href: string | null;
+    actionLabel: string | null;
+  };
+}) {
   return (
     <section className="journey-map" aria-labelledby="journey-map-title">
+      <Image
+        className="journey-map-world"
+        src="/images/exploration-camp-hero-v2.png"
+        alt=""
+        fill
+        sizes="(max-width: 1072px) calc(100vw - 32px), 1040px"
+      />
       <header className="journey-map-heading">
         <div>
-          <p className="journey-whisper">It&apos;s a long game.</p>
-          <h1 id="journey-map-title">{journey.title}</h1>
+          <p className="journey-whisper">探索营 · Map 01 / 05</p>
+          <h1 id="journey-map-title">你现在只走这一站</h1>
         </div>
         <strong aria-label={`已完成 ${journey.completed_stages} / ${journey.total_stages} 站`}>
           {journey.completed_stages}<span>/ {journey.total_stages}</span>
         </strong>
       </header>
+      <article className="journey-current-mission">
+        <p>当前任务 · 第 {current.position + 1} 站</p>
+        <h2>{current.title}</h2>
+        <span>{current.reason}</span>
+        {current.href && current.actionLabel ? (
+          <Link className="button primary" href={current.href}>{current.actionLabel}<b aria-hidden="true">→</b></Link>
+        ) : (
+          <strong className="journey-waiting">等待下一步开放</strong>
+        )}
+      </article>
       <div className="journey-route-canvas">
         <RouteMapSvg journey={journey} points={ROUTE_POINTS.wide} variant="wide" />
         <RouteMapSvg journey={journey} points={ROUTE_POINTS.narrow} variant="narrow" />
@@ -125,16 +146,12 @@ export function JourneyMap({ journey }: { journey: JourneyProgress }) {
           {journey.nodes.map((node) => {
             const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
             return (
-              <li key={node.stable_key}>
-                {node.status === "CURRENT" ? (
-                  <Link href={`/app/tasks/${node.assignment_id}`}>{label}</Link>
-                ) : label}
-              </li>
+              <li key={node.stable_key}>{label}</li>
             );
           })}
         </ol>
       </div>
-      <p className="journey-map-hint">触碰路标，看见这一站。</p>
+      <p className="journey-map-hint">暖金色路标是当前位置；方形路标是能力评测。</p>
     </section>
   );
 }

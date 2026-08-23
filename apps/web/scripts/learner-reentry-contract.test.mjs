@@ -15,7 +15,7 @@ const panel = await readFile(
 test("expired learner pages fail closed into an explicit operator-assisted recovery state", () => {
   assert.match(api, /export async function learnerPageRequest/);
   assert.match(api, /auth_error=LEARNER_SESSION_EXPIRED/);
-  assert.match(home, /新人会话已失效/);
+  assert.match(home, /会话已失效，但你的成长进度和证据仍然保留/);
   assert.match(home, /一次性重新进入链接/);
 });
 
@@ -30,7 +30,7 @@ test("operator creates a bounded reentry link for the existing enrollment", () =
 
 test("reentry confirmation does not collect a new display name or claim new business facts", () => {
   assert.match(join, /summary\?\.flow === "REENTRY"/);
-  assert.match(join, /只恢复原有 Learner 会话/);
-  assert.match(join, /不会创建新人、Enrollment、Assignment 或新提交/);
-  assert.match(join, /继续旅程/);
+  assert.match(join, /原有进度会被安全恢复/);
+  assert.match(join, /不会创建重复记录/);
+  assert.match(join, /继续当前一站/);
 });

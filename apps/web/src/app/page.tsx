@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import journeyProduct from "../../../../config/muchen_journey_product.json";
+import journeyProduct from "@/lib/muchen-journey-product.generated.json";
 
 import { exchangeInvite } from "@/app/actions";
 import { apiRequest, CurrentAction, hasValidLearnerSession } from "@/lib/server/api";

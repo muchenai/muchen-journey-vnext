@@ -25,8 +25,10 @@ test("private invitations explain the whole Journey before the first form action
   assert.match(orientation, /CONFIRM_IDENTITY/);
   assert.match(orientation, /REENTRY/);
   assert.match(orientation, /验证专属邀请/);
-  assert.match(orientation, /确认这是你的邀请并开启旅程/);
-  assert.match(orientation, /确认邀请并恢复原有旅程/);
+  assert.match(orientation, /确认这是你的邀请/);
+  assert.match(orientation, /确认邀请并恢复进度/);
+  assert.match(orientation, /第一站回报/);
+  assert.match(orientation, /一个真实问题 \+ 一种验证方法/);
 });
 
 test("the orientation is non-interactive and preserves one primary form action", () => {
@@ -47,7 +49,7 @@ test("both invitation exchange states retain fragment security and share the ori
 });
 
 test("local styles remain responsive and isolated from shared home selectors", () => {
-  assert.match(styles, /@media \(min-width: 768px\)/);
+  assert.match(styles, /@media \(max-width: 640px\)/);
   assert.match(styles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(styles, /animation|transition/);
   assert.doesNotMatch(styles, /\.landing-|\.button\b/);

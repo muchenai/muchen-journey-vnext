@@ -11,6 +11,31 @@ import { Attachment } from "@/lib/server/api";
 
 const INITIAL_STATE: SubmissionActionState = {};
 
+const FIRST_WIN_DIAGNOSTICS = {
+  direction: {
+    label: "方向很多，不知道先做什么",
+    judgement: "你现在缺的不是更多选项，而是一个可验证的优先级。",
+    experiment: "选出影响最大的一个问题；写下 24 小时内能找到的最小证据，并约定何时回看。",
+  },
+  evidence: {
+    label: "有判断，但不知道怎么验证",
+    judgement: "你的起点判断已经存在，下一步要把它变成别人也能核对的证据。",
+    experiment: "把判断改写成“如果……那么……”；找一条支持证据和一条反例，明天同一时间复核。",
+  },
+  uncertainty: {
+    label: "遇到不确定，容易自己硬猜",
+    judgement: "真正的风险不是不确定，而是没有把已知、未知和求助问题分开。",
+    experiment: "下一次卡住时只写三行：已知事实、我的初判、需要谁回答的一个具体问题。",
+  },
+  action: {
+    label: "知道很多，但迟迟没有行动",
+    judgement: "你需要的不是更完整的计划，而是一个小到今天能结束的动作。",
+    experiment: "把目标缩成 20 分钟版本；完成后只记录结果、意外和下一次要改的一件事。",
+  },
+} as const;
+
+type FirstWinKey = keyof typeof FIRST_WIN_DIAGNOSTICS;
+
 export function SubmissionComposer({
   assignmentId,
   assignmentRevision,
@@ -22,6 +47,7 @@ export function SubmissionComposer({
   draftIdempotencyKey,
   responseSections,
   requiresReview,
+  isFirstStation,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -33,8 +59,10 @@ export function SubmissionComposer({
   draftIdempotencyKey: string;
   responseSections: string[];
   requiresReview: boolean;
+  isFirstStation: boolean;
 }) {
   const [body, setBody] = useState(initialBody);
+  const [firstWinKey, setFirstWinKey] = useState<FirstWinKey | null>(null);
   const [submitState, submitAction, submitPending] = useActionState(
     submitAssignment,
     INITIAL_STATE,
@@ -44,6 +72,7 @@ export function SubmissionComposer({
     INITIAL_STATE,
   );
   const errorState = submitState.error ? submitState : draftState;
+  const firstWin = firstWinKey ? FIRST_WIN_DIAGNOSTICS[firstWinKey] : null;
 
   return (
     <form action={submitAction}>
@@ -55,6 +84,32 @@ export function SubmissionComposer({
         value={submissionIdempotencyKey}
       />
       <input type="hidden" name="draft_idempotency_key" value={draftIdempotencyKey} />
+      {isFirstStation ? (
+        <fieldset className="first-win-diagnostic">
+          <legend><span>60 秒起点判断</span>你现在最真实的卡点是什么？</legend>
+          <p>选一个最接近的处境。这里不评分，也不会作为绩效结论。</p>
+          <div className="first-win-options">
+            {(Object.entries(FIRST_WIN_DIAGNOSTICS) as Array<[FirstWinKey, typeof FIRST_WIN_DIAGNOSTICS[FirstWinKey]]>).map(([key, item]) => (
+              <button
+                className={firstWinKey === key ? "is-selected" : ""}
+                type="button"
+                aria-pressed={firstWinKey === key}
+                onClick={() => setFirstWinKey(key)}
+                key={key}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {firstWin ? (
+            <div className="first-win-result" role="status">
+              <p><span>起点判断</span><strong>{firstWin.judgement}</strong></p>
+              <p><span>今天的实验</span><strong>{firstWin.experiment}</strong></p>
+              <small>把这个实验写进下方学习记录；完成后再用真实结果修正判断。</small>
+            </div>
+          ) : null}
+        </fieldset>
+      ) : null}
       {responseSections.length > 0 ? (
         <div className="response-map" aria-labelledby="response-map-title">
           <strong id="response-map-title">输出结构</strong>

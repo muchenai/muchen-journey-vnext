@@ -137,7 +137,12 @@
   }
 
   .title {
-    max-width: none;
+    display: none;
+  }
+
+  .description,
+  .reward {
+    display: none;
   }
 
   .route li > strong {

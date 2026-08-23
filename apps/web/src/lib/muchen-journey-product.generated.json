@@ -1,0 +1,41 @@
+{
+  "generated_from": "config/muchen_journey_product.json",
+  "current_map": "exploration-camp",
+  "maps": [
+    {
+      "order": 1,
+      "key": "exploration-camp",
+      "name": "探索营",
+      "mission": "建立旅程方向感、成长意图和第一份可核对的能力基线。",
+      "people_ai_output": "person-growth-baseline"
+    },
+    {
+      "order": 2,
+      "key": "newcomer-village",
+      "name": "新手村",
+      "mission": "完成公司、岗位、协作方式与基本工作习惯的真实融入。",
+      "people_ai_output": "role-and-collaboration-readiness"
+    },
+    {
+      "order": 3,
+      "key": "ai-academy",
+      "name": "AI学院",
+      "mission": "通过课程、练习与测评形成可解释的 AI 能力成长记录。",
+      "people_ai_output": "ai-capability-profile"
+    },
+    {
+      "order": 4,
+      "key": "delivery-guild",
+      "name": "交付线工会",
+      "mission": "在真实交付协作中积累项目证据、反馈、复盘与导师评价。",
+      "people_ai_output": "delivery-capability-evidence"
+    },
+    {
+      "order": 5,
+      "key": "boss-dungeon",
+      "name": "BOSS副本",
+      "mission": "通过模拟真实大型项目综合验证判断、协作、交付和复盘能力。",
+      "people_ai_output": "integrated-project-readiness-evidence"
+    }
+  ]
+}

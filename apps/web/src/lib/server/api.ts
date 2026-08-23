@@ -689,3 +689,17 @@ export function cookieValue(setCookies: string[], name: string): string | undefi
 export async function hasVNextSession(): Promise<boolean> {
   return Boolean((await cookies()).get(SESSION_COOKIE)?.value);
 }
+
+export async function hasValidLearnerSession(): Promise<boolean> {
+  if (!(await cookies()).get(SESSION_COOKIE)?.value) return false;
+  try {
+    const session = await apiRequest<{ roles: string[]; safe_entry: string }>(
+      "/api/v1/session",
+      "LEARNER",
+    );
+    return session.roles.includes("LEARNER") && session.safe_entry === "/app";
+  } catch (error) {
+    if (error instanceof ApiRequestError) return false;
+    return false;
+  }
+}

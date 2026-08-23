@@ -10,6 +10,12 @@ const api = await readFile(new URL("../src/lib/server/api.ts", import.meta.url),
 const product = JSON.parse(
   await readFile(new URL("../../../config/muchen_journey_product.json", import.meta.url), "utf8"),
 );
+const generatedProduct = JSON.parse(
+  await readFile(
+    new URL("../src/lib/muchen-journey-product.generated.json", import.meta.url),
+    "utf8",
+  ),
+);
 const contract = JSON.parse(
   await readFile(
     new URL("../../../outputs/controller-integration/shared-home/contract.json", import.meta.url),
@@ -20,12 +26,27 @@ const contract = JSON.parse(
 test("shared home is bound to the controller contract and product source of truth", () => {
   assert.equal(contract.surface, "/");
   assert.equal(contract.owner, "muchen-journey-program-control");
-  assert.match(home, /config\/muchen_journey_product\.json/);
+  assert.match(home, /muchen-journey-product\.generated\.json/);
   assert.match(home, /journeyProduct\.maps\.map/);
   assert.match(home, /journeyProduct\.current_map/);
   assert.match(home, /People AI 成长系统/);
   assert.match(home, /五张地图，走成一个人的长期成长/);
   assert.doesNotMatch(home, /当前只开放探索营|探索营 · P0|探索营路线预览/);
+});
+
+test("the deployable web projection cannot drift from the controller product contract", () => {
+  assert.equal(generatedProduct.generated_from, "config/muchen_journey_product.json");
+  assert.equal(generatedProduct.current_map, product.current_map);
+  assert.deepEqual(
+    generatedProduct.maps,
+    product.maps.map(({ order, key, name, mission, people_ai_output }) => ({
+      order,
+      key,
+      name,
+      mission,
+      people_ai_output,
+    })),
+  );
 });
 
 test("all canonical maps and growth missions remain ordered in the shared product contract", () => {

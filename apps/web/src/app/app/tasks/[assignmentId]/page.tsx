@@ -36,6 +36,9 @@ export default async function TaskPage({
     : null;
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
+  const nextMaterialKey = assignment.learning_materials.find(
+    (material) => material.completed_at === null,
+  )?.key;
 
   return (
     <article className="learner-task-page">
@@ -46,7 +49,7 @@ export default async function TaskPage({
           </span>
           <p>
             {assignment.journey_stage?.title ?? assignment.stable_task_key}
-            <small>V{assignment.task_version}</small>
+            {assignment.journey_stage ? <small>第 {assignment.journey_stage.position + 1} 站</small> : null}
           </p>
         </div>
         <h1>{assignment.task_title}</h1>
@@ -57,7 +60,7 @@ export default async function TaskPage({
       </header>
 
       {assignment.learning_materials.length > 0 ? (
-        <section className="learning-materials" aria-labelledby="learning-materials-title">
+        <section id="first-learning-input" className="learning-materials" aria-labelledby="learning-materials-title">
           <div className="learning-materials-heading">
             <div>
               <p className="section-label">先完成输入</p>
@@ -72,10 +75,16 @@ export default async function TaskPage({
             <p className="success-text" role="status">完成事实已保存，可在重新登录后恢复。</p>
           ) : null}
           <ol className="learning-material-list">
-            {assignment.learning_materials.map((material, index) => (
-              <li className={material.completed_at ? "is-complete" : ""} key={material.key}>
+            {assignment.learning_materials.map((material, index) => {
+              const isComplete = material.completed_at !== null;
+              const isCurrentMaterial = material.key === nextMaterialKey;
+              return (
+              <li
+                className={isComplete ? "is-complete" : isCurrentMaterial ? "is-current" : "is-locked"}
+                key={material.key}
+              >
                 <div className="learning-material-order" aria-hidden="true">
-                  {material.completed_at ? "✓" : String(index + 1).padStart(2, "0")}
+                  {isComplete ? "✓" : String(index + 1).padStart(2, "0")}
                 </div>
                 <article>
                   <p>
@@ -83,14 +92,16 @@ export default async function TaskPage({
                     {material.required ? " · 必读" : " · 选读"}
                   </p>
                   <h3>{material.title}</h3>
-                  {material.kind === "TEXT" ? <div>{material.body}</div> : (
-                    <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
-                      打开 {new URL(material.url ?? "https://invalid.example").hostname}
-                    </a>
-                  )}
-                  {material.completed_at ? (
+                  {isCurrentMaterial ? (
+                    material.kind === "TEXT" ? <div>{material.body}</div> : (
+                      <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
+                        打开 {new URL(material.url ?? "https://invalid.example").hostname}
+                      </a>
+                    )
+                  ) : null}
+                  {isComplete ? (
                     <span className="material-complete-label">已完成</span>
-                  ) : (
+                  ) : isCurrentMaterial ? (
                     <form action={completeLearningMaterial}>
                       <input type="hidden" name="assignment_id" value={assignment.id} />
                       <input type="hidden" name="task_version" value={assignment.task_version} />
@@ -100,16 +111,19 @@ export default async function TaskPage({
                         完成本材料
                       </button>
                     </form>
+                  ) : (
+                    <span className="material-locked-label">完成上一份后开放</span>
                   )}
                 </article>
               </li>
-            ))}
+              );
+            })}
           </ol>
         </section>
       ) : null}
 
       {experience && assignment.learning_materials.length === 0 ? (
-        <section className="learning-experience" aria-labelledby="learning-experience-title">
+        <section id="first-learning-input" className="learning-experience" aria-labelledby="learning-experience-title">
           <div className="learning-schedule">
             <span>{experience.schedule.start}</span>
             <i aria-hidden="true" />
@@ -140,7 +154,7 @@ export default async function TaskPage({
             <p className="learning-break">完成后 · {experience.schedule.break_after}</p>
           ) : null}
         </section>
-      ) : (
+      ) : materialsReady ? (
         <section className="task-moves" aria-labelledby="task-moves-title">
           <p className="section-label">这一站</p>
           <h2 id="task-moves-title">沿着动作前进</h2>
@@ -148,7 +162,7 @@ export default async function TaskPage({
             {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
           </ol>
         </section>
-      )}
+      ) : null}
 
       <details className="task-contract">
         <summary>完成边界</summary>
@@ -258,6 +272,7 @@ export default async function TaskPage({
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
+            isFirstStation={assignment.journey_stage?.position === 0}
           />
         </>
       ) : null}

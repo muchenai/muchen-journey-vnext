@@ -10,6 +10,10 @@ const css = readFileSync(
   new URL("../src/app/globals.css", import.meta.url),
   "utf8",
 );
+const learnerHome = readFileSync(
+  new URL("../src/app/app/page.tsx", import.meta.url),
+  "utf8",
+);
 
 test("journey nodes and route line share one coordinate source", () => {
   assert.match(component, /const ROUTE_POINTS =/);
@@ -19,6 +23,13 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.doesNotMatch(component, /--route-x-/);
   assert.doesNotMatch(component, /style=\{pointStyle\}/);
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);
+});
+
+test("the route is orientation-only and leaves one primary current-stage entry", () => {
+  assert.doesNotMatch(component, /href=\{`\/app\/tasks/);
+  assert.doesNotMatch(component, /route-node-link/);
+  assert.match(learnerHome, /打开第一份必读材料/);
+  assert.match(learnerHome, /#first-learning-input/);
 });
 
 test("all eight formal stages have short route labels and progressive disclosure", () => {

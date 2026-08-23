@@ -181,8 +181,17 @@ function safeJoinError(error: unknown): never {
 }
 
 export async function exchangeInvite(data: FormData) {
-  const token = data.get("token");
-  if (typeof token !== "string" || token.length < 32 || token.length > 256) {
+  const inviteInput = data.get("token");
+  let token = typeof inviteInput === "string" ? inviteInput.trim() : "";
+  if (token.includes("://") || token.includes("#token=")) {
+    try {
+      const inviteUrl = new URL(token);
+      token = new URLSearchParams(inviteUrl.hash.slice(1)).get("token") ?? "";
+    } catch {
+      token = "";
+    }
+  }
+  if (token.length < 32 || token.length > 256) {
     redirect("/join?code=INVITE_EXPIRED_OR_REVOKED");
   }
   let exchange: {

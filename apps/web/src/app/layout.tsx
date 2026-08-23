@@ -30,9 +30,6 @@ export default async function RootLayout({
           <Link className="brand" href="/">
             Muchen Journey
           </Link>
-          <nav aria-label="主要导航">
-            <Link href="/app">我的旅程</Link>
-          </nav>
         </header>
         <main id="main-content" className="page-shell">
           {children}
