@@ -22,6 +22,7 @@ def git(repo: Path, *arguments: str) -> str:
 
 class ControlledReleaseStageTests(unittest.TestCase):
     def test_hash_lock_root_files_are_in_source_scope(self) -> None:
+        self.assertTrue(is_source_path(PurePosixPath(".gitattributes")))
         self.assertTrue(is_source_path(PurePosixPath("requirements.lock")))
         self.assertTrue(is_source_path(PurePosixPath("requirements-build.lock")))
 

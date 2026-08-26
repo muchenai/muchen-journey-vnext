@@ -112,6 +112,7 @@ RELEASE_REQUIRED_WEB = {
 }
 
 CONSTRUCTION_V1_REQUIRED_EXACT = {
+    ".gitattributes",
     "Makefile",
     "apps/api/Dockerfile",
     "apps/api/journey_api/construction_module_content.py",

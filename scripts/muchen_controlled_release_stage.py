@@ -28,6 +28,7 @@ SOURCE_TOP_LEVELS = {
     "tests",
 }
 SOURCE_ROOT_FILES = {
+    ".gitattributes",
     ".dockerignore",
     ".gitleaks.toml",
     ".gitignore",

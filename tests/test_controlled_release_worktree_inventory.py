@@ -12,6 +12,10 @@ from scripts.muchen_controlled_release_inventory import build_inventory, classif
 class ControlledReleaseWorktreeInventoryTests(unittest.TestCase):
     def test_release_scope_and_deferred_paths_are_explicit(self) -> None:
         self.assertEqual(
+            classify_path(".gitattributes")[:2],
+            ("RELEASE_REQUIRED", "IN_SCOPE_CANDIDATE"),
+        )
+        self.assertEqual(
             classify_path("apps/web/src/lib/journey-program.ts")[0],
             "RELEASE_REQUIRED",
         )
