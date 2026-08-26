@@ -1,6 +1,18 @@
 {
   "generated_from": "config/muchen_journey_product.json",
   "current_map": "exploration-camp",
+  "approved_product_modules": {
+    "model": "five-stage-plus-cross-cutting-career-map",
+    "recorded_on": "2026-08-23",
+    "modules": [
+      { "order": 1, "key": "exploration-camp", "runtime_key": "exploration-camp", "name": "探索营", "owner": "郑田源", "role": "STAGE", "output": "个人成长基线" },
+      { "order": 2, "key": "newcomer-village", "runtime_key": "newcomer-village", "name": "新手村", "owner": "屠元琦", "role": "STAGE", "output": "角色准备度与协作习惯证据" },
+      { "order": 3, "key": "ai-academy", "runtime_key": "ai-academy", "name": "AI 学院", "owner": "段超群", "role": "STAGE", "output": "AI 能力档案" },
+      { "order": 4, "key": "delivery-guild", "runtime_key": "delivery-guild", "name": "公会", "owner": "段超群", "role": "STAGE", "output": "交付能力证据与导师反馈" },
+      { "order": 5, "key": "certification-arena", "runtime_key": "boss-dungeon", "name": "认证竞技场", "owner": "段超群", "role": "STAGE", "output": "综合能力认证结果包" },
+      { "order": 6, "key": "career-map", "runtime_key": "career-map", "name": "Career Map", "owner": "段超群", "role": "CROSS_CUTTING_RESULT", "output": "能力图谱与下一阶段 Growth Plan" }
+    ]
+  },
   "maps": [
     {
       "order": 1,
@@ -32,10 +44,10 @@
     },
     {
       "order": 5,
-      "key": "boss-dungeon",
-      "name": "BOSS副本",
-      "mission": "通过模拟真实大型项目综合验证判断、协作、交付和复盘能力。",
-      "people_ai_output": "integrated-project-readiness-evidence"
+      "key": "certification-arena",
+      "name": "认证竞技场",
+      "mission": "通过固定挑战、真人 Panel 与独立申诉形成可复核的综合能力认证。",
+      "people_ai_output": "appealable-human-signed-certification"
     }
   ]
 }

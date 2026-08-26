@@ -16,6 +16,18 @@ const generatedProduct = JSON.parse(
     "utf8",
   ),
 );
+const controlledRelease = JSON.parse(
+  await readFile(
+    new URL("../../../config/muchen_journey_2026_09_01_controlled_release.json", import.meta.url),
+    "utf8",
+  ),
+);
+const generatedControlledRelease = JSON.parse(
+  await readFile(
+    new URL("../src/lib/muchen-journey-controlled-release.generated.json", import.meta.url),
+    "utf8",
+  ),
+);
 const contract = JSON.parse(
   await readFile(
     new URL("../../../outputs/controller-integration/shared-home/contract.json", import.meta.url),
@@ -23,14 +35,16 @@ const contract = JSON.parse(
   ),
 );
 
-test("shared home is bound to the controller contract and product source of truth", () => {
+test("shared home is bound to the product contract and controlled release overlay", () => {
   assert.equal(contract.surface, "/");
   assert.equal(contract.owner, "muchen-journey-program-control");
   assert.match(home, /muchen-journey-product\.generated\.json/);
-  assert.match(home, /journeyProduct\.maps\.map/);
+  assert.match(home, /muchen-journey-controlled-release\.generated\.json/);
+  assert.match(home, /CONTROLLED_MODULE_KEYS/);
   assert.match(home, /journeyProduct\.current_map/);
   assert.match(home, /People AI 成长系统/);
-  assert.match(home, /五张地图，走成一个人的长期成长/);
+  assert.match(home, /四个模块，共用一条真实任务闭环/);
+  assert.doesNotMatch(home, /五张地图|Career Map|认证竞技场/);
   assert.doesNotMatch(home, /当前只开放探索营|探索营 · P0|探索营路线预览/);
 });
 
@@ -47,6 +61,29 @@ test("the deployable web projection cannot drift from the controller product con
       people_ai_output,
     })),
   );
+  assert.deepEqual(
+    generatedProduct.approved_product_modules,
+    {
+      model: product.approved_product_modules.model,
+      recorded_on: product.approved_product_modules.recorded_on,
+      modules: product.approved_product_modules.modules,
+    },
+  );
+});
+
+test("the deployable controlled release projection cannot expand the frozen owner scope", () => {
+  assert.equal(
+    generatedControlledRelease.generated_from,
+    "config/muchen_journey_2026_09_01_controlled_release.json",
+  );
+  assert.deepEqual(generatedControlledRelease.modules, controlledRelease.modules);
+  assert.deepEqual(
+    generatedControlledRelease.shared_vertical_slice,
+    controlledRelease.shared_vertical_slice,
+  );
+  assert.equal(generatedControlledRelease.cohort_limit, 25);
+  assert.equal(generatedControlledRelease.full_product_release, false);
+  assert.equal(generatedControlledRelease.release_authorized, false);
 });
 
 test("all canonical maps and growth missions remain ordered in the shared product contract", () => {
@@ -57,11 +94,12 @@ test("all canonical maps and growth missions remain ordered in the shared produc
       { order: 2, key: "newcomer-village", name: "新手村" },
       { order: 3, key: "ai-academy", name: "AI学院" },
       { order: 4, key: "delivery-guild", name: "交付线工会" },
-      { order: 5, key: "boss-dungeon", name: "BOSS副本" },
+      { order: 5, key: "certification-arena", name: "认证竞技场" },
     ],
   );
   assert.ok(product.maps.every((map) => map.mission && map.people_ai_output));
   assert.match(home, /map\.mission/);
+  assert.doesNotMatch(home, /BOSS副本/);
 });
 
 test("the four contract states each resolve to their one exact primary action", () => {

@@ -36,7 +36,58 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0019_wp30_invitation_control"
+EXPECTED_MIGRATION_HEAD = "0027_next_stage_review"
+SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
+ROLLBACK_OWNED_FACT_TABLES: tuple[str, ...] = ()
+CURRENT_FACT_TABLES = (
+    "organizations",
+    "users",
+    "role_assignments",
+    "external_identities",
+    "invites",
+    "invitation_controls",
+    "join_contexts",
+    "identity_sessions",
+    "external_identity_links",
+    "audit_entries",
+    "task_definitions",
+    "content_drafts",
+    "task_versions",
+    "learning_material_completions",
+    "journey_definitions",
+    "journey_versions",
+    "module_content_package_bindings",
+    "journey_stage_versions",
+    "enrollments",
+    "assignments",
+    "submissions",
+    "submission_versions",
+    "submission_drafts",
+    "attachments",
+    "submission_version_attachments",
+    "reviews",
+    "evaluations",
+    "incentive_ledger_entries",
+    "outcomes",
+    "journey_admission_decisions",
+    "journey_outcome_evidence",
+    "handoffs",
+    "next_training_stage_decisions",
+    "next_training_stage_review_requests",
+    "controlled_task_authorizations",
+    "controlled_task_authorization_approvals",
+    "handoff_acceptances",
+    "outbox_events",
+    "notification_deliveries",
+    "notification_attempts",
+    "local_notification_receipts",
+    "external_notification_receipts",
+    "worker_heartbeats",
+    "import_batches",
+    "import_records",
+    "idempotency_records",
+    "data_rights_requests",
+)
 ALLOWED_STATUSES = {"PASS", "FAIL", "NOT_RUN"}
 REQUIRED_RELEASE_CHECKS = (
     "local_automated_suite",
@@ -68,6 +119,10 @@ EXTERNAL_BLOCKERS = {
     "real_observation_window",
 }
 SAFE_RUN_ID = re.compile(r"^wp06-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$")
+IMMUTABLE_LOCAL_IMAGE = re.compile(
+    r"^[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}$"
+)
+ISOLATED_COMPOSE_PROJECT = re.compile(r"^journey-c1-[a-z0-9-]+$")
 UTC = timezone.utc
 
 
@@ -206,20 +261,7 @@ def source_fingerprint() -> str:
 def database_facts(service: str, database: str) -> dict[str, Any]:
     migration = psql(service, database, "SELECT version_num FROM alembic_version")
     counts: dict[str, int] = {}
-    for table in (
-        "organizations",
-        "users",
-        "enrollments",
-        "task_definitions",
-        "task_versions",
-        "assignments",
-        "submission_versions",
-        "reviews",
-        "evaluations",
-        "outcomes",
-        "import_batches",
-        "data_rights_requests",
-    ):
+    for table in CURRENT_FACT_TABLES:
         counts[table] = int(psql(service, database, f'SELECT count(*) FROM "{table}"'))
     task_fingerprint = psql(
         service,
@@ -236,6 +278,10 @@ def database_facts(service: str, database: str) -> dict[str, Any]:
             """
             SELECT
               (SELECT count(*) FROM enrollments e JOIN users u ON u.id=e.learner_id WHERE e.organization_id<>u.organization_id)
+              + (SELECT count(*) FROM role_assignments r JOIN users u ON u.id=r.user_id WHERE r.organization_id<>u.organization_id)
+              + (SELECT count(*) FROM external_identities i JOIN users u ON u.id=i.user_id WHERE i.organization_id<>u.organization_id)
+              + (SELECT count(*) FROM identity_sessions s JOIN users u ON u.id=s.user_id WHERE s.organization_id<>u.organization_id)
+              + (SELECT count(*) FROM join_contexts c JOIN users u ON u.id=c.user_id JOIN invites i ON i.id=c.invite_id WHERE c.organization_id<>u.organization_id OR c.organization_id<>i.organization_id)
               + (SELECT count(*) FROM assignments a JOIN task_versions tv ON tv.id=a.task_version_id WHERE a.organization_id<>tv.organization_id OR a.task_definition_id<>tv.task_definition_id)
               + (SELECT count(*) FROM reviews r JOIN assignments a ON a.id=r.assignment_id WHERE r.organization_id<>a.organization_id)
               + (SELECT count(*) FROM outcomes o JOIN evaluations e ON e.id=o.source_evaluation_id WHERE o.organization_id<>e.organization_id)
@@ -248,6 +294,99 @@ def database_facts(service: str, database: str) -> dict[str, Any]:
         "task_version_fingerprint": task_fingerprint,
         "invalid_constraints": invalid_constraints,
         "critical_invariant_violations": invariant_violations,
+    }
+
+
+def require_safe_schema_rollback(facts: dict[str, Any]) -> None:
+    if facts.get("migration_revision") != EXPECTED_MIGRATION_HEAD:
+        raise OpsError("restore is not at the current migration head")
+    counts = facts.get("counts")
+    if not isinstance(counts, dict):
+        raise OpsError("restore fact counts are missing")
+    populated = [
+        table
+        for table in ROLLBACK_OWNED_FACT_TABLES
+        if not isinstance(counts.get(table), int) or counts[table] != 0
+    ]
+    if populated:
+        raise OpsError(
+            "current-head-owned facts prevent adjacent schema rollback: "
+            + ", ".join(populated)
+        )
+
+
+def probe_api_image(
+    image: str, release: str, network: str, database_url: str
+) -> None:
+    run(["docker", "image", "inspect", image], capture=True)
+    script = (
+        "from fastapi.testclient import TestClient; "
+        "from journey_api.main import app; "
+        "r=TestClient(app,base_url='http://localhost').get('/health/ready'); "
+        "assert r.status_code==200,r.text; "
+        "d=r.json(); assert d['status']=='ok' and d['release']=='" + release + "'"
+    )
+    run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            network,
+            "-e",
+            "APP_ENV=local",
+            "-e",
+            f"APP_RELEASE={release}",
+            "-e",
+            "CONFIG_SCHEMA_VERSION=3",
+            "-e",
+            f"DATABASE_URL={database_url}",
+            image,
+            "python",
+            "-c",
+            script,
+        ],
+        capture=True,
+    )
+
+
+def application_image_rollback(
+    database: str, expected_facts: dict[str, Any]
+) -> dict[str, Any]:
+    candidate = os.environ.get("WP06_CANDIDATE_API_IMAGE", "")
+    rollback = os.environ.get("WP06_ROLLBACK_API_IMAGE", "")
+    if not candidate and not rollback:
+        return {"status": "NOT_RUN"}
+    if not candidate or not rollback:
+        raise OpsError("both candidate and rollback image digests are required")
+    if not IMMUTABLE_LOCAL_IMAGE.fullmatch(candidate) or not IMMUTABLE_LOCAL_IMAGE.fullmatch(
+        rollback
+    ):
+        raise OpsError("application rollback requires an immutable local digest reference")
+    project = os.environ.get("COMPOSE_PROJECT_NAME", "")
+    if not ISOLATED_COMPOSE_PROJECT.fullmatch(project):
+        raise OpsError("application rollback requires an explicit isolated Compose project")
+    network = f"{project}_default"
+    database_url = (
+        f"postgresql+psycopg://{TEST_DATABASE_USER}:{TEST_DATABASE_PASSWORD}"
+        f"@db-test:5432/{database}"
+    )
+    sequence = (
+        (candidate, "construction-candidate"),
+        (rollback, "rollback-baseline"),
+        (candidate, "construction-candidate-recovered"),
+    )
+    for image, release in sequence:
+        probe_api_image(image, release, network, database_url)
+        if database_facts("db-test", database) != expected_facts:
+            raise OpsError("application rollback health probe changed formal facts")
+    return {
+        "status": "PASS",
+        "candidate_image": candidate,
+        "rollback_image": rollback,
+        "sequence": [release for _, release in sequence],
+        "formal_facts_preserved": True,
+        "database_write_exercised": False,
     }
 
 
@@ -510,11 +649,8 @@ def drill(manifest_path: Path) -> Path:
             restored = database_facts("db-test", database)
             if restored != manifest["database_facts"]:
                 raise OpsError("restored database facts do not match the signed backup manifest")
-            if restored["counts"]["data_rights_requests"] != 0:
-                raise OpsError(
-                    "N+1 data-rights facts exist; schema rollback is unsafe, "
-                    "use maintenance mode or a forward fix"
-                )
+            require_safe_schema_rollback(restored)
+            application_rollback = application_image_rollback(database, restored)
             database_url = (
                 f"postgresql+psycopg://{TEST_DATABASE_USER}:{TEST_DATABASE_PASSWORD}"
                 f"@db-test:5432/{database}"
@@ -528,12 +664,12 @@ def drill(manifest_path: Path) -> Path:
                 "api",
                 "alembic",
                 "downgrade",
-                "0013_wp11_notify_observability",
+                SAFE_ROLLBACK_REVISION,
             )
             rollback_revision = psql("db-test", database, "SELECT version_num FROM alembic_version")
-            if rollback_revision != "0013_wp11_notify_observability":
+            if rollback_revision != SAFE_ROLLBACK_REVISION:
                 raise OpsError(
-                    "migration rollback did not reach 0013_wp11_notify_observability"
+                    "migration rollback did not reach the reviewed adjacent revision"
                 )
             compose(
                 "run",
@@ -566,8 +702,10 @@ def drill(manifest_path: Path) -> Path:
                 "restore": "PASS",
                 "rollback_to": rollback_revision,
                 "reupgrade": "PASS",
-                "rollback_mode": "N_TO_N_PLUS_1_TO_N_WITH_ZERO_N_PLUS_1_FACTS",
+                "rollback_mode": "0026_TO_0025_TO_0026_IDENTITY_SCOPE_CONSTRAINTS_ONLY",
                 "accepted_business_facts_rolled_back": False,
+                "application_image_rollback": application_rollback["status"],
+                "application_image_rollback_evidence": application_rollback,
                 "elapsed_seconds": elapsed_seconds,
                 "backup_age_seconds": backup_age_seconds,
                 "rto_budget_seconds": 4 * 60 * 60,

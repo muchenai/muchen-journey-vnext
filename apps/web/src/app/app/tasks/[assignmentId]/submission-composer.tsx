@@ -131,6 +131,18 @@ export function SubmissionComposer({
       />
       <p className="status-meta">草稿会安全保存；提交后保留原始版本。</p>
 
+      <details className="fixed-references">
+        <summary>AI 使用披露</summary>
+        <label className="attachment-choice">
+          <input type="checkbox" name="learner_ai_used" />
+          <span>我在本次作答中使用了 AI；AI 输出只是建议，最终内容由我确认。</span>
+        </label>
+        <label>AI 用途<input name="learner_ai_purpose" maxLength={200} /></label>
+        <label>模型版本<input name="learner_ai_model_version" maxLength={200} /></label>
+        <label>Prompt 版本<input name="learner_ai_prompt_version" maxLength={200} /></label>
+        <p className="status-meta">勾选使用 AI 后，三项来源必须全部填写。</p>
+      </details>
+
       {attachments.length > 0 ? (
         <fieldset>
           <legend>本次使用的 READY 附件</legend>

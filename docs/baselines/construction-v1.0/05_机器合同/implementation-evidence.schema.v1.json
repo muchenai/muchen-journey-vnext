@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muchen.local/schemas/implementation-evidence.v1.json",
+  "title": "Muchen Journey Requirement Implementation Evidence V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "requirement_id", "candidate_sha", "status", "implementation_refs", "test_refs", "negative_test_refs", "executed_at", "evidence_hashes", "remaining_risks", "production_mutation_executed", "human_gate_filled_by_machine"],
+  "properties": {
+    "schema_version": {"const": "implementation-evidence.v1"},
+    "requirement_id": {"type": "string", "pattern": "^[A-Z]{2,5}-[0-9]{3}$"},
+    "candidate_sha": {"type": ["string", "null"], "pattern": "^[a-f0-9]{40}$"},
+    "status": {"enum": ["NOT_STARTED", "IN_PROGRESS", "BLOCKED_OWNER_CONTENT", "MACHINE_FAIL", "READY_FOR_HUMAN", "HUMAN_PASS"]},
+    "implementation_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 300}},
+    "test_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 300}},
+    "negative_test_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 300}},
+    "executed_at": {"type": "string", "format": "date-time"},
+    "evidence_hashes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "remaining_risks": {"type": "array", "items": {"type": "string", "minLength": 3, "maxLength": 500}},
+    "human_evidence_ref": {"type": ["string", "null"], "minLength": 3, "maxLength": 300},
+    "production_mutation_executed": {"const": false},
+    "human_gate_filled_by_machine": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "HUMAN_PASS"}}},
+      "then": {"required": ["human_evidence_ref"], "properties": {"candidate_sha": {"type": "string"}, "human_evidence_ref": {"type": "string"}}}
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": "construction-v1-requirement-priority-correction.v1",
+  "recorded_on": "2026-08-26",
+  "authority": [
+    "PRODUCT_OWNER",
+    "TECH_LEAD",
+    "RELEASE_OPS_OWNER",
+    "BUSINESS_DECIDER"
+  ],
+  "p0": {
+    "pass": 0,
+    "ready_for_human": 9,
+    "in_progress": 8,
+    "blocked_or_gated": 7,
+    "total": 24
+  },
+  "p1": {
+    "total": 2,
+    "requirements": {
+      "NV-003": "PARTIAL_RUNTIME",
+      "AIA-003": "GAP_P1"
+    }
+  },
+  "p1_development": "STOPPED",
+  "post_release_deferred_development": "STOPPED",
+  "technical_checkpoint_only": true,
+  "candidate_frozen": false,
+  "ready_for_uat": false,
+  "release_authorized": false,
+  "production_mutation_authorized": false
+}

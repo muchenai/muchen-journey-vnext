@@ -140,12 +140,17 @@
     display: none;
   }
 
-  .description,
+  .description {
+    font-size: .78rem;
+    line-height: 1.45;
+  }
+
   .reward {
     display: none;
   }
 
   .route li > strong {
-    display: none;
+    font-size: .58rem;
+    word-break: keep-all;
   }
 }

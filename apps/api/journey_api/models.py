@@ -115,6 +115,49 @@ class Decision(str, enum.Enum):
     REVISION_REQUIRED = "REVISION_REQUIRED"
 
 
+class IncentiveType(str, enum.Enum):
+    POINTS = "POINTS"
+    XP = "XP"
+    BADGE = "BADGE"
+    RANK = "RANK"
+
+
+class NextTrainingStageDecisionValue(str, enum.Enum):
+    READY = "READY"
+    DEFER = "DEFER"
+    NOT_READY = "NOT_READY"
+
+
+class NextTrainingStageReviewRequestStatus(str, enum.Enum):
+    RECEIVED = "RECEIVED"
+
+
+class NextTrainingStageReviewResolutionStatus(str, enum.Enum):
+    UPHELD = "UPHELD"
+    OVERTURNED = "OVERTURNED"
+    RETURNED_FOR_REVIEW = "RETURNED_FOR_REVIEW"
+
+
+class ControlledTaskAuthorizationStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    PENDING_APPROVALS = "PENDING_APPROVALS"
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+    EXPIRED = "EXPIRED"
+
+
+class ControlledTaskAuthorizationApprovalRole(str, enum.Enum):
+    NEWCOMER_OPERATIONS_OWNER = "NEWCOMER_OPERATIONS_OWNER"
+    PROJECT_OWNER = "PROJECT_OWNER"
+    DATA_SECURITY_OWNER = "DATA_SECURITY_OWNER"
+    REVIEWER_OWNER = "REVIEWER_OWNER"
+
+
+class ControlledTaskAuthorizationApprovalDecision(str, enum.Enum):
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+
+
 class FormalAdmissionDecisionType(str, enum.Enum):
     ADMIT = "ADMIT"
     DEFER = "DEFER"
@@ -193,6 +236,9 @@ class Organization(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("id", "organization_id", name="uq_users_id_organization"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -202,7 +248,14 @@ class User(Base):
 
 class RoleAssignment(Base):
     __tablename__ = "role_assignments"
-    __table_args__ = (UniqueConstraint("user_id", "role", name="uq_role_assignments_user_role"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "role", name="uq_role_assignments_user_role"),
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_role_assignments_user_organization",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -214,6 +267,16 @@ class ExternalIdentity(Base):
     __tablename__ = "external_identities"
     __table_args__ = (
         UniqueConstraint("provider", "subject", name="uq_external_identity_provider_subject"),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_external_identities_id_organization",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_external_identities_user_organization",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -233,6 +296,32 @@ class Invite(Base):
             ["journey_version_id", "organization_id"],
             ["journey_versions.id", "journey_versions.organization_id"],
             name="fk_invites_journey_version_organization",
+        ),
+        UniqueConstraint("id", "organization_id", name="uq_invites_id_organization"),
+        ForeignKeyConstraint(
+            ["reviewer_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_invites_reviewer_organization",
+        ),
+        ForeignKeyConstraint(
+            ["task_version_id", "organization_id"],
+            ["task_versions.id", "task_versions.organization_id"],
+            name="fk_invites_task_version_organization",
+        ),
+        ForeignKeyConstraint(
+            ["target_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_invites_target_organization",
+        ),
+        ForeignKeyConstraint(
+            ["created_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_invites_creator_organization",
+        ),
+        ForeignKeyConstraint(
+            ["consumed_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_invites_consumer_organization",
         ),
     )
 
@@ -260,6 +349,13 @@ class Invite(Base):
 
 class InvitationControl(Base):
     __tablename__ = "invitation_controls"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["updated_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_invitation_controls_updater_organization",
+        ),
+    )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("organizations.id"), primary_key=True
@@ -277,8 +373,28 @@ class InvitationControl(Base):
 
 class JoinContext(Base):
     __tablename__ = "join_contexts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["invite_id", "organization_id"],
+            ["invites.id", "invites.organization_id"],
+            name="fk_join_contexts_invite_organization",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_join_contexts_user_organization",
+        ),
+        ForeignKeyConstraint(
+            ["enrollment_id", "organization_id", "user_id"],
+            ["enrollments.id", "enrollments.organization_id", "enrollments.learner_id"],
+            name="fk_join_contexts_enrollment_person_organization",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     invite_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("invites.id"), unique=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.id"))
@@ -293,6 +409,18 @@ class JoinContext(Base):
 
 class IdentitySession(Base):
     __tablename__ = "identity_sessions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_identity_sessions_user_organization",
+        ),
+        ForeignKeyConstraint(
+            ["external_identity_id", "organization_id"],
+            ["external_identities.id", "external_identities.organization_id"],
+            name="fk_identity_sessions_external_identity_organization",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -340,6 +468,18 @@ class AuthRateLimit(Base):
 
 class ExternalIdentityLink(Base):
     __tablename__ = "external_identity_links"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_external_identity_links_user_organization",
+        ),
+        ForeignKeyConstraint(
+            ["created_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_external_identity_links_creator_organization",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -608,6 +748,124 @@ class JourneyVersion(Base):
     )
 
 
+class ModuleContentPackageBinding(Base):
+    __tablename__ = "module_content_package_bindings"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["journey_version_id", "organization_id"],
+            ["journey_versions.id", "journey_versions.organization_id"],
+            name="fk_mcpb_journey_version_scope",
+        ),
+        ForeignKeyConstraint(
+            ["task_version_id", "organization_id"],
+            ["task_versions.id", "task_versions.organization_id"],
+            name="fk_mcpb_task_version_scope",
+        ),
+        ForeignKeyConstraint(
+            ["owner_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_mcpb_owner_scope",
+        ),
+        ForeignKeyConstraint(
+            ["primary_reviewer_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_mcpb_primary_reviewer_scope",
+        ),
+        ForeignKeyConstraint(
+            ["backup_reviewer_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_mcpb_backup_reviewer_scope",
+        ),
+        ForeignKeyConstraint(
+            ["created_by_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_mcpb_created_by_scope",
+        ),
+        UniqueConstraint(
+            "organization_id",
+            "package_id",
+            "package_version",
+            name="uq_mcpb_package_version",
+        ),
+        UniqueConstraint(
+            "journey_version_id", name="uq_mcpb_journey_version"
+        ),
+        CheckConstraint(
+            "module_key IN ('ai-academy','delivery-guild')",
+            name="ck_mcpb_initial_modules",
+        ),
+        CheckConstraint(
+            "package_sha256 ~ '^[0-9a-f]{64}$' AND "
+            "task_package_sha256 ~ '^[0-9a-f]{64}$' AND "
+            "rubric_package_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_mcpb_hashes",
+        ),
+        CheckConstraint(
+            "owner_user_id <> primary_reviewer_user_id AND "
+            "owner_user_id <> backup_reviewer_user_id AND "
+            "primary_reviewer_user_id <> backup_reviewer_user_id",
+            name="ck_mcpb_separation_of_duties",
+        ),
+        CheckConstraint(
+            "expires_at IS NULL OR expires_at > effective_at",
+            name="ck_mcpb_validity",
+        ),
+        CheckConstraint(
+            "first_response_sla_minutes >= 1 AND "
+            "completion_sla_minutes >= first_response_sla_minutes",
+            name="ck_mcpb_sla",
+        ),
+        CheckConstraint(
+            "package_document->>'sha256' = package_sha256 AND "
+            "package_document->>'package_id' = package_id AND "
+            "package_document->>'version' = package_version AND "
+            "package_document->>'module_key' = module_key AND "
+            "package_document->'task_versions'->0->>'sha256' = task_package_sha256 AND "
+            "package_document->'rubrics'->0->>'sha256' = rubric_package_sha256",
+            name="ck_mcpb_document_lineage",
+        ),
+        CheckConstraint(
+            "package_document->'data_policy'->>'production_write_allowed' = 'false' AND "
+            "package_document->'data_policy'->>'raw_customer_data_allowed' = 'false' AND "
+            "package_document->'data_policy'->>'ai_high_impact_decision_allowed' = 'false' AND "
+            "package_document->'task_versions'->0->>'execution_environment' = 'SIMULATION'",
+            name="ck_mcpb_safety_boundary",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    journey_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    task_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    package_id: Mapped[str] = mapped_column(String(120))
+    package_version: Mapped[str] = mapped_column(String(40))
+    module_key: Mapped[str] = mapped_column(String(40), index=True)
+    package_sha256: Mapped[str] = mapped_column(String(64))
+    task_package_sha256: Mapped[str] = mapped_column(String(64))
+    rubric_package_sha256: Mapped[str] = mapped_column(String(64))
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    owner_role: Mapped[str] = mapped_column(String(50))
+    owner_signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_refs: Mapped[list[str]] = mapped_column(JSON)
+    reviewer_pool_ref: Mapped[str] = mapped_column(String(120))
+    primary_reviewer_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    backup_reviewer_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    first_response_sla_minutes: Mapped[int]
+    completion_sla_minutes: Mapped[int]
+    visibility: Mapped[list[str]] = mapped_column(JSON)
+    data_classification: Mapped[str] = mapped_column(String(40))
+    retention_policy: Mapped[str] = mapped_column(String(120))
+    package_document: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_by_user_id: Mapped[uuid.UUID]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class JourneyStageVersion(Base):
     __tablename__ = "journey_stage_versions"
     __table_args__ = (
@@ -629,6 +887,13 @@ class JourneyStageVersion(Base):
         ),
         UniqueConstraint(
             "id", "organization_id", name="uq_journey_stages_id_organization"
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "journey_version_id",
+            "task_version_id",
+            name="uq_jsv_acceptance_lineage",
         ),
         CheckConstraint("position >= 0", name="ck_journey_stages_nonnegative_position"),
         CheckConstraint(
@@ -665,6 +930,14 @@ class Enrollment(Base):
         ),
         UniqueConstraint(
             "id", "organization_id", name="uq_enrollments_id_organization"
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "learner_id",
+            "journey_version_id",
+            "reviewer_id",
+            name="uq_enrollments_acceptance_lineage",
         ),
         ForeignKeyConstraint(
             ["journey_version_id", "organization_id"],
@@ -705,6 +978,14 @@ class Assignment(Base):
             "enrollment_id",
             "journey_stage_version_id",
             name="uq_assignments_enrollment_journey_stage",
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "enrollment_id",
+            "journey_stage_version_id",
+            "task_version_id",
+            name="uq_assignments_acceptance_lineage",
         ),
         CheckConstraint("position >= 1", name="ck_assignments_positive_position"),
     )
@@ -767,6 +1048,16 @@ class SubmissionVersion(Base):
     submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id"), index=True)
     version_no: Mapped[int]
     body: Mapped[str] = mapped_column(Text)
+    ai_use: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        default=lambda: {
+            "used": False,
+            "purpose": None,
+            "model_version": None,
+            "prompt_version": None,
+            "output_is_advisory_only": True,
+        },
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -1021,8 +1312,85 @@ class Evaluation(Base):
     )
     feedback_structure_version: Mapped[int] = mapped_column(default=1)
     feedback: Mapped[str] = mapped_column(Text)
+    ai_use: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        default=lambda: {
+            "used": False,
+            "purpose": None,
+            "model_version": None,
+            "prompt_version": None,
+            "output_is_advisory_only": True,
+        },
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IncentiveLedgerEntry(Base):
+    __tablename__ = "incentive_ledger_entries"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["person_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_incentive_entries_person_organization",
+        ),
+        ForeignKeyConstraint(
+            ["created_by", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_incentive_entries_creator_organization",
+        ),
+        ForeignKeyConstraint(
+            ["source_outcome_id", "organization_id", "person_id"],
+            ["outcomes.id", "outcomes.organization_id", "outcomes.learner_id"],
+            name="fk_incentive_entries_outcome_person_scope",
+        ),
+        UniqueConstraint(
+            "id", "organization_id", name="uq_incentive_entries_id_organization"
+        ),
+        CheckConstraint(
+            "module_key IN ('exploration-camp', 'newcomer-village', "
+            "'ai-academy', 'delivery-guild', 'certification-arena', 'career-map')",
+            name="ck_incentive_entries_module_key",
+        ),
+        CheckConstraint(
+            "(incentive_type IN ('POINTS', 'XP') AND amount IS NOT NULL "
+            "AND amount <> 0 AND label IS NULL) OR "
+            "(incentive_type IN ('BADGE', 'RANK') AND amount IS NULL "
+            "AND length(trim(label)) BETWEEN 1 AND 120)",
+            name="ck_incentive_entries_value_shape",
+        ),
+        CheckConstraint(
+            "(correction_of_entry_id IS NULL AND correction_reason IS NULL) OR "
+            "(correction_of_entry_id IS NOT NULL "
+            "AND length(trim(correction_reason)) BETWEEN 10 AND 500)",
+            name="ck_incentive_entries_correction_shape",
+        ),
+        CheckConstraint(
+            "rule_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_incentive_entries_rule_sha256",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    module_key: Mapped[str] = mapped_column(String(40))
+    incentive_type: Mapped[IncentiveType] = mapped_column(
+        Enum(IncentiveType, native_enum=False)
+    )
+    amount: Mapped[int | None] = mapped_column(nullable=True)
+    label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_outcome_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    rule_ref: Mapped[str] = mapped_column(String(300))
+    rule_sha256: Mapped[str] = mapped_column(String(64))
+    correction_of_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("incentive_ledger_entries.id"), nullable=True
+    )
+    correction_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[uuid.UUID]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class Outcome(Base):
@@ -1195,6 +1563,12 @@ class Handoff(Base):
         UniqueConstraint("outcome_id", name="uq_handoffs_outcome"),
         UniqueConstraint("enrollment_id", name="uq_handoffs_enrollment"),
         UniqueConstraint("source_evaluation_id", name="uq_handoffs_evaluation"),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "outcome_id",
+            name="uq_handoffs_next_stage_scope",
+        ),
         CheckConstraint("status = 'READY'", name="ck_handoffs_ready"),
         CheckConstraint(
             "next_step_code = 'CONFIRM_HANDOFF'", name="ck_handoffs_next_step"
@@ -1214,6 +1588,600 @@ class Handoff(Base):
     next_step_code: Mapped[str] = mapped_column(String(80))
     next_step_title: Mapped[str] = mapped_column(String(240))
     instructions: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NextTrainingStageDecision(Base):
+    __tablename__ = "next_training_stage_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["handoff_id", "organization_id", "outcome_id"],
+            ["handoffs.id", "handoffs.organization_id", "handoffs.outcome_id"],
+            name="fk_ntsd_handoff_scope",
+        ),
+        ForeignKeyConstraint(
+            ["outcome_id", "organization_id", "person_id"],
+            ["outcomes.id", "outcomes.organization_id", "outcomes.learner_id"],
+            name="fk_ntsd_outcome_person_scope",
+        ),
+        ForeignKeyConstraint(
+            ["decided_by_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_ntsd_decider_scope",
+        ),
+        UniqueConstraint(
+            "organization_id", "handoff_id", "decision_scope", "revision",
+            name="uq_ntsd_handoff_scope_revision",
+        ),
+        UniqueConstraint(
+            "source_review_request_id", name="uq_ntsd_source_review_request"
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "handoff_id",
+            "decision_scope",
+            "decision",
+            name="uq_ntsd_review_request_scope",
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "handoff_id",
+            "decision_scope",
+            "decision",
+            "person_id",
+            name="uq_ntsd_acceptance_person_scope",
+        ),
+        CheckConstraint(
+            "decision_scope = 'NEXT_TRAINING_STAGE'", name="ck_ntsd_scope"
+        ),
+        CheckConstraint(
+            "length(trim(decision_reason)) BETWEEN 10 AND 2000",
+            name="ck_ntsd_reason",
+        ),
+        CheckConstraint(
+            "decision_evidence_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_ntsd_evidence_sha256",
+        ),
+        CheckConstraint(
+            "length(trim(decision_evidence_ref)) BETWEEN 3 AND 500",
+            name="ck_ntsd_evidence_ref",
+        ),
+        CheckConstraint(
+            "decided_by_user_id <> person_id", name="ck_ntsd_human_independence"
+        ),
+        CheckConstraint("revision >= 1", name="ck_ntsd_positive_revision"),
+        CheckConstraint(
+            "(revision = 1 AND supersedes_decision_id IS NULL "
+            "AND source_review_request_id IS NULL) OR "
+            "(revision > 1 AND supersedes_decision_id IS NOT NULL "
+            "AND source_review_request_id IS NOT NULL)",
+            name="ck_ntsd_replacement_lineage_shape",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    handoff_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    outcome_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    decision_scope: Mapped[str] = mapped_column(String(40))
+    decision: Mapped[NextTrainingStageDecisionValue] = mapped_column(
+        Enum(NextTrainingStageDecisionValue, native_enum=False)
+    )
+    decision_reason: Mapped[str] = mapped_column(Text)
+    decided_by_user_id: Mapped[uuid.UUID]
+    decision_evidence_ref: Mapped[str] = mapped_column(String(500))
+    decision_evidence_sha256: Mapped[str] = mapped_column(String(64))
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(default=1)
+    supersedes_decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
+    source_review_request_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NextTrainingStageReviewRequest(Base):
+    __tablename__ = "next_training_stage_review_requests"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "next_training_stage_decision_id",
+                "organization_id",
+                "handoff_id",
+                "decision_scope",
+                "source_decision",
+            ],
+            [
+                "next_training_stage_decisions.id",
+                "next_training_stage_decisions.organization_id",
+                "next_training_stage_decisions.handoff_id",
+                "next_training_stage_decisions.decision_scope",
+                "next_training_stage_decisions.decision",
+            ],
+            name="fk_ntsrr_adverse_decision",
+        ),
+        ForeignKeyConstraint(
+            ["requester_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_ntsrr_requester_scope",
+        ),
+        UniqueConstraint(
+            "organization_id",
+            "next_training_stage_decision_id",
+            "requester_user_id",
+            name="uq_ntsrr_decision_person",
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "next_training_stage_decision_id",
+            "requester_user_id",
+            name="uq_ntsrr_assignment_scope",
+        ),
+        CheckConstraint(
+            "decision_scope = 'NEXT_TRAINING_STAGE'", name="ck_ntsrr_scope"
+        ),
+        CheckConstraint(
+            "source_decision IN ('DEFER', 'NOT_READY')",
+            name="ck_ntsrr_adverse_decision",
+        ),
+        CheckConstraint("status = 'RECEIVED'", name="ck_ntsrr_received_only"),
+        CheckConstraint(
+            "length(trim(reason)) BETWEEN 10 AND 2000", name="ck_ntsrr_reason"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    handoff_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    next_training_stage_decision_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    decision_scope: Mapped[str] = mapped_column(String(40))
+    source_decision: Mapped[NextTrainingStageDecisionValue] = mapped_column(
+        Enum(NextTrainingStageDecisionValue, native_enum=False)
+    )
+    requester_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    evidence_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[NextTrainingStageReviewRequestStatus] = mapped_column(
+        Enum(NextTrainingStageReviewRequestStatus, native_enum=False)
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NextTrainingStageReviewAssignment(Base):
+    __tablename__ = "next_training_stage_review_assignments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "review_request_id",
+                "organization_id",
+                "source_decision_id",
+                "person_id",
+            ],
+            [
+                "next_training_stage_review_requests.id",
+                "next_training_stage_review_requests.organization_id",
+                "next_training_stage_review_requests.next_training_stage_decision_id",
+                "next_training_stage_review_requests.requester_user_id",
+            ],
+            name="fk_ntsra_request_scope",
+        ),
+        ForeignKeyConstraint(
+            ["reviewer_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_ntsra_reviewer_scope",
+        ),
+        ForeignKeyConstraint(
+            ["assigned_by_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_ntsra_assigner_scope",
+        ),
+        UniqueConstraint("review_request_id", name="uq_ntsra_request"),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "review_request_id",
+            "reviewer_user_id",
+            name="uq_ntsra_resolution_scope",
+        ),
+        CheckConstraint(
+            "reviewer_user_id <> person_id", name="ck_ntsra_reviewer_not_person"
+        ),
+        CheckConstraint(
+            "assigned_by_user_id <> reviewer_user_id",
+            name="ck_ntsra_assigner_not_reviewer",
+        ),
+        CheckConstraint(
+            "length(trim(assignment_reason)) BETWEEN 10 AND 1000",
+            name="ck_ntsra_reason",
+        ),
+        CheckConstraint(
+            "length(trim(assignment_evidence_ref)) BETWEEN 3 AND 300",
+            name="ck_ntsra_evidence_ref",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    review_request_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    source_decision_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    reviewer_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assigned_by_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assignment_reason: Mapped[str] = mapped_column(Text)
+    assignment_evidence_ref: Mapped[str] = mapped_column(String(300))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NextTrainingStageReviewResolution(Base):
+    __tablename__ = "next_training_stage_review_resolutions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "assignment_id",
+                "organization_id",
+                "review_request_id",
+                "reviewer_user_id",
+            ],
+            [
+                "next_training_stage_review_assignments.id",
+                "next_training_stage_review_assignments.organization_id",
+                "next_training_stage_review_assignments.review_request_id",
+                "next_training_stage_review_assignments.reviewer_user_id",
+            ],
+            name="fk_ntsrrs_assignment_scope",
+        ),
+        UniqueConstraint("review_request_id", name="uq_ntsrrs_request"),
+        UniqueConstraint("assignment_id", name="uq_ntsrrs_assignment"),
+        CheckConstraint(
+            "status IN ('UPHELD', 'OVERTURNED', 'RETURNED_FOR_REVIEW')",
+            name="ck_ntsrrs_terminal_status",
+        ),
+        CheckConstraint(
+            "length(trim(resolution_reason)) BETWEEN 10 AND 2000",
+            name="ck_ntsrrs_reason",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    review_request_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    reviewer_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    status: Mapped[NextTrainingStageReviewResolutionStatus] = mapped_column(
+        Enum(NextTrainingStageReviewResolutionStatus, native_enum=False)
+    )
+    resolution_reason: Mapped[str] = mapped_column(Text)
+    evidence_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
+    resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ControlledTaskAuthorization(Base):
+    __tablename__ = "controlled_task_authorizations"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "target_journey_stage_version_id",
+                "organization_id",
+                "target_journey_version_id",
+                "task_version_id",
+            ],
+            [
+                "journey_stage_versions.id",
+                "journey_stage_versions.organization_id",
+                "journey_stage_versions.journey_version_id",
+                "journey_stage_versions.task_version_id",
+            ],
+            name="fk_cta_stage_lineage",
+        ),
+        *(
+            ForeignKeyConstraint(
+                [column, "organization_id"],
+                ["users.id", "users.organization_id"],
+                name=name,
+            )
+            for column, name in (
+                ("project_owner_user_id", "fk_cta_project_owner_scope"),
+                ("newcomer_operations_owner_user_id", "fk_cta_operations_owner_scope"),
+                ("data_security_owner_user_id", "fk_cta_data_security_owner_scope"),
+                ("reviewer_owner_user_id", "fk_cta_reviewer_owner_scope"),
+                ("primary_reviewer_user_id", "fk_cta_primary_reviewer_scope"),
+                ("backup_reviewer_user_id", "fk_cta_backup_reviewer_scope"),
+                ("created_by_user_id", "fk_cta_created_by_scope"),
+                ("activated_by_user_id", "fk_cta_activated_by_scope"),
+                ("revoked_by_user_id", "fk_cta_revoked_by_scope"),
+                ("expired_by_user_id", "fk_cta_expired_by_scope"),
+            )
+        ),
+        UniqueConstraint("id", "organization_id", name="uq_cta_id_org"),
+        UniqueConstraint(
+            "id", "organization_id", "scope_sha256", name="uq_cta_scope_hash_ref"
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "target_journey_version_id",
+            "target_journey_stage_version_id",
+            "task_version_id",
+            "primary_reviewer_user_id",
+            name="uq_cta_acceptance_lineage",
+        ),
+        UniqueConstraint(
+            "organization_id",
+            "target_journey_version_id",
+            "target_journey_stage_version_id",
+            "task_version_id",
+            "authorization_version",
+            name="uq_cta_stage_business_version",
+        ),
+        CheckConstraint(
+            "authorization_scope = 'NEWCOMER_CONTROLLED_TRAINING'",
+            name="ck_cta_scope",
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT','PENDING_APPROVALS','ACTIVE','REVOKED','EXPIRED')",
+            name="ck_cta_status",
+        ),
+        CheckConstraint(
+            "authorization_version >= 1 AND revision >= 1",
+            name="ck_cta_positive_versions",
+        ),
+        CheckConstraint(
+            "task_version_sha256 ~ '^[0-9a-f]{64}$' AND "
+            "scope_sha256 ~ '^[0-9a-f]{64}$' AND "
+            "policy_snapshot_sha256 ~ '^[0-9a-f]{64}$' AND "
+            "policy_evidence_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_cta_hashes",
+        ),
+        CheckConstraint("valid_from < expires_at", name="ck_cta_validity"),
+        CheckConstraint(
+            "primary_reviewer_user_id <> backup_reviewer_user_id AND "
+            "primary_reviewer_user_id NOT IN (project_owner_user_id, newcomer_operations_owner_user_id, data_security_owner_user_id, reviewer_owner_user_id) AND "
+            "backup_reviewer_user_id NOT IN (project_owner_user_id, newcomer_operations_owner_user_id, data_security_owner_user_id, reviewer_owner_user_id)",
+            name="ck_cta_distinct_reviewers",
+        ),
+        CheckConstraint(
+            "((status IN ('ACTIVE','REVOKED','EXPIRED')) = (activated_by_user_id IS NOT NULL AND activated_at IS NOT NULL))",
+            name="ck_cta_activation_audit",
+        ),
+        CheckConstraint(
+            "(status = 'REVOKED' AND revoked_by_user_id IS NOT NULL AND revoked_at IS NOT NULL AND length(trim(revocation_reason)) BETWEEN 10 AND 500) OR "
+            "(status <> 'REVOKED' AND revoked_by_user_id IS NULL AND revoked_at IS NULL AND revocation_reason IS NULL)",
+            name="ck_cta_revocation_audit",
+        ),
+        CheckConstraint(
+            "(status = 'EXPIRED' AND expired_by_user_id IS NOT NULL AND expired_at IS NOT NULL) OR "
+            "(status <> 'EXPIRED' AND expired_by_user_id IS NULL AND expired_at IS NULL)",
+            name="ck_cta_expiration_audit",
+        ),
+        CheckConstraint(
+            "status <> 'EXPIRED' OR expired_at >= expires_at",
+            name="ck_cta_expiration_time",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    authorization_scope: Mapped[str] = mapped_column(String(50))
+    authorized_project_ref: Mapped[str] = mapped_column(String(500))
+    target_journey_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    target_journey_stage_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    task_version_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    task_version_sha256: Mapped[str] = mapped_column(String(64))
+    authorization_version: Mapped[int]
+    scope_sha256: Mapped[str] = mapped_column(String(64))
+    project_owner_user_id: Mapped[uuid.UUID]
+    newcomer_operations_owner_user_id: Mapped[uuid.UUID]
+    data_security_owner_user_id: Mapped[uuid.UUID]
+    reviewer_owner_user_id: Mapped[uuid.UUID]
+    primary_reviewer_user_id: Mapped[uuid.UUID]
+    backup_reviewer_user_id: Mapped[uuid.UUID]
+    policy_snapshot_ref: Mapped[str] = mapped_column(String(500))
+    policy_snapshot_version: Mapped[str] = mapped_column(String(80))
+    policy_snapshot_sha256: Mapped[str] = mapped_column(String(64))
+    policy_evidence_ref: Mapped[str] = mapped_column(String(500))
+    policy_evidence_sha256: Mapped[str] = mapped_column(String(64))
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[ControlledTaskAuthorizationStatus] = mapped_column(
+        Enum(ControlledTaskAuthorizationStatus, native_enum=False)
+    )
+    revision: Mapped[int]
+    created_by_user_id: Mapped[uuid.UUID]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    activated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revocation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expired_by_user_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    expired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ControlledTaskAuthorizationApproval(Base):
+    __tablename__ = "controlled_task_authorization_approvals"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["authorization_id", "organization_id", "signed_scope_sha256"],
+            [
+                "controlled_task_authorizations.id",
+                "controlled_task_authorizations.organization_id",
+                "controlled_task_authorizations.scope_sha256",
+            ],
+            name="fk_ctaa_authorization_scope",
+        ),
+        ForeignKeyConstraint(
+            ["signer_user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_ctaa_signer_scope",
+        ),
+        UniqueConstraint(
+            "authorization_id", "approval_role", name="uq_ctaa_authorization_role"
+        ),
+        CheckConstraint(
+            "approval_role IN ('NEWCOMER_OPERATIONS_OWNER','PROJECT_OWNER','DATA_SECURITY_OWNER','REVIEWER_OWNER')",
+            name="ck_ctaa_role",
+        ),
+        CheckConstraint(
+            "decision IN ('APPROVE','REJECT')", name="ck_ctaa_decision"
+        ),
+        CheckConstraint(
+            "signed_scope_sha256 ~ '^[0-9a-f]{64}$' AND signature_evidence_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_ctaa_hashes",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    authorization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    approval_role: Mapped[ControlledTaskAuthorizationApprovalRole] = mapped_column(
+        Enum(ControlledTaskAuthorizationApprovalRole, native_enum=False)
+    )
+    signer_user_id: Mapped[uuid.UUID]
+    decision: Mapped[ControlledTaskAuthorizationApprovalDecision] = mapped_column(
+        Enum(ControlledTaskAuthorizationApprovalDecision, native_enum=False)
+    )
+    signed_scope_sha256: Mapped[str] = mapped_column(String(64))
+    signature_evidence_ref: Mapped[str] = mapped_column(String(500))
+    signature_evidence_sha256: Mapped[str] = mapped_column(String(64))
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class HandoffAcceptance(Base):
+    __tablename__ = "handoff_acceptances"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "next_training_stage_decision_id",
+                "organization_id",
+                "handoff_id",
+                "decision_scope",
+                "decision_value",
+                "accepted_by_user_id",
+            ],
+            [
+                "next_training_stage_decisions.id",
+                "next_training_stage_decisions.organization_id",
+                "next_training_stage_decisions.handoff_id",
+                "next_training_stage_decisions.decision_scope",
+                "next_training_stage_decisions.decision",
+                "next_training_stage_decisions.person_id",
+            ],
+            name="fk_ha_ready_decision_person",
+        ),
+        ForeignKeyConstraint(
+            [
+                "controlled_task_authorization_id",
+                "organization_id",
+                "target_journey_version_id",
+                "target_journey_stage_version_id",
+                "target_task_version_id",
+                "target_reviewer_user_id",
+            ],
+            [
+                "controlled_task_authorizations.id",
+                "controlled_task_authorizations.organization_id",
+                "controlled_task_authorizations.target_journey_version_id",
+                "controlled_task_authorizations.target_journey_stage_version_id",
+                "controlled_task_authorizations.task_version_id",
+                "controlled_task_authorizations.primary_reviewer_user_id",
+            ],
+            name="fk_ha_authorized_lineage",
+        ),
+        ForeignKeyConstraint(
+            [
+                "target_enrollment_id",
+                "organization_id",
+                "accepted_by_user_id",
+                "target_journey_version_id",
+                "target_reviewer_user_id",
+            ],
+            [
+                "enrollments.id",
+                "enrollments.organization_id",
+                "enrollments.learner_id",
+                "enrollments.journey_version_id",
+                "enrollments.reviewer_id",
+            ],
+            name="fk_ha_target_enrollment_lineage",
+        ),
+        ForeignKeyConstraint(
+            [
+                "target_assignment_id",
+                "organization_id",
+                "target_enrollment_id",
+                "target_journey_stage_version_id",
+                "target_task_version_id",
+            ],
+            [
+                "assignments.id",
+                "assignments.organization_id",
+                "assignments.enrollment_id",
+                "assignments.journey_stage_version_id",
+                "assignments.task_version_id",
+            ],
+            name="fk_ha_target_assignment_lineage",
+        ),
+        UniqueConstraint("handoff_id", name="uq_ha_handoff"),
+        UniqueConstraint("target_enrollment_id", name="uq_ha_target_enrollment"),
+        UniqueConstraint("target_assignment_id", name="uq_ha_target_assignment"),
+        CheckConstraint(
+            "decision_scope = 'NEXT_TRAINING_STAGE'", name="ck_ha_decision_scope"
+        ),
+        CheckConstraint("decision_value = 'READY'", name="ck_ha_ready_decision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    handoff_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    accepted_by_user_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    next_training_stage_decision_id: Mapped[uuid.UUID]
+    decision_scope: Mapped[str] = mapped_column(String(40))
+    decision_value: Mapped[NextTrainingStageDecisionValue] = mapped_column(
+        Enum(NextTrainingStageDecisionValue, native_enum=False)
+    )
+    controlled_task_authorization_id: Mapped[uuid.UUID]
+    target_journey_version_id: Mapped[uuid.UUID]
+    target_journey_stage_version_id: Mapped[uuid.UUID]
+    target_task_version_id: Mapped[uuid.UUID]
+    target_reviewer_user_id: Mapped[uuid.UUID]
+    target_enrollment_id: Mapped[uuid.UUID]
+    target_assignment_id: Mapped[uuid.UUID]
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

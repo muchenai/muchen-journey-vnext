@@ -1,0 +1,24 @@
+{
+  "generated_from": "config/muchen_journey_2026_09_01_controlled_release.json",
+  "release_id": "muchen-journey-2026-09-01-controlled-cohort",
+  "release_date": "2026-09-01",
+  "release_type": "CONTROLLED_COHORT_RELEASE",
+  "cohort_limit": 25,
+  "full_product_release": false,
+  "release_authorized": false,
+  "modules": [
+    "exploration-camp",
+    "newcomer-village",
+    "ai-academy",
+    "delivery-guild"
+  ],
+  "shared_vertical_slice": [
+    "MODULE_ENTRY",
+    "TASK_ASSIGNMENT_OR_SELECTION",
+    "PRACTICE",
+    "EVIDENCE_SUBMISSION",
+    "HUMAN_REVIEW",
+    "REWORK_OR_PASS",
+    "RESULT_PACKAGE"
+  ]
+}

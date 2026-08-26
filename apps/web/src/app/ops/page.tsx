@@ -24,7 +24,6 @@ import {
 import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
-import { FormalAdmissionPanel } from "@/app/ops/formal-admission-panel";
 import { ContentDraftPublicationPanel } from "@/app/ops/content-draft-publication-panel";
 import { JourneyV3AssemblyPanel } from "@/app/ops/journey-v3-assembly-panel";
 
@@ -195,14 +194,8 @@ export default async function OpsPage({
               {enrollment.open_review_status ? (
                 <p className="inline-error">已有 {enrollment.open_review_status} Review；Reviewer 重分配与 Enrollment 取消均被状态机阻断。</p>
               ) : null}
-              {enrollment.admission_decision ? (
-                <div className="admission-preview">
-                  <strong>{enrollment.admission_total_score} / 100 · {enrollment.admission_tier} 档</strong>
-                  <span>人工结论：{enrollment.admission_decision} · 已不可变记录</span>
-                </div>
-              ) : null}
-              {enrollment.allowed_commands.includes("create_formal_admission") ? (
-                <FormalAdmissionPanel enrollmentId={enrollment.id} />
+              {enrollment.status === "COMPLETED" ? (
+                <p>下一训练阶段决定尚未启用；当前运营页不提供该高影响决定入口。</p>
               ) : null}
               {enrollment.allowed_commands.includes("create_learner_reentry") ? (
                 <LearnerReentryPanel

@@ -16,9 +16,10 @@ const styles = await readFile(
   "utf8",
 );
 
-test("private invitations explain the whole Journey before the first form action", () => {
-  assert.match(orientation, /01 \/ 05/);
-  assert.match(orientation, /五张地图/);
+test("private invitations explain the controlled release before the first form action", () => {
+  assert.match(orientation, /四模块受控首发/);
+  assert.match(orientation, /四个模块/);
+  assert.doesNotMatch(orientation, /01 \/ 05|五张地图|Career Map/);
   assert.match(orientation, /探索营/);
   assert.match(orientation, /第一份必读材料/);
   assert.match(orientation, /VERIFY_INVITE/);
@@ -53,4 +54,6 @@ test("local styles remain responsive and isolated from shared home selectors", (
   assert.match(styles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(styles, /animation|transition/);
   assert.doesNotMatch(styles, /\.landing-|\.button\b/);
+  assert.doesNotMatch(styles, /\.description\s*\{[^}]*display:\s*none/s);
+  assert.doesNotMatch(styles, /\.route li > strong\s*\{[^}]*display:\s*none/s);
 });

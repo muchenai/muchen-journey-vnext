@@ -170,6 +170,16 @@ export function ReviewWorkbench({
           maxLength={2000}
           required
         />
+        <details className="fixed-references">
+          <summary>Reviewer AI 使用披露</summary>
+          <label className="attachment-choice">
+            <input type="checkbox" name="reviewer_ai_used" />
+            <span>我使用了 AI 整理评审输入；AI 只提供建议，最终决定和理由由我本人作出。</span>
+          </label>
+          <label>AI 用途<input name="reviewer_ai_purpose" maxLength={200} /></label>
+          <label>模型版本<input name="reviewer_ai_model_version" maxLength={200} /></label>
+          <label>Prompt 版本<input name="reviewer_ai_prompt_version" maxLength={200} /></label>
+        </details>
         <fieldset>
           <legend>最终结论</legend>
           <div className="decision-grid">

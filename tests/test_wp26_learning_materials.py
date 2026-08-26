@@ -297,7 +297,7 @@ def test_wp26_required_materials_are_immutable_server_side_facts():
     )
     assert resubmitted["assignment_status"] == "SUBMITTED"
     approved = finalize_review(reviewer, assignment_id, "APPROVE")
-    assert approved["assignment_status"] == "COMPLETED"
+    assert approved["assignment_status"] == "PASSED"
 
     with SessionLocal() as session:
         assert session.scalar(

@@ -11,8 +11,11 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from journey_api.config import get_settings
 from journey_api.content_routes import router as content_router
+from journey_api.controlled_task_routes import router as controlled_task_router
+from journey_api.construction_module_routes import router as construction_module_router
 from journey_api.errors import ApiError
 from journey_api.identity_routes import router as identity_router
+from journey_api.next_stage_review_routes import router as next_stage_review_router
 from journey_api.outcome_routes import router as outcome_router
 from journey_api.ops_routes import router as ops_router
 from journey_api.oauth_routes import router as oauth_router
@@ -108,8 +111,11 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 app.include_router(router)
 app.include_router(submission_router)
 app.include_router(identity_router)
+app.include_router(next_stage_review_router)
 app.include_router(review_router)
 app.include_router(outcome_router)
 app.include_router(ops_router)
 app.include_router(oauth_router)
 app.include_router(content_router)
+app.include_router(controlled_task_router)
+app.include_router(construction_module_router)

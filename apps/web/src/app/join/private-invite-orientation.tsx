@@ -1,4 +1,6 @@
 import styles from "./private-invite-orientation.module.css";
+import journeyProduct from "@/lib/muchen-journey-product.generated.json";
+import controlledRelease from "@/lib/muchen-journey-controlled-release.generated.json";
 
 export type OrientationPhase = "VERIFY_INVITE" | "CONFIRM_IDENTITY" | "REENTRY";
 
@@ -17,6 +19,11 @@ const PHASE_COPY: Record<OrientationPhase, { now: string; next: string }> = {
   },
 };
 
+const CONTROLLED_MODULE_KEYS = new Set<string>(controlledRelease.modules);
+const INVITE_ROUTE = journeyProduct.maps
+  .filter((map) => CONTROLLED_MODULE_KEYS.has(map.key))
+  .map((map) => map.name);
+
 export function PrivateInviteOrientation({
   phase,
   descriptionId,
@@ -28,15 +35,15 @@ export function PrivateInviteOrientation({
 
   return (
     <aside id={descriptionId} className={styles.orientation} aria-labelledby={`${descriptionId}-title`}>
-      <p className={styles.eyebrow}>Muchen Journey · 01 / 05 · 探索营</p>
+      <p className={styles.eyebrow}>Muchen Journey · 四模块受控首发 · 探索营</p>
       <h2 id={`${descriptionId}-title`} className={styles.title}>
         先完成一次，再理解全部
       </h2>
       <p className={styles.description}>
-        整个 Journey 有五张地图。今天只进入第 1 张「探索营」，不用先记住整套系统。
+        本次受控首发包含四个模块。今天先进入「探索营」，不用先记住全部流程。
       </p>
-      <ol className={styles.route} aria-label="五张地图，当前位于探索营">
-        {["探索营", "新手村", "AI学院", "交付线工会", "BOSS副本"].map((name, index) => (
+      <ol className={styles.route} aria-label="四个受控首发模块，当前位于探索营">
+        {INVITE_ROUTE.map((name, index) => (
           <li className={index === 0 ? styles.current : ""} key={name}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             <strong>{name}</strong>

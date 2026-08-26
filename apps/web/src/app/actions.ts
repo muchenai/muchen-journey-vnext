@@ -17,6 +17,7 @@ import {
 } from "@/lib/server/api";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 
 function requiredUuid(data: FormData, key: string): string {
@@ -31,6 +32,14 @@ function requiredRevision(data: FormData): number {
   const value = Number(data.get("revision"));
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error("版本信息无效。请刷新页面后重试。");
+  }
+  return value;
+}
+
+function requiredSha256(data: FormData, key: string): string {
+  const value = data.get(key);
+  if (typeof value !== "string" || !SHA256_PATTERN.test(value)) {
+    throw new Error("授权证据校验值无效。请刷新页面后重试。");
   }
   return value;
 }
@@ -158,6 +167,33 @@ export type SubmissionActionState = {
   error?: string;
   requestId?: string;
 };
+
+function aiUseDisclosure(data: FormData, prefix: "learner_ai" | "reviewer_ai") {
+  const used = data.get(`${prefix}_used`) === "on";
+  if (!used) {
+    return {
+      used: false,
+      purpose: null,
+      model_version: null,
+      prompt_version: null,
+      output_is_advisory_only: true,
+    };
+  }
+  const requiredText = (field: "purpose" | "model_version" | "prompt_version") => {
+    const value = data.get(`${prefix}_${field}`);
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error("使用 AI 时必须完整记录用途、模型版本和 Prompt 版本。");
+    }
+    return value.trim();
+  };
+  return {
+    used: true,
+    purpose: requiredText("purpose"),
+    model_version: requiredText("model_version"),
+    prompt_version: requiredText("prompt_version"),
+    output_is_advisory_only: true,
+  };
+}
 
 function submissionError(error: unknown): SubmissionActionState {
   if (error instanceof ApiRequestError) {
@@ -292,6 +328,67 @@ export async function logoutSession() {
   redirect("/");
 }
 
+export async function requestNextTrainingStageReview(data: FormData) {
+  const decisionId = requiredUuid(data, "decision_id");
+  const reason = requiredText(data, "reason", 10, 2_000);
+  const evidenceRefValue = data.get("evidence_ref");
+  const evidenceRef =
+    typeof evidenceRefValue === "string" ? evidenceRefValue.trim() : "";
+  if (evidenceRef && (evidenceRef.length < 3 || evidenceRef.length > 300)) {
+    throw new Error("补充证据引用需为 3–300 个字符。");
+  }
+  await apiRequest(
+    `/api/v1/me/next-training-stage-decisions/${decisionId}/review-requests`,
+    "LEARNER",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        reason,
+        evidence_refs: evidenceRef ? [evidenceRef] : [],
+      }),
+    },
+  );
+  revalidatePath("/app/result");
+  redirect("/app/result?review_requested=received");
+}
+
+export async function acceptControlledTaskHandoff(data: FormData) {
+  const handoffId = requiredUuid(data, "handoff_id");
+  const nextTrainingStageDecisionId = requiredUuid(
+    data,
+    "next_training_stage_decision_id",
+  );
+  const controlledTaskAuthorizationId = requiredUuid(
+    data,
+    "controlled_task_authorization_id",
+  );
+  const targetJourneyVersionId = requiredUuid(data, "target_journey_version_id");
+  const targetJourneyStageVersionId = requiredUuid(
+    data,
+    "target_journey_stage_version_id",
+  );
+  const targetTaskVersionId = requiredUuid(data, "target_task_version_id");
+  await apiRequest(`/api/v1/me/handoffs/${handoffId}/accept`, "LEARNER", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      next_training_stage_decision_id: nextTrainingStageDecisionId,
+      controlled_task_authorization_id: controlledTaskAuthorizationId,
+      expected_authorization_revision: requiredRevision(data),
+      expected_scope_sha256: requiredSha256(data, "scope_sha256"),
+      expected_task_version_sha256: requiredSha256(data, "task_version_sha256"),
+      expected_policy_snapshot_sha256: requiredSha256(data, "policy_snapshot_sha256"),
+      expected_target_journey_version_id: targetJourneyVersionId,
+      expected_target_journey_stage_version_id: targetJourneyStageVersionId,
+      expected_target_task_version_id: targetTaskVersionId,
+    }),
+  });
+  revalidatePath("/app");
+  revalidatePath("/app/result");
+  redirect("/app/result?handoff_accepted=1");
+}
+
 export async function startAssignment(data: FormData) {
   const assignmentId = requiredUuid(data, "assignment_id");
   const expectedRevision = requiredRevision(data);
@@ -348,6 +445,7 @@ export async function submitAssignment(
         expected_revision: expectedRevision,
         body: body.trim(),
         attachment_ids: attachmentIds(data),
+        ai_use: aiUseDisclosure(data, "learner_ai"),
       }),
     });
   } catch (error) {
@@ -596,6 +694,7 @@ export async function finalizeReview(
         overall_decision: overallDecision,
         overall_feedback: overallFeedback.trim(),
         rubric_evaluations: rubricEvaluations,
+        ai_use: aiUseDisclosure(data, "reviewer_ai"),
       }),
     });
   } catch (error) {
@@ -765,99 +864,6 @@ export async function updateInvitationControl(data: FormData) {
   );
   revalidatePath("/ops");
   redirect(`/ops?updated=invites-${target === "FROZEN" ? "frozen" : "resumed"}#learner-invites`);
-}
-
-type AdmissionScores = {
-  attendance_discipline: number;
-  muchener_understanding: number;
-  ai_data_fundamentals: number;
-  project_organization_fit: number;
-};
-
-export type AdmissionPreviewActionState = SubmissionActionState & {
-  enrollmentId?: string;
-  scores?: AdmissionScores;
-  totalScore?: number;
-  recommendationTier?: "A" | "B" | "C" | "D";
-  recommendedDecision?: "ADMIT" | "DEFER" | "NOT_ADMIT";
-};
-
-function admissionScores(data: FormData): AdmissionScores {
-  const read = (key: keyof AdmissionScores) => {
-    const value = Number(data.get(key));
-    if (!Number.isInteger(value) || value < 0 || value > 10) {
-      throw new Error("四项人工观察分必须是 0–10 的整数。");
-    }
-    return value;
-  };
-  return {
-    attendance_discipline: read("attendance_discipline"),
-    muchener_understanding: read("muchener_understanding"),
-    ai_data_fundamentals: read("ai_data_fundamentals"),
-    project_organization_fit: read("project_organization_fit"),
-  };
-}
-
-export async function previewFormalAdmission(
-  _previousState: AdmissionPreviewActionState,
-  data: FormData,
-): Promise<AdmissionPreviewActionState> {
-  try {
-    const enrollmentId = requiredUuid(data, "enrollment_id");
-    const scores = admissionScores(data);
-    const preview = await apiRequest<{
-      total_score: number;
-      recommendation_tier: "A" | "B" | "C" | "D";
-      recommended_decision: "ADMIT" | "DEFER" | "NOT_ADMIT";
-    }>(`/api/v1/ops/enrollments/${enrollmentId}/formal-admission/preview`, "OPERATOR", {
-      method: "POST",
-      body: JSON.stringify({ scores }),
-    });
-    return {
-      enrollmentId,
-      scores,
-      totalScore: preview.total_score,
-      recommendationTier: preview.recommendation_tier,
-      recommendedDecision: preview.recommended_decision,
-    };
-  } catch (error) {
-    return submissionError(error);
-  }
-}
-
-export async function createFormalAdmissionDecision(data: FormData) {
-  const enrollmentId = requiredUuid(data, "enrollment_id");
-  const decision = data.get("decision");
-  if (!["ADMIT", "DEFER", "NOT_ADMIT"].includes(String(decision))) {
-    throw new Error("请选择人工准入结论。");
-  }
-  const scoreEvidence = data.get("score_evidence");
-  const decisionReason = data.get("decision_reason");
-  const overrideValue = data.get("override_reason");
-  if (typeof scoreEvidence !== "string" || scoreEvidence.trim().length < 20) {
-    throw new Error("请记录至少 20 个字符的人工评分证据。");
-  }
-  if (typeof decisionReason !== "string" || decisionReason.trim().length < 20) {
-    throw new Error("请记录至少 20 个字符的人工决定理由。");
-  }
-  const overrideReason = typeof overrideValue === "string" && overrideValue.trim()
-    ? overrideValue.trim()
-    : null;
-  await apiRequest(`/api/v1/ops/enrollments/${enrollmentId}/formal-admission`, "OPERATOR", {
-    method: "POST",
-    headers: commandHeaders(),
-    body: JSON.stringify({
-      expected_absent: true,
-      human_judgement_acknowledged: data.get("human_judgement_acknowledged") === "on",
-      scores: admissionScores(data),
-      score_evidence: scoreEvidence.trim(),
-      decision,
-      decision_reason: decisionReason.trim(),
-      override_reason: overrideReason,
-    }),
-  });
-  revalidatePath("/ops");
-  redirect("/ops?updated=formal-admission-decided#admission-decisions");
 }
 
 export type LearnerReentryActionState = {

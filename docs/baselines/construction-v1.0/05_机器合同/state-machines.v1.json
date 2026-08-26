@@ -1,0 +1,102 @@
+{
+  "schema_version": "muchen-journey-state-machines.v1",
+  "machines": [
+    {
+      "id": "formal-assignment.v1",
+      "initial": "DRAFT",
+      "terminal": ["PASSED", "CANCELLED"],
+      "states": ["DRAFT", "AVAILABLE", "IN_PROGRESS", "SUBMITTED", "IN_REVIEW", "NEEDS_REVISION", "PASSED", "CANCELLED"],
+      "transitions": [
+        {"from": "DRAFT", "event": "PUBLISH", "to": "AVAILABLE", "actor": ["MODULE_OPERATOR"], "guards": ["published_task_version", "approved_content", "rubric_bound", "reviewer_bound", "security_gate_if_required"]},
+        {"from": "AVAILABLE", "event": "START", "to": "IN_PROGRESS", "actor": ["LEARNER"], "guards": ["owns_assignment"]},
+        {"from": "IN_PROGRESS", "event": "SUBMIT", "to": "SUBMITTED", "actor": ["LEARNER"], "effects": ["append_submission_version", "audit"]},
+        {"from": "SUBMITTED", "event": "START_REVIEW", "to": "IN_REVIEW", "actor": ["ASSIGNED_REVIEWER"], "guards": ["fixed_submission_version", "active_reviewer_assignment"]},
+        {"from": "IN_REVIEW", "event": "REQUEST_REVISION", "to": "NEEDS_REVISION", "actor": ["ASSIGNED_REVIEWER"], "guards": ["rubric_complete", "reason_present"], "effects": ["append_evaluation", "audit", "notify"]},
+        {"from": "IN_REVIEW", "event": "PASS", "to": "PASSED", "actor": ["ASSIGNED_REVIEWER"], "guards": ["rubric_complete", "reason_present"], "effects": ["append_evaluation", "create_human_evaluation_evidence", "audit", "outbox"]},
+        {"from": "NEEDS_REVISION", "event": "RESUBMIT", "to": "SUBMITTED", "actor": ["LEARNER"], "guards": ["new_submission_version"], "effects": ["append_submission_version", "audit"]},
+        {"from": "DRAFT", "event": "CANCEL", "to": "CANCELLED", "actor": ["MODULE_OPERATOR"], "guards": ["reason_present"]},
+        {"from": "AVAILABLE", "event": "CANCEL", "to": "CANCELLED", "actor": ["MODULE_OPERATOR"], "guards": ["reason_present"]},
+        {"from": "IN_PROGRESS", "event": "CANCEL", "to": "CANCELLED", "actor": ["MODULE_OPERATOR", "LEARNER"], "guards": ["reason_present"]}
+      ],
+      "forbidden": [
+        "DRAFT->PASSED",
+        "AVAILABLE->PASSED",
+        "IN_PROGRESS->PASSED",
+        "SUBMITTED->PASSED without review and evaluation",
+        "AI_ADVISORY->PASSED",
+        "SELF_ATTESTATION->PASSED",
+        "INCENTIVE_LEDGER->PASSED",
+        "overwrite SubmissionVersion",
+        "overwrite Evaluation"
+      ],
+      "compatibility": {"database_completed_maps_to_product_passed": true, "public_term": "PASSED", "migration_required_if_enum_changes": true}
+    },
+    {
+      "id": "content-lifecycle.v1",
+      "initial": "DRAFT",
+      "terminal": ["RETIRED"],
+      "states": ["DRAFT", "DOMAIN_REVIEW", "BOUNDARY_REVIEW", "PILOT", "PUBLISHED", "MONITORED", "REVISED", "RETIRED"],
+      "transitions": [
+        {"from": "DRAFT", "event": "SUBMIT_DOMAIN_REVIEW", "to": "DOMAIN_REVIEW", "actor": ["CONTENT_EDITOR"]},
+        {"from": "DOMAIN_REVIEW", "event": "DOMAIN_APPROVE", "to": "BOUNDARY_REVIEW", "actor": ["MODULE_OWNER"]},
+        {"from": "BOUNDARY_REVIEW", "event": "BOUNDARY_APPROVE", "to": "PILOT", "actor": ["DATA_SECURITY_OWNER"]},
+        {"from": "PILOT", "event": "PILOT_APPROVE", "to": "PUBLISHED", "actor": ["MODULE_OWNER", "QA"]},
+        {"from": "PUBLISHED", "event": "START_MONITORING", "to": "MONITORED", "actor": ["MODULE_OPERATOR"]},
+        {"from": "MONITORED", "event": "CREATE_REVISION", "to": "REVISED", "actor": ["CONTENT_EDITOR"]},
+        {"from": "REVISED", "event": "SUBMIT_DOMAIN_REVIEW", "to": "DOMAIN_REVIEW", "actor": ["CONTENT_EDITOR"]},
+        {"from": "PUBLISHED", "event": "RETIRE", "to": "RETIRED", "actor": ["MODULE_OWNER"], "guards": ["impact_assessment", "replacement_or_exit_path"]},
+        {"from": "MONITORED", "event": "RETIRE", "to": "RETIRED", "actor": ["MODULE_OWNER"], "guards": ["impact_assessment", "replacement_or_exit_path"]}
+      ],
+      "forbidden": ["edit published version in place", "publish without source owner version", "machine self-approval"]
+    },
+    {
+      "id": "human-gate-appeal.v1",
+      "initial": "GATE_SIGNED",
+      "terminal": ["UPHELD", "OVERTURNED", "RETURNED_FOR_REVIEW", "WITHDRAWN"],
+      "states": ["GATE_SIGNED", "APPEAL_SUBMITTED", "APPEAL_IN_REVIEW", "UPHELD", "OVERTURNED", "RETURNED_FOR_REVIEW", "WITHDRAWN"],
+      "transitions": [
+        {"from": "GATE_SIGNED", "event": "SUBMIT_APPEAL", "to": "APPEAL_SUBMITTED", "actor": ["PERSON"], "guards": ["within_window", "reason_present"]},
+        {"from": "APPEAL_SUBMITTED", "event": "ASSIGN_INDEPENDENT_REVIEWER", "to": "APPEAL_IN_REVIEW", "actor": ["APPEAL_OPERATOR"], "guards": ["reviewer_not_original_signer", "reviewer_not_person"]},
+        {"from": "APPEAL_IN_REVIEW", "event": "UPHOLD", "to": "UPHELD", "actor": ["INDEPENDENT_APPEAL_REVIEWER"], "guards": ["reason_present"]},
+        {"from": "APPEAL_IN_REVIEW", "event": "OVERTURN", "to": "OVERTURNED", "actor": ["INDEPENDENT_APPEAL_REVIEWER"], "guards": ["reason_present"], "effects": ["append_replacement_gate"]},
+        {"from": "APPEAL_IN_REVIEW", "event": "RETURN", "to": "RETURNED_FOR_REVIEW", "actor": ["INDEPENDENT_APPEAL_REVIEWER"], "guards": ["reason_present"]},
+        {"from": "APPEAL_SUBMITTED", "event": "WITHDRAW", "to": "WITHDRAWN", "actor": ["PERSON"]}
+      ],
+      "forbidden": ["delete original gate", "original signer as independent reviewer", "AI resolve appeal", "silent gate overwrite"]
+    },
+    {
+      "id": "guild-membership.v1",
+      "initial": "APPLIED",
+      "terminal": ["EXITED"],
+      "states": ["APPLIED", "ACTIVE", "PAUSED", "EXITED"],
+      "transitions": [
+        {"from": "APPLIED", "event": "ACCEPT", "to": "ACTIVE", "actor": ["GUILD_OPERATOR"], "guards": ["approved_low_impact_rule_or_human_confirmation"]},
+        {"from": "ACTIVE", "event": "PAUSE", "to": "PAUSED", "actor": ["MEMBER", "GUILD_OPERATOR"], "guards": ["reason_present"]},
+        {"from": "PAUSED", "event": "RESUME", "to": "ACTIVE", "actor": ["MEMBER", "GUILD_OPERATOR"]},
+        {"from": "ACTIVE", "event": "EXIT", "to": "EXITED", "actor": ["MEMBER", "GUILD_OPERATOR"], "guards": ["reason_present", "data_exit_path"]},
+        {"from": "PAUSED", "event": "EXIT", "to": "EXITED", "actor": ["MEMBER", "GUILD_OPERATOR"], "guards": ["reason_present", "data_exit_path"]}
+      ],
+      "forbidden": ["points auto accept", "AI auto exit", "task pass auto certify", "membership state mutate assignment state"]
+    },
+    {
+      "id": "release-candidate.v1",
+      "initial": "DEVELOPMENT",
+      "terminal": ["CONTROLLED_RELEASE_ACTIVE", "NO_GO", "ROLLED_BACK"],
+      "states": ["DEVELOPMENT", "MACHINE_READY", "CANDIDATE_FROZEN", "HUMAN_UAT", "INDEPENDENT_REVIEW", "READY_FOR_RELEASE_DECISION", "CONTROLLED_RELEASE_ACTIVE", "NO_GO", "ROLLED_BACK"],
+      "transitions": [
+        {"from": "DEVELOPMENT", "event": "MACHINE_GATES_PASS", "to": "MACHINE_READY", "actor": ["CI"]},
+        {"from": "MACHINE_READY", "event": "FREEZE_CANDIDATE", "to": "CANDIDATE_FROZEN", "actor": ["TECH_LEAD"], "guards": ["clean_tree", "manifest_complete"]},
+        {"from": "CANDIDATE_FROZEN", "event": "START_UAT", "to": "HUMAN_UAT", "actor": ["QA_UAT_OWNER"]},
+        {"from": "HUMAN_UAT", "event": "UAT_PASS", "to": "INDEPENDENT_REVIEW", "actor": ["QA_UAT_OWNER"], "guards": ["four_modules", "two_real_users_each", "same_candidate_sha"]},
+        {"from": "INDEPENDENT_REVIEW", "event": "INDEPENDENT_PASS", "to": "READY_FOR_RELEASE_DECISION", "actor": ["INDEPENDENT_QA", "INDEPENDENT_RELEASE_REVIEWER"], "guards": ["same_candidate_sha", "recovery_and_rollback_pass"]},
+        {"from": "READY_FOR_RELEASE_DECISION", "event": "RELEASE_GO", "to": "CONTROLLED_RELEASE_ACTIVE", "actor": ["BUSINESS_DECIDER"], "guards": ["cohort_at_most_25", "freeze_switch_ready", "day_one_monitoring_ready"]},
+        {"from": "DEVELOPMENT", "event": "BLOCKER", "to": "NO_GO", "actor": ["QA", "SECURITY", "RELEASE_REVIEWER"]},
+        {"from": "MACHINE_READY", "event": "BLOCKER", "to": "NO_GO", "actor": ["QA", "SECURITY", "RELEASE_REVIEWER"]},
+        {"from": "CANDIDATE_FROZEN", "event": "CANDIDATE_DRIFT", "to": "NO_GO", "actor": ["SYSTEM"]},
+        {"from": "HUMAN_UAT", "event": "P0_FAILURE", "to": "NO_GO", "actor": ["QA_UAT_OWNER", "INDEPENDENT_QA"]},
+        {"from": "CONTROLLED_RELEASE_ACTIVE", "event": "STOP_LINE", "to": "ROLLED_BACK", "actor": ["RELEASE_OPS", "BUSINESS_DECIDER"]}
+      ],
+      "forbidden": ["deadline creates release pass", "role acceptance equals candidate signoff", "dirty candidate freeze", "synthetic human UAT", "production mutation before release go"]
+    }
+  ]
+}

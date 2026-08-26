@@ -115,7 +115,7 @@ export function JourneyMap({
       <span className="journey-map-world" aria-hidden="true" />
       <header className="journey-map-heading">
         <div>
-          <p className="journey-whisper">探索营 · Map 01 / 05</p>
+          <p className="journey-whisper">四模块受控首发 · 探索营</p>
           <h1 id="journey-map-title">你现在只走这一站</h1>
         </div>
         <strong aria-label={`已完成 ${journey.completed_stages} / ${journey.total_stages} 站`}>

@@ -1,4 +1,14 @@
-import { learnerPageRequest, Result, Timeline } from "@/lib/server/api";
+import {
+  acceptControlledTaskHandoff,
+  requestNextTrainingStageReview,
+} from "@/app/actions";
+import {
+  HandoffDetail,
+  learnerPageRequest,
+  NextTrainingStageReviewRequestList,
+  Result,
+  Timeline,
+} from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +23,19 @@ const ratingLabels: Record<string, string> = {
   NEEDS_WORK: "需要改进",
 };
 
-const admissionLabels: Record<string, string> = {
-  ADMIT: "准入下一阶段",
-  DEFER: "暂缓，补充观察",
-  NOT_ADMIT: "本次不准入",
-};
+const nextStageLabels = {
+  READY: "进入下一训练阶段",
+  DEFER: "先巩固并复测",
+  NOT_READY: "暂停并由真人重新安排",
+} as const;
+
+const reviewStatusLabels = {
+  RECEIVED: "复核申请已接收",
+  IN_REVIEW: "独立 Reviewer 复核中",
+  UPHELD: "独立复核维持原决定",
+  OVERTURNED: "独立复核已追加替换决定",
+  RETURNED_FOR_REVIEW: "已退回重新评审",
+} as const;
 
 function timelineDetail(eventType: string, details: Timeline["items"][number]["details"]) {
   if (eventType === "SUBMISSION_VERSION_CREATED") {
@@ -38,23 +56,45 @@ function timelineDetail(eventType: string, details: Timeline["items"][number]["d
   return null;
 }
 
-export default async function ResultPage() {
-  const [result, timeline] = await Promise.all([
-    learnerPageRequest<Result>("/api/v1/me/result"),
-    learnerPageRequest<Timeline>("/api/v1/me/timeline?limit=100"),
+export default async function ResultPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    enrollment_id?: string;
+    review_requested?: string;
+    handoff_accepted?: string;
+  }>;
+}) {
+  const query = await searchParams;
+  const enrollmentQuery = query.enrollment_id
+    ? `&enrollment_id=${encodeURIComponent(query.enrollment_id)}`
+    : "";
+  const resultQuery = query.enrollment_id
+    ? `?enrollment_id=${encodeURIComponent(query.enrollment_id)}`
+    : "";
+  const [result, timeline, reviewRequests] = await Promise.all([
+    learnerPageRequest<Result>(`/api/v1/me/result${resultQuery}`),
+    learnerPageRequest<Timeline>(`/api/v1/me/timeline?limit=100${enrollmentQuery}`),
+    learnerPageRequest<NextTrainingStageReviewRequestList>(
+      "/api/v1/me/next-training-stage-review-requests",
+    ),
   ]);
+  const handoff = await learnerPageRequest<HandoffDetail>(
+    `/api/v1/me/handoffs/${result.handoff.id}`,
+  );
   const notificationEvidence = result.notification.external_delivery_confirmed
     ? "飞书服务已确认接受通知请求。"
     : result.notification.delivery_scope === "FEISHU"
       ? "尚无飞书服务回执；结果仍以本页为准。"
       : "本地测试记录不代表外部送达。";
+  const latestReviewRequest = reviewRequests.items[0] ?? null;
   return (
     <article className="result-page">
       <header className="panel result-hero">
         <div className="completion-orbit" aria-hidden="true"><i /><i /><i /></div>
         <p className="journey-whisper">The journey continues.</p>
         <p className="result-kicker"><span aria-hidden="true">✓</span> 已完成</p>
-        <h1>这段旅程，走完了。</h1>
+        <h1>探索营结果包已准备好</h1>
         <p className="lede">{result.summary}</p>
         <p className="status-meta">
           结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
@@ -63,35 +103,40 @@ export default async function ResultPage() {
 
       <section className="panel result-section" aria-labelledby="decision-layers-title">
         <p className="section-label">01 · 结论分层</p>
-        <h2 id="decision-layers-title">完成不等于自动准入</h2>
+        <h2 id="decision-layers-title">结果、真人结论与下一训练阶段分开记录</h2>
         <div className="decision-layer-grid">
           <article>
             <span className="material-status complete">学习完成</span>
             <strong>{result.learning_completion.completed_stages} / {result.learning_completion.total_stages} 站</strong>
-            <p>八站学习与提交证据已完整保存。</p>
+            <p>本次学习与提交证据已保存。</p>
           </article>
           <article>
             <span className="material-status complete">Reviewer 结论</span>
             <strong>探索营通过</strong>
             <p>{result.reviewer_conclusion.overall_feedback}</p>
+            <small>
+              Reviewer AI 披露：{result.reviewer_conclusion.ai_use.used
+                ? "已使用建议性 AI，结论仍由真人签署"
+                : "未使用 AI"}
+            </small>
           </article>
           <article>
-            <span className="material-status">系统建议 · 非决定</span>
+            <span className="material-status">下一训练阶段决定</span>
             <strong>
-              {result.system_recommendation.status === "RECORDED"
-                ? `${result.system_recommendation.recommendation_tier} 档 · ${admissionLabels[result.system_recommendation.recommended_decision ?? ""] ?? "—"}`
-                : "等待 Operator 录入人工观察"}
+              {result.next_training_stage.decision
+                ? nextStageLabels[result.next_training_stage.decision]
+                : "待授权真人决定"}
             </strong>
-            <p>系统只整理固定证据，不替代人的准入判断。</p>
-          </article>
-          <article>
-            <span className={`material-status ${result.operator_admission.status === "DECIDED" ? "complete" : ""}`}>Operator 人工准入</span>
-            <strong>
-              {result.operator_admission.status === "DECIDED"
-                ? admissionLabels[result.operator_admission.decision ?? ""]
-                : "尚未作出"}
-            </strong>
-            <p>{result.operator_admission.decision_reason ?? "完成探索营后，由 Operator 独立作出不可变结论。"}</p>
+            <p>
+              {result.next_training_stage.decision_reason
+                ?? "本页不根据 AI、积分或自证自动产生下一阶段状态。"}
+            </p>
+            {result.next_training_stage.signed_at ? (
+              <small>
+                真人签署于 {formatDate.format(new Date(result.next_training_stage.signed_at))}；
+                原决定保持不可变。
+              </small>
+            ) : null}
           </article>
         </div>
       </section>
@@ -149,8 +194,54 @@ export default async function ResultPage() {
         </aside>
       </section>
 
+      {latestReviewRequest ? (
+        <section className="panel result-section" aria-labelledby="review-lineage-title">
+          <p className="section-label">03 · 人工复核谱系</p>
+          <h2 id="review-lineage-title">
+            {reviewStatusLabels[latestReviewRequest.status]}
+          </h2>
+          <p>{latestReviewRequest.resolution_reason ?? latestReviewRequest.reason}</p>
+          <p className="status-meta">
+            原 {nextStageLabels[latestReviewRequest.source_decision]} 决定保持不可变；
+            {latestReviewRequest.assigned_at
+              ? ` 独立 Reviewer 已于 ${formatDate.format(new Date(latestReviewRequest.assigned_at))} 接收。`
+              : " 正等待 Operator 分配独立 Reviewer。"}
+          </p>
+          {latestReviewRequest.replacement_decision_id ? (
+            <p className="status-meta">
+              替换决定已作为新版本追加，并明确引用本次复核和原决定。
+            </p>
+          ) : null}
+        </section>
+      ) : result.next_training_stage.can_request_review
+        && result.next_training_stage.decision_id ? (
+        <section className="panel result-section" aria-labelledby="review-request-title">
+          <p className="section-label">03 · 人工复核入口</p>
+          <h2 id="review-request-title">申请独立人工复核</h2>
+          <p>
+            申请会保留原决定，并由 Operator 分配未参与原决定的 Reviewer；只有独立真人复核可以追加替换决定。
+          </p>
+          <form action={requestNextTrainingStageReview} className="content-form">
+            <input
+              type="hidden"
+              name="decision_id"
+              value={result.next_training_stage.decision_id}
+            />
+            <label>
+              为什么需要复核
+              <textarea name="reason" minLength={10} maxLength={2000} required />
+            </label>
+            <label>
+              补充证据引用（可选，不粘贴敏感正文）
+              <input name="evidence_ref" minLength={3} maxLength={300} />
+            </label>
+            <button type="submit">申请人工复核</button>
+          </form>
+        </section>
+      ) : null}
+
       <section className="panel result-section" aria-labelledby="handoff-title">
-        <p className="section-label">03 · 唯一下一步</p>
+        <p className="section-label">04 · 唯一下一步</p>
         <h2 id="handoff-title">{result.handoff.next_step_title}</h2>
         <div className="handoff-card">
           <div>
@@ -162,10 +253,91 @@ export default async function ResultPage() {
         <p className="status-meta">
           交接事实生成于 <time dateTime={result.handoff.created_at}>{formatDate.format(new Date(result.handoff.created_at))}</time>；刷新或重放不会新建下一步。
         </p>
+        {handoff.acceptance_status === "READY_TO_ACCEPT"
+          && handoff.controlled_task_authorization
+          && handoff.next_training_stage_decision_id ? (
+          <div className="handoff-card">
+            <div>
+              <span className="handoff-owner-label">受控任务授权</span>
+              <strong>已生效，等待本人确认</strong>
+            </div>
+            <p>
+              授权有效至 {formatDate.format(new Date(handoff.controlled_task_authorization.expires_at))}。
+              确认只会原子创建一个新手村 Enrollment 和一个 Assignment；不会执行生产作业。
+            </p>
+            <form action={acceptControlledTaskHandoff} className="content-form">
+              <input type="hidden" name="handoff_id" value={result.handoff.id} />
+              <input
+                type="hidden"
+                name="next_training_stage_decision_id"
+                value={handoff.next_training_stage_decision_id}
+              />
+              <input
+                type="hidden"
+                name="controlled_task_authorization_id"
+                value={handoff.controlled_task_authorization.id}
+              />
+              <input
+                type="hidden"
+                name="revision"
+                value={handoff.controlled_task_authorization.revision}
+              />
+              <input
+                type="hidden"
+                name="scope_sha256"
+                value={handoff.controlled_task_authorization.scope_sha256}
+              />
+              <input
+                type="hidden"
+                name="task_version_sha256"
+                value={handoff.controlled_task_authorization.task_version_sha256}
+              />
+              <input
+                type="hidden"
+                name="policy_snapshot_sha256"
+                value={handoff.controlled_task_authorization.policy_snapshot_sha256}
+              />
+              <input
+                type="hidden"
+                name="target_journey_version_id"
+                value={handoff.controlled_task_authorization.target_journey_version_id}
+              />
+              <input
+                type="hidden"
+                name="target_journey_stage_version_id"
+                value={handoff.controlled_task_authorization.target_journey_stage_version_id}
+              />
+              <input
+                type="hidden"
+                name="target_task_version_id"
+                value={handoff.controlled_task_authorization.target_task_version_id}
+              />
+              <button type="submit">本人确认进入受控训练</button>
+            </form>
+          </div>
+        ) : handoff.acceptance_status === "ALREADY_ACCEPTED" && handoff.acceptance ? (
+          <div className="handoff-card">
+            <div>
+              <span className="handoff-owner-label">本人确认事实</span>
+              <strong>已确认，受控任务已创建</strong>
+            </div>
+            <p>
+              确认时间 {formatDate.format(new Date(handoff.acceptance.accepted_at))}；
+              Outcome 与 Handoff 保持不可变。
+            </p>
+            <a href={`/app/tasks/${handoff.acceptance.target_assignment_id}`}>
+              查看新手村受控任务
+            </a>
+          </div>
+        ) : handoff.acceptance_status === "AUTHORIZATION_REQUIRED" ? (
+          <p className="status-meta">
+            下一训练阶段 READY 决定已记录，但尚无当前有效的受控任务授权；系统不会自动分配任务。
+          </p>
+        ) : null}
       </section>
 
       <section className="panel result-section" aria-labelledby="notification-title">
-        <p className="section-label">04 · 通知状态</p>
+        <p className="section-label">05 · 通知状态</p>
         <h2 id="notification-title">核心结果不依赖通知</h2>
         <div className={`notification-state notification-${result.notification.status.toLowerCase()}`}>
           <strong>{result.notification.status}</strong>
@@ -178,7 +350,7 @@ export default async function ResultPage() {
       </section>
 
       <section className="panel result-section" aria-labelledby="timeline-title">
-        <p className="section-label">05 · 不可变时间线</p>
+        <p className="section-label">06 · 不可变时间线</p>
         <h2 id="timeline-title">从提交到交接</h2>
         <ol className="result-timeline">
           {timeline.items.map((item) => {

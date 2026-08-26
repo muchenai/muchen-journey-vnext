@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import journeyProduct from "@/lib/muchen-journey-product.generated.json";
+import controlledRelease from "@/lib/muchen-journey-controlled-release.generated.json";
 
 import { exchangeInvite } from "@/app/actions";
 import { apiRequest, CurrentAction, hasValidLearnerSession } from "@/lib/server/api";
@@ -16,7 +17,8 @@ const AUTH_ERRORS: Record<string, string> = {
   LEARNER_SESSION_EXPIRED: "会话已失效，但你的成长进度和证据仍然保留。",
 };
 
-const JOURNEY_MAPS = journeyProduct.maps.map((map) => ({
+const CONTROLLED_MODULE_KEYS = new Set<string>(controlledRelease.modules);
+const JOURNEY_MAPS = journeyProduct.maps.filter((map) => CONTROLLED_MODULE_KEYS.has(map.key)).map((map) => ({
   key: map.key,
   mission: map.mission,
   name: map.name,
@@ -148,23 +150,24 @@ export default async function Home({
     <section className="shared-home" data-home-state={context.state}>
       <header className="home-world-intro">
         <p className="home-world-kicker">Muchen Journey · People AI 成长系统</p>
-        <h1>五张地图，走成一个人的长期成长</h1>
+        <h1>四个模块，共用一条真实任务闭环</h1>
         <p>
-          从认识方向，到融入岗位、建立 AI 能力、积累交付证据，最后在模拟真实项目中综合演练。
+          从认识方向，到融入岗位、建立 AI 能力、积累交付证据；本次只开放受控首发范围，
+          每个正式结果都需要真实实操、证据与真人签署。
         </p>
       </header>
 
       <div className="home-world-grid">
-        <section className="home-worldboard" aria-labelledby="five-map-heading">
+        <section className="home-worldboard" aria-labelledby="controlled-modules-heading">
           <div className="home-worldboard-heading">
             <div>
               <p>一家公司 · 一段连续旅程</p>
-              <h2 id="five-map-heading">五张相连的成长地图</h2>
+              <h2 id="controlled-modules-heading">四个受控首发模块</h2>
             </div>
-            <span aria-hidden="true">01—05</span>
+            <span aria-hidden="true">01—04</span>
           </div>
 
-          <ol className="home-map-rail" aria-label="Muchen Journey 五张成长地图">
+          <ol className="home-map-rail" aria-label="Muchen Journey 四个受控首发模块">
             {JOURNEY_MAPS.map((map, index) => {
               const mapState = index < context.currentMapIndex
                 ? "completed"

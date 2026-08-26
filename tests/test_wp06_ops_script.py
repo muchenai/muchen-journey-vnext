@@ -157,3 +157,71 @@ def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
     ]
     assert report["legacy_fixture_prepared_by_current_seed_then_downgrade"] is True
     assert report["business_facts_preserved"] is True
+
+
+def test_current_ops_contract_tracks_0026_and_all_formal_fact_tables():
+    assert ops.EXPECTED_MIGRATION_HEAD == "0027_next_stage_review"
+    assert ops.SAFE_ROLLBACK_REVISION == "0025_formal_result_gate"
+    assert {
+        "submission_versions",
+        "reviews",
+        "evaluations",
+        "outcomes",
+        "journey_admission_decisions",
+        "next_training_stage_decisions",
+        "next_training_stage_review_requests",
+        "controlled_task_authorizations",
+        "controlled_task_authorization_approvals",
+        "handoff_acceptances",
+        "module_content_package_bindings",
+        "external_identities",
+        "join_contexts",
+        "identity_sessions",
+        "external_identity_links",
+    }.issubset(set(ops.CURRENT_FACT_TABLES))
+
+
+def test_schema_rollback_only_accepts_the_current_identity_scope_head():
+    facts = {
+        "migration_revision": "0027_next_stage_review",
+        "counts": {"outcomes": 1},
+    }
+    ops.require_safe_schema_rollback(facts)
+
+    facts["migration_revision"] = "0025_formal_result_gate"
+    with pytest.raises(OpsError, match="current migration head"):
+        ops.require_safe_schema_rollback(facts)
+
+
+def test_application_rollback_requires_immutable_images_and_preserves_facts(
+    monkeypatch,
+):
+    candidate = "journey-c1-ops-api@sha256:" + "a" * 64
+    rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
+    expected = {
+        "migration_revision": "0027_next_stage_review",
+        "counts": {"outcomes": 1},
+    }
+    probes: list[tuple[str, str, str, str]] = []
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "journey-c1-ops")
+    monkeypatch.setenv("WP06_CANDIDATE_API_IMAGE", candidate)
+    monkeypatch.setenv("WP06_ROLLBACK_API_IMAGE", rollback)
+    monkeypatch.setattr(
+        ops,
+        "probe_api_image",
+        lambda image, release, network, database_url: probes.append(
+            (image, release, network, database_url)
+        ),
+    )
+    monkeypatch.setattr(ops, "database_facts", lambda *_args: expected)
+
+    result = ops.application_image_rollback("journey_next_restore_deadbeef", expected)
+
+    assert result["status"] == "PASS"
+    assert result["formal_facts_preserved"] is True
+    assert [item[0] for item in probes] == [candidate, rollback, candidate]
+    assert all(item[2] == "journey-c1-ops_default" for item in probes)
+
+    monkeypatch.setenv("WP06_ROLLBACK_API_IMAGE", "journey-c1-rollback-api:latest")
+    with pytest.raises(OpsError, match="immutable local digest"):
+        ops.application_image_rollback("journey_next_restore_deadbeef", expected)

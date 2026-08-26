@@ -5,12 +5,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Request
-from sqlalchemy import case, select
+from sqlalchemy import and_, case, or_, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
+from journey_api.formal_assignment_workflow import (
+    FormalAssignmentEvent,
+    FormalAssignmentTransitionError,
+    WorkflowActorKind,
+    public_assignment_status,
+    transition_formal_assignment,
+)
 from journey_api.idempotency import find_replay, store_result
 from journey_api.journey_service import (
     formal_evaluation_evidence,
@@ -27,6 +34,7 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     Evaluation,
+    JourneyStageVersion,
     OutboxEvent,
     OutboxStatus,
     Review,
@@ -103,6 +111,30 @@ def priority_reason(review: Review, version: SubmissionVersion) -> str:
     return "按等待时间排序"
 
 
+def scoped_review_lineage(actor: Actor):
+    """Bind a review read to its durable person, task, and module lineage."""
+
+    return (
+        Assignment.organization_id == actor.organization_id,
+        Submission.organization_id == actor.organization_id,
+        Enrollment.organization_id == actor.organization_id,
+        User.organization_id == actor.organization_id,
+        TaskDefinition.organization_id == actor.organization_id,
+        TaskVersion.organization_id == actor.organization_id,
+        Enrollment.reviewer_id == Review.reviewer_id,
+        TaskVersion.task_definition_id == Assignment.task_definition_id,
+        or_(
+            Assignment.journey_stage_version_id.is_(None),
+            and_(
+                JourneyStageVersion.organization_id == actor.organization_id,
+                JourneyStageVersion.journey_version_id
+                == Enrollment.journey_version_id,
+                JourneyStageVersion.task_version_id == Assignment.task_version_id,
+            ),
+        ),
+    )
+
+
 def scoped_context_query(actor: Actor, review_id: uuid.UUID):
     return (
         select(
@@ -123,17 +155,19 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
         .join(User, User.id == Enrollment.learner_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .outerjoin(
+            JourneyStageVersion,
+            and_(
+                JourneyStageVersion.id == Assignment.journey_stage_version_id,
+                JourneyStageVersion.organization_id == Assignment.organization_id,
+            ),
+        )
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
         .where(
             Review.id == review_id,
             Review.organization_id == actor.organization_id,
             Review.reviewer_id == actor.id,
-            Assignment.organization_id == actor.organization_id,
-            Submission.organization_id == actor.organization_id,
-            Enrollment.organization_id == actor.organization_id,
-            User.organization_id == actor.organization_id,
-            TaskDefinition.organization_id == actor.organization_id,
-            TaskVersion.organization_id == actor.organization_id,
+            *scoped_review_lineage(actor),
         )
     )
 
@@ -152,9 +186,12 @@ def locked_scoped_context_query(actor: Actor, review_id: uuid.UUID):
     # Lock them in the same scoped join used to load the immutable context so
     # one database round trip replaces the former lock-review, lock-assignment,
     # then load-context sequence.
-    return scoped_context_query(actor, review_id).with_for_update(
-        of=(Review, Assignment)
-    )
+    return scoped_context_query(actor, review_id).where(
+        or_(
+            Enrollment.status == EnrollmentStatus.ACTIVE,
+            Review.status == ReviewStatus.FINALIZED,
+        )
+    ).with_for_update(of=(Review, Assignment))
 
 
 def lock_scoped_context(
@@ -233,6 +270,7 @@ def evaluation_out(evaluation: Evaluation) -> EvaluationOut:
         feedback_structure_version=evaluation.feedback_structure_version,
         reviewer_id=evaluation.reviewer_id,
         review_revision=evaluation.review_revision,
+        ai_use=evaluation.ai_use,
         created_at=evaluation.created_at,
     )
 
@@ -248,7 +286,11 @@ def queue_item(
         submission_version_id=context.version.id,
         status=context.review.status.value,
         revision=context.review.revision,
-        allowed_commands=allowed_commands(context.review.status),
+        allowed_commands=(
+            allowed_commands(context.review.status)
+            if context.enrollment.status == EnrollmentStatus.ACTIVE
+            else []
+        ),
         learner_name=context.learner.display_name,
         task_title=context.task.title,
         task_version=context.task.version,
@@ -324,16 +366,19 @@ def review_queue(
         .join(User, User.id == Enrollment.learner_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .outerjoin(
+            JourneyStageVersion,
+            and_(
+                JourneyStageVersion.id == Assignment.journey_stage_version_id,
+                JourneyStageVersion.organization_id == Assignment.organization_id,
+            ),
+        )
         .where(
             Review.organization_id == actor.organization_id,
             Review.reviewer_id == actor.id,
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
-            Assignment.organization_id == actor.organization_id,
-            Submission.organization_id == actor.organization_id,
-            Enrollment.organization_id == actor.organization_id,
-            User.organization_id == actor.organization_id,
-            TaskDefinition.organization_id == actor.organization_id,
-            TaskVersion.organization_id == actor.organization_id,
+            Enrollment.status == EnrollmentStatus.ACTIVE,
+            *scoped_review_lineage(actor),
         )
         .order_by(
             case(
@@ -368,6 +413,7 @@ def review_detail(
         ReviewDetailOut(
             **base,
             submission_body=context.version.body,
+            submission_ai_use=context.version.ai_use,
             task_purpose=context.task.purpose,
             completion_criteria=list(context.task.completion_criteria),
             required_deliverables=list(context.task.required_deliverables),
@@ -410,19 +456,31 @@ def start_review(
     ensure_revision(context.review.revision, command.expected_revision)
     if context.review.status != ReviewStatus.ASSIGNED:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前评审不能开始。")
-    if context.assignment.status != AssignmentStatus.SUBMITTED:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "对应任务不在待评审状态。")
+    try:
+        target_status = transition_formal_assignment(
+            current=context.assignment.status,
+            event=FormalAssignmentEvent.START_REVIEW,
+            actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
+            actor_id=actor.id,
+            learner_id=context.learner.id,
+            assigned_reviewer_id=context.review.reviewer_id,
+            fixed_submission_version=True,
+        )
+    except FormalAssignmentTransitionError as exc:
+        raise ApiError(
+            409, "INVALID_STATE_TRANSITION", "对应任务不在待评审状态。"
+        ) from exc
     context.review.status = ReviewStatus.IN_REVIEW
     context.review.started_at = datetime.now(UTC)
     context.review.revision += 1
-    context.assignment.status = AssignmentStatus.IN_REVIEW
+    context.assignment.status = target_status
     context.assignment.revision += 1
     result = ReviewMutationOut(
         review_id=context.review.id,
         review_status=context.review.status.value,
         review_revision=context.review.revision,
         assignment_id=context.assignment.id,
-        assignment_status=context.assignment.status.value,
+        assignment_status=public_assignment_status(context.assignment.status),
         assignment_revision=context.assignment.revision,
     )
     store_result(
@@ -537,6 +595,26 @@ def finalize_review(
         if command.overall_decision == "APPROVE"
         else Decision.REVISION_REQUIRED
     )
+    try:
+        target_status = transition_formal_assignment(
+            current=context.assignment.status,
+            event=(
+                FormalAssignmentEvent.PASS
+                if decision is Decision.PASS
+                else FormalAssignmentEvent.REQUEST_REVISION
+            ),
+            actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
+            actor_id=actor.id,
+            learner_id=context.learner.id,
+            assigned_reviewer_id=context.review.reviewer_id,
+            fixed_submission_version=True,
+            rubric_complete=True,
+            reason=command.overall_feedback,
+        )
+    except FormalAssignmentTransitionError as exc:
+        raise ApiError(
+            409, "INVALID_STATE_TRANSITION", "当前评审不能提交最终结论。"
+        ) from exc
     evaluation = Evaluation(
         id=uuid.uuid4(),
         review_id=context.review.id,
@@ -555,6 +633,7 @@ def finalize_review(
         ],
         feedback_structure_version=1,
         feedback=command.overall_feedback,
+        ai_use=command.ai_use.model_dump(mode="json"),
         created_by=actor.id,
     )
     session.add(evaluation)
@@ -562,12 +641,24 @@ def finalize_review(
     context.review.finalized_at = datetime.now(UTC)
     context.review.revision += 1
     if decision == Decision.PASS:
-        context.assignment.status = AssignmentStatus.COMPLETED
+        context.assignment.status = target_status
         if context.enrollment.status != EnrollmentStatus.ACTIVE:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
         if context.enrollment.journey_version_id is None:
             context.enrollment.status = EnrollmentStatus.COMPLETED
             context.enrollment.revision += 1
+            # The database formal-result Gate reads the immutable submission,
+            # finalized Review/Evaluation and completed Assignment/Enrollment.
+            # Flush those existing fact sources before inserting Outcome; do not
+            # introduce a second Evidence or HumanGate table.
+            session.flush(
+                (
+                    evaluation,
+                    context.review,
+                    context.assignment,
+                    context.enrollment,
+                )
+            )
             create_pass_outcome_bundle(
                 session,
                 enrollment=context.enrollment,
@@ -583,6 +674,14 @@ def finalize_review(
                 evidence = formal_evaluation_evidence(session, context.enrollment)
                 context.enrollment.status = EnrollmentStatus.COMPLETED
                 context.enrollment.revision += 1
+                session.flush(
+                    (
+                        evaluation,
+                        context.review,
+                        context.assignment,
+                        context.enrollment,
+                    )
+                )
                 create_pass_outcome_bundle(
                     session,
                     enrollment=context.enrollment,
@@ -596,7 +695,7 @@ def finalize_review(
             else:
                 assignment_event = "journey_stage.completed.v1"
     else:
-        context.assignment.status = AssignmentStatus.NEEDS_REVISION
+        context.assignment.status = target_status
         assignment_event = "assignment.revision_requested.v1"
     context.assignment.revision += 1
     result = ReviewMutationOut(
@@ -604,7 +703,7 @@ def finalize_review(
         review_status=context.review.status.value,
         review_revision=context.review.revision,
         assignment_id=context.assignment.id,
-        assignment_status=context.assignment.status.value,
+        assignment_status=public_assignment_status(context.assignment.status),
         assignment_revision=context.assignment.revision,
         evaluation_id=evaluation.id,
         decision=evaluation.decision.value,

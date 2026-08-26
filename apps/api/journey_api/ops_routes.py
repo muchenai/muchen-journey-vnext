@@ -11,6 +11,12 @@ from journey_api.auth import Actor, get_actor, require_role
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
+from journey_api.formal_assignment_workflow import (
+    FormalAssignmentEvent,
+    FormalAssignmentTransitionError,
+    WorkflowActorKind,
+    transition_formal_assignment,
+)
 from journey_api.idempotency import find_replay, store_result
 from journey_api.models import (
     Assignment,
@@ -25,14 +31,13 @@ from journey_api.models import (
     InviteStatus,
     JoinContext,
     JoinContextStatus,
-    JourneyAdmissionDecision,
-    JourneyStageVersion,
     ExternalNotificationReceipt,
     NotificationChannel,
     NotificationDelivery,
     NotificationEndpoint,
     NotificationEndpointStatus,
     NotificationStatus,
+    ModuleContentPackageBinding,
     OutboxEvent,
     OutboxStatus,
     Review,
@@ -75,6 +80,9 @@ from journey_api.schemas import (
     RuntimeMetricsOut,
     RuntimeStatusOut,
     RuntimeStatusResponse,
+    ReviewerWorkloadListOut,
+    ReviewerWorkloadListResponse,
+    ReviewerWorkloadOut,
     SetDataRightsLegalHoldCommand,
 )
 from journey_api.notification_recipients import encrypt_open_id
@@ -556,30 +564,12 @@ def list_enrollments(
             .order_by(Assignment.position)
         ).all()
         open_review = open_review_for_enrollment(session, enrollment, for_update=False)
-        admission = session.scalar(
-            select(JourneyAdmissionDecision).where(
-                JourneyAdmissionDecision.enrollment_id == enrollment.id,
-                JourneyAdmissionDecision.organization_id == actor.organization_id,
-            )
-        )
-        is_formal_v2 = bool(
-            enrollment.journey_version_id
-            and session.scalar(
-                select(JourneyStageVersion.id).where(
-                    JourneyStageVersion.journey_version_id == enrollment.journey_version_id,
-                    JourneyStageVersion.organization_id == actor.organization_id,
-                    JourneyStageVersion.stable_key == "ASM-003-DATA-CONSTRUCTION",
-                )
-            )
-        )
         allowed: list[str] = []
         if enrollment.status in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
         if enrollment.status == EnrollmentStatus.ACTIVE:
             allowed.append("create_learner_reentry")
-        if enrollment.status == EnrollmentStatus.COMPLETED and is_formal_v2 and admission is None:
-            allowed.append("create_formal_admission")
         items.append(
             EnrollmentOpsOut(
                 id=enrollment.id,
@@ -592,10 +582,6 @@ def list_enrollments(
                 journey_version_id=enrollment.journey_version_id,
                 assignment_statuses=[item.status.value for item in assignments],
                 open_review_status=open_review.status.value if open_review else None,
-                admission_decision_id=admission.id if admission else None,
-                admission_total_score=admission.total_score if admission else None,
-                admission_tier=admission.recommendation_tier if admission else None,
-                admission_decision=admission.decision.value if admission else None,
                 allowed_commands=allowed,
             )
         )
@@ -633,6 +619,26 @@ def assign_reviewer(
     if enrollment.reviewer_id == command.reviewer_id:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "新主管必须与当前主管不同。")
     reviewer_in_scope(session, actor, command.reviewer_id)
+    module_binding = (
+        session.scalar(
+            select(ModuleContentPackageBinding).where(
+                ModuleContentPackageBinding.organization_id == actor.organization_id,
+                ModuleContentPackageBinding.journey_version_id
+                == enrollment.journey_version_id,
+            )
+        )
+        if enrollment.journey_version_id is not None
+        else None
+    )
+    if module_binding is not None and command.reviewer_id not in {
+        module_binding.primary_reviewer_user_id,
+        module_binding.backup_reviewer_user_id,
+    }:
+        raise ApiError(
+            422,
+            "CONTENT_BINDING_INVALID",
+            "模块 Enrollment 只能在 Owner 内容包具名的主备 Reviewer 间替换。",
+        )
     open_review = open_review_for_enrollment(session, enrollment, for_update=True)
     if open_review is not None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已生成评审记录，不能更换主管或改写评审历史。")
@@ -669,6 +675,88 @@ def assign_reviewer(
     )
     session.commit()
     return envelope(request, EnrollmentMutationOut(**result))
+
+
+@router.get("/reviewer-workload", response_model=ReviewerWorkloadListResponse)
+def reviewer_workload(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    db_now = session.scalar(select(func.clock_timestamp()))
+    bindings = session.scalars(
+        select(ModuleContentPackageBinding)
+        .where(ModuleContentPackageBinding.organization_id == actor.organization_id)
+        .order_by(
+            ModuleContentPackageBinding.module_key,
+            ModuleContentPackageBinding.created_at.desc(),
+            ModuleContentPackageBinding.id,
+        )
+    ).all()
+    items: list[ReviewerWorkloadOut] = []
+    for binding in bindings:
+        primary = session.get(User, binding.primary_reviewer_user_id)
+        backup = session.get(User, binding.backup_reviewer_user_id)
+        if (
+            primary is None
+            or backup is None
+            or primary.organization_id != actor.organization_id
+            or backup.organization_id != actor.organization_id
+        ):
+            raise ApiError(409, "VERSION_CONFLICT", "内容包 Reviewer 谱系已不可用。")
+        enrollments = session.scalars(
+            select(Enrollment).where(
+                Enrollment.organization_id == actor.organization_id,
+                Enrollment.journey_version_id == binding.journey_version_id,
+                Enrollment.status.in_(
+                    [EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE]
+                ),
+            )
+        ).all()
+        enrollment_ids = [item.id for item in enrollments]
+        reviews = (
+            session.scalars(
+                select(Review)
+                .join(Assignment, Assignment.id == Review.assignment_id)
+                .where(
+                    Review.organization_id == actor.organization_id,
+                    Assignment.organization_id == actor.organization_id,
+                    Assignment.enrollment_id.in_(enrollment_ids),
+                    Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
+                )
+            ).all()
+            if enrollment_ids
+            else []
+        )
+        overdue = sum(
+            db_now is not None
+            and review.assigned_at
+            + timedelta(minutes=binding.completion_sla_minutes)
+            <= db_now
+            for review in reviews
+        )
+        items.append(
+            ReviewerWorkloadOut(
+                binding_id=binding.id,
+                module_key=binding.module_key,
+                package_id=binding.package_id,
+                package_version=binding.package_version,
+                primary_reviewer_id=primary.id,
+                primary_reviewer_display_name=primary.display_name,
+                backup_reviewer_id=backup.id,
+                backup_reviewer_display_name=backup.display_name,
+                first_response_sla_minutes=binding.first_response_sla_minutes,
+                completion_sla_minutes=binding.completion_sla_minutes,
+                active_enrollment_count=len(enrollments),
+                open_review_count=len(reviews),
+                overdue_review_count=overdue,
+                capacity_limit=None,
+                capacity_status="PENDING_OWNER_CONTENT",
+                replacement_scope="PRIMARY_OR_NAMED_BACKUP_ONLY",
+            )
+        )
+    return envelope(request, ReviewerWorkloadListOut(items=items))
 
 
 @router.post(
@@ -714,13 +802,34 @@ def cancel_enrollment(
         if assignment.status in {
             AssignmentStatus.AVAILABLE,
             AssignmentStatus.IN_PROGRESS,
+        }:
+            try:
+                assignment.status = transition_formal_assignment(
+                    current=assignment.status,
+                    event=FormalAssignmentEvent.CANCEL,
+                    actor_kind=WorkflowActorKind.MODULE_OPERATOR,
+                    actor_id=actor.id,
+                    learner_id=enrollment.learner_id,
+                    assigned_reviewer_id=enrollment.reviewer_id,
+                    reason=command.reason,
+                )
+            except FormalAssignmentTransitionError as exc:
+                raise ApiError(
+                    409,
+                    "INVALID_STATE_TRANSITION",
+                    "当前任务状态不能随 Enrollment 取消。",
+                ) from exc
+            assignment.revision += 1
+        elif assignment.status in {
             AssignmentStatus.SUBMITTED,
+            AssignmentStatus.IN_REVIEW,
             AssignmentStatus.NEEDS_REVISION,
         }:
-            assignment.status = AssignmentStatus.CANCELLED
-            assignment.revision += 1
-        elif assignment.status == AssignmentStatus.IN_REVIEW:
-            raise ApiError(409, "INVALID_STATE_TRANSITION", "存在进行中的评审，不能取消。")
+            raise ApiError(
+                409,
+                "INVALID_STATE_TRANSITION",
+                "已进入提交或评审历史的任务不能通过取消 Enrollment 覆盖。",
+            )
     join_context = session.scalar(
         select(JoinContext).where(JoinContext.enrollment_id == enrollment.id).with_for_update()
     )

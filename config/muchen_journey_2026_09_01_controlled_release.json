@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "release_id": "muchen-journey-2026-09-01-controlled-cohort",
+  "release_date": "2026-09-01",
+  "release_type": "CONTROLLED_COHORT_RELEASE",
+  "cohort_limit": 25,
+  "full_product_release": false,
+  "high_impact_automated_decision": false,
+  "scope_status": "FROZEN_BY_OWNER",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "modules": [
+    "exploration-camp",
+    "newcomer-village",
+    "ai-academy",
+    "delivery-guild"
+  ],
+  "shared_vertical_slice": [
+    "MODULE_ENTRY",
+    "TASK_ASSIGNMENT_OR_SELECTION",
+    "PRACTICE",
+    "EVIDENCE_SUBMISSION",
+    "HUMAN_REVIEW",
+    "REWORK_OR_PASS",
+    "RESULT_PACKAGE"
+  ],
+  "required_platform_capabilities": [
+    "PRIVATE_INVITATION_AND_LOGIN",
+    "UNIQUE_PERSON_IDENTITY_BINDING",
+    "UNIFIED_JOURNEY_HOME",
+    "FOUR_MODULE_ENTRY",
+    "SHARED_TASK_STATE_MACHINE",
+    "TASK_ASSIGNMENT_OR_SELECTION",
+    "EVIDENCE_SUBMISSION",
+    "REVIEWER_WORKBENCH",
+    "REWORK_OR_PASS",
+    "HUMAN_SIGNATURE",
+    "RESULT_PACKAGE",
+    "ROLE_PERMISSIONS",
+    "AUDIT_LOG",
+    "BACKUP_AND_RESTORE",
+    "RELEASE_ROLLBACK",
+    "CONTROLLED_COHORT_IMPORT_25",
+    "DAY_ONE_MONITORING"
+  ],
+  "deferred": [
+    "LEGACY_23_TABLE_COMPLETENESS_SUPPLEMENT",
+    "LEGACY_FORMAL_MIGRATION",
+    "FULL_CERTIFICATION_ARENA",
+    "FULL_CERTIFICATION_SYSTEM",
+    "CAREER_MAP_COMPLEX_COMPUTATION",
+    "POINTS_REDEMPTION_AND_COMPLEX_INCENTIVES",
+    "AUTOMATED_CROSS_MODULE_ADMISSION",
+    "AI_GENERATED_FORMAL_TALENT_OR_CAPABILITY_DECISIONS",
+    "NON_RELEASE_PRODUCT_LOGIC_INVENTION"
+  ],
+  "legacy_disposition": {
+    "legacy_data_usage": "REFERENCE_ONLY",
+    "legacy_formal_migration": "NOT_REQUIRED",
+    "legacy_completeness_gate": "SUPERSEDED_FOR_RELEASE",
+    "historical_completeness_gate": "FAIL",
+    "complete_legacy_snapshot": "NOT_ESTABLISHED",
+    "migrate_record_count": 0
+  },
+  "owner_roster": {
+    "product_owner": "刘默文",
+    "tech_lead": "刘默文",
+    "data_owner": "刘默文",
+    "security_privacy_owner": "刘默文",
+    "release_ops_owner": "刘默文",
+    "business_decider": "刘默文",
+    "exploration_camp_owner": "郑田源",
+    "newcomer_village_owner": "屠元琦",
+    "ai_academy_owner": "段超群",
+    "delivery_guild_owner": "段超群",
+    "qa_uat_operations_owner": "屠元琦",
+    "reviewer_panel_owner": "屠元琦",
+    "independent_qa": "冯宇汀",
+    "independent_release_reviewer": "冯宇汀"
+  },
+  "independent_role_acceptance": {
+    "status": "ACCEPTED",
+    "basis": "PRODUCT_OWNER_ATTESTATION",
+    "accepted_roles": [
+      "INDEPENDENT_QA",
+      "INDEPENDENT_RELEASE_REVIEWER"
+    ],
+    "candidate_qa_signoff": "NOT_RUN",
+    "candidate_release_review": "NOT_RUN"
+  },
+  "human_uat": {
+    "required_real_target_people_per_module": 2,
+    "modules_required": 4,
+    "status": "NOT_RUN",
+    "synthetic_or_ai_substitution_allowed": false
+  },
+  "candidate_binding": {
+    "candidate_sha": null,
+    "configuration_sha256": null,
+    "migration_revision": null,
+    "web_artifact_sha256": null,
+    "api_artifact_sha256": null,
+    "content_package_sha256": null,
+    "state": "NOT_FROZEN"
+  },
+  "next_gate": "PRO_2026_09_01_RELEASE_CANDIDATE_REVIEW"
+}

@@ -99,6 +99,11 @@ export default async function ReviewPage({
       <section className="review-section" aria-labelledby="submission-title">
         <h2 id="submission-title">固定提交正文</h2>
         <p className="status-meta">该正文属于 SubmissionVersion {review.submission_version_no}，评审不会修改它。</p>
+        <p className="status-meta">
+          AI 披露：{review.submission_ai_use.used
+            ? `已使用（${review.submission_ai_use.purpose}）；只作建议`
+            : "未使用"}
+        </p>
         <div className="submission">{review.submission_body}</div>
       </section>
 
@@ -122,6 +127,11 @@ export default async function ReviewPage({
             <strong>总体反馈</strong>
             <p>{review.evaluation.overall_feedback}</p>
           </div>
+          <p className="status-meta">
+            Reviewer AI 披露：{review.evaluation.ai_use.used
+              ? `已使用（${review.evaluation.ai_use.purpose}）；不替代真人决定`
+              : "未使用"}
+          </p>
           <ol className="evaluation-list">
             {review.evaluation.rubric_evaluations.map((item) => (
               <li key={item.dimension_key}>
