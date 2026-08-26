@@ -82,21 +82,24 @@
       "id": "release-candidate.v1",
       "initial": "DEVELOPMENT",
       "terminal": ["CONTROLLED_RELEASE_ACTIVE", "NO_GO", "ROLLED_BACK"],
-      "states": ["DEVELOPMENT", "MACHINE_READY", "CANDIDATE_FROZEN", "HUMAN_UAT", "INDEPENDENT_REVIEW", "READY_FOR_RELEASE_DECISION", "CONTROLLED_RELEASE_ACTIVE", "NO_GO", "ROLLED_BACK"],
+      "states": ["DEVELOPMENT", "MACHINE_READY", "CANDIDATE_FROZEN", "PRODUCTION_CANARY_READY", "PRODUCTION_CANARY_UAT_ACTIVE", "INDEPENDENT_REVIEW", "READY_FOR_RELEASE_DECISION", "CONTROLLED_RELEASE_ACTIVE", "NO_GO", "ROLLED_BACK"],
       "transitions": [
         {"from": "DEVELOPMENT", "event": "MACHINE_GATES_PASS", "to": "MACHINE_READY", "actor": ["CI"]},
         {"from": "MACHINE_READY", "event": "FREEZE_CANDIDATE", "to": "CANDIDATE_FROZEN", "actor": ["TECH_LEAD"], "guards": ["clean_tree", "manifest_complete"]},
-        {"from": "CANDIDATE_FROZEN", "event": "START_UAT", "to": "HUMAN_UAT", "actor": ["QA_UAT_OWNER"]},
-        {"from": "HUMAN_UAT", "event": "UAT_PASS", "to": "INDEPENDENT_REVIEW", "actor": ["QA_UAT_OWNER"], "guards": ["four_modules", "two_real_users_each", "same_candidate_sha"]},
+        {"from": "CANDIDATE_FROZEN", "event": "CANARY_READINESS_PASS", "to": "PRODUCTION_CANARY_READY", "actor": ["DATA_OWNER", "SECURITY_PRIVACY_OWNER", "RELEASE_OPS"], "guards": ["current_image_scan_pass", "backup_restore_rollback_pass", "alerts_reach_named_human", "exactly_eight_named_participants", "allowlist_hash_fixed", "freeze_switch_ready"]},
+        {"from": "PRODUCTION_CANARY_READY", "event": "CANARY_DEPLOYMENT_GO", "to": "PRODUCTION_CANARY_UAT_ACTIVE", "actor": ["BUSINESS_DECIDER"], "guards": ["same_candidate_sha", "same_content_and_config_hashes", "server_side_allowlist", "release_marker_production_canary_uat", "external_production_writes_disabled"]},
+        {"from": "PRODUCTION_CANARY_UAT_ACTIVE", "event": "CANARY_UAT_PASS", "to": "INDEPENDENT_REVIEW", "actor": ["QA_UAT_OWNER"], "guards": ["four_modules", "two_real_users_each", "exactly_eight_named_participants", "same_candidate_sha", "same_deployed_artifacts", "non_allowlisted_access_rejected"]},
         {"from": "INDEPENDENT_REVIEW", "event": "INDEPENDENT_PASS", "to": "READY_FOR_RELEASE_DECISION", "actor": ["INDEPENDENT_QA", "INDEPENDENT_RELEASE_REVIEWER"], "guards": ["same_candidate_sha", "recovery_and_rollback_pass"]},
         {"from": "READY_FOR_RELEASE_DECISION", "event": "RELEASE_GO", "to": "CONTROLLED_RELEASE_ACTIVE", "actor": ["BUSINESS_DECIDER"], "guards": ["cohort_at_most_25", "freeze_switch_ready", "day_one_monitoring_ready"]},
         {"from": "DEVELOPMENT", "event": "BLOCKER", "to": "NO_GO", "actor": ["QA", "SECURITY", "RELEASE_REVIEWER"]},
         {"from": "MACHINE_READY", "event": "BLOCKER", "to": "NO_GO", "actor": ["QA", "SECURITY", "RELEASE_REVIEWER"]},
         {"from": "CANDIDATE_FROZEN", "event": "CANDIDATE_DRIFT", "to": "NO_GO", "actor": ["SYSTEM"]},
-        {"from": "HUMAN_UAT", "event": "P0_FAILURE", "to": "NO_GO", "actor": ["QA_UAT_OWNER", "INDEPENDENT_QA"]},
+        {"from": "PRODUCTION_CANARY_READY", "event": "CANDIDATE_DRIFT", "to": "NO_GO", "actor": ["SYSTEM"]},
+        {"from": "PRODUCTION_CANARY_UAT_ACTIVE", "event": "P0_FAILURE", "to": "ROLLED_BACK", "actor": ["QA_UAT_OWNER", "INDEPENDENT_QA", "RELEASE_OPS"]},
+        {"from": "PRODUCTION_CANARY_UAT_ACTIVE", "event": "STOP_LINE", "to": "ROLLED_BACK", "actor": ["RELEASE_OPS", "BUSINESS_DECIDER"]},
         {"from": "CONTROLLED_RELEASE_ACTIVE", "event": "STOP_LINE", "to": "ROLLED_BACK", "actor": ["RELEASE_OPS", "BUSINESS_DECIDER"]}
       ],
-      "forbidden": ["deadline creates release pass", "role acceptance equals candidate signoff", "dirty candidate freeze", "synthetic human UAT", "production mutation before release go"]
+      "forbidden": ["deadline creates release pass", "role acceptance equals candidate signoff", "dirty candidate freeze", "synthetic human UAT", "production canary deployment before canary deployment go", "non allowlisted canary access", "external production work during canary", "canary deployment equals release go", "canary uat pass equals release go", "cohort expansion before release go"]
     }
   ]
 }

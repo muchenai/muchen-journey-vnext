@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "contract_baseline_version": "1.0.1",
   "release_id": "muchen-journey-2026-09-01-controlled-cohort",
   "release_date": "2026-09-01",
   "release_type": "CONTROLLED_COHORT_RELEASE",
@@ -9,6 +10,22 @@
   "scope_status": "FROZEN_BY_OWNER",
   "release_authorized": false,
   "production_mutation_executed": false,
+  "uat_execution": {
+    "mode": "PRODUCTION_CANARY_UAT",
+    "canary_limit": 8,
+    "participant_count": 0,
+    "allowlist_sha256": null,
+    "release_marker": "PRODUCTION_CANARY_UAT",
+    "server_side_allowlist_required": true,
+    "non_allowlisted_access": "DENY",
+    "public_release": false,
+    "canary_deployment_authorized": false,
+    "canary_deployment_executed": false,
+    "canary_deployment_go_evidence_sha256": null,
+    "same_candidate_required": true,
+    "release_go_separate": true,
+    "contract_amendment": "docs/baselines/construction-v1.0/04_UAT与发布/03_PRODUCTION_CANARY_UAT合同变更_V1.0.1.md"
+  },
   "modules": [
     "exploration-camp",
     "newcomer-village",
@@ -89,10 +106,15 @@
     "candidate_release_review": "NOT_RUN"
   },
   "human_uat": {
+    "execution_mode": "PRODUCTION_CANARY_UAT",
+    "environment": "FINAL_PRODUCTION_INFRASTRUCTURE",
+    "required_total_real_target_people": 8,
     "required_real_target_people_per_module": 2,
     "modules_required": 4,
     "status": "NOT_RUN",
-    "synthetic_or_ai_substitution_allowed": false
+    "synthetic_or_ai_substitution_allowed": false,
+    "same_frozen_candidate_required": true,
+    "release_authorization_implied": false
   },
   "candidate_binding": {
     "candidate_sha": null,
@@ -103,5 +125,5 @@
     "content_package_sha256": null,
     "state": "NOT_FROZEN"
   },
-  "next_gate": "PRO_2026_09_01_RELEASE_CANDIDATE_REVIEW"
+  "next_gate": "OWNER_CONTENT_BINDING_REQUIRED"
 }

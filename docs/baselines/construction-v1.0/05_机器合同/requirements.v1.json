@@ -1,8 +1,10 @@
 {
   "schema_version": "muchen-journey-requirements.v1",
   "release_id": "muchen-journey-2026-09-01-controlled-cohort",
-  "generated_at": "2026-08-26T00:00:00+08:00",
+  "generated_at": "2026-08-27T00:00:00+08:00",
   "release_limit": 25,
+  "uat_mode": "PRODUCTION_CANARY_UAT",
+  "canary_uat_limit": 8,
   "requirements": [
     {
       "id": "GOV-001",
@@ -273,7 +275,7 @@
       "priority": "P0",
       "title": "可复现数据库与候选供应链",
       "modules": ["all"],
-      "source_refs": ["SRC-TECH-01"],
+      "source_refs": ["SRC-TECH-01", "SRC-OWNER-02"],
       "owners": ["tech_lead", "release_ops_owner"],
       "status": "APPROVED_FOR_BUILD",
       "behavior": "A clean candidate binds full Git SHA, OpenAPI hash, one migration head, schema hash, web/api/worker digests, configuration and content hashes.",
@@ -285,36 +287,36 @@
       "priority": "P0",
       "title": "备份恢复回滚和告警到人",
       "modules": ["all"],
-      "source_refs": ["SRC-TECH-01"],
+      "source_refs": ["SRC-TECH-01", "SRC-OWNER-02"],
       "owners": ["data_owner", "release_ops_owner"],
       "status": "APPROVED_FOR_BUILD",
-      "behavior": "Before release create a fresh encrypted backup, restore it in isolation, verify summaries, exercise app rollback and prove alerts reach named human recipients.",
+      "behavior": "Before production Canary deployment create a fresh encrypted backup, restore it in isolation, verify summaries, exercise app rollback and prove alerts reach named human recipients on the exact candidate.",
       "acceptance": ["backup age under 24h", "isolated restore passes", "rollback preserves formal facts", "alert receipt exists"],
       "negative_tests": ["dashboard_without_recipient_not_pass", "unverified_restore_not_pass"]
     },
     {
       "id": "UAT-001",
       "priority": "P0",
-      "title": "四模块真实真人UAT",
+      "title": "生产Canary四模块真实真人UAT",
       "modules": ["all"],
-      "source_refs": ["SRC-OWNER-01"],
+      "source_refs": ["SRC-OWNER-01", "SRC-OWNER-02"],
       "owners": ["qa_uat_operations_owner", "independent_qa"],
       "status": "NOT_RUN",
-      "behavior": "At least two real target users per module complete the full revision path on the exact candidate; synthetic or AI evidence cannot substitute.",
-      "acceptance": ["eight or more real participant records", "all P0 scenarios pass", "candidate SHA matches"],
-      "negative_tests": ["synthetic_uat_rejected", "builder_self_signoff_not_independent"]
+      "behavior": "Exactly eight named allowlisted target users, at least two per module, complete the full revision path on the exact candidate and final production infrastructure under release_marker PRODUCTION_CANARY_UAT; synthetic or AI evidence cannot substitute.",
+      "acceptance": ["exactly eight real participant records", "two target users per module", "all P0 scenarios pass", "candidate SHA and deployed artifacts match", "non allowlisted access is rejected"],
+      "negative_tests": ["synthetic_uat_rejected", "builder_self_signoff_not_independent", "non_allowlisted_canary_access_rejected", "canary_deployment_not_release_go", "external_production_write_rejected"]
     },
     {
       "id": "REL-001",
       "priority": "P0",
       "title": "9月1日最多25人受控发布",
       "modules": ["all"],
-      "source_refs": ["SRC-OWNER-01"],
+      "source_refs": ["SRC-OWNER-01", "SRC-OWNER-02"],
       "owners": ["business_decider", "release_ops_owner", "independent_release_reviewer"],
       "status": "RELEASE_NOT_AUTHORIZED",
-      "behavior": "Release only the four modules to an explicit cohort of no more than 25 after all candidate, UAT, recovery and independent review gates pass and the business decider signs the exact candidate.",
-      "acceptance": ["cohort size at most 25", "freeze-invites switch works", "all release signatures bind candidate"],
-      "negative_tests": ["role_acceptance_not_candidate_signoff", "deadline_cannot_override_failed_gate", "deferred_features_absent"]
+      "behavior": "After the exact candidate passes the eight-person production Canary UAT, recovery and independent review gates, and the business decider separately signs RELEASE_GO, expand the same candidate allowlist to an explicit cohort of no more than 25 without rebuilding or silently changing content.",
+      "acceptance": ["production Canary UAT passed on same candidate", "cohort size at most 25", "freeze-invites switch works", "all release signatures bind candidate"],
+      "negative_tests": ["role_acceptance_not_candidate_signoff", "canary_deployment_or_uat_pass_not_release_go", "deadline_cannot_override_failed_gate", "candidate_change_invalidates_canary_uat", "deferred_features_absent"]
     }
   ]
 }

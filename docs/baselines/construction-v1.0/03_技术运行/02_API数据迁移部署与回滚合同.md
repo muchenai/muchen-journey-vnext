@@ -61,10 +61,13 @@
 | --- | --- | --- | --- |
 | local | 开发 | 合成/可重建 | fixture可用 |
 | test | 自动测试 | 每次重建 | 仅fixture |
-| staging/uat | 候选真人UAT | 受控试点 | 真实身份，禁止fixture |
-| production | 最多25人受控发布 | 新批次正式事实 | 真实身份，最小权限 |
+| staging | 机器集成、smoke和候选预检；不作为必需真人UAT环境 | 合成/受控可重建 | fixture或受控技术身份 |
+| production-canary-uat | 最终生产基础设施上的8人真人UAT | 带canary_uat_id的真实Journey试点事实 | 仅具名白名单真实身份，禁止fixture |
+| production-controlled-release | `RELEASE_GO`后最多25人受控发布 | 新批次正式事实＋获准保留的Canary事实 | 真实身份，最小权限 |
 
 环境必须独立secret、数据库逻辑边界和release marker。local默认secret不得被production接受。
+`production-canary-uat` 与最终受控发布复用相同生产运行面，但必须以服务端allowlist/cohort scope、
+`release_marker=PRODUCTION_CANARY_UAT`、停邀请开关和观察窗口限制为8人；隐藏按钮不是访问控制。
 
 ## 6. 候选manifest
 
@@ -72,7 +75,7 @@
 
 ## 7. 备份、恢复与回滚
 
-候选前24小时内生成加密备份并记录范围、hash、密钥保管和Owner。在隔离数据库实际恢复并对账：migration、表数、关键计数、抽样hash和应用只读查询。
+Canary部署前24小时内生成加密备份并记录范围、hash、密钥保管和Owner。在隔离数据库实际恢复并对账：migration、表数、关键计数、抽样hash和应用只读查询。恢复、回滚和真人告警未通过时不得签署 `CANARY_DEPLOYMENT_GO`。
 
 回滚分两类：
 
@@ -92,4 +95,3 @@ P0指标：readiness、HTTP 5xx、登录失败、任务/提交/评审命令失�
 - 通知失败：业务事实继续，使用站内/人工补充通知；
 - 性能下降：限流/降级非P0视图，保持提交/评审；
 - 不能在观察窗口证明安全：回滚或暂停小名单，不扩大访问。
-

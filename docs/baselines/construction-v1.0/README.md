@@ -1,9 +1,11 @@
-# Muchen Journey 施工总包 V1.0
+# Muchen Journey 施工总包 V1.0.1
 
-> 版本：`V1.0`  
-> 生成日期：`2026-08-26`  
+> 版本：`V1.0.1`  
+> 初版日期：`2026-08-26`  
+> 合同变更日期：`2026-08-27`  
+> UAT模式：`PRODUCTION_CANARY_UAT`  
 > 目标发布：`2026-09-01 CONTROLLED_COHORT_RELEASE`  
-> 当前文档状态：`APPROVED_PRODUCT_BASELINE / BUILD_INPUT_READY / RELEASE_NOT_AUTHORIZED`
+> 当前文档状态：`APPROVED_PRODUCT_BASELINE / CANARY_UAT_MODE_APPROVED / BUILD_INPUT_READY / CANARY_DEPLOYMENT_NOT_AUTHORIZED / RELEASE_NOT_AUTHORIZED`
 
 ## 一句话施工口径
 
@@ -41,11 +43,13 @@ SOURCE_MANIFEST.md
 04_UAT与发布/
   01_真人UAT合同.md
   02_2026-09-01受控发布合同.md
+  03_PRODUCTION_CANARY_UAT合同变更_V1.0.1.md
 05_机器合同/
   README.md
   requirements.v1.json
   state-machines.v1.json
   release-gates.v1.json
+  production-canary-uat-authorization.schema.v1.json
   traceability.v1.json
   module-content-package.schema.v1.json
   implementation-evidence.schema.v1.json
@@ -58,13 +62,14 @@ SHA256SUMS
 2. 受控真实项目任务可以进入 Journey 编排，但生产动作永远在获授权业务系统中执行；Journey 不直接写生产。
 3. 2026-09-01 是最多 25 人的受控发布，不是全量产品发布；竞技场、Career Map 复杂计算、历史数据正式迁移和复杂积分均延期。
 4. 文档完成不等于发布完成；发布必须绑定干净候选 SHA、同 SHA 真人 UAT、独立 QA、独立 Release Reviewer、备份恢复和回滚证据。
+5. 真人 UAT 使用生产基础设施上的 8 人白名单 Canary；`CANARY_DEPLOYMENT_GO` 只允许 UAT，不等于 `RELEASE_GO`。
 
 ## 当前已确定与仍待绑定
 
 - 已确定：产品继承公式、四个首发模块、共享任务闭环、AI/真人边界、真实任务边界、历史数据参考策略、Owner 名单、9 月 1 日受控发布范围。
 - 待业务 Owner 绑定：探索营四宝藏的正式材料版本与三项 Rubric；新手村首批任务卡；AI 学院首个学习单元；交付线公会首个任务包；各模块执行 Reviewer、替补和 SLA。
 - 待技术形成：干净发布候选、不可移动 tag/候选 SHA、当前工作树资产收口、候选部署物与迁移版本绑定。
-- 待真人完成：每模块至少 2 名真实目标用户 UAT、独立 QA、发布复核和小名单放行。
+- 待真人完成：在 `PRODUCTION_CANARY_UAT` 中每模块至少 2 名真实目标用户 UAT、独立 QA、发布复核和小名单放行。
 
 ## 状态解释
 
@@ -72,5 +77,7 @@ SHA256SUMS
 - `OWNER_CONTENT_BINDING_REQUIRED`：框架已定，但具体材料/题目/Reviewer 不得由开发者发明。
 - `READY_FOR_MACHINE_TEST`：实现已具备机器验收条件。
 - `READY_FOR_HUMAN_UAT`：同一候选机器验收通过，可开始真人 UAT。
+- `PRODUCTION_CANARY_READY`：同一候选的扫描、恢复、回滚、8人白名单和停线能力齐全，等待 `CANARY_DEPLOYMENT_GO`。
+- `PRODUCTION_CANARY_UAT_ACTIVE`：同一候选仅对8名白名单学员开放真人UAT，不代表正式发布。
 - `READY_FOR_RELEASE_DECISION`：真人与运行 Gate 齐全，等待明确发布决定。
 - `RELEASE_GO`：只能由产品 Owner/业务 Decider 在独立复核后显式签署。
