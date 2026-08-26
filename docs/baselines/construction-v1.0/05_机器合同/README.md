@@ -10,7 +10,9 @@
 - `production-canary-uat-authorization.schema.v1.json`：准确候选的8人生产Canary部署授权证据；schema本身不构成授权。
 - `traceability.v1.json`：来源、冲突、模块、现有技术载体与要求ID映射。
 - `module-content-package.schema.v1.json`：四模块正式内容包的失败关闭格式。
-- 仓库 `config/module-content-candidates.v1.json`：产品 Owner 授权补齐、机器校验通过但仍待模块 Owner 精确 hash 签署的候选；不得直接当作正式内容包。
+- 仓库 `config/module-content-candidates.v1.json`：保留四模块经批准候选及原始 hash，不直接作为正式内容包。
+- 仓库 `config/module-content-approval-evidence.v1.json` 与 `config/exploration-sheet-version-binding.v1.json`：固定具名 Owner 批准证据和探索营目标 Sheet 版本元数据绑定。
+- 仓库 `config/module-content-packages/module-content-package-index.v1.json`：四模块正式内容包索引；其状态为 `G1_CONTENT_BINDING_PASS`，不构成候选冻结、Canary 部署或发布授权。
 - `implementation-evidence.schema.v1.json`：Mini逐Requirement提交实现/测试证据的格式。
 
 ## Mini执行循环
@@ -36,4 +38,4 @@
 
 每个 Requirement ID 至少登记：`implementation_refs, test_refs, negative_test_refs, commit_sha, status, executed_at, evidence_hashes, remaining_risks`。机器只能把完成项标为 `READY_FOR_HUMAN`；真人/发布状态由对应签署合同产生。
 
-Owner内容候选先通过 `scripts/validate_module_content_candidates.py` 并固定模块 hash；对应模块 Owner 本人签署精确 hash 后，才转换为通过 `module-content-package.schema.v1.json` 的正式内容包。Mini不得复制候选中的姓名制造签署。实现证据应逐条通过 `implementation-evidence.schema.v1.json`，但schema通过本身不等于测试或真人Gate通过。
+Owner内容候选先通过 `scripts/validate_module_content_candidates.py` 并固定模块 hash；具名 Owner 的批准由产品 Owner 证明绑定后，通过 `scripts/promote_module_content_packages.py` 转换为符合 `module-content-package.schema.v1.json` 的正式内容包。当前 G1 已通过，但 Mini 不得把 G1 扩张为候选冻结、生产 Canary 或发布授权。实现证据应逐条通过 `implementation-evidence.schema.v1.json`，但 schema 通过本身不等于测试或真人 Gate 通过。

@@ -1,0 +1,232 @@
+{
+  "schema_version": "module-content-package.v1",
+  "package_id": "exploration-camp-p0-2026-09-01",
+  "module_key": "exploration-camp",
+  "version": "1.0.0",
+  "owner": {
+    "role": "exploration_camp_owner",
+    "person_name": "郑田源",
+    "signed_at": "2026-08-27T07:30:29+08:00",
+    "decision": "APPROVED"
+  },
+  "source_refs": [
+    "SRC-OWNER-03",
+    "SRC-EXP-01",
+    "SRC-EXP-02",
+    "SRC-EXP-03"
+  ],
+  "effective_at": "2026-08-27T07:30:29+08:00",
+  "content_items": [
+    {
+      "content_id": "EXP-TREASURE-01",
+      "title": "公司与 Muchener",
+      "version": "1.0.0",
+      "source_ref": "SRC-EXP-03",
+      "owner": "郑田源",
+      "estimated_minutes": 20,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "4b84b6dd7076d01bed6011174b959c24ca001a0da3bf7fcfed4a189877301c5b"
+    },
+    {
+      "content_id": "EXP-TREASURE-02",
+      "title": "AI 数据行业与模型",
+      "version": "1.0.0",
+      "source_ref": "SRC-EXP-03",
+      "owner": "郑田源",
+      "estimated_minutes": 25,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "8a33bb3ebc83fa20003cb7180ad323a8279e2a2e19eb401ae6ced449d56302a7"
+    },
+    {
+      "content_id": "EXP-TREASURE-03",
+      "title": "项目认知",
+      "version": "1.0.0",
+      "source_ref": "SRC-EXP-03",
+      "owner": "郑田源",
+      "estimated_minutes": 25,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "ef13548fa36172e92b35f2588fc198fe5418385d67144343668b262d02794abe"
+    },
+    {
+      "content_id": "EXP-TREASURE-04",
+      "title": "项目交付与组织适配",
+      "version": "1.0.0",
+      "source_ref": "SRC-EXP-03",
+      "owner": "郑田源",
+      "estimated_minutes": 20,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "1fffc1aeaa4e8667e21fa995ae4476eaade1e6050a5a8ec0fb46221cc6130feb"
+    }
+  ],
+  "task_versions": [
+    {
+      "task_key": "EXP-P1",
+      "version": "1.0.0",
+      "purpose": "把一段工作规则拆成可执行、可提报且不会越过红线的判断结构。",
+      "non_goals": [
+        "背诵规则原文",
+        "自行补写未知规则",
+        "仅输出总分或结论"
+      ],
+      "inputs": [
+        "获批的短规则或合成规则材料"
+      ],
+      "deliverables": [
+        "目标",
+        "判断维度",
+        "红线",
+        "例外",
+        "不确定项",
+        "需提报问题"
+      ],
+      "rubric_id": "EXP-P1-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "867e0f340490c5d5bf3c500f012aad2405d6bd0b232e3af4ea5b7636a334b773"
+    },
+    {
+      "task_key": "EXP-P2",
+      "version": "1.0.0",
+      "purpose": "对同一Prompt的两个回答作出可解释判断，并保留无法判断和不确定性的空间。",
+      "non_goals": [
+        "凭个人偏好选答案",
+        "把AI建议当作真人结论",
+        "编造外部事实"
+      ],
+      "inputs": [
+        "同一Prompt的A/B回答",
+        "获批评价上下文"
+      ],
+      "deliverables": [
+        "选择A、选择B或无法判断",
+        "判断维度",
+        "具体理由",
+        "证据与对比",
+        "不确定项"
+      ],
+      "rubric_id": "EXP-P2-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "a4f3d7e66d4906598613c4118cf593ac8899c8139f8e2f1a3defc15aaa0ce9fd"
+    },
+    {
+      "task_key": "EXP-P3",
+      "version": "1.0.0",
+      "purpose": "在数据、规则或协作异常中先控制风险，再把问题提报给正确的人。",
+      "non_goals": [
+        "未经授权继续执行",
+        "把未知项当作事实",
+        "越权替决策人下结论"
+      ],
+      "inputs": [
+        "合成的数据、规则或协作异常情境"
+      ],
+      "deliverables": [
+        "已知事实",
+        "未知项",
+        "潜在影响",
+        "安全的临时处理建议",
+        "停止线",
+        "需谁裁决"
+      ],
+      "rubric_id": "EXP-P3-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "0974e9ab585ad9e2f130090ca2574a7c37fee1859f5d3ec3ecad24e13d8a7023"
+    }
+  ],
+  "rubrics": [
+    {
+      "rubric_id": "EXP-P1-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "目标识别准确",
+        "判断维度完整",
+        "红线与不可做事项明确",
+        "例外和不确定项分开",
+        "提报对象和问题具体"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P1-R1",
+      "sha256": "d9065dbc6e28745032dbd721b63049f223ce5411451ed1c5a6c3c8eaead5622f"
+    },
+    {
+      "rubric_id": "EXP-P2-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "事实和证据",
+        "回答完整性",
+        "指令遵循",
+        "对比理由具体",
+        "不确定性披露"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P2-R1",
+      "sha256": "9c45f214d93a99e27b1f070189fb72fec1eb0eb03ccd32a386dd5ca00e19cbe6"
+    },
+    {
+      "rubric_id": "EXP-P3-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "事实与未知项分离",
+        "影响判断",
+        "停止线",
+        "临时处理不扩大风险",
+        "裁决人和问题具体"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P3-R1",
+      "sha256": "2d06158224e030ca491fdd4bbda973890337d3b00b14b7aa6bb045eeb2e576e0"
+    }
+  ],
+  "reviewer_policy": {
+    "pool_ref": "REVIEW-POOL-2026-09-01-P0",
+    "primary_reviewers": [
+      "万雨欣"
+    ],
+    "backup_reviewers": [
+      "屠元琦"
+    ],
+    "first_response_sla_minutes": 1440,
+    "completion_sla_minutes": 2880,
+    "escalation_owner": "屠元琦"
+  },
+  "data_policy": {
+    "production_write_allowed": false,
+    "raw_customer_data_allowed": false,
+    "ai_high_impact_decision_allowed": false,
+    "visibility": [
+      "PERSON",
+      "ASSIGNED_REVIEWERS",
+      "AUTHORIZED_OPERATORS"
+    ],
+    "retention_policy": "180_DAYS"
+  },
+  "sha256": "99b03cde7e0ffa600d3a95a7b56498887394d6f05f7c28b6aaed2a5b38446a45"
+}

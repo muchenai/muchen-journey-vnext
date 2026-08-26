@@ -1,6 +1,6 @@
 # Muchen Journey Construction V1 Owner Decision Pack V1.1
 
-> 状态：`ACTIVE_DECISION_PACK / PRODUCT_OWNER_FIELDS_COMPLETE / MODULE_OWNER_HASH_SIGNATURES_PENDING`
+> 状态：`ACTIVE_DECISION_PACK / G1_CONTENT_BINDING_PASS / FINAL_CANDIDATE_FREEZE_REQUIRED`
 >
 > 生效范围：Construction V1 四模块 P0 内容候选
 >
@@ -41,33 +41,37 @@
 
 | 模块 | Owner | Candidate SHA-256 | 当前签署状态 |
 |---|---|---|---|
-| `exploration-camp` | 郑田源 | `1d9feb1672c847279c0b85cdc5a13ea9a9890d45cad4b223dd59ef2f05bbeb1c` | `PENDING_PERSONAL_HASH_ACCEPTANCE` |
-| `newcomer-village` | 屠元琦 | `6dfedfa9e95e78b8ab06115b08f0b5e7379b988b87f59de5c166c37f45937f1b` | `PENDING_PERSONAL_HASH_ACCEPTANCE_AND_REVIEW_OPERATIONS` |
-| `ai-academy` | 段超群 | `e58880f712ee6c1aa3e4e31e5a51e62e15ac1e8bd9a75ec3600ca8b03095a894` | `PENDING_PERSONAL_HASH_ACCEPTANCE` |
-| `delivery-guild` | 段超群 | `4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba` | `PENDING_PERSONAL_HASH_ACCEPTANCE` |
+| `exploration-camp` | 郑田源 | `1d9feb1672c847279c0b85cdc5a13ea9a9890d45cad4b223dd59ef2f05bbeb1c` | `APPROVED / SOURCE_VERSION_BOUND` |
+| `newcomer-village` | 屠元琦 | `6dfedfa9e95e78b8ab06115b08f0b5e7379b988b87f59de5c166c37f45937f1b` | `APPROVED / REVIEWER_OPERATIONS_ACCEPTED` |
+| `ai-academy` | 段超群 | `e58880f712ee6c1aa3e4e31e5a51e62e15ac1e8bd9a75ec3600ca8b03095a894` | `APPROVED` |
+| `delivery-guild` | 段超群 | `4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba` | `APPROVED` |
 
-## 4. 唯一剩余的 Owner 内容 Gate
+## 4. Owner 内容 Gate 结果
 
-1. 郑田源本人批准探索营精确 hash，并绑定目标 Sheet 的版本或导出 hash；
-2. 屠元琦本人批准新手村精确 hash，同时接受 Reviewer 运营合同；
-3. 段超群本人分别批准 AI 学院和交付线公会两个精确 hash。
+- 产品 Owner 已正式证明郑田源、屠元琦、段超群作出上述精确 hash 批准；证据为 `config/module-content-approval-evidence.v1.json`。
+- 探索营目标 Sheet 已绑定可复核版本元数据：文档 token、sheet id、标题、可见 Owner、最近修改时间、当前 Sheet 标题和只读状态；绑定 hash 为 `4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b`。
+- 该绑定不是 XLSX/CSV 全文 hash。任何最近修改时间、sheet id、标题或候选 hash 变化，均触发重新批准。
+- 四个正式内容包索引为 `config/module-content-packages/module-content-package-index.v1.json`，内置 hash 为 `041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e`。
 
-机器不得把“已任命”“口头总体同意”“产品 Owner 代为确认”或本文件中的姓名当成模块 Owner 签署。
+结论：`G1_CONTENT_BINDING=PASS`。这一结论不替代最终候选冻结、同候选机器 Gate、恢复验证、真人 UAT、独立复核或发布决定。
 
 ## 5. 状态转换
 
 ```text
 PRODUCT_OWNER_FIELDS_COMPLETE
-  + 3人对4模块精确hash本人签署
-  + 探索营Sheet版本/导出hash
+  + 3人4模块批准证明
+  + 探索营Sheet版本元数据绑定
+  + 4个正式内容包机器校验
 = G1_CONTENT_BINDING_PASS
 ```
 
-在此之前：
+当前可以：
 
-- 可以准备内容载入、路由、显示和机器验证；
-- 不得把候选转换成正式 `module-content-package.v1`；
-- 不得冻结最终发布候选；
+- 把正式 `module-content-package.v1` 接入内容载入、路由、显示和机器验证；
+- 开始最终候选收口与冻结准备；
+
+当前仍不得：
+
 - 不得执行生产 Canary 部署或真人 UAT；
 - `RELEASE=NO`。
 

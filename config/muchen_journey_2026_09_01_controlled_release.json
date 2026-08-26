@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_baseline_version": "1.0.2",
+  "contract_baseline_version": "1.0.3",
   "release_id": "muchen-journey-2026-09-01-controlled-cohort",
   "release_date": "2026-09-01",
   "release_type": "CONTROLLED_COHORT_RELEASE",
@@ -106,7 +106,7 @@
     "candidate_release_review": "NOT_RUN"
   },
   "content_binding": {
-    "state": "CONTENT_CANDIDATES_MACHINE_VALIDATED_OWNER_SIGNATURES_PENDING",
+    "state": "G1_CONTENT_BINDING_PASS",
     "product_owner_source_ref": "SRC-OWNER-03",
     "active_owner_decision_pack_path": "docs/baselines/Muchen_Journey_Construction_V1_Owner_Decision_Pack_V1.1.md",
     "superseded_owner_decision_pack_path": "docs/baselines/Muchen_Journey_Construction_V1_Owner_Decision_Pack_V1.0.md",
@@ -120,9 +120,14 @@
       "delivery-guild": "4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba"
     },
     "machine_validation": "PASS",
-    "module_owner_signatures": "PENDING_3_PEOPLE_4_MODULES",
-    "exploration_sheet_version_or_export_hash": null,
-    "formal_content_package_sha256": null,
+    "module_owner_signatures": "APPROVED_3_PEOPLE_4_MODULES_BY_PRODUCT_OWNER_ATTESTATION",
+    "approval_evidence_path": "config/module-content-approval-evidence.v1.json",
+    "approval_evidence_sha256": "2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc",
+    "exploration_sheet_version_binding_path": "config/exploration-sheet-version-binding.v1.json",
+    "exploration_sheet_version_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+    "exploration_full_export_sha256": null,
+    "formal_content_package_index_path": "config/module-content-packages/module-content-package-index.v1.json",
+    "formal_content_package_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
     "reviewer_pool": {
       "primary": ["万雨欣"],
       "backup": ["屠元琦"],
@@ -149,8 +154,8 @@
     "migration_revision": null,
     "web_artifact_sha256": null,
     "api_artifact_sha256": null,
-    "content_package_sha256": null,
+    "content_package_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
     "state": "NOT_FROZEN"
   },
-  "next_gate": "OWNER_CONTENT_BINDING_REQUIRED"
+  "next_gate": "FINAL_CANDIDATE_FREEZE"
 }

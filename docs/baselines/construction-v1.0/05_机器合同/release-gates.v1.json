@@ -25,7 +25,10 @@
       "required": ["exploration_content_hash", "newcomer_task_pack_hash", "ai_academy_unit_hash", "delivery_guild_plugin_hash", "rubric_hashes", "reviewer_roster_and_sla", "product_owner_supplement_source", "exact_module_candidate_hashes", "three_person_four_module_hash_signatures"],
       "owner_roles": ["EXPLORATION_OWNER", "NEWCOMER_OWNER", "AI_ACADEMY_OWNER", "DELIVERY_GUILD_OWNER", "REVIEWER_PANEL_OWNER"],
       "candidate_manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6",
-      "current_state": "CONTENT_CANDIDATES_MACHINE_VALIDATED_OWNER_SIGNATURES_PENDING",
+      "approval_evidence_sha256": "2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc",
+      "exploration_source_version_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+      "formal_content_package_index_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
+      "current_state": "PASS",
       "allows": "MODULE_OPENING"
     },
     {
