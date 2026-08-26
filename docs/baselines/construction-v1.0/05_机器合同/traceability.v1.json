@@ -3,14 +3,17 @@
   "source_to_requirements": {
     "SRC-OWNER-01": ["GOV-001", "GOV-002", "GOV-003", "GOV-004", "GOV-005", "CORE-002", "EXP-001", "EXP-002", "EXP-003", "NV-002", "NV-003", "AIA-001", "DLG-001", "DATA-001", "TECH-001", "UAT-001", "REL-001"],
     "SRC-OWNER-02": ["TECH-002", "OPS-001", "UAT-001", "REL-001"],
+    "SRC-OWNER-03": ["EXP-001", "EXP-002", "NV-001", "AIA-001", "DLG-001"],
     "SRC-EXP-01": ["EXP-001"],
     "SRC-EXP-02": ["EXP-002"],
+    "SRC-EXP-03": ["EXP-001", "EXP-002"],
     "SRC-NV-01": ["GOV-002", "GOV-004", "CORE-005", "NV-001", "NV-002", "NV-003"],
     "SRC-NV-02": ["NV-001"],
     "SRC-GOV-01": ["GOV-001", "GOV-003", "GOV-004", "GOV-005", "CORE-001", "CORE-003", "CORE-004", "EXP-003", "AIA-003", "DLG-001"],
     "SRC-AIA-01": ["GOV-003", "CORE-005", "AIA-001", "AIA-002", "AIA-003"],
     "SRC-TECH-01": ["CORE-001", "CORE-003", "CORE-004", "TECH-001", "TECH-002", "OPS-001"],
-    "SRC-AUDIT-01": ["DATA-001"]
+    "SRC-AUDIT-01": ["DATA-001"],
+    "SRC-WIKI-04": ["DLG-001"]
   },
   "module_to_requirements": {
     "shared": ["GOV-001", "GOV-002", "GOV-003", "GOV-004", "GOV-005", "CORE-001", "CORE-002", "CORE-003", "CORE-004", "CORE-005", "DATA-001", "TECH-001", "TECH-002", "OPS-001", "UAT-001", "REL-001"],
@@ -26,7 +29,8 @@
     {"id": "CON-004", "conflict": "Day1 admission semantics", "decision": "next training stage only", "requirement_ids": ["EXP-003"]},
     {"id": "CON-005", "conflict": "six-module release versus deadline", "decision": "four-module controlled release; arena and career map deferred", "requirement_ids": ["REL-001"]},
     {"id": "CON-006", "conflict": "technical greenfield versus product inheritance", "decision": "technical greenfield retained; product behavior inherited", "requirement_ids": ["TECH-001"]},
-    {"id": "CON-007", "conflict": "staging UAT versus production UAT", "decision": "run exactly eight-person allowlisted UAT on final production infrastructure under a distinct PRODUCTION_CANARY_UAT state; do not lower candidate gates or infer RELEASE_GO", "requirement_ids": ["OPS-001", "UAT-001", "REL-001"]}
+    {"id": "CON-007", "conflict": "staging UAT versus production UAT", "decision": "run exactly eight-person allowlisted UAT on final production infrastructure under a distinct PRODUCTION_CANARY_UAT state; do not lower candidate gates or infer RELEASE_GO", "requirement_ids": ["OPS-001", "UAT-001", "REL-001"]},
+    {"id": "CON-008", "conflict": "Mini cannot invent owner content versus Product Owner authorization to complete missing P0 fields", "decision": "build a source-bounded machine-validated candidate; it becomes formal only after each module owner personally approves the exact candidate hash", "requirement_ids": ["EXP-001", "EXP-002", "NV-001", "AIA-001", "DLG-001"]}
   ],
   "current_technical_targets": {
     "repository": "/Users/liumowen/Documents/Muchen Journey2.0",

@@ -1,5 +1,9 @@
 # Muchen Journey Construction V1｜Owner Decision Pack V1.0
 
+> 状态：`SUPERSEDED_BY_V1.1 / DO_NOT_USE_FOR_ACTIVE_BLOCKER_COUNT`
+>
+> 2026-08-27 起，活动决策包为 `Muchen_Journey_Construction_V1_Owner_Decision_Pack_V1.1.md`。本文件中的 `PENDING_OWNER_INPUT` 仅保留历史审计，不得再计入当前字段缺口；当前只按 V1.1 的精确 hash 签署 Gate 判断。
+
 状态：`TECHNICAL_CHECKPOINT_AUTHORIZED / OWNER_INPUT_PENDING / NO_RELEASE`  
 记录日期：2026-08-26  
 适用范围：Construction V1 首发四模块的内容、任务、Reviewer 与运营决定  

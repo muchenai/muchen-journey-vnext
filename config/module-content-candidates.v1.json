@@ -1,0 +1,617 @@
+{
+  "schema_version": "module-content-candidates.v1",
+  "status": "PRODUCT_OWNER_SUPPLEMENT_COMPLETE_PENDING_MODULE_OWNER_HASH_SIGNATURE",
+  "release_target": "2026-09-01-production-canary-uat",
+  "decision_source": {
+    "source_id": "SRC-OWNER-03",
+    "product_owner": "刘默文",
+    "authorized_at": "2026-08-26T17:26:27Z",
+    "decision": "AUTHORIZE_MINIMUM_P0_CONTENT_COMPLETION",
+    "constraints": [
+      "不伪造模块Owner本人签署",
+      "不降低候选冻结、安全、恢复、真人UAT或发布Gate",
+      "不执行生产作业或写入生产系统",
+      "积分仅用于激励和参考",
+      "AI仅做自查、初评和摘要，正式结论由真人签署"
+    ]
+  },
+  "shared_reviewer_policy": {
+    "pool_ref": "REVIEW-POOL-2026-09-01-P0",
+    "primary_reviewers": [
+      "万雨欣"
+    ],
+    "backup_reviewers": [
+      "屠元琦"
+    ],
+    "weekly_capacity_people": 25,
+    "capacity_scope": "每个滚动7日最多服务25名唯一学员；Canary 8人包含在内",
+    "first_response_sla_minutes": 1440,
+    "completion_sla_minutes": 2880,
+    "revision_response_sla_minutes": 1440,
+    "backup_triggers": [
+      "分配后12小时内主Reviewer未接单",
+      "提交后24小时内无首次反馈",
+      "主Reviewer请假、失联或超过周容量",
+      "主Reviewer与提交人或任务存在回避关系"
+    ],
+    "escalation_owner": "屠元琦",
+    "final_escalation_owner": "刘默文",
+    "independent_uat_witness": "冯宇汀",
+    "separation_of_duties": "屠元琦不得同时成为同一任务的唯一Reviewer和唯一UAT签署人；申诉必须由未参与原结论的真人处理。"
+  },
+  "shared_data_policy": {
+    "production_write_allowed": false,
+    "raw_customer_data_allowed": false,
+    "ai_high_impact_decision_allowed": false,
+    "allowed_inputs": [
+      "公开材料",
+      "合成材料",
+      "经批准的脱敏内部材料"
+    ],
+    "visibility": [
+      "PERSON",
+      "ASSIGNED_REVIEWERS",
+      "AUTHORIZED_OPERATORS"
+    ],
+    "default_retention_days": 180,
+    "production_execution_location": "JOURNEY_OUTSIDE_ONLY"
+  },
+  "modules": [
+    {
+      "module_key": "exploration-camp",
+      "package_id": "exploration-camp-p0-2026-09-01",
+      "version": "1.0.0-candidate",
+      "module_owner": "郑田源",
+      "owner_confirmation_state": "SOURCE_SCOPE_CONFIRMED_BY_OWNER_ATTESTATION",
+      "owner_hash_signature_state": "PENDING_PERSONAL_HASH_ACCEPTANCE",
+      "source_refs": [
+        "SRC-OWNER-03",
+        "SRC-EXP-01",
+        "SRC-EXP-02",
+        "SRC-EXP-03"
+      ],
+      "source_locators": [
+        "https://zx6w57w0j34.feishu.cn/sheets/LpnOsAMGth34BVtzRdXcq96Unwh?sheet=2ogROw",
+        "docs/baselines/construction-v1.0/02_模块分册/01_探索营_V1.0.md"
+      ],
+      "source_confirmation": "郑田源已确认目标Sheet包含三项实操及Rubric；最终候选Hash仍待郑田源本人签署。",
+      "content_items": [
+        {
+          "content_id": "EXP-TREASURE-01",
+          "sequence": 1,
+          "title": "公司与 Muchener",
+          "learner_question": "这是一家怎样的公司，我将如何协作？",
+          "minimum_output": "认知确认与真实问题清单",
+          "estimated_minutes": 20
+        },
+        {
+          "content_id": "EXP-TREASURE-02",
+          "sequence": 2,
+          "title": "AI 数据行业与模型",
+          "learner_question": "AI数据为何影响模型，质量和安全意味着什么？",
+          "minimum_output": "概念判断与不确定项",
+          "estimated_minutes": 25
+        },
+        {
+          "content_id": "EXP-TREASURE-03",
+          "sequence": 3,
+          "title": "项目认知",
+          "learner_question": "一个AI数据项目为何存在，角色、目标和风险是什么？",
+          "minimum_output": "项目结构理解卡",
+          "estimated_minutes": 25
+        },
+        {
+          "content_id": "EXP-TREASURE-04",
+          "sequence": 4,
+          "title": "项目交付与组织适配",
+          "learner_question": "交付如何协作、提报、返修和承担责任？",
+          "minimum_output": "通用交付认知卡与风险确认",
+          "estimated_minutes": 20
+        }
+      ],
+      "tasks": [
+        {
+          "task_key": "EXP-P1",
+          "title": "规则拆解",
+          "purpose": "把一段工作规则拆成可执行、可提报且不会越过红线的判断结构。",
+          "non_goals": [
+            "背诵规则原文",
+            "自行补写未知规则",
+            "仅输出总分或结论"
+          ],
+          "inputs": [
+            "获批的短规则或合成规则材料"
+          ],
+          "deliverables": [
+            "目标",
+            "判断维度",
+            "红线",
+            "例外",
+            "不确定项",
+            "需提报问题"
+          ],
+          "estimated_minutes": 30,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "EXP-P1-R1",
+            "dimensions": [
+              "目标识别准确",
+              "判断维度完整",
+              "红线与不可做事项明确",
+              "例外和不确定项分开",
+              "提报对象和问题具体"
+            ],
+            "pass_rule": "五个维度至少四项满足，且红线识别不得失败；真人Reviewer必须写理由。",
+            "revision_rule": "缺少必交字段、把猜测写成事实、遗漏安全红线或提报对象不明确时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 10,
+            "repeat_award_allowed": false,
+            "talent_conclusion_effect": "NONE"
+          }
+        },
+        {
+          "task_key": "EXP-P2",
+          "title": "模型回答判断",
+          "purpose": "对同一Prompt的两个回答作出可解释判断，并保留无法判断和不确定性的空间。",
+          "non_goals": [
+            "凭个人偏好选答案",
+            "把AI建议当作真人结论",
+            "编造外部事实"
+          ],
+          "inputs": [
+            "同一Prompt的A/B回答",
+            "获批评价上下文"
+          ],
+          "deliverables": [
+            "选择A、选择B或无法判断",
+            "判断维度",
+            "具体理由",
+            "证据与对比",
+            "不确定项"
+          ],
+          "estimated_minutes": 35,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "EXP-P2-R1",
+            "dimensions": [
+              "事实和证据",
+              "回答完整性",
+              "指令遵循",
+              "对比理由具体",
+              "不确定性披露"
+            ],
+            "pass_rule": "至少覆盖最相关的三个维度，理由必须引用回答中的具体证据，且不得编造事实。",
+            "revision_rule": "只有结论无证据、理由泛化、忽略关键指令或隐藏不确定性时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 10,
+            "repeat_award_allowed": false,
+            "talent_conclusion_effect": "NONE"
+          }
+        },
+        {
+          "task_key": "EXP-P3",
+          "title": "边界与问题提报",
+          "purpose": "在数据、规则或协作异常中先控制风险，再把问题提报给正确的人。",
+          "non_goals": [
+            "未经授权继续执行",
+            "把未知项当作事实",
+            "越权替决策人下结论"
+          ],
+          "inputs": [
+            "合成的数据、规则或协作异常情境"
+          ],
+          "deliverables": [
+            "已知事实",
+            "未知项",
+            "潜在影响",
+            "安全的临时处理建议",
+            "停止线",
+            "需谁裁决"
+          ],
+          "estimated_minutes": 30,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "EXP-P3-R1",
+            "dimensions": [
+              "事实与未知项分离",
+              "影响判断",
+              "停止线",
+              "临时处理不扩大风险",
+              "裁决人和问题具体"
+            ],
+            "pass_rule": "停止线和安全临时处理两项必须满足，其余三个维度至少两项满足；真人Reviewer必须写理由。",
+            "revision_rule": "继续执行高风险动作、未区分事实和猜测、无停止线或无裁决对象时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 10,
+            "repeat_award_allowed": false,
+            "talent_conclusion_effect": "NONE"
+          }
+        }
+      ],
+      "module_policy": {
+        "result_package": "PERSONAL_GROWTH_BASELINE",
+        "allowed_next_stage_decisions": [
+          "进入下一训练阶段",
+          "补强后复测",
+          "暂缓"
+        ],
+        "forbidden_interpretations": [
+          "录用结论",
+          "淘汰结论",
+          "项目准入终判"
+        ],
+        "calibration_rule": "两名Reviewer对同一样例最多允许一个非安全维度差异；任何安全维度分歧必须进入Panel校准。"
+      },
+      "candidate_sha256": "1d9feb1672c847279c0b85cdc5a13ea9a9890d45cad4b223dd59ef2f05bbeb1c"
+    },
+    {
+      "module_key": "newcomer-village",
+      "package_id": "newcomer-village-p0-2026-09-01",
+      "version": "1.0.0-candidate",
+      "module_owner": "屠元琦",
+      "owner_confirmation_state": "PRODUCT_OWNER_SUPPLEMENTED_FROM_VERIFIED_SOURCE",
+      "owner_hash_signature_state": "PENDING_PERSONAL_HASH_ACCEPTANCE",
+      "source_refs": [
+        "SRC-OWNER-03",
+        "SRC-NV-01",
+        "SRC-NV-02"
+      ],
+      "source_locators": [
+        "https://zx6w57w0j34.feishu.cn/wiki/Zz4awe7I8iW6Cokjhi0cg8UunLb",
+        "docs/baselines/construction-v1.0/02_模块分册/02_沐晨新手村.md"
+      ],
+      "source_confirmation": "沿用Muchen Quest已验证任务闭环；首发仅选择两条已存在且已启用的模拟任务。",
+      "content_items": [
+        {
+          "content_id": "NV-TASK-23",
+          "sequence": 1,
+          "title": "T+1 公司与行业初识卡",
+          "source_task_id": "23",
+          "estimated_minutes": 45
+        },
+        {
+          "content_id": "NV-TASK-24",
+          "sequence": 2,
+          "title": "AI 数据交付关键词解释",
+          "source_task_id": "24",
+          "estimated_minutes": 40
+        }
+      ],
+      "tasks": [
+        {
+          "task_key": "NV-T1-COMPANY-INDUSTRY-CARD",
+          "title": "T+1 公司与行业初识卡",
+          "purpose": "帮助新成员建立对沐晨业务、AI数据行业和自身协作方式的可核验基础认知。",
+          "non_goals": [
+            "考察记忆背诵",
+            "形成录用或淘汰判断",
+            "使用客户原始数据"
+          ],
+          "inputs": [
+            "获批的公司介绍材料",
+            "获批的行业基础材料"
+          ],
+          "deliverables": [
+            "公司业务理解",
+            "行业关键词",
+            "三个仍不确定的问题",
+            "已咨询对象",
+            "下一步补充计划",
+            "可访问的提交链接"
+          ],
+          "estimated_minutes": 45,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "NV-T1-R1",
+            "dimensions": [
+              "业务理解准确",
+              "行业概念可解释",
+              "问题真实具体",
+              "来源与咨询对象可追溯",
+              "下一步行动可执行"
+            ],
+            "pass_rule": "五个维度至少四项满足，且不得出现明显虚构或敏感信息泄露。",
+            "revision_rule": "只有口号、无来源、问题空泛、无法访问交付物或包含未经授权敏感信息时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 10,
+            "repeat_award_allowed": false,
+            "correction_policy": "更正采用追加分录，不覆盖原积分事实。",
+            "talent_conclusion_effect": "NONE"
+          }
+        },
+        {
+          "task_key": "NV-T2-AI-DELIVERY-GLOSSARY",
+          "title": "AI 数据交付关键词解释",
+          "purpose": "把AI数据交付中的常用词汇转化为能在具体项目情境中使用的共同语言。",
+          "non_goals": [
+            "复制百科定义",
+            "堆砌过宽泛术语",
+            "未经确认解释客户专有规则"
+          ],
+          "inputs": [
+            "获批的AI数据交付术语材料",
+            "合成或脱敏项目场景"
+          ],
+          "deliverables": [
+            "关键词清单",
+            "自己的解释",
+            "适用场景",
+            "易错点",
+            "向Reviewer确认过的问题",
+            "可访问的提交链接"
+          ],
+          "estimated_minutes": 40,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "NV-T2-R1",
+            "dimensions": [
+              "术语解释准确",
+              "适用场景具体",
+              "易错点有效",
+              "确认问题可追溯",
+              "表达能被协作者复用"
+            ],
+            "pass_rule": "至少包含五个有效关键词，五个维度至少四项满足，且无关键概念性错误。",
+            "revision_rule": "照抄定义、缺少场景、关键概念错误或无确认问题时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 10,
+            "repeat_award_allowed": false,
+            "correction_policy": "更正采用追加分录，不覆盖原积分事实。",
+            "talent_conclusion_effect": "NONE"
+          }
+        }
+      ],
+      "module_policy": {
+        "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+        "help_path": "Journey求助入口 → 万雨欣 → 屠元琦",
+        "retention_days": 180,
+        "production_write_allowed": false,
+        "first_release_task_count": 2,
+        "deferred_source_task": "T+30 个人成长复盘",
+        "deferred_reason": "不适合9月1日前的短周期Canary验收"
+      },
+      "candidate_sha256": "6dfedfa9e95e78b8ab06115b08f0b5e7379b988b87f59de5c166c37f45937f1b"
+    },
+    {
+      "module_key": "ai-academy",
+      "package_id": "ai-academy-p0-2026-09-01",
+      "version": "1.0.0-candidate",
+      "module_owner": "段超群",
+      "owner_confirmation_state": "PRODUCT_OWNER_SUPPLEMENTED_FROM_VERIFIED_SOURCE",
+      "owner_hash_signature_state": "PENDING_PERSONAL_HASH_ACCEPTANCE",
+      "source_refs": [
+        "SRC-OWNER-03",
+        "SRC-AIA-01",
+        "SRC-NV-01"
+      ],
+      "source_locators": [
+        "https://zx6w57w0j34.feishu.cn/wiki/GzknwrxybiOAOGkRrKKcjZyqnPb",
+        "https://zx6w57w0j34.feishu.cn/wiki/Zz4awe7I8iW6Cokjhi0cg8UunLb",
+        "docs/baselines/construction-v1.0/02_模块分册/03_AI学院.md"
+      ],
+      "source_confirmation": "Muchen Quest中存在第1月AI通识任务包、两项启用课程资源和AI通识任务卡；本补充将其收口为首发单元。",
+      "content_items": [
+        {
+          "content_id": "AIA-M1-MATERIAL-01",
+          "sequence": 1,
+          "title": "AI for Everyone 核心选段",
+          "source_resource_id": "res_001",
+          "estimated_minutes": 30
+        },
+        {
+          "content_id": "AIA-M1-MATERIAL-02",
+          "sequence": 2,
+          "title": "Generative AI for Everyone 核心选段",
+          "source_resource_id": "res_002",
+          "estimated_minutes": 30
+        },
+        {
+          "content_id": "AIA-M1-PRACTICE-GUIDE",
+          "sequence": 3,
+          "title": "第1月 AI 通识与生成式 AI 认知任务指南",
+          "source_task_package_id": "academy_m1_assignment_001",
+          "estimated_minutes": 10
+        }
+      ],
+      "tasks": [
+        {
+          "task_key": "AIA-M1-AI-LITERACY-CARD",
+          "title": "AI通识任务卡",
+          "purpose": "把AI通识迁移到一个沐晨真实或脱敏项目，解释交付物、模型能力、数据质量和业务价值之间的关系。",
+          "non_goals": [
+            "复述课程摘要",
+            "使用未授权客户数据",
+            "把AI生成内容冒充个人判断",
+            "自动形成岗位或能力等级"
+          ],
+          "inputs": [
+            "两个首发核心学习材料",
+            "一个公开、合成或获批脱敏的沐晨项目案例",
+            "AI使用披露模板"
+          ],
+          "deliverables": [
+            "所选项目和表面交付物",
+            "背后可能支持的模型能力",
+            "数据质量对模型和业务的影响",
+            "AI数据工程与传统标注的区别",
+            "一个可沉淀的组织表达",
+            "AI使用范围、模型和Prompt版本",
+            "可访问的提交链接"
+          ],
+          "estimated_minutes": 60,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "AIA-M1-R1",
+            "dimensions": [
+              "项目与交付物描述准确",
+              "模型能力关联合理",
+              "数据质量影响有因果链",
+              "AI数据工程与传统标注区分清楚",
+              "来源、限制与AI使用披露完整"
+            ],
+            "pass_rule": "五个维度至少四项满足，且来源/限制/AI披露不得失败；真人Reviewer必须写理由。",
+            "revision_rule": "只复述课程、无项目映射、因果关系错误、泄露敏感信息或未披露AI使用时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 20,
+            "organization_asset_bonus_points": 10,
+            "bonus_condition": "经Content Owner另行批准成为组织资产后追加",
+            "repeat_award_allowed": false,
+            "talent_conclusion_effect": "NONE"
+          }
+        }
+      ],
+      "module_policy": {
+        "unit_name": "第1月 AI 通识与生成式 AI 认知",
+        "target_audience": "魔鬼训练营2.0首批学员",
+        "content_owner": "段超群",
+        "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+        "evidence_validity_days": 180,
+        "organization_asset_policy": "人工PASS只产生组织资产候选；必须由Content Owner另行审核来源、版本、敏感度和复用条件后才能发布。",
+        "next_action_after_pass": "进入下一AI学院练习或由真人推荐到交付线公会",
+        "ai_self_check_policy": "AI可检查结构、缺项、事实风险和敏感信息；输出必须标记为建议，不得写入PASS或能力结论。"
+      },
+      "candidate_sha256": "e58880f712ee6c1aa3e4e31e5a51e62e15ac1e8bd9a75ec3600ca8b03095a894"
+    },
+    {
+      "module_key": "delivery-guild",
+      "package_id": "delivery-guild-p0-2026-09-01",
+      "version": "1.0.0-candidate",
+      "module_owner": "段超群",
+      "owner_confirmation_state": "PRODUCT_OWNER_SUPPLEMENTED_FROM_APPROVED_BOUNDARIES",
+      "owner_hash_signature_state": "PENDING_PERSONAL_HASH_ACCEPTANCE",
+      "source_refs": [
+        "SRC-OWNER-03",
+        "SRC-GOV-01",
+        "SRC-WIKI-04"
+      ],
+      "source_locators": [
+        "docs/baselines/construction-v1.0/02_模块分册/04_交付线公会.md",
+        "wiki/concepts/训练任务的可追溯交付.md",
+        "wiki/concepts/训练周任务交付.md",
+        "wiki/concepts/任务提交状态管理.md"
+      ],
+      "source_confirmation": "首发能力主题从已批准公会边界和现有可追溯训练交付实践中提炼，不使用真实生产任务。",
+      "content_items": [
+        {
+          "content_id": "DLG-ORIENTATION-01",
+          "sequence": 1,
+          "title": "交付线公会使命、边界与证据说明",
+          "estimated_minutes": 15
+        },
+        {
+          "content_id": "DLG-HANDOFF-GUIDE-01",
+          "sequence": 2,
+          "title": "可追溯交付与交接包指南",
+          "estimated_minutes": 20
+        }
+      ],
+      "tasks": [
+        {
+          "task_key": "DLG-P1-TRACEABLE-HANDOFF",
+          "title": "可追溯交付与交接包",
+          "purpose": "把一个模拟或脱敏任务整理成接收人无需口头补充即可核验、继续执行并发现风险的交接包。",
+          "non_goals": [
+            "直接操作生产系统",
+            "上传客户原始数据",
+            "只写心得或周报",
+            "用AI生成内容替代个人核验",
+            "产生项目准入或岗位等级结论"
+          ],
+          "inputs": [
+            "合成或获批脱敏的任务背景",
+            "交付物样例",
+            "质量要求和限制条件"
+          ],
+          "deliverables": [
+            "一页范围、目标和成功定义",
+            "输入输出与证据链接索引",
+            "质量检查清单和抽样结果",
+            "风险、未知项和停止线",
+            "下一责任人、下一行动和回退建议",
+            "AI使用披露",
+            "可访问的交接包链接"
+          ],
+          "estimated_minutes": 75,
+          "execution_environment": "SIMULATION",
+          "rubric": {
+            "rubric_id": "DLG-P1-R1",
+            "dimensions": [
+              "范围和成功定义清楚",
+              "证据链接可访问且可追溯",
+              "质量检查可复现",
+              "风险、未知项和停止线完整",
+              "接收人能独立完成下一行动"
+            ],
+            "pass_rule": "证据可访问、质量可复现和停止线三项必须满足；其余两项至少一项满足，并由真人导师确认接收人可继续。",
+            "revision_rule": "空链接、证据与任务不对应、质量结论不可复现、遗漏停止线或无法识别下一责任人时返工。",
+            "human_decision_required": true
+          },
+          "reward_policy": {
+            "points_after_human_pass": 30,
+            "repeat_award_allowed": false,
+            "talent_conclusion_effect": "NONE"
+          }
+        }
+      ],
+      "module_policy": {
+        "guild_name": "交付线公会",
+        "mission": "让成员用可追溯证据完成可接手、可复核、可回退的交付。",
+        "target_capability": "可追溯交付与交接",
+        "target_audience": "已完成探索营或经Operator确认适合试练的学员",
+        "membership_policy": {
+          "join": "真人确认试练资格后从APPLIED进入ACTIVE",
+          "pause": "成员或公会Owner可因容量、时间或安全原因暂停，并记录理由和恢复条件",
+          "exit": "由真人记录退出理由；积分、活跃度或AI不得自动退出",
+          "transfer": "仅形成真人建议，不自动转会"
+        },
+        "mentor_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+        "evidence_validity_days": 180,
+        "next_actions": [
+          "下一公会任务",
+          "继续补强",
+          "转向其他练习",
+          "暂缓"
+        ],
+        "production_task_policy": "首发只使用SIMULATION；后续真实任务必须另行通过ControlledTaskAuthorization。"
+      },
+      "candidate_sha256": "4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba"
+    }
+  ],
+  "required_human_signatures": [
+    {
+      "person_name": "郑田源",
+      "module_keys": [
+        "exploration-camp"
+      ],
+      "decision_required": "APPROVE_EXACT_CANDIDATE_HASH"
+    },
+    {
+      "person_name": "屠元琦",
+      "module_keys": [
+        "newcomer-village"
+      ],
+      "decision_required": "APPROVE_EXACT_CANDIDATE_HASH_AND_REVIEW_OPERATIONS"
+    },
+    {
+      "person_name": "段超群",
+      "module_keys": [
+        "ai-academy",
+        "delivery-guild"
+      ],
+      "decision_required": "APPROVE_EXACT_CANDIDATE_HASHES"
+    }
+  ],
+  "manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6"
+}

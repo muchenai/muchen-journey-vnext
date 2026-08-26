@@ -1,11 +1,12 @@
-# Muchen Journey 施工总包 V1.0.1
+# Muchen Journey 施工总包 V1.0.2
 
-> 版本：`V1.0.1`  
+> 版本：`V1.0.2`  
 > 初版日期：`2026-08-26`  
 > 合同变更日期：`2026-08-27`  
 > UAT模式：`PRODUCTION_CANARY_UAT`  
 > 目标发布：`2026-09-01 CONTROLLED_COHORT_RELEASE`  
-> 当前文档状态：`APPROVED_PRODUCT_BASELINE / CANARY_UAT_MODE_APPROVED / BUILD_INPUT_READY / CANARY_DEPLOYMENT_NOT_AUTHORIZED / RELEASE_NOT_AUTHORIZED`
+> 内容候选收口日期：`2026-08-27`  
+> 当前文档状态：`APPROVED_PRODUCT_BASELINE / CONTENT_CANDIDATES_MACHINE_VALIDATED / MODULE_OWNER_HASH_SIGNATURES_PENDING / CANARY_DEPLOYMENT_NOT_AUTHORIZED / RELEASE_NOT_AUTHORIZED`
 
 ## 一句话施工口径
 
@@ -67,7 +68,8 @@ SHA256SUMS
 ## 当前已确定与仍待绑定
 
 - 已确定：产品继承公式、四个首发模块、共享任务闭环、AI/真人边界、真实任务边界、历史数据参考策略、Owner 名单、9 月 1 日受控发布范围。
-- 待业务 Owner 绑定：探索营四宝藏的正式材料版本与三项 Rubric；新手村首批任务卡；AI 学院首个学习单元；交付线公会首个任务包；各模块执行 Reviewer、替补和 SLA。
+- 已形成但未生效：四模块最低 P0 内容候选、7 项任务与 Rubric、主备 Reviewer、25 人周容量及 SLA，机器清单为 `config/module-content-candidates.v1.json`，完整清单 hash 为 `b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6`。
+- 待业务 Owner 绑定：郑田源、屠元琦、段超群对本人模块精确候选 hash 的签署；探索营目标 Sheet 的版本/导出 hash。没有这些证据，候选不能转换为正式内容包。
 - 待技术形成：干净发布候选、不可移动 tag/候选 SHA、当前工作树资产收口、候选部署物与迁移版本绑定。
 - 待真人完成：在 `PRODUCTION_CANARY_UAT` 中每模块至少 2 名真实目标用户 UAT、独立 QA、发布复核和小名单放行。
 

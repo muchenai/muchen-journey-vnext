@@ -23,8 +23,10 @@
 | --- | --- | --- | --- |
 | `SRC-OWNER-01` | 产品 Owner 九项产品裁决及后续历史数据/发布裁决 | 最高产品决策 | 全量继承 |
 | `SRC-OWNER-02` | 产品 Owner 2026-08-27 `PRODUCTION_CANARY_UAT` 裁决 | UAT使用生产基础设施上的8人白名单Canary；候选Gate不降低 | 全量继承；Canary部署授权与Release GO严格分离 |
+| `SRC-OWNER-03` | 产品 Owner 2026-08-27 四模块 P0 内容补充授权 | 允许在既有来源和裁决边界内补齐最低内容、Rubric、Reviewer与SLA候选 | 继承；只能形成候选，不能替模块Owner签署或放行发布 |
 | `SRC-EXP-01` | 探索营 V1.0，飞书 `Wuz5dtk8GoXpdvxrH7BcQlaVnZe` | 四宝藏真实业务结构 | 全量继承；个人成长基线改为结果包 |
 | `SRC-EXP-02` | 《MUCHEN 新人启航探索营 Day1 方案》 | Day0、三项实操、评分素材、AI助教边界 | 继承实操与运营骨架；原准入措辞受 Owner 裁决限制 |
+| `SRC-EXP-03` | 飞书 Sheet `LpnOsAMGth34BVtzRdXcq96Unwh / 2ogROw`，郑田源确认其包含三项实操与Rubric | 探索营当前正式内容输入载体 | 作为候选内容来源；须由郑田源绑定精确候选hash，Sheet版本/导出hash仍待补 |
 | `SRC-NV-01` | 《Muchen Quest｜沐晨新手村》V1.0 | 已验证任务/NPC/运营/积分闭环 | 继承行为，不照搬旧表和高影响人才结论 |
 | `SRC-NV-02` | 《新手村任务卡库表 & 积分兑换表内容 V1.0》 | 任务字段、首批任务与积分内容 | 作为内容候选，须由屠元琦绑定版本 |
 | `SRC-GOV-01` | 《Muchen Journey 产品设计融合文档 V0.7》 | 证据、权限、AI、人审、申诉、审计、插件治理 | 只继承已批准治理；不继承五宝藏和与真实任务裁决冲突的限制 |
@@ -34,6 +36,7 @@
 | `SRC-WIKI-01` | `wiki/concepts/新人训练失败模式.md` | 训练必须贴近真实规则、统一门槛和评估口径 | 作为负向设计约束 |
 | `SRC-WIKI-02` | `wiki/concepts/口径一致性验证.md` | 发布后验证理解一致而非只发布文字 | 作为内容变更/UAT约束 |
 | `SRC-WIKI-03` | `wiki/concepts/沐晨-journey.md` | Journey 为跨学习、任务、认证和回流的成长主线 | 仅作背景；具体顺序以本包为准 |
+| `SRC-WIKI-04` | `wiki/concepts/训练任务的可追溯交付.md`、`训练周任务交付.md`、`任务提交状态管理.md` | 交付证据、状态、责任人与审核链的最低结构 | 用于补齐交付线公会首任务候选；不构成段超群批准 |
 
 ## 3. 已裁决冲突
 
@@ -48,6 +51,7 @@
 | 六模块首发 vs 9/1现实期限 | 9/1首发四模块；完整竞技场和 Career Map 延期 |
 | staging UAT vs production UAT | 真人UAT改在生产基础设施上的8人白名单Canary执行；不改变候选、安全、恢复、真人或独立复核Gate |
 | README 技术 Greenfield vs 产品继承 | 技术 Greenfield 可以保留；“产品从零设计”必须废止 |
+| Mini不得发明内容 vs 产品Owner授权补齐 | 可在既有来源、已批准治理与硬边界内形成最低P0候选；模块Owner必须对精确hash本人签署后才生效 |
 
 ## 4. 源文件定位
 
@@ -64,4 +68,4 @@ AI学院 Wiki 节点：`https://zx6w57w0j34.feishu.cn/wiki/GzknwrxybiOAOGkRrKKcj
 
 ## 5. 不得伪造的空位
 
-以下内容必须由对应 Owner 提供并形成版本/hash，Mini 不得自行补写：正式材料正文、真实项目任务授权、Rubric 具体阈值、执行 Reviewer 名单、替补 Reviewer、SLA 例外、UAT 真人记录、候选发布签署和任何高影响人才结论。
+在 `SRC-OWNER-03` 之后，Mini 可消费产品 Owner 已授权并通过机器校验的最低 P0 **候选**；仍不得把候选标成正式批准。以下内容必须由对应真人形成证据，Mini 不得代签或推断：模块 Owner 对精确候选 hash 的批准、探索营 Sheet 版本/导出 hash、真实项目任务授权、SLA 例外、申诉裁决、UAT 真人记录、候选发布签署和任何高影响人才结论。
