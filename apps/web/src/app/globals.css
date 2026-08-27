@@ -44,6 +44,38 @@ button, textarea, input, select { font: inherit; }
 }
 .skip-link:focus { transform: translateY(0); }
 
+.fact-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 3px 9px;
+  color: #173e5c;
+  background: #eef4ff;
+  border: 1px solid #b8caef;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.fact-label-human { color: #6a4700; background: #fff8e6; border-color: #e7cb78; }
+.fact-label-ai { color: #4d347a; background: #f5f0ff; border-color: #cab9ed; }
+.fact-label-incentive { color: #17613c; background: #edf8f1; border-color: #a9d8bc; }
+.fact-label-system { color: #374151; background: #f3f4f6; border-color: #cfd4dc; }
+.fact-legend { padding: 16px 18px; background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: 16px; }
+.fact-legend summary { cursor: pointer; font-weight: 800; }
+.fact-legend dl { display: grid; gap: 10px; margin: 16px 0 0; }
+.fact-legend dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; align-items: start; }
+.fact-legend dt, .fact-legend dd { margin: 0; }
+.experience-state { display: grid; gap: 12px; padding: 22px; background: #fff; border: 1px solid var(--border-default); border-radius: 18px; }
+.experience-state h2, .experience-state p, .experience-state ul { margin: 0; }
+.experience-state-error { border-color: #d78b84; background: #fff7f6; }
+.experience-state-locked { border-color: #e7cb78; background: #fffaf0; }
+.experience-state .button { width: fit-content; }
+.home-action-facts { display: grid; gap: 8px; margin: 0; }
+.home-action-facts > div { display: grid; gap: 2px; }
+.home-action-facts dt { color: var(--text-muted); font-size: 12px; font-weight: 750; }
+.home-action-facts dd { margin: 0; font-weight: 650; }
+
 .site-header,
 .site-footer {
   display: flex;
@@ -222,6 +254,8 @@ td { color: var(--text-secondary); }
 td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; white-space: normal; }
 
 @media (max-width: 640px) {
+  .fact-legend dl > div { grid-template-columns: 1fr; }
+  .experience-state .button { width: 100%; }
   .site-header { align-items: flex-start; flex-direction: column; padding: 16px 0; }
   nav { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
   .page-shell { padding-top: 48px; }

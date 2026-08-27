@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logoutSession } from "@/app/actions";
+import { ExperienceState, FactLegend } from "@/app/human-experience";
 import {
   CurrentAction,
   hasVNextSession,
@@ -29,6 +30,7 @@ export default async function LearnerHome({
   const opensTask = ["START_OR_CONTINUE_TASK", "REVISE_SUBMISSION"].includes(
     action.action_type,
   );
+  const waitsForReview = action.action_type === "WAIT_FOR_REVIEW";
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
   const currentNode = action.journey?.nodes.find((node) => node.status === "CURRENT");
   const opensFirstMaterial = opensTask && currentNode?.position === 0;
@@ -49,9 +51,11 @@ export default async function LearnerHome({
               position: currentNode?.position ?? 0,
               title: currentNode?.title ?? action.title,
               reason: action.reason,
-              href: opensTask ? taskHref : opensResult ? resultHref : null,
+              href: opensTask || waitsForReview ? taskHref : opensResult ? resultHref : null,
               actionLabel: opensResult
                 ? "打开旅程结果"
+                : waitsForReview
+                  ? "查看已提交版本"
                 : opensFirstMaterial
                   ? "打开第一份必读材料"
                   : opensTask
@@ -60,17 +64,31 @@ export default async function LearnerHome({
             }}
           />
         </>
-      ) : (
+      ) : opensTask || waitsForReview || opensResult ? (
         <article className="status-card">
           <p className="eyebrow">{action.stage}</p>
           <h2>{action.title}</h2>
           <p>{action.reason}</p>
-          {!action.journey && opensTask ? (
+          {opensTask ? (
             <Link className="button primary" href={taskHref}>进入当前任务</Link>
-          ) : !action.journey && opensResult ? (
+          ) : waitsForReview ? (
+            <Link className="button primary" href={taskHref}>查看已提交版本</Link>
+          ) : opensResult ? (
             <Link className="button primary" href={resultHref}>查看当前结果</Link>
           ) : null}
         </article>
+      ) : (
+        <ExperienceState
+          kind={action.action_type === "RESOLVE_ENROLLMENT" ? "locked" : "empty"}
+          title={action.title}
+          summary={action.reason}
+          knownFacts={[
+            `当前阶段：${action.stage}`,
+            `责任角色：${action.responsible_party}`,
+            `反馈说明：${action.feedback_expectation}`,
+          ]}
+          action={{ href: "/", label: "返回安全入口" }}
+        />
       )}
       <JourneyProgramOverview
         currentAction={currentNode?.title ?? action.title}
@@ -81,6 +99,7 @@ export default async function LearnerHome({
           {action.responsible_party} · {action.feedback_expectation}
         </p>
       )}
+      <FactLegend />
       {hasSession ? (
         <form action={logoutSession} className="quiet-exit">
           <button className="button secondary" type="submit">退出 vNext 会话</button>

@@ -4,7 +4,13 @@ import journeyProduct from "@/lib/muchen-journey-product.generated.json";
 import controlledRelease from "@/lib/muchen-journey-controlled-release.generated.json";
 
 import { exchangeInvite } from "@/app/actions";
-import { apiRequest, CurrentAction, hasValidLearnerSession } from "@/lib/server/api";
+import { FactLabel, FactLegend } from "@/app/human-experience";
+import {
+  apiRequest,
+  CurrentAction,
+  LearnerSessionState,
+  resolveLearnerSessionState,
+} from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -31,21 +37,32 @@ const PRODUCT_CURRENT_MAP_INDEX = Math.max(
   JOURNEY_MAPS.findIndex((map) => map.key === journeyProduct.current_map),
 );
 
-type HomeState = "visitor" | "active" | "expired" | "unlocked";
+type HomeState = "visitor" | "active" | "expired" | "unlocked" | "unavailable";
 
 type HomeContext = {
+  action: CurrentAction | null;
   currentMapIndex: number;
   state: HomeState;
 };
 
 async function resolveHomeContext(
-  hasSession: boolean,
+  session: LearnerSessionState,
   authError: string | undefined,
 ): Promise<HomeContext> {
-  if (!hasSession) {
+  if (session.status === "UNAVAILABLE") {
     return {
+      action: null,
       currentMapIndex: PRODUCT_CURRENT_MAP_INDEX,
-      state: authError === "LEARNER_SESSION_EXPIRED" ? "expired" : "visitor",
+      state: "unavailable",
+    };
+  }
+  if (session.status !== "VALID") {
+    return {
+      action: null,
+      currentMapIndex: PRODUCT_CURRENT_MAP_INDEX,
+      state: session.status === "INVALID" || authError === "LEARNER_SESSION_EXPIRED"
+        ? "expired"
+        : "visitor",
     };
   }
 
@@ -60,11 +77,16 @@ async function resolveHomeContext(
       : PRODUCT_CURRENT_MAP_INDEX;
 
     return {
+      action,
       currentMapIndex,
       state: currentMapIndex > PRODUCT_CURRENT_MAP_INDEX ? "unlocked" : "active",
     };
   } catch {
-    return { currentMapIndex: PRODUCT_CURRENT_MAP_INDEX, state: "active" };
+    return {
+      action: null,
+      currentMapIndex: PRODUCT_CURRENT_MAP_INDEX,
+      state: "unavailable",
+    };
   }
 }
 
@@ -106,6 +128,15 @@ function StateAction({ state }: { state: HomeState }) {
     return <InvitationAction expired={state === "expired"} />;
   }
 
+  if (state === "unavailable") {
+    return (
+      <Link className="button primary home-primary-action" href="/" prefetch={false}>
+        重试状态读取
+        <span aria-hidden="true">→</span>
+      </Link>
+    );
+  }
+
   return (
     <Link
       className="button primary home-primary-action"
@@ -123,22 +154,27 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string }>;
 }) {
-  const [query, hasSession] = await Promise.all([searchParams, hasValidLearnerSession()]);
-  const context = await resolveHomeContext(hasSession, query.auth_error);
+  const [query, session] = await Promise.all([searchParams, resolveLearnerSessionState()]);
+  const context = await resolveHomeContext(session, query.auth_error);
   const currentMap = JOURNEY_MAPS[context.currentMapIndex] ?? JOURNEY_MAPS[0];
   const completedMap = context.currentMapIndex > 0
     ? JOURNEY_MAPS[context.currentMapIndex - 1]
     : null;
   const isExpired = context.state === "expired";
   const isUnlocked = context.state === "unlocked";
-  const stateTitle = isExpired
+  const isUnavailable = context.state === "unavailable";
+  const stateTitle = isUnavailable
+    ? "状态暂时无法确认"
+    : isExpired
     ? "你的进度还在，重新验证即可继续"
     : isUnlocked
       ? `${currentMap.name} 已经为你解锁`
       : context.state === "active"
         ? `你正在 ${currentMap.name}`
         : `你的起点是 ${currentMap.name}`;
-  const stateDescription = isExpired
+  const stateDescription = isUnavailable
+    ? "未能取得服务端权威状态；页面不会猜测进度、解锁模块或显示成功。"
+    : isExpired
     ? "已完成的地图、能力与成长证据不会因会话失效而丢失。"
     : isUnlocked && completedMap
       ? `${completedMap.name} 的成长证据会连续带入 ${currentMap.name}，不必重新开始。`
@@ -169,7 +205,9 @@ export default async function Home({
 
           <ol className="home-map-rail" aria-label="Muchen Journey 四个受控首发模块">
             {JOURNEY_MAPS.map((map, index) => {
-              const mapState = index < context.currentMapIndex
+              const mapState = isUnavailable
+                ? "unknown"
+                : index < context.currentMapIndex
                 ? "completed"
                 : index === context.currentMapIndex
                   ? "current"
@@ -188,7 +226,7 @@ export default async function Home({
                       ? "已完成"
                       : mapState === "current"
                         ? index === 0 ? "当前起点" : "当前位置"
-                        : "后续地图"}
+                        : mapState === "unknown" ? "状态待确认" : "后续地图"}
                   </span>
                 </li>
               );
@@ -199,10 +237,18 @@ export default async function Home({
         <aside className="home-state-card" aria-labelledby="home-state-heading">
           <div className="home-state-location">
             <span aria-hidden="true" />
-            <p>{isExpired ? "会话需要恢复" : isUnlocked ? "下一地图已解锁" : "你现在的位置"}</p>
+            <p>{isUnavailable ? "权威状态读取失败" : isExpired ? "会话需要恢复" : isUnlocked ? "下一地图已解锁" : "你现在的位置"}</p>
           </div>
+          <FactLabel kind="system" />
           <h2 id="home-state-heading">{stateTitle}</h2>
           <p className="home-state-description">{stateDescription}</p>
+          {context.action ? (
+            <dl className="home-action-facts">
+              <div><dt>当前任务</dt><dd>{context.action.title}</dd></div>
+              <div><dt>为什么现在做</dt><dd>{context.action.reason}</dd></div>
+              <div><dt>责任与反馈</dt><dd>{context.action.responsible_party} · {context.action.feedback_expectation}</dd></div>
+            </dl>
+          ) : null}
           <StateAction state={context.state} />
           {query.auth_error ? (
             <div
@@ -215,6 +261,8 @@ export default async function Home({
           <p className="home-state-note">
             {isUnlocked && completedMap
               ? `${completedMap.name} → ${currentMap.name} · 证据连续`
+              : isUnavailable
+                ? "未确认的状态不会写入或覆盖成长事实"
               : `${currentMap.name} · ${context.state === "visitor" ? "专属邀请制" : "成长记录已保留"}`}
           </p>
         </aside>
@@ -223,6 +271,7 @@ export default async function Home({
       <p className="home-governance-note">
         People AI 只支持培养与反馈；重要人员决定始终由人负责。成长事实、人工判断、AI 建议与系统状态会被清楚区分。
       </p>
+      <FactLegend />
     </section>
   );
 }

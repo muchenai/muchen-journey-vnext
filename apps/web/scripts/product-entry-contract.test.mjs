@@ -112,8 +112,8 @@ test("the four contract states each resolve to their one exact primary action", 
   assert.equal(expectedActions.get("learner-with-next-map-unlocked"), "进入下一张地图");
   for (const action of expectedActions.values()) assert.match(home, new RegExp(action));
 
-  assert.match(home, /type HomeState = "visitor" \| "active" \| "expired" \| "unlocked"/);
-  assert.match(home, /authError === "LEARNER_SESSION_EXPIRED" \? "expired" : "visitor"/);
+  assert.match(home, /type HomeState = "visitor" \| "active" \| "expired" \| "unlocked" \| "unavailable"/);
+  assert.match(home, /session\.status === "INVALID" \|\| authError === "LEARNER_SESSION_EXPIRED"/);
   assert.match(home, /currentMapIndex > PRODUCT_CURRENT_MAP_INDEX \? "unlocked" : "active"/);
 });
 
@@ -130,13 +130,14 @@ test("visitor and expired states validate complete invitation links on the homep
 });
 
 test("returning states use verified server facts and avoid authentication prefetch", () => {
-  assert.match(home, /hasValidLearnerSession/);
+  assert.match(home, /resolveLearnerSessionState/);
   assert.match(home, /apiRequest<CurrentAction>\("\/api\/v1\/me\/current-action", "LEARNER"\)/);
   assert.match(home, /action\.journey\?\.stable_key/);
   assert.match(home, /stableKey\.includes\(map\.key\)/);
   assert.match(home, /prefetch=\{false\}/);
   assert.match(home, /href="\/app"/);
   assert.match(api, /roles\.includes\("LEARNER"\)/);
+  assert.match(api, /status: "UNAVAILABLE"/);
   assert.doesNotMatch(home, /localStorage|sessionStorage|document\.cookie|NEXT_MAP_UNLOCKED/);
 });
 

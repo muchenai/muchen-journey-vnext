@@ -9,6 +9,10 @@ export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
 export type Role = "LEARNER" | "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR";
 
+export type LearnerSessionState =
+  | { status: "ABSENT" | "INVALID" | "UNAVAILABLE" }
+  | { status: "VALID"; roles: string[]; safeEntry: string };
+
 export type CurrentAction = {
   action_type: string;
   stage: string;
@@ -781,16 +785,25 @@ export async function hasVNextSession(): Promise<boolean> {
   return Boolean((await cookies()).get(SESSION_COOKIE)?.value);
 }
 
-export async function hasValidLearnerSession(): Promise<boolean> {
-  if (!(await cookies()).get(SESSION_COOKIE)?.value) return false;
+export async function resolveLearnerSessionState(): Promise<LearnerSessionState> {
+  if (!(await cookies()).get(SESSION_COOKIE)?.value) return { status: "ABSENT" };
   try {
     const session = await apiRequest<{ roles: string[]; safe_entry: string }>(
       "/api/v1/session",
       "LEARNER",
     );
-    return session.roles.includes("LEARNER") && session.safe_entry === "/app";
+    if (!session.roles.includes("LEARNER") || session.safe_entry !== "/app") {
+      return { status: "INVALID" };
+    }
+    return { status: "VALID", roles: session.roles, safeEntry: session.safe_entry };
   } catch (error) {
-    if (error instanceof ApiRequestError) return false;
-    return false;
+    if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+      return { status: "INVALID" };
+    }
+    return { status: "UNAVAILABLE" };
   }
+}
+
+export async function hasValidLearnerSession(): Promise<boolean> {
+  return (await resolveLearnerSessionState()).status === "VALID";
 }

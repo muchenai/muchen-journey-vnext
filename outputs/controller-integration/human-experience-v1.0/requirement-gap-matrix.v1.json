@@ -13,10 +13,10 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 40,
-    "NOT_IMPLEMENTED": 9,
+    "PARTIAL": 39,
+    "NOT_IMPLEMENTED": 8,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 7,
+    "IMPLEMENTED": 9,
     "GATED": 18
   },
   "requirements": [
@@ -224,11 +224,12 @@
     },
     {
       "id": "HX-PAGE-018",
-      "status": "NOT_IMPLEMENTED",
+      "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "现有空态仅显示简单无任务文案，未区分成功空结果、未配置与未加载。",
+      "audit_finding": "共享空态可显示服务端已知事实与唯一恢复动作；Reviewer/运营仍需区分成功空结果、未配置与未加载。",
       "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
         "apps/web/src/app/review/page.tsx",
         "apps/web/src/app/app/page.tsx",
         "apps/web/src/app/ops/page.tsx"
@@ -498,11 +499,12 @@
     },
     {
       "id": "HX-BAN-007",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 5,
-      "audit_finding": "多数 mutation 失败会保留事实；首页 CurrentAction 失败目前错误回退 active，需修复。",
+      "audit_finding": "mutation 失败保留事实；首页会话或 CurrentAction 不可用时显式失败关闭，不再推断 active。",
       "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
         "apps/web/src/app/page.tsx",
         "apps/web/src/app/error.tsx"
       ]
@@ -757,11 +759,13 @@
     },
     {
       "id": "HX-IMPL-001",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 1,
-      "audit_finding": "共享壳/投影存在；五类标签和统一锁定/空/错误态未完成.",
+      "audit_finding": "共享壳提供五类文字标签与统一锁定/空/错误态；首页只消费服务端会话和 CurrentAction，失败时不猜测状态。",
       "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
+        "apps/web/scripts/human-experience-shell-contract.test.mjs",
         "apps/web/src/app/page.tsx",
         "apps/web/src/app/app/page.tsx",
         "apps/api/journey_api/domain.py",

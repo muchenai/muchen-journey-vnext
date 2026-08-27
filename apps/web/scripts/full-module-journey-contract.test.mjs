@@ -88,7 +88,7 @@ test("the current learner action precedes the controlled-module directory", () =
 });
 
 test("a learner without a journey projection still receives one executable current action", () => {
-  assert.match(learnerHomeSource, /!action\.journey && opensTask/);
+  assert.match(learnerHomeSource, /\) : opensTask \|\| waitsForReview \|\| opensResult \? \(/);
   assert.match(learnerHomeSource, /href=\{taskHref\}/);
   assert.match(learnerHomeSource, /进入当前任务/);
 });
