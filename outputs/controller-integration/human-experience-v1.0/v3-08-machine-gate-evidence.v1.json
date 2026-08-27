@@ -2,12 +2,12 @@
   "schema_version": 1,
   "contract_id": "MJ-HX-V1.0",
   "phase": "V3-08_MACHINE_CLOSEOUT",
-  "status": "MACHINE_EXECUTION_COMPLETE_CANDIDATE_SHA_PENDING",
+  "status": "READY_FOR_REAL_HUMAN_UAT_PREPARATION",
   "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
   "fixed_start_sha": "80be672810af1dcc066591b13e2a730bb7fc0fee",
   "source_checkpoint_sha": "d35dd89bfa220af1200b0ec721657ae102565638",
-  "runtime_candidate_sha": "PENDING_V3_08_IMPLEMENTATION_COMMIT",
-  "checkpoint_head": "PENDING_V3_08_EVIDENCE_COMMIT",
+  "runtime_candidate_sha": "0eee45d925e4fed2b689940bea87cba1d7cb8918",
+  "checkpoint_head": "RESOLVED_OUT_OF_BAND_TO_AVOID_SELF_REFERENTIAL_GIT_OBJECT",
   "migration_head": "0027_next_stage_review",
   "execution": {
     "full_verify_initial": {
@@ -44,6 +44,10 @@
       "exit_code": 0,
       "result": "API/HX 664 passed; Web lint and TypeScript passed; 68/68 Web contract tests passed; Next.js production build emitted 16 routes; Web runtime check passed"
     },
+    "evidence_binding_validation": {
+      "exit_code": 0,
+      "result": "158 HX machine, traceability and supply-chain contract tests passed after final evidence binding"
+    },
     "secret_scan": {
       "exit_code": 0,
       "result": "gitleaks scanned approximately 6.17 MB; 0 leaks"
@@ -64,6 +68,17 @@
     "sha256": "450038cdf9d8d16d93799e30b8c7a863fd79a8c9881d9e0e84b826140daafa65",
     "result": "21/21 passed in isolated local Chromium"
   },
+  "traceability": {
+    "gap_matrix_path": "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json",
+    "gap_matrix_sha256": "cb09b5ac1ca01950c6f6f9e93fdfb753058b2fcb6bc04156c21704500ee0eb6f",
+    "status_counts": {
+      "IMPLEMENTED": 18,
+      "PARTIAL": 37,
+      "NOT_IMPLEMENTED": 0,
+      "GATED": 19,
+      "P1_DEFERRED": 5
+    }
+  },
   "build_identifiers": {
     "api_local_manifest_list_sha256": "312e92cbbcb2dc0574eb5dd67bf39c61c5033ca64d1091cf1c771dccdf3794dc",
     "web_local_manifest_list_sha256": "6597ee10d3ebf5eb8944961a08fe5f9207a872eacfb8f4bb4d4895c3f59945a1",
@@ -78,7 +93,11 @@
     "canary": "NOT_RUN",
     "release": "NOT_AUTHORIZED"
   },
-  "machine_conclusion": "READY_FOR_REAL_HUMAN_UAT_PREPARATION_PENDING_FINAL_EVIDENCE_BINDING_COMMIT",
+  "machine_conclusion": "READY_FOR_REAL_HUMAN_UAT_PREPARATION",
+  "evidence_binding": {
+    "runtime_candidate_sha": "0eee45d925e4fed2b689940bea87cba1d7cb8918",
+    "semantics": "The following commit changes only traceability and evidence metadata. Its SHA is reported from Git after commit because embedding a commit's own SHA in its content is impossible."
+  },
   "production_effects": {
     "production_mutation": false,
     "deployment": false,

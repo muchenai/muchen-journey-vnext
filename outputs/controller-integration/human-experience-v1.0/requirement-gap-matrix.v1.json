@@ -13,10 +13,10 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 38,
+    "PARTIAL": 37,
     "NOT_IMPLEMENTED": 0,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 17,
+    "IMPLEMENTED": 18,
     "GATED": 19
   },
   "requirements": [
@@ -890,13 +890,15 @@
     },
     {
       "id": "HX-IMPL-006",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 6,
-      "audit_finding": "HX 专用机器目标、固定机器分母、NOT_RUN 真人 UAT 计划和 Owner Review 准备包已形成；固定候选 SHA、完整 Gate 结果与证据 manifest 留待 V3-08。",
+      "audit_finding": "HX 专用机器目标、固定运行时候选 SHA、完整 API/Web/构建/安全/依赖/浏览器结果、证据 manifest、NOT_RUN 真人 UAT 计划和 Owner Review 准备包均已形成。该实施完成不代表 HX-GATE-001 的具名真人签署，不代表真人 UAT、Canary 或 Release。",
       "trace_paths": [
         "Makefile",
         "config/human_experience_machine_cases.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-machine-gate-evidence.v1.json",
         "docs/uat/HX_V1.0_REAL_HUMAN_UAT_PLAN.md",
         "docs/uat/HX_V1.0_OWNER_REVIEW_PACKAGE.md"
       ]
