@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "environment": "PRODUCTION_CANARY_UAT",
   "application_candidate_sha": "1bccbbf1706a8216892f5b9b512b1e27ce784101",
   "package_workflow_run_id": "33062342289",
@@ -13,6 +13,7 @@
     "fixture_identity": false,
     "worker_started": false,
     "legacy_migration_authorized": false,
+    "production_job_execution_authorized": false,
     "release_go": false
   },
   "images": {

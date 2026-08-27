@@ -13,4 +13,5 @@ for path in compose.canary.yaml edge.sh Caddyfile.rollback; do
 done
 WP31_EDGE_MODE=rollback WP31_EDGE_SOURCE="$PWD/Caddyfile.rollback" ./edge.sh
 docker compose -f compose.canary.yaml down
+rm -f -- "$root/current"
 printf 'WP31_CANARY_ROLLBACK=PASS restored_candidate=ff53052847a268d025bceb93c3eab37986d50219 database_unchanged=true\n'

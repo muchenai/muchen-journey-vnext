@@ -38,8 +38,13 @@ set -a; . ./secrets/edge.env; . ./.deployment.env; set +a
 docker compose run --rm --no-deps edge caddy validate --config /etc/caddy/Caddyfile
 docker compose up -d --no-deps --force-recreate --pull never edge
 sleep 2
-code=$(curl -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%{http_code}' https://journey.muchenai.com/)
-[[ "$code" == 200 ]] || fail "public surface did not converge"
+ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+expected=ff53052847a268d025bceb93c3eab37986d50219
+[[ "$WP31_EDGE_MODE" == canary ]] && expected=1bccbbf1706a8216892f5b9b512b1e27ce784101
+python3 - "$ready" "$expected" <<'PY'
+import json,sys
+assert json.loads(sys.argv[1]) == {"status":"ready","release":sys.argv[2]}
+PY
 rm -f -- "$backup"
 trap - ERR
-printf 'WP31_CANARY_EDGE=PASS mode=%s status=%s\n' "$WP31_EDGE_MODE" "$code"
+printf 'WP31_CANARY_EDGE=PASS mode=%s exact_release=%s\n' "$WP31_EDGE_MODE" "$expected"

@@ -31,6 +31,16 @@ on:
         required: false
         default: ""
         type: string
+      preflight_run_id:
+        description: Exact unexpired Greenfield preflight run required by backup/deploy
+        required: false
+        default: ""
+        type: string
+      deploy_run_id:
+        description: Exact Greenfield deploy run required by inspect/rollback
+        required: false
+        default: ""
+        type: string
       archive_run_id:
         description: Successful off-host archive workflow run required by deploy
         required: false
@@ -173,6 +183,16 @@ jobs:
             --registry-image "worker=ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker:$candidate")
           (cd candidate && python3 scripts/wp07_candidate.py verify \
             artifacts/wp07-candidate/release-manifest.json)
+      - name: Generate verifiable non-self-referential evidence checksums
+        run: |
+          set -euo pipefail
+          cd candidate/artifacts/wp07-candidate
+          files=(release-manifest.json api.spdx.json web.spdx.json worker.spdx.json task-versions.json amd64-build-definition-manifest.json)
+          : >SHA256SUMS
+          for file in "${files[@]}"; do sha256sum "$file" >>SHA256SUMS; done
+          test "$(wc -l <SHA256SUMS | tr -d ' ')" = 6
+          if grep -qE '[[:space:]]SHA256SUMS$' SHA256SUMS; then exit 2; fi
+          sha256sum -c SHA256SUMS
       - name: Upload exact registry-bound candidate evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -184,6 +204,7 @@ jobs:
             candidate/artifacts/wp07-candidate/worker.spdx.json
             candidate/artifacts/wp07-candidate/task-versions.json
             candidate/artifacts/wp07-candidate/amd64-build-definition-manifest.json
+            candidate/artifacts/wp07-candidate/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
 
@@ -197,7 +218,7 @@ jobs:
       (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_1BCCBBF_TO_FF53052'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    environment: staging
+    environment: production-canary-uat
     permissions:
       actions: read
       contents: read
@@ -233,6 +254,7 @@ jobs:
       WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
       WP15_BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
       WP31_CANARY_LEARNER_USER_IDS: ${{ secrets.WP31_CANARY_LEARNER_USER_IDS }}
+      WP31_PRO_REVIEW_EVIDENCE_B64: ${{ secrets.WP31_PRO_REVIEW_EVIDENCE_B64 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -252,17 +274,108 @@ jobs:
         run: |
           set -euo pipefail
           test '${{ inputs.candidate }}' = 1bccbbf1706a8216892f5b9b512b1e27ce784101
+          test -n "$WP31_PRO_REVIEW_EVIDENCE_B64"
+          evidence="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+          umask 077
+          printf '%s' "$WP31_PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$evidence"
           python3 scripts/wp31_greenfield_canary.py contract-check
           python3 scripts/wp31_greenfield_canary.py package-check \
             --manifest artifacts/wp31-candidate/release-manifest.json
           python3 scripts/wp31_greenfield_canary.py review-check \
+            --evidence "$evidence" \
             --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}'
-          if [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
-            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-          else
+          if [[ '${{ inputs.phase }}' == greenfield-preflight ]]; then
+            test -z '${{ inputs.preflight_run_id }}'
             test -z '${{ inputs.backup_run_id }}'
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-backup-restore ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            test -z '${{ inputs.backup_run_id }}'
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-inspect || '${{ inputs.phase }}' == greenfield-rollback ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.deploy_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+          else
+            exit 2
           fi
           test -z '${{ inputs.archive_run_id }}'
+      - name: Download exact preflight evidence before infrastructure access
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp31-canary-preflight-${{ inputs.preflight_run_id }}
+          path: ${{ runner.temp }}/wp31-downloaded-preflight
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.preflight_run_id }}
+      - name: Verify exact expiring preflight evidence before infrastructure access
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
+        run: |
+          set -euo pipefail
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp31_phase_evidence.py verify \
+            --evidence "$RUNNER_TEMP/wp31-downloaded-preflight/phase-evidence.json" \
+            --phase preflight --run-id '${{ inputs.preflight_run_id }}' \
+            --candidate '${{ inputs.candidate }}' \
+            --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
+            --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
+            --payload-dir "$RUNNER_TEMP/wp31-downloaded-preflight"
+      - name: Download exact off-host recovery proof before deploy infrastructure access
+        if: inputs.phase == 'greenfield-deploy'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp31-canary-backup-${{ inputs.backup_run_id }}
+          path: ${{ runner.temp }}/wp31-downloaded-backup-proof
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.backup_run_id }}
+      - name: Verify exact off-host recovery proof before deploy infrastructure access
+        if: inputs.phase == 'greenfield-deploy'
+        run: |
+          set -euo pipefail
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$RUNNER_TEMP/wp31-downloaded-backup-proof/backup-manifest.json" '${{ inputs.backup_run_id }}' '${{ inputs.preflight_run_id }}' "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" "$RUNNER_TEMP/wp31-downloaded-backup-proof" <<'PY'
+          import hashlib, hmac, json, os, sys
+          from datetime import datetime, timezone
+          value=json.load(open(sys.argv[1])); signature=value.pop("manifest_hmac_sha256", "")
+          expected=hmac.new(os.environ["WP15_BACKUP_KEY"].encode(), json.dumps(value, sort_keys=True, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
+          assert hmac.compare_digest(signature, expected)
+          assert value["run_id"] == sys.argv[2]
+          assert value["preflight_run_id"] == sys.argv[3]
+          assert value["ops_manifest_sha256"] == sys.argv[4]
+          assert value["candidate_sha"] == "1bccbbf1706a8216892f5b9b512b1e27ce784101"
+          assert value["isolated_canary_database"] == "journey_next_canary_20260827_1bccbbf"
+          assert value["backup"] == value["restore"] == "PASS"
+          assert value["source_modified"] is False
+          root=sys.argv[5]
+          digest=lambda name: hashlib.sha256(open(os.path.join(root,name),"rb").read()).hexdigest()
+          assert digest("canary-source.dump.enc") == value["encrypted_backup_sha256"]
+          assert digest("source-facts.json") == value["source_facts_sha256"]
+          assert digest("restored-facts.json") == value["restored_facts_sha256"]
+          assert json.load(open(os.path.join(root,"source-facts.json"))) == json.load(open(os.path.join(root,"restored-facts.json")))
+          assert datetime.now(timezone.utc) < datetime.fromisoformat(value["expires_at_utc"].replace("Z","+00:00"))
+          PY
+      - name: Download exact deploy evidence before inspect/rollback infrastructure access
+        if: inputs.phase == 'greenfield-inspect' || inputs.phase == 'greenfield-rollback'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp31-canary-deploy-${{ inputs.deploy_run_id }}
+          path: ${{ runner.temp }}/wp31-downloaded-deploy
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.deploy_run_id }}
+      - name: Verify exact expiring deploy evidence before infrastructure access
+        if: inputs.phase == 'greenfield-inspect' || inputs.phase == 'greenfield-rollback'
+        run: |
+          set -euo pipefail
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp31_phase_evidence.py verify \
+            --evidence "$RUNNER_TEMP/wp31-downloaded-deploy/phase-evidence.json" \
+            --phase deploy --run-id '${{ inputs.deploy_run_id }}' \
+            --candidate '${{ inputs.candidate }}' \
+            --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
+            --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
+            --previous-run-id '${{ inputs.backup_run_id }}' \
+            --payload-dir "$RUNNER_TEMP/wp31-downloaded-deploy"
       - name: Initialize frozen infrastructure state read-only
         working-directory: infra/staging
         run: |
@@ -291,12 +404,8 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
           echo "rds_instance_id=$rds_instance_id" >>"$GITHUB_OUTPUT"
-      - name: Create only the exact isolated canary database
-        if: inputs.phase == 'greenfield-backup-restore'
-        run: |
-          python3 -m scripts.wp15_rds_database --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
-          python3 -m scripts.wp15_rds_schema_owner --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
       - name: Open bounded SSH ingress
+        id: open_ssh
         run: |
           set -euo pipefail
           runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
@@ -308,6 +417,20 @@ jobs:
           python3 -m scripts.wp08_security_group open --security-group-id '${{ steps.frozen.outputs.security_group_id }}' --cidr "$runner_ip/32"
           printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp31-key"
           chmod 0600 "$RUNNER_TEMP/wp31-key"
+      - name: Recheck exact rollback release and no conflicting Canary
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          python3 - "$ready" <<'PY'
+          import json,sys
+          assert json.loads(sys.argv[1]) == {"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}
+          PY
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
       - name: Verify rollback target and no conflicting canary
         if: inputs.phase == 'greenfield-preflight'
         env:
@@ -317,6 +440,43 @@ jobs:
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          install -d -m 0700 "$RUNNER_TEMP/wp31-preflight-proof"
+          python3 - "$ready" "$RUNNER_TEMP/wp31-preflight-proof/preflight-facts.json" <<'PY'
+          import json, sys
+          ready=json.loads(sys.argv[1])
+          assert ready == {"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}
+          value={
+              "public_rollback_release":"ff53052847a268d025bceb93c3eab37986d50219",
+              "canary_current_present":False,
+              "source_database":"journey_next_cutover_20260810",
+              "isolated_canary_database":"journey_next_canary_20260827_1bccbbf",
+          }
+          open(sys.argv[2],"x").write(json.dumps(value,sort_keys=True)+"\n")
+          PY
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp31_phase_evidence.py create \
+            --evidence "$RUNNER_TEMP/wp31-preflight-proof/phase-evidence.json" \
+            --phase preflight --run-id "$GITHUB_RUN_ID" \
+            --candidate '${{ inputs.candidate }}' \
+            --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
+            --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
+            --payload-dir "$RUNNER_TEMP/wp31-preflight-proof" \
+            --payload "$RUNNER_TEMP/wp31-preflight-proof/preflight-facts.json" \
+            --lifetime-minutes 60
+      - name: Upload exact expiring preflight evidence
+        if: inputs.phase == 'greenfield-preflight'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-canary-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp31-preflight-proof
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create only the exact isolated canary database after preflight validation
+        if: inputs.phase == 'greenfield-backup-restore'
+        run: |
+          set -euo pipefail
+          python3 -m scripts.wp15_rds_database --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
+          python3 -m scripts.wp15_rds_schema_owner --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
       - name: Prepare exact owner-only canary bundle
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
         run: |
@@ -346,7 +506,8 @@ jobs:
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
           tar -C "$RUNNER_TEMP/wp31-bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$remote' && set -a && . ./secrets/backup.env && set +a && WP31_RUN_ID='$GITHUB_RUN_ID' ./backup_restore.sh"
+          ops_sha=$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$remote' && set -a && . ./secrets/backup.env && set +a && WP31_RUN_ID='$GITHUB_RUN_ID' WP31_PREFLIGHT_RUN_ID='${{ inputs.preflight_run_id }}' WP31_OPS_MANIFEST_SHA256='$ops_sha' ./backup_restore.sh"
       - name: Collect exact encrypted off-host recovery proof
         if: inputs.phase == 'greenfield-backup-restore'
         env:
@@ -357,17 +518,28 @@ jobs:
           source="/srv/journey-next-production/canary/backups/$GITHUB_RUN_ID"
           destination="$RUNNER_TEMP/wp31-backup-proof"
           install -d -m 0700 "$destination"
-          for name in canary-source.dump.enc backup-manifest.json restored-facts.json; do
+          for name in canary-source.dump.enc backup-manifest.json source-facts.json restored-facts.json; do
             scp "${opts[@]}" root@"$PUBLIC_IP":"$source/$name" "$destination/$name"
           done
-          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$destination/backup-manifest.json" "$GITHUB_RUN_ID" <<'PY'
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$destination/backup-manifest.json" "$GITHUB_RUN_ID" '${{ inputs.preflight_run_id }}' "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" "$destination" <<'PY'
           import hashlib, hmac, json, os, sys
+          from datetime import datetime, timezone
           value=json.load(open(sys.argv[1])); signature=value.pop("manifest_hmac_sha256", "")
           expected=hmac.new(os.environ["WP15_BACKUP_KEY"].encode(), json.dumps(value, sort_keys=True, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
           assert hmac.compare_digest(signature, expected)
           assert value["run_id"] == sys.argv[2]
+          assert value["preflight_run_id"] == sys.argv[3]
+          assert value["ops_manifest_sha256"] == sys.argv[4]
           assert value["backup"] == value["restore"] == "PASS"
           assert value["source_modified"] is False
+          root=sys.argv[5]
+          digest=lambda name: hashlib.sha256(open(os.path.join(root,name),"rb").read()).hexdigest()
+          assert digest("canary-source.dump.enc") == value["encrypted_backup_sha256"]
+          assert digest("source-facts.json") == value["source_facts_sha256"]
+          assert digest("restored-facts.json") == value["restored_facts_sha256"]
+          assert json.load(open(os.path.join(root,"source-facts.json"))) == json.load(open(os.path.join(root,"restored-facts.json")))
+          expires=datetime.fromisoformat(value["expires_at_utc"].replace("Z","+00:00"))
+          assert datetime.now(timezone.utc) < expires
           PY
       - name: Upload exact encrypted off-host recovery proof
         if: inputs.phase == 'greenfield-backup-restore'
@@ -377,31 +549,10 @@ jobs:
           path: |
             ${{ runner.temp }}/wp31-backup-proof/canary-source.dump.enc
             ${{ runner.temp }}/wp31-backup-proof/backup-manifest.json
+            ${{ runner.temp }}/wp31-backup-proof/source-facts.json
             ${{ runner.temp }}/wp31-backup-proof/restored-facts.json
           if-no-files-found: error
           retention-days: 30
-      - name: Download exact off-host recovery proof required by deploy
-        if: inputs.phase == 'greenfield-deploy'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: wp31-canary-backup-${{ inputs.backup_run_id }}
-          path: ${{ runner.temp }}/wp31-downloaded-backup-proof
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ inputs.backup_run_id }}
-      - name: Verify exact off-host recovery proof required by deploy
-        if: inputs.phase == 'greenfield-deploy'
-        run: |
-          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$RUNNER_TEMP/wp31-downloaded-backup-proof/backup-manifest.json" '${{ inputs.backup_run_id }}' <<'PY'
-          import hashlib, hmac, json, os, sys
-          value=json.load(open(sys.argv[1])); signature=value.pop("manifest_hmac_sha256", "")
-          expected=hmac.new(os.environ["WP15_BACKUP_KEY"].encode(), json.dumps(value, sort_keys=True, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
-          assert hmac.compare_digest(signature, expected)
-          assert value["run_id"] == sys.argv[2]
-          assert value["candidate_sha"] == "1bccbbf1706a8216892f5b9b512b1e27ce784101"
-          assert value["isolated_canary_database"] == "journey_next_canary_20260827_1bccbbf"
-          assert value["backup"] == value["restore"] == "PASS"
-          assert value["source_modified"] is False
-          PY
       - name: Deploy exact zero-worker Canary against isolated restore
         id: deploy
         if: inputs.phase == 'greenfield-deploy'
@@ -416,8 +567,10 @@ jobs:
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
           tar -C "$RUNNER_TEMP/wp31-bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && BACKUP_RUN_ID='${{ inputs.backup_run_id }}' ./deploy.sh"
+          ops_sha=$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && BACKUP_RUN_ID='${{ inputs.backup_run_id }}' PREFLIGHT_RUN_ID='${{ inputs.preflight_run_id }}' WP31_OPS_MANIFEST_SHA256='$ops_sha' WP31_DEPLOY_RUN_ID='$GITHUB_RUN_ID' ./deploy.sh"
       - name: Inspect exact public and remote Canary state
+        id: inspect
         if: inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-inspect'
         env:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
@@ -430,6 +583,61 @@ jobs:
           PY
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -e; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(docker compose -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; docker compose -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
+          if [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
+            proof="$RUNNER_TEMP/wp31-deploy-proof"
+            install -d -m 0700 "$proof"
+            python3 - "$proof/deploy-facts.json" <<'PY'
+          import json,sys
+          value={"public_release":"1bccbbf1706a8216892f5b9b512b1e27ce784101","services":["api","web"],"worker_started":False,"release_go":False}
+          open(sys.argv[1],"x").write(json.dumps(value,sort_keys=True)+"\n")
+          PY
+            WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp31_phase_evidence.py create \
+              --evidence "$proof/phase-evidence.json" --phase deploy --run-id "$GITHUB_RUN_ID" \
+              --candidate '${{ inputs.candidate }}' \
+              --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
+              --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
+              --previous-run-id '${{ inputs.backup_run_id }}' --payload-dir "$proof" \
+              --payload "$proof/deploy-facts.json" --lifetime-minutes 60
+          fi
+      - name: Upload exact expiring deploy evidence
+        id: upload_deploy_evidence
+        if: inputs.phase == 'greenfield-deploy' && steps.inspect.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-canary-deploy-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp31-deploy-proof
+          if-no-files-found: error
+          retention-days: 7
+      - name: Automatic rollback after any deploy or public inspection failure
+        if: >-
+          always() && inputs.phase == 'greenfield-deploy' &&
+          (steps.deploy.outcome == 'failure' || steps.inspect.outcome == 'failure' ||
+          steps.upload_deploy_evidence.outcome == 'failure')
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set +e
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          release='${{ steps.deploy.outputs.release }}'
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "
+            set +e
+            if test -n '$release' && test -d '$release'; then
+              cd '$release'
+              WP31_EDGE_MODE=rollback WP31_EDGE_SOURCE='$release/Caddyfile.rollback' ./edge.sh
+              docker compose -f compose.canary.yaml down
+            fi
+            if test -L /srv/journey-next-production/canary/current && test \"\$(readlink -f /srv/journey-next-production/canary/current)\" = '$release'; then
+              rm -f -- /srv/journey-next-production/canary/current
+            fi
+            install -d -m 0700 /srv/journey-next-production/canary/failures
+            printf '%s\n' '{\"candidate_sha\":\"1bccbbf1706a8216892f5b9b512b1e27ce784101\",\"automatic_rollback\":\"ATTEMPTED\",\"database_preserved\":true,\"release_evidence_preserved\":true}' >'/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
+            chmod 0600 '/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
+          "
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          python3 - "$ready" <<'PY'
+          import json,sys
+          assert json.loads(sys.argv[1]) == {"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}
+          PY
       - name: Roll back edge to exact current production and stop Canary
         if: inputs.phase == 'greenfield-rollback'
         env:
@@ -439,9 +647,30 @@ jobs:
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" '/srv/journey-next-production/canary/current/rollback.sh'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          python3 - "$ready" <<'PY'
+          import json,sys
+          assert json.loads(sys.argv[1]) == {"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}
+          PY
+      - name: Always remove transient credentials and remote registry session
+        if: always()
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set +e
+          cleanup_status=0
+          if [[ -s "$RUNNER_TEMP/wp31-key" && -n "$PUBLIC_IP" ]]; then
+            opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- '/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID'" || cleanup_status=1
+          fi
+          rm -rf -- "$RUNNER_TEMP/wp31-bundle" "$RUNNER_TEMP/wp31-pro-review-evidence.json"
+          rm -f -- "$RUNNER_TEMP/wp31-key" "$RUNNER_TEMP/wp31-known-hosts"
+          echo 'WP31_TRANSIENT_CREDENTIALS=REMOVED'
+          exit "$cleanup_status"
       - name: Close temporary SSH ingress
         if: always() && steps.frozen.outputs.security_group_id != ''
         run: |
+          set -euo pipefail
           if [[ -n "${WP31_RUNNER_CIDR:-}" ]]; then python3 -m scripts.wp08_security_group close --security-group-id '${{ steps.frozen.outputs.security_group_id }}' --cidr "$WP31_RUNNER_CIDR"; fi
           echo 'WP31_TEMPORARY_SSH_INGRESS=CLOSED'
 
