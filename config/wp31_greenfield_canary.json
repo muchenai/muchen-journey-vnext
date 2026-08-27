@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "environment": "PRODUCTION_CANARY_UAT",
+  "application_candidate_sha": "1bccbbf1706a8216892f5b9b512b1e27ce784101",
+  "package_workflow_run_id": "33062342289",
+  "package_manifest_sha256": "49f95c33131932e113cc8bcdf252ff647a4d21782ce353d1b2038ffc75960eb1",
+  "migration_head": "0027_next_stage_review",
+  "production_host": "journey.muchenai.com",
+  "source_database": "journey_next_cutover_20260810",
+  "isolated_canary_database": "journey_next_canary_20260827_1bccbbf",
+  "scope": {
+    "max_allowlisted_learners": 8,
+    "fixture_identity": false,
+    "worker_started": false,
+    "legacy_migration_authorized": false,
+    "release_go": false
+  },
+  "images": {
+    "api": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:772ea55221ab07fdec746c9098542c2e627a658239b2769cc214c969e1ed1a85",
+    "web": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:743d441ef04c1d23e7cc77c34c4216028ec2b8f2499260a98283428803b6cdbb",
+    "worker_evidence_only": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker@sha256:ec9aa9f3975db8349e8439990bc98d6740fff5cf763496a174b1cf0b33b00e5d"
+  },
+  "rollback": {
+    "candidate_sha": "ff53052847a268d025bceb93c3eab37986d50219",
+    "database": "journey_next_cutover_20260810",
+    "edge_upstream": "production-web:3000",
+    "does_not_require_database_restore": true
+  },
+  "canary_edge_upstream": "greenfield-canary-web:3000",
+  "pro_review": {
+    "status": "PENDING",
+    "reviewed_ops_commit_sha": null,
+    "evidence_path": null,
+    "evidence_sha256": null
+  },
+  "owner_canary_deployment_go": true,
+  "entrypoint_execution_granted": false
+}
