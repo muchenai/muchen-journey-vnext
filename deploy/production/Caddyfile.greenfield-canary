@@ -1,0 +1,38 @@
+{
+  admin off
+  email {$ACME_EMAIL}
+}
+
+{$STAGING_HOST} {
+  log_skip /auth/feishu*
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    -Server
+  }
+  reverse_proxy journey-next-staging-web-1:3000
+  log {
+    output stdout
+    format json
+  }
+}
+
+{$PRODUCTION_HOST} {
+  log_skip /auth/feishu*
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    -Server
+  }
+  reverse_proxy greenfield-canary-web:3000
+  log {
+    output stdout
+    format json
+  }
+}

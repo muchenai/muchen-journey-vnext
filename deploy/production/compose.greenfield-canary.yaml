@@ -1,0 +1,66 @@
+name: journey-next-greenfield-canary
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  extra_hosts:
+    - "journey.muchenai.com:127.0.0.1"
+
+x-app-security: &app-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  pids_limit: 256
+
+services:
+  api:
+    <<: [*common, *app-security]
+    image: ${API_IMAGE:?API_IMAGE must be an immutable GHCR digest reference}
+    env_file:
+      - secrets/api.env
+    volumes:
+      - ./secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro
+    expose:
+      - "8000"
+    networks:
+      default:
+        aliases:
+          - greenfield-canary-api
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  web:
+    <<: [*common, *app-security]
+    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable GHCR digest reference}
+    env_file:
+      - secrets/web.env
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - greenfield-canary-web
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(async r=>{const b=await r.json();if(!r.ok||b.status!=='ready'||b.release!==process.env.APP_RELEASE)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+networks:
+  edge:
+    external: true
+    name: journey-next-staging_default

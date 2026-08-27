@@ -13,7 +13,7 @@ def workflow_text() -> str:
 def greenfield_package_job() -> str:
     text = workflow_text()
     start = text.index("  greenfield_package:\n")
-    end = text.index("  operate:\n", start)
+    end = text.index("  greenfield_canary:\n", start)
     return text[start:end]
 
 

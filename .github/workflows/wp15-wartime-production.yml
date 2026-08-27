@@ -9,6 +9,11 @@ on:
         type: choice
         options:
           - greenfield-package
+          - greenfield-preflight
+          - greenfield-backup-restore
+          - greenfield-deploy
+          - greenfield-inspect
+          - greenfield-rollback
           - preflight
           - backup-restore
           - archive-backup
@@ -34,6 +39,11 @@ on:
       confirmation:
         description: Exact reviewed confirmation phrase
         required: true
+        type: string
+      pro_review_evidence_sha256:
+        description: Exact independently supplied Pro entrypoint review evidence SHA-256
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -176,6 +186,264 @@ jobs:
             candidate/artifacts/wp07-candidate/amd64-build-definition-manifest.json
           if-no-files-found: error
           retention-days: 30
+
+  greenfield_canary:
+    if: >-
+      inputs.candidate == '1bccbbf1706a8216892f5b9b512b1e27ce784101' &&
+      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_1BCCBBF_TO_FF53052'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+      WP08_MIGRATION_DB_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      WP08_RUNTIME_DB_PASSWORD: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      WP08_RDS_CA_PEM_B64: ${{ secrets.WP08_RDS_CA_PEM_B64 }}
+      WP09_IDENTITY_SUBJECT_SECRET: ${{ secrets.WP09_IDENTITY_SUBJECT_SECRET }}
+      WP09_FEISHU_APP_ID: ${{ secrets.WP09_FEISHU_APP_ID }}
+      WP09_FEISHU_APP_SECRET: ${{ secrets.WP09_FEISHU_APP_SECRET }}
+      WP15_SESSION_SECRET: ${{ secrets.WP15_SESSION_SECRET }}
+      WP15_INVITE_SECRET: ${{ secrets.WP15_INVITE_SECRET }}
+      WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
+      WP15_BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
+      WP31_CANARY_LEARNER_USER_IDS: ${{ secrets.WP31_CANARY_LEARNER_USER_IDS }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Download exact registry-bound candidate evidence
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp07-candidate-1bccbbf1706a8216892f5b9b512b1e27ce784101
+          path: artifacts/wp31-candidate
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 33062342289
+      - name: Enforce PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW
+        run: |
+          set -euo pipefail
+          test '${{ inputs.candidate }}' = 1bccbbf1706a8216892f5b9b512b1e27ce784101
+          python3 scripts/wp31_greenfield_canary.py contract-check
+          python3 scripts/wp31_greenfield_canary.py package-check \
+            --manifest artifacts/wp31-candidate/release-manifest.json
+          python3 scripts/wp31_greenfield_canary.py review-check \
+            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}'
+          if [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
+            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+          else
+            test -z '${{ inputs.backup_run_id }}'
+          fi
+          test -z '${{ inputs.archive_run_id }}'
+      - name: Initialize frozen infrastructure state read-only
+        working-directory: infra/staging
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen host and RDS coordinates
+        id: frozen
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          rds_host=$(terraform output -raw rds_private_host)
+          rds_port=$(terraform output -raw rds_private_port)
+          rds_instance_id=$(terraform show -json | jq -er '[.values.root_module.resources[] | select(.address == "volcenginecc_rdspostgresql_instance.staging") | .values.instance_id] | if length == 1 then .[0] else error("expected one RDS instance") end')
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port" "$rds_instance_id"; do test -n "$value"; echo "::add-mask::$value"; done
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+          echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
+          echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+          echo "rds_instance_id=$rds_instance_id" >>"$GITHUB_OUTPUT"
+      - name: Create only the exact isolated canary database
+        if: inputs.phase == 'greenfield-backup-restore'
+        run: |
+          python3 -m scripts.wp15_rds_database --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
+          python3 -m scripts.wp15_rds_schema_owner --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260827_1bccbbf
+      - name: Open bounded SSH ingress
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 - "$runner_ip" <<'PY'
+          import ipaddress, sys
+          ipaddress.IPv4Address(sys.argv[1])
+          PY
+          echo "WP31_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id '${{ steps.frozen.outputs.security_group_id }}' --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp31-key"
+          chmod 0600 "$RUNNER_TEMP/wp31-key"
+      - name: Verify rollback target and no conflicting canary
+        if: inputs.phase == 'greenfield-preflight'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
+      - name: Prepare exact owner-only canary bundle
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/wp31-bundle"
+          python3 scripts/wp31_prepare_greenfield_canary.py --output "$bundle" --rds-host '${{ steps.frozen.outputs.rds_host }}' --rds-port '${{ steps.frozen.outputs.rds_port }}'
+          cp deploy/production/compose.greenfield-canary.yaml "$bundle/compose.canary.yaml"
+          cp deploy/production/compose.greenfield-canary.migrate.yaml "$bundle/compose.migrate.yaml"
+          cp deploy/production/wartime_grant_runtime.py "$bundle/grant_runtime.py"
+          cp deploy/production/greenfield_canary_backup_restore.sh "$bundle/backup_restore.sh"
+          cp deploy/production/greenfield_canary_deploy.sh "$bundle/deploy.sh"
+          cp deploy/production/greenfield_canary_rollback.sh "$bundle/rollback.sh"
+          cp deploy/production/greenfield_canary_edge.sh "$bundle/edge.sh"
+          cp deploy/production/db_facts.py "$bundle/db_facts.py"
+          cp deploy/production/Caddyfile.greenfield-canary "$bundle/Caddyfile.canary"
+          cp deploy/staging/Caddyfile "$bundle/Caddyfile.rollback"
+          chmod 0755 "$bundle"/*.sh
+      - name: Execute encrypted current-production backup and isolated restore
+        if: inputs.phase == 'greenfield-backup-restore'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          remote="/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
+          tar -C "$RUNNER_TEMP/wp31-bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$remote' && set -a && . ./secrets/backup.env && set +a && WP31_RUN_ID='$GITHUB_RUN_ID' ./backup_restore.sh"
+      - name: Collect exact encrypted off-host recovery proof
+        if: inputs.phase == 'greenfield-backup-restore'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          source="/srv/journey-next-production/canary/backups/$GITHUB_RUN_ID"
+          destination="$RUNNER_TEMP/wp31-backup-proof"
+          install -d -m 0700 "$destination"
+          for name in canary-source.dump.enc backup-manifest.json restored-facts.json; do
+            scp "${opts[@]}" root@"$PUBLIC_IP":"$source/$name" "$destination/$name"
+          done
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$destination/backup-manifest.json" "$GITHUB_RUN_ID" <<'PY'
+          import hashlib, hmac, json, os, sys
+          value=json.load(open(sys.argv[1])); signature=value.pop("manifest_hmac_sha256", "")
+          expected=hmac.new(os.environ["WP15_BACKUP_KEY"].encode(), json.dumps(value, sort_keys=True, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
+          assert hmac.compare_digest(signature, expected)
+          assert value["run_id"] == sys.argv[2]
+          assert value["backup"] == value["restore"] == "PASS"
+          assert value["source_modified"] is False
+          PY
+      - name: Upload exact encrypted off-host recovery proof
+        if: inputs.phase == 'greenfield-backup-restore'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-canary-backup-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/wp31-backup-proof/canary-source.dump.enc
+            ${{ runner.temp }}/wp31-backup-proof/backup-manifest.json
+            ${{ runner.temp }}/wp31-backup-proof/restored-facts.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Download exact off-host recovery proof required by deploy
+        if: inputs.phase == 'greenfield-deploy'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp31-canary-backup-${{ inputs.backup_run_id }}
+          path: ${{ runner.temp }}/wp31-downloaded-backup-proof
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.backup_run_id }}
+      - name: Verify exact off-host recovery proof required by deploy
+        if: inputs.phase == 'greenfield-deploy'
+        run: |
+          WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$RUNNER_TEMP/wp31-downloaded-backup-proof/backup-manifest.json" '${{ inputs.backup_run_id }}' <<'PY'
+          import hashlib, hmac, json, os, sys
+          value=json.load(open(sys.argv[1])); signature=value.pop("manifest_hmac_sha256", "")
+          expected=hmac.new(os.environ["WP15_BACKUP_KEY"].encode(), json.dumps(value, sort_keys=True, separators=(",", ":")).encode(), hashlib.sha256).hexdigest()
+          assert hmac.compare_digest(signature, expected)
+          assert value["run_id"] == sys.argv[2]
+          assert value["candidate_sha"] == "1bccbbf1706a8216892f5b9b512b1e27ce784101"
+          assert value["isolated_canary_database"] == "journey_next_canary_20260827_1bccbbf"
+          assert value["backup"] == value["restore"] == "PASS"
+          assert value["source_modified"] is False
+          PY
+      - name: Deploy exact zero-worker Canary against isolated restore
+        id: deploy
+        if: inputs.phase == 'greenfield-deploy'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          release="/srv/journey-next-production/canary/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
+          echo "release=$release" >>"$GITHUB_OUTPUT"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
+          tar -C "$RUNNER_TEMP/wp31-bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$release'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && BACKUP_RUN_ID='${{ inputs.backup_run_id }}' ./deploy.sh"
+      - name: Inspect exact public and remote Canary state
+        if: inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-inspect'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          python3 - "$ready" <<'PY'
+          import json, sys
+          assert json.loads(sys.argv[1]) == {"status": "ready", "release": "1bccbbf1706a8216892f5b9b512b1e27ce784101"}
+          PY
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -e; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(docker compose -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; docker compose -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
+      - name: Roll back edge to exact current production and stop Canary
+        if: inputs.phase == 'greenfield-rollback'
+        env:
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" '/srv/journey-next-production/canary/current/rollback.sh'
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
+      - name: Close temporary SSH ingress
+        if: always() && steps.frozen.outputs.security_group_id != ''
+        run: |
+          if [[ -n "${WP31_RUNNER_CIDR:-}" ]]; then python3 -m scripts.wp08_security_group close --security-group-id '${{ steps.frozen.outputs.security_group_id }}' --cidr "$WP31_RUNNER_CIDR"; fi
+          echo 'WP31_TEMPORARY_SSH_INGRESS=CLOSED'
 
   operate:
     if: >-
