@@ -2,6 +2,8 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -9,6 +11,7 @@ import pytest
 
 from scripts import wp15_rds_database, wp15_rds_schema_owner
 from scripts import wp31_greenfield_canary as contract
+from scripts import wp31_ops_closure as closure
 from scripts import wp31_phase_evidence as phase_evidence
 from scripts import wp31_prepare_greenfield_canary as prepare
 
@@ -16,27 +19,29 @@ from scripts import wp31_prepare_greenfield_canary as prepare
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_contract_is_exact_and_execution_remains_fail_closed() -> None:
+def test_contract_is_exact_and_mutable_authorization_is_external() -> None:
     value = contract.load()
     assert value["application_candidate_sha"] == prepare.CANDIDATE
     assert value["scope"]["max_allowlisted_learners"] == 8
     assert value["scope"]["worker_started"] is False
     assert value["scope"]["release_go"] is False
-    assert value["owner_canary_deployment_go"] is True
-    assert value["entrypoint_execution_granted"] is False
-    with pytest.raises(contract.CanaryContractError, match="execution is not granted"):
-        contract.review_check(Path("missing"), "0" * 64)
+    assert value["authorization_model"] == (
+        "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+    )
+    assert "owner_canary_deployment_go" not in value
+    assert "entrypoint_execution_granted" not in value
 
 
 def test_review_requires_real_evidence_hash_and_all_bindings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     value = contract.load()
-    value["entrypoint_execution_granted"] = True
     monkeypatch.setattr(contract, "load", lambda: value)
     monkeypatch.setattr(contract, "verify_reviewed_tree", lambda *_: None)
     manifest_hash = contract.sha256(contract.OPS_MANIFEST)
     evidence = tmp_path / "review.json"
+    reviewed = "1" * 40
+    reviewed_ref = f"refs/tags/muchen-journey-greenfield-ops-{reviewed}"
     evidence.write_text(
         json.dumps(
             {
@@ -46,7 +51,8 @@ def test_review_requires_real_evidence_hash_and_all_bindings(
                 "evidence_scope": "PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW",
                 "reviewer_independent": True,
                 "production_mutation": False,
-                "reviewed_ops_commit_sha": "1" * 40,
+                "reviewed_ops_commit_sha": reviewed,
+                "reviewed_ops_ref": reviewed_ref,
                 "application_candidate_sha": value["application_candidate_sha"],
                 "package_manifest_sha256": value["package_manifest_sha256"],
                 "ops_manifest_sha256": manifest_hash,
@@ -56,19 +62,139 @@ def test_review_requires_real_evidence_hash_and_all_bindings(
         + "\n"
     )
     digest = contract.sha256(evidence)
-    assert contract.review_check(evidence, digest)["status"] == "PASS"
+    assert contract.review_check(evidence, digest, reviewed_ref)["status"] == "PASS"
     with pytest.raises(contract.CanaryContractError, match="hash differs"):
-        contract.review_check(evidence, "0" * 64)
+        contract.review_check(evidence, "0" * 64, reviewed_ref)
     changed = json.loads(evidence.read_text())
     changed["reviewer"] = "SELF_SIGNED_FIXTURE"
     evidence.write_text(json.dumps(changed) + "\n")
     with pytest.raises(contract.CanaryContractError, match="reviewer identity"):
-        contract.review_check(evidence, contract.sha256(evidence))
+        contract.review_check(evidence, contract.sha256(evidence), reviewed_ref)
     changed["reviewer"] = "CODEX_PRO_REVIEW_MACBOOK_PRO"
     changed["ops_manifest_sha256"] = "0" * 64
     evidence.write_text(json.dumps(changed) + "\n")
     with pytest.raises(contract.CanaryContractError, match="binding differs"):
-        contract.review_check(evidence, contract.sha256(evidence))
+        contract.review_check(evidence, contract.sha256(evidence), reviewed_ref)
+    changed["ops_manifest_sha256"] = manifest_hash
+    evidence.write_text(json.dumps(changed) + "\n")
+    with pytest.raises(contract.CanaryContractError, match="exact reviewed immutable tag"):
+        contract.review_check(evidence, contract.sha256(evidence), "refs/heads/movable")
+
+
+def test_owner_authorization_is_external_exact_phase_short_lived_and_hash_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = contract.load()
+    monkeypatch.setattr(contract, "load", lambda: value)
+    reviewed = "1" * 40
+    reviewed_ref = f"refs/tags/muchen-journey-greenfield-ops-{reviewed}"
+    monkeypatch.setattr(
+        contract,
+        "_git",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, (reviewed + "\n").encode(), b""),
+    )
+    now = datetime.now(timezone.utc)
+    evidence = tmp_path / "owner-authorization.json"
+    payload = {
+        "authorization_id": str(uuid.uuid4()),
+        "authorization_status": "GRANTED",
+        "authorized_at_utc": (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
+        "not_after_utc": (now + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
+        "authorized_by": "刘默文",
+        "authority": "PRODUCT_OWNER_AND_RELEASE_OPS_OWNER",
+        "environment": "PRODUCTION_CANARY_UAT",
+        "application_candidate_sha": value["application_candidate_sha"],
+        "reviewed_ops_commit_sha": reviewed,
+        "reviewed_ops_ref": reviewed_ref,
+        "ops_manifest_sha256": contract.sha256(contract.OPS_MANIFEST),
+        "pro_review_evidence_sha256": "2" * 64,
+        "phase": "greenfield-preflight",
+        "max_allowlisted_learners": 8,
+        "production_job_execution_authorized": True,
+        "worker_start_authorized": False,
+        "release_go": False,
+    }
+    evidence.write_text(json.dumps(payload, sort_keys=True) + "\n")
+    digest = contract.sha256(evidence)
+    result = contract.authorization_check(
+        evidence, digest, "2" * 64, "greenfield-preflight", reviewed_ref, reviewed
+    )
+    assert result["status"] == "PASS"
+    with pytest.raises(contract.CanaryContractError, match="binding differs"):
+        contract.authorization_check(
+            evidence, digest, "2" * 64, "greenfield-deploy", reviewed_ref, reviewed
+        )
+    payload["not_after_utc"] = (now - timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    evidence.write_text(json.dumps(payload, sort_keys=True) + "\n")
+    with pytest.raises(contract.CanaryContractError, match="not currently valid"):
+        contract.authorization_check(
+            evidence,
+            contract.sha256(evidence),
+            "2" * 64,
+            "greenfield-preflight",
+            reviewed_ref,
+            reviewed,
+        )
+
+
+def test_reviewed_tree_rejects_descendant_head(monkeypatch: pytest.MonkeyPatch) -> None:
+    reviewed = "1" * 40
+    descendant = "2" * 40
+
+    def fake_git(*args: str, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if args[:2] == ("cat-file", "-e"):
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+        if args[:2] == ("rev-parse", "HEAD"):
+            return subprocess.CompletedProcess(args, 0, (descendant + "\n").encode(), b"")
+        raise AssertionError(f"unexpected git call: {args}")
+
+    monkeypatch.setattr(contract, "_git", fake_git)
+    with pytest.raises(contract.CanaryContractError, match="exact reviewed operations commit"):
+        contract.verify_reviewed_tree(reviewed, {"files": {}})
+
+
+def test_transitive_greenfield_closure_is_fully_manifest_bound() -> None:
+    result = closure.validate(ROOT, contract.OPS_MANIFEST)
+    assert result["missing"] == []
+    discovered = closure.discover(ROOT)
+    for required in (
+        "infra/staging/main.tf",
+        "deploy/staging/Caddyfile",
+        "scripts/wp08_security_group.py",
+        "scripts/wp15_production_inventory.py",
+        "scripts/wp15_rds_database.py",
+        "scripts/wp15_rds_schema_owner.py",
+    ):
+        assert required in discovered
+    assert result["candidate_bound_references"] == ["scripts/wp07_candidate.py"]
+
+
+def test_transitive_greenfield_closure_rejects_unbound_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path = tmp_path / closure.MANIFEST
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps({"files": {}}) + "\n")
+    monkeypatch.setattr(
+        closure,
+        "discover",
+        lambda _root: {closure.MANIFEST, "scripts/unbound_operation.py"},
+    )
+    with pytest.raises(closure.ClosureError, match="scripts/unbound_operation.py"):
+        closure.validate(tmp_path, manifest_path)
+
+
+def test_transitive_greenfield_closure_extracts_and_rejects_real_workflow_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = closure.greenfield_workflow_text
+
+    def workflow_with_unbound_reference(root: Path) -> str:
+        return original(root) + "\n      - run: python3 scripts/muchen_candidate.py\n"
+
+    monkeypatch.setattr(closure, "greenfield_workflow_text", workflow_with_unbound_reference)
+    with pytest.raises(closure.ClosureError, match="scripts/muchen_candidate.py"):
+        closure.validate(ROOT, contract.OPS_MANIFEST)
 
 
 def test_phase_evidence_closes_chain_and_detects_payload_tampering(
@@ -140,10 +266,28 @@ def test_canary_compose_has_api_web_only_and_distinct_edge_alias() -> None:
 
 def test_workflow_requires_real_review_before_infrastructure_read() -> None:
     workflow = (ROOT / ".github/workflows/wp15-wartime-production.yml").read_text()
+    no_secret_gate = workflow[
+        workflow.index("  greenfield_authorize:\n") : workflow.index(
+            "  greenfield_execution_authorize:\n"
+        )
+    ]
+    owner_gate = workflow[
+        workflow.index("  greenfield_execution_authorize:\n") : workflow.index(
+            "  greenfield_canary:\n"
+        )
+    ]
     job = workflow[workflow.index("  greenfield_canary:\n") : workflow.index("  operate:\n")]
+    assert "environment:" not in no_secret_gate
+    assert "${{ secrets." not in no_secret_gate
+    assert "WP31_EXECUTION_AUTHORIZATION_B64" in owner_gate
+    assert "VOLCENGINE_ACCESS_KEY" not in owner_gate
+    assert "WP08_MIGRATION_DB_PASSWORD" not in owner_gate
+    assert "needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha" in owner_gate
+    assert "needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref" in owner_gate
     assert "environment: production-canary-uat" in job
     assert "scripts/wp31_greenfield_canary.py review-check" in job
     assert job.index("review-check") < job.index("terraform init")
+    assert "greenfield_execution_authorize" in job
     assert "greenfield-backup-restore" in job
     assert "greenfield-deploy" in job
     assert "greenfield-rollback" in job
@@ -192,8 +336,11 @@ def test_ops_manifest_fails_closed_on_working_tree_drift(
     manifest.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "application_candidate_sha": contract.EXPECTED_CANDIDATE,
+                "closure_model": "REPOSITORY_GREENFIELD_TRANSITIVE_V2",
+                "candidate_bound_references": ["scripts/wp07_candidate.py"],
+                "manifest_self_binding": "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT",
                 "files": files,
             }
         )

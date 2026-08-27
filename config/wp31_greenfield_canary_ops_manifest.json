@@ -1,8 +1,12 @@
 {
   "application_candidate_sha": "1bccbbf1706a8216892f5b9b512b1e27ce784101",
+  "candidate_bound_references": ["scripts/wp07_candidate.py"],
+  "closure_model": "REPOSITORY_GREENFIELD_TRANSITIVE_V2",
   "files": {
-    ".github/workflows/wp15-wartime-production.yml": "4ba74a048ea1c3f8e3a2bfc4e2f7cf6518a8f9c626bebe67b75b4da94873ec2b",
-    "config/wp31_greenfield_canary_pro_review_evidence.schema.json": "1d9cbebafca33a144b13e48cc87d01255e621c5c4d91c50fa7b94b92f802b9b1",
+    ".github/workflows/wp15-wartime-production.yml": "68f40ef098c92b9cbaa7d238c5dfad4e9a218d7c653ba671bc27c209852f4179",
+    "config/wp31_greenfield_canary.json": "5df1bbc380cb829fe8030e9b2ce2cd9d7fd513a0c2a25a202450fa787788a12d",
+    "config/wp31_greenfield_canary_execution_authorization.schema.json": "157c1521984b1546534274e3aba5ecb59ffc23260804744abd2c0603607abef6",
+    "config/wp31_greenfield_canary_pro_review_evidence.schema.json": "095b5679d83fb512c3a996373680af14b914857da25879eb30176011c0e4a464",
     "deploy/production/Caddyfile.greenfield-canary": "d61d3004076110c9d29cf132b21cac9ff81129bc9981b7bcf753e24b6a20c840",
     "deploy/production/compose.greenfield-canary.migrate.yaml": "929b2694d396a04cab69beb49d3da1a025598ec787d070f4c5eb766ba9251679",
     "deploy/production/compose.greenfield-canary.yaml": "039ecaa6b54295f7a6d8b1cb262d2eca6e30b07e62d58bbb525a0048b7d8902c",
@@ -12,11 +16,26 @@
     "deploy/production/greenfield_canary_edge.sh": "5058c21872262e11fe55d845108cbd0e57c1b4a8ccec808c31b69991f6de4659",
     "deploy/production/greenfield_canary_rollback.sh": "0d1a21cdba4102b1ef64172b1efa61b42253b4a22ace6dea4af765c071464738",
     "deploy/production/wartime_grant_runtime.py": "aabb0bb9766251631bb76b1ec18866637314773245d9954fb4f48fde1678c481",
-    "scripts/wp31_greenfield_canary.py": "2fa2435eefa375f1493eb3d48a5bd5827b767f9339c39af0e37b1987d2fe5184",
+    "deploy/staging/Caddyfile": "10bbc841f0f92e721f4a055182687047de1583750387021c1c19e0066224d180",
+    "infra/staging/.terraform.lock.hcl": "084d9ab7cc2b898f51cdb487ddb076d9180bb79ec31b2f7797eef17ee4ab0d6c",
+    "infra/staging/main.tf": "fdea93951df4a14124fd4b378f08ab7033863c648392dec53f5229754992b764",
+    "infra/staging/outputs.tf": "0b0e37760b4c6606812694f0256851cd4e61de8df9e1f9dd136b797eb87fb65b",
+    "infra/staging/terraform.tfvars.example": "1cd51efe186ad9b1e4c6f7c1f413bfcca1fd6d4e7df31da095f86d197c4f42b3",
+    "infra/staging/variables.tf": "a9680858a5ada710a74fffba9d3ec1ab3a3f11b868b0213977dc3aa49e51b296",
+    "infra/staging/versions.tf": "48077a4ee40b67440a77ee53d3436d60a9701d79130434fca6a67a126a369657",
+    "scripts/wp08_dns_record.py": "33af944cf77c375abaffedc28b852de42ff7094ec93b5d1d1675727325d5ecf2",
+    "scripts/wp08_security_group.py": "bc0d8f75d2300da73cf17f6700f355fae303e555494a23891337c1e0ada62225",
+    "scripts/wp15_production_inventory.py": "c67afe45302c4e6798a924c3fc71254ceb72664f6f745667d61e6b307fb320c4",
+    "scripts/wp15_rds_database.py": "458ee5b951cebfff64622c0be1c40af502d50752cbf778a050ad8dc2d4981955",
+    "scripts/wp15_rds_schema_owner.py": "c4eeda0af0ad9e502ea45aabf0d2309209528184e3d143480e5b4d34ca6a8325",
+    "scripts/wp31_greenfield_canary.py": "c51a7b86822b02e80b106312c5fe05e65d9425fa8cec98e4fc4405c41f1f0453",
+    "scripts/wp31_ops_closure.py": "a2f1e4a23d036e30c621484370100522e03691ce01a3a3d792f943e44cba2707",
     "scripts/wp31_phase_evidence.py": "b15dd3b19c7cd6f2e46c693e69fe436565bff1e458c82e11d83ead8d8e8b62b2",
+    "scripts/wp31_prepare_amd64_dockerfiles.py": "5c37aa1057f06ccf85101d6f59d1ad4027da937be28dd6379e04c4a6f355ced1",
     "scripts/wp31_prepare_greenfield_canary.py": "53b7c39b87aaec41aa2681fd20ebe7472e2ce07d934ca071eb08266d318c7d76",
-    "tests/test_greenfield_canary_entrypoint.py": "4739f6aa30677011e8099b2ed3c98dce72e409efc8be8d8e79dedc8734daf89f",
-    "tests/test_wp31_greenfield_canary.py": "9f193cc1fea3fca24bd394c3e776838f6839fd65599611d60641d1414edec5eb"
+    "tests/test_greenfield_canary_entrypoint.py": "7c5669b90b944a082e7ae7ccb78aee563f8b96df90aed6eec02f3e832b86f1e3",
+    "tests/test_wp31_greenfield_canary.py": "89b6a188751b60f01d1350dae4579b1f1506d137636ea7cf8bbda493f1bb4a41"
   },
-  "schema_version": 1
+  "manifest_self_binding": "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT",
+  "schema_version": 2
 }
