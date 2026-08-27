@@ -30,3 +30,35 @@ condition = "AND"
 regexTarget = "line"
 regexes = ['''["']?(api_release|api_worker_baseline|api_candidate_sha|web_candidate_sha|worker_candidate_sha)["']?\s*[:,]\s*["'][0-9a-f]{40}["']''']
 paths = ['''(^|/)(config/wp13_uat_rebind\.json|scripts/wp13_15_evidence\.py|tests/test_wp08_web_only\.py|tests/test_wp13_15_evidence\.py)$''']
+
+[[allowlists]]
+description = "The exploration document token is a public source locator already present in source_url, not an app credential."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''"document_token"\s*:\s*"[A-Za-z0-9]{20,40}"''']
+paths = ['''(^|/)config/exploration-sheet-version-binding\.v1\.json$''']
+
+[[allowlists]]
+description = "Formal content task_key values are public product identifiers, not credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''"task_key"\s*:\s*"(EXP|NV|AIA|DLG)-[A-Z0-9-]+"''']
+paths = ['''(^|/)config/(module-content-candidates\.v1\.json|module-content-packages/[a-z-]+\.module-content-package\.v1\.json)$''']
+
+[[allowlists]]
+description = "Controller candidate manifests map repository paths to public SHA-256 file digests."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''"[^"\r\n]+"\s*:\s*"[0-9a-f]{64}"''']
+paths = ['''(^|/)outputs/controller-integration/[^/]+/candidate-manifest\.json$''']
+
+[[allowlists]]
+description = "Prototype browser storage keys are local namespace labels, not credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''(STORAGE_KEY|storageKey)\s*=\s*"muchen[-.][a-z0-9.-]+"''']
+paths = ['''(^|/)prototypes/(boss-dungeon/app\.js|delivery-guild/index\.html)$''']
