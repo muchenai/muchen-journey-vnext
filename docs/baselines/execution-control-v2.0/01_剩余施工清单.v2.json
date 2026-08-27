@@ -1,0 +1,173 @@
+{
+  "schema_version": 2,
+  "control_id": "muchen-journey-final-candidate-closure-v2",
+  "base_commit_sha": "7c57a2f7fa16eacdf2a3a6e2a8bfd594d00460f1",
+  "branch": "codex/construction-v1-candidate-prep-20260826",
+  "product_semantic_baseline": "docs/baselines/construction-v1.0",
+  "execution_source_of_truth": "docs/baselines/execution-control-v2.0",
+  "current_release_boundary": {
+    "g1_content_binding": "PASS",
+    "candidate": "NOT_FROZEN",
+    "production_canary": "NOT_AUTHORIZED",
+    "human_uat": "NOT_RUN",
+    "release": "NOT_AUTHORIZED"
+  },
+  "work_items": [
+    {
+      "id": "V2-00",
+      "title": "V2起跑和旧控制停用",
+      "state": "READY",
+      "depends_on": [],
+      "requirements": ["TECH-001"],
+      "acceptance": [
+        "base commit is ancestor of current HEAD",
+        "branch is exact",
+        "worktree is clean at start",
+        "V2 SHA256SUMS passes",
+        "V1 progress text is not used as current status"
+      ]
+    },
+    {
+      "id": "V2-01",
+      "title": "产品schema v2与旧运维插件兼容性隔离",
+      "state": "OPEN_TOOL_CONTRACT_DRIFT",
+      "depends_on": ["V2-00"],
+      "requirements": ["TECH-001", "OPS-001"],
+      "acceptance": [
+        "product schema remains 2 and product doctor passes",
+        "ops plugin schema-1 error is recorded as tooling incompatibility",
+        "no product contract downgrade or fake legacy marker",
+        "G4 and release interpretation stay blocked until compatible ops evidence exists"
+      ],
+      "blocking_scope": ["G4", "G7"],
+      "non_blocking_scope": ["V2-02", "G2", "G3_PREPARATION"]
+    },
+    {
+      "id": "V2-02",
+      "title": "四模块正式内容包Runtime兼容",
+      "state": "FAIL_0_OF_4",
+      "depends_on": ["V2-00"],
+      "requirements": ["CORE-003", "EXP-001", "EXP-002", "NV-001", "AIA-001", "DLG-001"],
+      "root_cause": "generator hashes source candidate fragments and does not apply Runtime timestamp canonicalization; Runtime hashes final contract objects",
+      "acceptance": [
+        "all four formal packages load through ConstructionModuleContentPackage",
+        "all nested and root hashes use the Runtime canonical rule",
+        "candidate approval hashes and exploration source binding remain unchanged",
+        "only derived hashes and dependent indexes/references change",
+        "any semantic payload change fails closed for Owner reapproval",
+        "nested drift, root drift, owner role, reviewer overlap and unsafe policy negative tests pass"
+      ],
+      "gate": "G2_BLOCKER"
+    },
+    {
+      "id": "V2-03",
+      "title": "候选验证环境隔离",
+      "state": "OPEN_DEFAULT_PROJECT_COLLISION",
+      "depends_on": ["V2-00"],
+      "requirements": ["TECH-002", "OPS-001"],
+      "acceptance": [
+        "unique Compose project name is used",
+        "dedicated DB/API/Web ports are used",
+        "no existing journey-next container is stopped, recreated or adopted",
+        "test database uses only synthetic data",
+        "evidence root is outside the Git worktree"
+      ],
+      "gate": "G2_BLOCKER"
+    },
+    {
+      "id": "V2-04",
+      "title": "固定提交上的G2机器合同",
+      "state": "NOT_RUN",
+      "depends_on": ["V2-02", "V2-03"],
+      "requirements": ["GOV-001", "GOV-002", "GOV-003", "GOV-004", "GOV-005", "CORE-001", "CORE-002", "CORE-003", "CORE-004", "CORE-005", "EXP-001", "EXP-002", "EXP-003", "NV-001", "NV-002", "AIA-001", "AIA-002", "DLG-001", "DATA-001", "TECH-001", "TECH-002"],
+      "acceptance": [
+        "API positive and negative tests pass",
+        "Web lint typecheck tests and production build pass",
+        "Worker tests pass",
+        "runtime OpenAPI equals locked contract",
+        "single migration head and fresh 0001-to-head upgrade pass",
+        "zero legacy migration records",
+        "secret and dependency scans pass",
+        "all results bind the same clean full commit SHA"
+      ],
+      "gate": "G2_MACHINE_CONTRACT"
+    },
+    {
+      "id": "V2-05",
+      "title": "候选镜像、SBOM与OS CVE",
+      "state": "NOT_RUN_ON_FIXED_SHA",
+      "depends_on": ["V2-04"],
+      "requirements": ["TECH-002"],
+      "acceptance": [
+        "API Web Worker images are built from one fixed SHA",
+        "three immutable image digests are recorded",
+        "three SBOMs and secret scan bind the same source tree",
+        "current OS CVE scanner database identity and time are recorded",
+        "Critical and High policy passes or state remains BLOCKED; old scan is not reused"
+      ],
+      "gate": "G2_MACHINE_CONTRACT"
+    },
+    {
+      "id": "V2-06",
+      "title": "无自引用的最终候选冻结",
+      "state": "NOT_RUN",
+      "depends_on": ["V2-04", "V2-05"],
+      "requirements": ["TECH-001", "TECH-002"],
+      "acceptance": [
+        "candidate full SHA is clean and unchanged after validation",
+        "candidate manifest is written outside the worktree",
+        "content index hash migration head config hash image digests and test evidence are fixed",
+        "local candidate tag is created only after all G2 checks pass",
+        "no commit is created after candidate evidence binds the SHA"
+      ],
+      "gate": "G3_CANDIDATE_FREEZE"
+    },
+    {
+      "id": "V2-07",
+      "title": "隔离恢复与应用回滚",
+      "state": "NOT_RUN",
+      "depends_on": ["V2-06"],
+      "requirements": ["OPS-001", "DATA-001"],
+      "acceptance": [
+        "encrypted backup from synthetic candidate environment exists",
+        "restore into a separate isolated target passes",
+        "formal facts summary matches",
+        "candidate-to-previous-and-back application rollback rehearsal passes",
+        "off-host and human alert receipt remain NOT_RUN unless actually executed"
+      ],
+      "gate": "G4_DATA_AND_RECOVERY"
+    },
+    {
+      "id": "V2-08",
+      "title": "Pro独立候选复核包",
+      "state": "NOT_RUN",
+      "depends_on": ["V2-06"],
+      "requirements": ["TECH-002", "OPS-001"],
+      "acceptance": [
+        "single archive and SHA256 are produced",
+        "every PASS has command exit code timestamp and artifact hash",
+        "NOT_RUN BLOCKED FAIL are preserved",
+        "production effects are all false",
+        "Pro can reproduce the verdict without trusting Mini prose"
+      ],
+      "gate": "PRO_FINAL_CANDIDATE_FREEZE_REVIEW"
+    },
+    {
+      "id": "V2-09",
+      "title": "生产Canary真人UAT与发布",
+      "state": "OUT_OF_SCOPE_NOT_AUTHORIZED",
+      "depends_on": ["V2-07", "V2-08"],
+      "requirements": ["UAT-001", "REL-001"],
+      "acceptance": [],
+      "gate": "HUMAN_AND_OWNER_ONLY"
+    }
+  ],
+  "forbidden_shortcuts": [
+    "downgrade product schema 2 to satisfy the old ops plugin",
+    "reuse old dirty-overlay tests or image scans as fixed-candidate evidence",
+    "run Docker Compose under the occupied journey-next project",
+    "edit evidence into the candidate worktree after freezing its SHA",
+    "treat G1 approval as Runtime compatibility",
+    "infer UAT QA release or production health"
+  ]
+}

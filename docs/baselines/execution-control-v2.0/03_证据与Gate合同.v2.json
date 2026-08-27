@@ -1,0 +1,70 @@
+{
+  "schema_version": 2,
+  "evidence_contract_id": "muchen-journey-final-candidate-evidence-v2",
+  "allowed_statuses": ["PASS", "FAIL", "NOT_RUN", "BLOCKED", "NOT_APPLICABLE"],
+  "gate_order": [
+    "V2_PREFLIGHT",
+    "CONTENT_PACKAGE_RUNTIME_COMPATIBILITY",
+    "G2_MACHINE_CONTRACT",
+    "IMAGE_AND_SUPPLY_CHAIN",
+    "G3_CANDIDATE_FREEZE",
+    "G4_ISOLATED_RECOVERY",
+    "PRO_FINAL_CANDIDATE_FREEZE_REVIEW"
+  ],
+  "required_top_level_fields": [
+    "schema_version",
+    "candidate_sha",
+    "branch",
+    "worktree_clean",
+    "base_commit_is_ancestor",
+    "content_package_index_sha256",
+    "migration_head",
+    "gates",
+    "production_effects",
+    "open_risks",
+    "artifact_hashes",
+    "generated_at",
+    "bundle_sha256"
+  ],
+  "gate_evidence_required_fields": [
+    "gate_id",
+    "status",
+    "command",
+    "exit_code",
+    "started_at",
+    "finished_at",
+    "source_commit_sha",
+    "artifact_paths",
+    "artifact_sha256",
+    "not_run_or_blocked_reason"
+  ],
+  "candidate_invariants": {
+    "full_sha_required": true,
+    "same_sha_for_all_machine_gates": true,
+    "worktree_clean": true,
+    "single_migration_head": true,
+    "legacy_migrate_record_count": 0,
+    "production_write_allowed": false,
+    "release_authorized": false,
+    "human_gate_machine_fill_allowed": false,
+    "evidence_root_inside_candidate_worktree_allowed": false,
+    "post_freeze_commit_allowed": false
+  },
+  "production_effects_shape": {
+    "production_deployment_executed": false,
+    "production_mutation_executed": false,
+    "production_database_accessed": false,
+    "external_message_sent": false,
+    "legacy_migration_executed": false,
+    "human_gate_filled_by_machine": false
+  },
+  "fail_closed_rules": [
+    "missing command or exit code cannot be PASS",
+    "evidence from another commit cannot be PASS",
+    "old image scan cannot be reused",
+    "tool incompatibility cannot be repaired by changing approved product truth",
+    "semantic content change invalidates prior owner approval",
+    "deadline cannot convert NOT_RUN BLOCKED or FAIL to PASS",
+    "candidate tag cannot exist before all G2 checks pass"
+  ]
+}

@@ -157,5 +157,14 @@
     "content_package_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
     "state": "NOT_FROZEN"
   },
-  "next_gate": "FINAL_CANDIDATE_FREEZE"
+  "execution_control": {
+    "version": "2.0",
+    "status": "ACTIVE_EXECUTION_CONTROL",
+    "config_path": "config/muchen_journey_execution_control.v2.json",
+    "control_directory": "docs/baselines/execution-control-v2.0",
+    "product_semantic_baseline_unchanged": true,
+    "known_runtime_content_package_state": "FAIL_0_OF_4",
+    "production_effects_authorized": false
+  },
+  "next_gate": "G2_FORMAL_PACKAGE_RUNTIME_COMPATIBILITY"
 }

@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "control_id": "muchen-journey-final-candidate-closure-v2",
+  "status": "ACTIVE_EXECUTION_CONTROL",
+  "base_commit_sha": "7c57a2f7fa16eacdf2a3a6e2a8bfd594d00460f1",
+  "branch": "codex/construction-v1-candidate-prep-20260826",
+  "control_directory": "docs/baselines/execution-control-v2.0",
+  "product_semantic_baseline": "docs/baselines/construction-v1.0",
+  "supersedes": {
+    "scope": "EXECUTION_PROGRESS_COMMANDS_AND_NEXT_WORK_ONLY",
+    "documents": [
+      "docs/baselines/construction-v1.0/README.md",
+      "docs/baselines/MINI_AUTONOMOUS_CONSTRUCTION_EXECUTION_LEDGER_V1.0.md",
+      "docs/baselines/Muchen_Journey_Construction_V1_Requirement_Gap_Matrix_V1.0.md"
+    ],
+    "product_semantics_superseded": false
+  },
+  "current_gate": "G2_FORMAL_PACKAGE_RUNTIME_COMPATIBILITY",
+  "known_states": {
+    "g1_content_binding": "PASS",
+    "formal_package_runtime_compatibility": "FAIL_0_OF_4",
+    "product_schema": 2,
+    "ops_plugin_compatibility": "BLOCKED_SCHEMA_1_ONLY",
+    "compose_default_project": "COLLIDES_WITH_EXISTING_WORKSPACE",
+    "candidate": "NOT_FROZEN",
+    "production_canary": "NOT_AUTHORIZED",
+    "human_uat": "NOT_RUN",
+    "release": "NOT_AUTHORIZED"
+  },
+  "autonomous_scope": [
+    "V2-00",
+    "V2-02",
+    "V2-03",
+    "V2-04",
+    "V2-05",
+    "V2-06",
+    "V2-07",
+    "V2-08"
+  ],
+  "human_or_external_scope": ["V2-01_PLUGIN_UPDATE", "V2-09"],
+  "production_effects_authorized": false,
+  "release_authorized": false
+}
