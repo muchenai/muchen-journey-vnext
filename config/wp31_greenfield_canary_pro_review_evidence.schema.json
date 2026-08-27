@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_candidate_sha": {"const": "1bccbbf1706a8216892f5b9b512b1e27ce784101"},
+    "evidence_scope": {"const": "PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW"},
+    "ops_manifest_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "package_manifest_sha256": {"const": "49f95c33131932e113cc8bcdf252ff647a4d21782ce353d1b2038ffc75960eb1"},
+    "production_mutation": {"const": false},
+    "review_status": {"const": "PASS"},
+    "reviewed_at_utc": {"format": "date-time", "type": "string"},
+    "reviewed_ops_commit_sha": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "reviewer": {"const": "CODEX_PRO_REVIEW_MACBOOK_PRO"},
+    "reviewer_independent": {"const": true}
+  },
+  "required": [
+    "application_candidate_sha",
+    "evidence_scope",
+    "ops_manifest_sha256",
+    "package_manifest_sha256",
+    "production_mutation",
+    "review_status",
+    "reviewed_at_utc",
+    "reviewed_ops_commit_sha",
+    "reviewer",
+    "reviewer_independent"
+  ],
+  "title": "WP-31 Greenfield Canary independent Pro review evidence",
+  "type": "object"
+}

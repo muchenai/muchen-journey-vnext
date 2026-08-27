@@ -54,6 +54,9 @@ def test_greenfield_package_rechecks_candidate_and_uploads_digest_evidence() -> 
     assert "python3 scripts/wp07_candidate.py registry" in job
     assert "python3 scripts/wp07_candidate.py verify" in job
     assert "name: wp07-candidate-${{ inputs.candidate }}" in job
+    assert "non-self-referential evidence checksums" in job
+    assert "if grep -qE '[[:space:]]SHA256SUMS$' SHA256SUMS; then exit 2; fi" in job
+    assert "sha256sum -c SHA256SUMS" in job
 
 
 def test_legacy_wartime_candidate_guard_remains_distinct() -> None:

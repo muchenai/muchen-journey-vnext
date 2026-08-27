@@ -1,0 +1,22 @@
+{
+  "application_candidate_sha": "1bccbbf1706a8216892f5b9b512b1e27ce784101",
+  "files": {
+    ".github/workflows/wp15-wartime-production.yml": "4ba74a048ea1c3f8e3a2bfc4e2f7cf6518a8f9c626bebe67b75b4da94873ec2b",
+    "config/wp31_greenfield_canary_pro_review_evidence.schema.json": "1d9cbebafca33a144b13e48cc87d01255e621c5c4d91c50fa7b94b92f802b9b1",
+    "deploy/production/Caddyfile.greenfield-canary": "d61d3004076110c9d29cf132b21cac9ff81129bc9981b7bcf753e24b6a20c840",
+    "deploy/production/compose.greenfield-canary.migrate.yaml": "929b2694d396a04cab69beb49d3da1a025598ec787d070f4c5eb766ba9251679",
+    "deploy/production/compose.greenfield-canary.yaml": "039ecaa6b54295f7a6d8b1cb262d2eca6e30b07e62d58bbb525a0048b7d8902c",
+    "deploy/production/db_facts.py": "5f8cd4ddf3ee84a84ad204795e2c9858e349538971e4132b8a5eded92ab3f82c",
+    "deploy/production/greenfield_canary_backup_restore.sh": "12ea6ff18df3b1e6550a7e99df41dd1b2733e9957da7edb69f2adec8a59510ee",
+    "deploy/production/greenfield_canary_deploy.sh": "33c8197d09420d9743c41bc282178f98d566aa11604c8eceda31ddbbb6e1553f",
+    "deploy/production/greenfield_canary_edge.sh": "5058c21872262e11fe55d845108cbd0e57c1b4a8ccec808c31b69991f6de4659",
+    "deploy/production/greenfield_canary_rollback.sh": "0d1a21cdba4102b1ef64172b1efa61b42253b4a22ace6dea4af765c071464738",
+    "deploy/production/wartime_grant_runtime.py": "aabb0bb9766251631bb76b1ec18866637314773245d9954fb4f48fde1678c481",
+    "scripts/wp31_greenfield_canary.py": "2fa2435eefa375f1493eb3d48a5bd5827b767f9339c39af0e37b1987d2fe5184",
+    "scripts/wp31_phase_evidence.py": "b15dd3b19c7cd6f2e46c693e69fe436565bff1e458c82e11d83ead8d8e8b62b2",
+    "scripts/wp31_prepare_greenfield_canary.py": "53b7c39b87aaec41aa2681fd20ebe7472e2ce07d934ca071eb08266d318c7d76",
+    "tests/test_greenfield_canary_entrypoint.py": "4739f6aa30677011e8099b2ed3c98dce72e409efc8be8d8e79dedc8734daf89f",
+    "tests/test_wp31_greenfield_canary.py": "9f193cc1fea3fca24bd394c3e776838f6839fd65599611d60641d1414edec5eb"
+  },
+  "schema_version": 1
+}
