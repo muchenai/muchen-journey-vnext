@@ -494,6 +494,37 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .admission-score-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .admission-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 14px 16px; color: #164c49; background: #e6f5f1; border-radius: 12px; }
 
+.task-authority-summary, .review-waiting-state, .revision-state { padding: clamp(24px, 5vw, 42px); background: #fff; border: 1px solid #d8e3df; border-radius: 24px; }
+.task-authority-summary > header { display: flex; gap: 12px; align-items: start; margin-bottom: 22px; }
+.task-authority-summary h2, .review-waiting-state h2, .revision-state h2 { margin: 3px 0 0; }
+.task-authority-summary dl, .review-waiting-state dl, .submission-confirmation dl, .incentive-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; background: #d8e3df; border: 1px solid #d8e3df; border-radius: 14px; }
+.task-authority-summary dl > div, .review-waiting-state dl > div, .submission-confirmation dl > div, .incentive-summary > div { padding: 13px 15px; background: #fff; }
+.task-authority-summary dt, .review-waiting-state dt, .submission-confirmation dt, .incentive-summary dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
+.task-authority-summary dd, .review-waiting-state dd, .submission-confirmation dd, .incentive-summary dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.review-waiting-state { background: #f7fbfa; border-color: #82bdb6; }
+.review-waiting-state .button, .revision-state .button { width: fit-content; margin-top: 18px; }
+.revision-state { background: #fffaf0; border-color: #e7cb78; }
+.revision-rubric-feedback, .incentive-ledger { display: grid; gap: 10px; margin: 18px 0; padding: 0; list-style: none; }
+.revision-rubric-feedback li, .incentive-ledger li { display: grid; gap: 4px; padding: 14px 16px; background: rgba(255, 255, 255, .78); border: 1px solid #d8e3df; border-radius: 12px; }
+.revision-rubric-feedback span, .incentive-ledger span, .incentive-ledger small { color: var(--text-muted); }
+.incentive-ledger code { overflow-wrap: anywhere; font-size: 11px; }
+.submission-composer { display: grid; gap: 18px; }
+.submission-composer > .action-row, .draft-recovery .action-row { margin: 0; }
+.draft-recovery, .ai-self-check-gated, .submission-confirmation { padding: 20px; border-radius: 16px; }
+.draft-recovery { color: #533800; background: #fff8e6; border: 1px solid #e7cb78; }
+.draft-recovery p { margin: 5px 0 14px; }
+.ai-self-check-gated { display: grid; gap: 10px; background: #f7f3ff; border: 1px solid #cab9ed; }
+.ai-self-check-gated h3, .ai-self-check-gated p { margin: 0; }
+.ai-self-check-gated dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.ai-self-check-gated dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
+.ai-self-check-gated dd { margin: 0; }
+.ai-self-check-gated .button { width: fit-content; }
+.submission-confirmation { background: #f4f8f7; border: 1px solid #82bdb6; }
+.submission-confirmation h3 { margin: 6px 0 8px; }
+.submission-preview { margin-top: 16px; padding: 16px; background: #fff; border-radius: 12px; }
+.submission-preview p { margin: 7px 0 0; white-space: pre-wrap; }
+.draft-save-status { margin: 0; color: var(--text-muted); font-size: 13px; }
+
 .completion-orbit { position: absolute; top: 24px; right: 24px; width: 110px; height: 110px; }
 .completion-orbit i { position: absolute; width: 13px; height: 13px; background: #efb43e; border-radius: 50%; }
 .completion-orbit i:nth-child(1) { top: 5px; left: 50%; }
@@ -586,6 +617,8 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .learning-schedule { grid-template-columns: auto 1fr auto; }
   .learning-schedule strong { grid-column: 1 / -1; justify-self: start; }
   .first-win-options { grid-template-columns: 1fr; }
+  .task-authority-summary dl, .review-waiting-state dl, .submission-confirmation dl, .incentive-summary { grid-template-columns: 1fr; }
+  .ai-self-check-gated dl { grid-template-columns: 1fr; gap: 8px; }
   .content-editor-grid { grid-template-columns: 1fr; }
 }
 

@@ -907,6 +907,10 @@ def test_request_revision_is_structured_replayable_and_history_is_immutable():
     )
     assert learner_detail["allowed_commands"] == ["submit_revision"]
     assert learner_detail["latest_revision_feedback"] == payload["overall_feedback"]
+    reviewed_version = learner_detail["submission"]["versions"][-1]
+    assert reviewed_version["decision"] == "REVISION_REQUIRED"
+    assert len(reviewed_version["rubric_feedback"]) == 4
+    assert all(item["feedback"] for item in reviewed_version["rubric_feedback"])
     current = assert_ok(flow["learner"].get("/api/v1/me/current-action"))
     assert current["action_type"] == "REVISE_SUBMISSION"
 

@@ -2,8 +2,10 @@ import {
   acceptControlledTaskHandoff,
   requestNextTrainingStageReview,
 } from "@/app/actions";
+import { FactLabel } from "@/app/human-experience";
 import {
   HandoffDetail,
+  IncentiveLedger,
   learnerPageRequest,
   NextTrainingStageReviewRequestList,
   Result,
@@ -72,12 +74,13 @@ export default async function ResultPage({
   const resultQuery = query.enrollment_id
     ? `?enrollment_id=${encodeURIComponent(query.enrollment_id)}`
     : "";
-  const [result, timeline, reviewRequests] = await Promise.all([
+  const [result, timeline, reviewRequests, incentives] = await Promise.all([
     learnerPageRequest<Result>(`/api/v1/me/result${resultQuery}`),
     learnerPageRequest<Timeline>(`/api/v1/me/timeline?limit=100${enrollmentQuery}`),
     learnerPageRequest<NextTrainingStageReviewRequestList>(
       "/api/v1/me/next-training-stage-review-requests",
     ),
+    learnerPageRequest<IncentiveLedger>("/api/v1/me/incentives"),
   ]);
   const handoff = await learnerPageRequest<HandoffDetail>(
     `/api/v1/me/handoffs/${result.handoff.id}`,
@@ -106,14 +109,19 @@ export default async function ResultPage({
         <h2 id="decision-layers-title">结果、真人结论与下一训练阶段分开记录</h2>
         <div className="decision-layer-grid">
           <article>
+            <FactLabel kind="completion" />
             <span className="material-status complete">学习完成</span>
             <strong>{result.learning_completion.completed_stages} / {result.learning_completion.total_stages} 站</strong>
             <p>本次学习与提交证据已保存。</p>
           </article>
           <article>
+            <FactLabel kind="human" />
             <span className="material-status complete">Reviewer 结论</span>
             <strong>探索营通过</strong>
             <p>{result.reviewer_conclusion.overall_feedback}</p>
+            <small>
+              {result.reviewer_conclusion.reviewer_display_name} · 固定 SubmissionVersion {result.reviewer_conclusion.submission_version_id}
+            </small>
             <small>
               Reviewer AI 披露：{result.reviewer_conclusion.ai_use.used
                 ? "已使用建议性 AI，结论仍由真人签署"
@@ -121,6 +129,7 @@ export default async function ResultPage({
             </small>
           </article>
           <article>
+            <FactLabel kind="system" />
             <span className="material-status">下一训练阶段决定</span>
             <strong>
               {result.next_training_stage.decision
@@ -189,6 +198,7 @@ export default async function ResultPage({
           </>
         )}
         <aside className="ai-note" aria-label="AI 摘要状态">
+          <FactLabel kind="ai" />
           <strong>人工评价原文</strong>
           <span>页面不使用 AI 改写 Reviewer 结论。</span>
         </aside>
@@ -239,6 +249,39 @@ export default async function ResultPage({
           </form>
         </section>
       ) : null}
+
+      <p className="status-meta">
+        当前仅开放已批准的“下一训练阶段决定”独立人工复核；通用高影响申诉政策尚未获批准，系统不会自行创建申诉状态或承诺时限。
+      </p>
+
+      <section className="panel result-section" aria-labelledby="incentive-ledger-title">
+        <FactLabel kind="incentive" />
+        <p className="section-label">激励独立账本</p>
+        <h2 id="incentive-ledger-title">积分只记录激励，不改变正式状态</h2>
+        <dl className="incentive-summary">
+          <div><dt>积分</dt><dd>{incentives.points_total}</dd></div>
+          <div><dt>XP</dt><dd>{incentives.xp_total}</dd></div>
+          <div><dt>正式影响</dt><dd>{incentives.formal_effect}</dd></div>
+          <div><dt>可解锁人工 Gate</dt><dd>{incentives.can_unlock_human_gate ? "是" : "否"}</dd></div>
+        </dl>
+        {incentives.entries.length > 0 ? (
+          <ol className="incentive-ledger">
+            {incentives.entries.map((entry) => (
+              <li key={entry.id}>
+                <strong>{entry.label ?? entry.incentive_type} {entry.amount === null ? "" : entry.amount}</strong>
+                <span>{entry.module_key} · {formatDate.format(new Date(entry.created_at))}</span>
+                <code>{entry.rule_ref} · {entry.rule_sha256}</code>
+                <small>来源 Outcome {entry.source_outcome_id}{entry.correction_of_entry_id ? ` · 更正 ${entry.correction_of_entry_id}` : ""}</small>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="status-meta">尚无激励记录；系统不会用缺失记录推断积分、徽章或排名。</p>
+        )}
+        <p className="status-meta">
+          formal_effect={incentives.formal_effect}；激励不会通过任务、不会产生人才结论，也不会绕过具名真人 Gate。
+        </p>
+      </section>
 
       <section className="panel result-section" aria-labelledby="handoff-title">
         <p className="section-label">04 · 唯一下一步</p>

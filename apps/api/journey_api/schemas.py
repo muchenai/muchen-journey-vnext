@@ -710,6 +710,8 @@ class AssignmentOut(StrictModel):
     id: UUID
     status: str
     revision: int
+    assigned_at: datetime
+    reviewer_display_name: str
     allowed_commands: list[str]
     stable_task_key: str
     task_version: int
@@ -726,6 +728,9 @@ class AssignmentOut(StrictModel):
     learning_experience: dict[str, object]
     estimated_duration_minutes: int
     feedback_sla_business_days: int
+    reviewer_role: str
+    sensitivity: str
+    audience: str
     rubric: dict[str, object]
     submission: "SubmissionOut | None"
     draft: "SubmissionDraftOut | None"
@@ -1208,6 +1213,7 @@ class SubmissionVersionOut(StrictModel):
     review_status: str | None
     decision: str | None
     feedback: str | None
+    rubric_feedback: list[dict[str, object]]
 
 
 class SubmissionOut(StrictModel):
@@ -1670,6 +1676,8 @@ class ResultReviewerConclusionOut(StrictModel):
     status: Literal["FINALIZED"] = "FINALIZED"
     decision: Literal["PASS"] = "PASS"
     reviewer_id: UUID
+    reviewer_display_name: str
+    submission_version_id: UUID
     overall_feedback: str
     ai_use: AiUseDisclosure
     concluded_at: datetime

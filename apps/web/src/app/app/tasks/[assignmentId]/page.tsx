@@ -1,22 +1,35 @@
 import { randomUUID } from "node:crypto";
+import Link from "next/link";
 
 import {
   completeLearningMaterial,
   deleteSubmissionAttachment,
   startAssignment,
 } from "@/app/actions";
+import { ExperienceState, FactLabel } from "@/app/human-experience";
 import { Assignment, learnerPageRequest } from "@/lib/server/api";
 import { AttachmentUploader } from "./attachment-uploader";
 import { SubmissionComposer } from "./submission-composer";
 
 export const dynamic = "force-dynamic";
 
+const formatDate = new Intl.DateTimeFormat("zh-CN", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Asia/Shanghai",
+});
+
 export default async function TaskPage({
   params,
   searchParams,
 }: {
   params: Promise<{ assignmentId: string }>;
-  searchParams: Promise<{ draft?: string; attachment?: string; material?: string }>;
+  searchParams: Promise<{
+    draft?: string;
+    attachment?: string;
+    material?: string;
+    revision?: string;
+  }>;
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
@@ -39,6 +52,15 @@ export default async function TaskPage({
   const nextMaterialKey = assignment.learning_materials.find(
     (material) => material.completed_at === null,
   )?.key;
+  const isWaiting = ["SUBMITTED", "IN_REVIEW"].includes(assignment.status);
+  const isRevision = assignment.status === "NEEDS_REVISION";
+  const revisionVersion = assignment.submission?.versions.findLast(
+    (version) => version.decision === "REVISION_REQUIRED",
+  );
+  const revisionReady = Boolean(
+    revisionVersion && revisionVersion.rubric_feedback.length > 0,
+  );
+  const editingRevision = query.revision === "edit" && revisionReady;
 
   return (
     <article className="learner-task-page">
@@ -58,6 +80,36 @@ export default async function TaskPage({
           <i aria-hidden="true" /> {assignment.estimated_duration_minutes} min
         </div>
       </header>
+
+      <section className="task-authority-summary" aria-labelledby="task-authority-title">
+        <header>
+          <FactLabel kind="system" />
+          <div>
+            <p className="section-label">权威任务说明</p>
+            <h2 id="task-authority-title">开始前，先确认目标与责任边界</h2>
+          </div>
+        </header>
+        <dl>
+          <div><dt>为什么做</dt><dd>{assignment.task_purpose}</dd></div>
+          <div><dt>任务版本</dt><dd>{assignment.stable_task_key} v{assignment.task_version} · Rubric v{assignment.rubric.version}</dd></div>
+          <div><dt>当前状态</dt><dd>{assignment.status}</dd></div>
+          <div><dt>正式性质</dt><dd>{assignment.journey_stage?.completion_policy === "LEARNER_EVIDENCE" ? "低风险学习证据" : "正式任务 · 必须真人审核"}</dd></div>
+          <div><dt>Reviewer</dt><dd>{assignment.reviewer_display_name} · {assignment.reviewer_role}</dd></div>
+          <div><dt>预计投入</dt><dd>{assignment.estimated_duration_minutes} 分钟</dd></div>
+          <div><dt>分配时间</dt><dd>{formatDate.format(new Date(assignment.assigned_at))}</dd></div>
+          <div><dt>截止与反馈</dt><dd>未配置任务截止时间；TaskVersion 记录反馈 SLA 为 {assignment.feedback_sla_business_days} 个工作日</dd></div>
+          <div><dt>可见与敏感级别</dt><dd>{assignment.audience} · {assignment.sensitivity}</dd></div>
+          <div><dt>积分规则</dt><dd>积分规则：未配置；积分不会改变正式状态或人才结论</dd></div>
+        </dl>
+        <details>
+          <summary>任务非目标与安全边界</summary>
+          <ul className="checklist">
+            <li>阅读、点击、自证、AI 建议或积分都不能产生正式通过。</li>
+            <li>Journey 内不执行外部生产作业，不上传未获批准的敏感或原始客户数据。</li>
+            <li>若任务专属非目标、截止时间或安全字段缺失，页面不会自行补写；请向 {assignment.reviewer_display_name} 或运营确认。</li>
+          </ul>
+        </details>
+      </section>
 
       {assignment.learning_materials.length > 0 ? (
         <section id="first-learning-input" className="learning-materials" aria-labelledby="learning-materials-title">
@@ -188,6 +240,65 @@ export default async function TaskPage({
         ) : null}
       </details>
 
+      {isWaiting && latestVersion ? (
+        <section className="review-waiting-state" aria-labelledby="review-waiting-title">
+          <FactLabel kind="system" />
+          <p className="section-label">{assignment.status}</p>
+          <h2 id="review-waiting-title">
+            {assignment.status === "IN_REVIEW" ? "Reviewer 正在处理固定版本" : "提交已接收，等待 Reviewer 开始"}
+          </h2>
+          <dl>
+            <div><dt>SubmissionVersion</dt><dd>Version {latestVersion.version_no} · {latestVersion.id}</dd></div>
+            <div><dt>提交时间</dt><dd>{formatDate.format(new Date(latestVersion.created_at))}</dd></div>
+            <div><dt>Reviewer / 队列</dt><dd>{assignment.reviewer_display_name} · {assignment.status}</dd></div>
+            <div><dt>首次反馈 SLA</dt><dd>TaskVersion 配置为 {assignment.feedback_sla_business_days} 个工作日；运营 SLA 以批准运行配置为准</dd></div>
+            <div><dt>通知</dt><dd>任务接口未提供外部通知回执；请以本页权威状态为准</dd></div>
+            <div><dt>撤回</dt><dd>正式任务尚未批准撤回；页面不提供绕过审核的动作</dd></div>
+          </dl>
+          <Link className="button primary" href="#submission-history">查看已提交版本</Link>
+        </section>
+      ) : null}
+
+      {isRevision && !revisionReady ? (
+        <ExperienceState
+          kind="error"
+          title="返工依据不完整，暂不能正式修订"
+          summary="系统没有取得固定旧版本及逐项 Rubric 反馈；为避免覆盖证据或猜测修改范围，当前保持失败关闭。"
+          knownFacts={[
+            "原提交与已有结论仍保持只读",
+            "页面不会自行补写 Reviewer 理由、Rubric 反馈或返工截止时间",
+            "需要运营纠正评审引用后，修订入口才会恢复",
+          ]}
+          action={{ href: "/app", label: "返回当前任务" }}
+        />
+      ) : null}
+
+      {isRevision && revisionVersion && revisionReady ? (
+        <section className="feedback-callout revision-state" aria-labelledby="revision-feedback-title">
+          <FactLabel kind="human" />
+          <p className="section-label">NEEDS_REVISION</p>
+          <h2 id="revision-feedback-title">{assignment.reviewer_display_name} 要求修订</h2>
+          <p>{revisionVersion.feedback}</p>
+          <ul className="revision-rubric-feedback">
+            {revisionVersion.rubric_feedback.map((item) => (
+              <li key={item.dimension_key}>
+                <strong>{item.dimension_key} · {item.rating}</strong>
+                <span>{item.feedback}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="status-meta">
+            引用旧提交 Version {revisionVersion.version_no}；旧提交与旧结论保持只读。未配置返工截止时间，页面不会自行生成日期。
+          </p>
+          <p className="status-meta">
+            只修改 Reviewer 指出的缺项；其余已提交证据可保留。若签署或证据引用不完整，请先联系运营纠正。
+          </p>
+          {!editingRevision ? (
+            <Link className="button primary" href={`?revision=edit#task-workspace`}>开始修订</Link>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">完成本阶段</p>
       <h2 id="task-workspace-title">
@@ -204,14 +315,6 @@ export default async function TaskPage({
         <p className="success-text" role="status">未绑定附件已删除。</p>
       ) : null}
 
-      {assignment.latest_revision_feedback ? (
-        <section className="feedback-callout" aria-labelledby="revision-feedback-title">
-          <h3 id="revision-feedback-title">主管要求修订</h3>
-          <p>{assignment.latest_revision_feedback}</p>
-          <p className="status-meta">旧版本和旧评审保持只读，本次提交会追加新版本。</p>
-        </section>
-      ) : null}
-
       {!materialsReady ? (
         <p className="task-locked-message" role="status">
           完成全部必读材料后，小任务会在这里解锁。
@@ -226,7 +329,7 @@ export default async function TaskPage({
         </form>
       ) : null}
 
-      {submitCommand && materialsReady ? (
+      {submitCommand && materialsReady && (!isRevision || editingRevision) ? (
         <>
           {assignment.allowed_attachment_types.length > 0 ? (
             <section className="attachment-workspace" aria-labelledby="attachment-title">
@@ -267,23 +370,28 @@ export default async function TaskPage({
             initialAttachmentIds={initialAttachmentIds}
             attachments={assignment.available_attachments}
             submissionIdempotencyKey={randomUUID()}
-            draftIdempotencyKey={randomUUID()}
+            initialDraftRevision={assignment.draft?.revision ?? null}
+            initialDraftUpdatedAt={assignment.draft?.updated_at ?? null}
             responseSections={experience?.response_sections ?? []}
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
             isFirstStation={assignment.journey_stage?.position === 0}
+            taskVersion={assignment.task_version}
+            rubricVersion={assignment.rubric.version}
+            reviewerName={assignment.reviewer_display_name}
+            visibility={`${assignment.audience} · ${assignment.sensitivity}`}
           />
         </>
       ) : null}
 
-      {assignment.allowed_commands.length === 0 ? (
+      {assignment.allowed_commands.length === 0 && !isWaiting ? (
         <p className="notice">这一站暂时没有可执行动作。</p>
       ) : null}
       </section>
 
       {assignment.submission ? (
-        <section className="submission-history" aria-labelledby="submission-history-title">
+        <section id="submission-history" className="submission-history" aria-labelledby="submission-history-title">
           <h2 id="submission-history-title">提交历史</h2>
           <p className="status-meta">
             当前为 Version {assignment.submission.current_version_no}；历史版本和评审引用永久只读。

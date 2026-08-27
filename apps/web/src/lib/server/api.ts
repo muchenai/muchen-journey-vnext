@@ -86,6 +86,8 @@ export type Assignment = {
   id: string;
   status: string;
   revision: number;
+  assigned_at: string;
+  reviewer_display_name: string;
   allowed_commands: string[];
   stable_task_key: string;
   task_version: number;
@@ -102,6 +104,9 @@ export type Assignment = {
   learning_experience: LearningExperience | Record<string, never>;
   estimated_duration_minutes: number;
   feedback_sla_business_days: number;
+  reviewer_role: string;
+  sensitivity: string;
+  audience: string;
   rubric: {
     version: number;
     dimensions: Array<{
@@ -166,6 +171,12 @@ export type SubmissionVersion = {
   review_status: string | null;
   decision: string | null;
   feedback: string | null;
+  rubric_feedback: Array<{
+    dimension_key: string;
+    rating: string;
+    score: number | null;
+    feedback: string;
+  }>;
 };
 
 export type Submission = {
@@ -267,6 +278,8 @@ export type Result = {
     status: "FINALIZED";
     decision: "PASS";
     reviewer_id: string;
+    reviewer_display_name: string;
+    submission_version_id: string;
     overall_feedback: string;
     ai_use: AiUseDisclosure;
     concluded_at: string;
@@ -345,6 +358,26 @@ export type Result = {
     message: string;
   };
   created_at: string;
+};
+
+export type IncentiveLedger = {
+  points_total: number;
+  xp_total: number;
+  formal_effect: "NONE";
+  can_unlock_human_gate: false;
+  entries: Array<{
+    id: string;
+    module_key: string;
+    incentive_type: "POINTS" | "XP" | "BADGE" | "RANK";
+    amount: number | null;
+    label: string | null;
+    source_outcome_id: string;
+    rule_ref: string;
+    rule_sha256: string;
+    correction_of_entry_id: string | null;
+    correction_reason: string | null;
+    created_at: string;
+  }>;
 };
 
 export type NextTrainingStageReviewRequest = {

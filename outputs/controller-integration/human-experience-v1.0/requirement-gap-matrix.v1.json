@@ -13,11 +13,11 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 37,
-    "NOT_IMPLEMENTED": 8,
+    "PARTIAL": 36,
+    "NOT_IMPLEMENTED": 7,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 11,
-    "GATED": 18
+    "IMPLEMENTED": 12,
+    "GATED": 19
   },
   "requirements": [
     {
@@ -99,11 +99,13 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "目标、步骤、交付、Rubric、时长存在；非目标、敏感数据边界、Reviewer 与积分边界不完整。",
+      "audit_finding": "权威任务摘要现显示目的、版本、正式性质、Reviewer、时长、SLA、可见/敏感级别和积分非正式边界；TaskVersion 未提供的任务专属非目标、截止和求助字段被明确标为未配置，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/api/journey_api/submission_routes.py"
+        "apps/api/journey_api/submission_routes.py",
+        "apps/api/journey_api/routes.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
       ]
     },
     {
@@ -111,22 +113,26 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "草稿、证据、版本和提交条件存在；缺自动保存、离线本地副本与逐步唯一动作投影。",
+      "audit_finding": "行动工作区现有 1.2 秒服务端自动保存、回执、本浏览器未同步副本与显式恢复，且提交前切换为唯一“检查并提交”；任务专属求助/升级和客户端敏感数据检测仍不完整，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/api/journey_api/submission_routes.py"
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/src/app/actions.ts",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
       ]
     },
     {
       "id": "HX-PAGE-009",
-      "status": "NOT_IMPLEMENTED",
+      "status": "GATED",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "只有 AI 使用披露，没有绑定草稿版本、可跳过且不改状态的 AI 自查页面。",
+      "audit_finding": "页面提供明确标记且可跳过的 AI 自查区；因无经批准模型、Prompt、版本化 Advisory 服务或记录，显示“当前不可用/未绑定”并保持无 mutation。最小解锁条件为 Owner/Security 批准并绑定版本化 AI Advisory 合同。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/api/journey_api/shared_domain.py"
+        "apps/api/journey_api/shared_domain.py",
+        "config/muchen_journey_product.json",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
       ]
     },
     {
@@ -134,11 +140,13 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "幂等正式提交与不可变版本已实现；缺提交预览/确认页及结果未知后的幂等查询反馈。",
+      "audit_finding": "两阶段确认现展示正文、附件、Task/Rubric 版本、Reviewer、可见范围、AI 披露和人工审核后果；浏览器负向回归证明第一步不触发提交。重复结果未知仍缺独立幂等查询反馈，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/api/journey_api/submission_routes.py"
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs",
+        "output/playwright/hx-v3-04-submit-confirmation-1280.png"
       ]
     },
     {
@@ -146,23 +154,27 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "CurrentAction 可表示等待；缺专页展示 SubmissionVersion、队列/Reviewer、批准 SLA 与异常升级。",
+      "audit_finding": "任务页现按权威状态展示 SUBMITTED/IN_REVIEW、固定 SubmissionVersion、提交时间、具名 Reviewer、TaskVersion SLA、通知回执缺失和未批准撤回边界；主备/超时升级需 HX-IMPL-004，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/page.tsx",
         "apps/api/journey_api/domain.py",
-        "apps/api/journey_api/review_routes.py"
+        "apps/api/journey_api/review_routes.py",
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "output/playwright/hx-v3-04-waiting-390.png"
       ]
     },
     {
       "id": "HX-PAGE-012",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "返工原因、旧版本、重提入口存在；逐项 Rubric 返工引用、求助和错误态仍不完整。",
+      "audit_finding": "返工页显示 NEEDS_REVISION、具名 Reviewer、理由、逐项结构化 Rubric 反馈、旧 SubmissionVersion、可保留项、未配置截止边界和追加式重提入口；固定旧版本或逐项 Rubric 缺失时专用错误态阻断修订并回运营纠正。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/api/journey_api/submission_routes.py"
+        "apps/api/journey_api/submission_routes.py",
+        "apps/api/journey_api/submission_service.py",
+        "output/playwright/hx-v3-04-revision-768.png"
       ]
     },
     {
@@ -170,11 +182,13 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "结果页分开学习与真人结论并提供下一动作/部分申诉；五类固定标签、积分账本和冲突态未完整。",
+      "audit_finding": "结果页现以五类固定标签分开展示完成事实、具名真人结论及固定 SubmissionVersion、AI 边界、append-only 激励账本和系统下一步；证据有效期与跨源冲突停止态仍不完整，通用高影响申诉因未批准而失败关闭，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/result/page.tsx",
         "apps/api/journey_api/outcome_routes.py",
-        "apps/api/journey_api/shared_domain.py"
+        "apps/api/journey_api/shared_domain.py",
+        "apps/api/journey_api/incentive_ledger.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
       ]
     },
     {
@@ -182,7 +196,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "结果包、真人签署、下一阶段和复核谱系存在；优势/发展项与五类固定标签未统一。",
+      "audit_finding": "结果包已统一五类事实标签、真人签署版本、下一阶段、独立复核谱系与激励边界；结构化优势/发展项及完整证据回链尚未由现有 Result 合同提供，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/result/page.tsx",
         "apps/api/journey_api/outcome_routes.py",
@@ -325,7 +339,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "固定步骤与完成条件存在；草稿层步骤尚未形成统一当前步投影.",
+      "audit_finding": "固定步骤、完成条件、输出结构、草稿回执和提交前唯一动作存在；逐步勾选仍仅为页面说明而非统一版本化草稿步骤投影，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
@@ -337,7 +351,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "本地/服务端校验与附件扫描存在；独立 AI 自查和细化风险标签缺失.",
+      "audit_finding": "本地/服务端校验、附件扫描、AI 建议标签及不可用时可跳过路径存在；经批准的版本化 AI Advisory 与细化风险提示尚未绑定，安全扫描不确定继续由服务端阻断，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
@@ -797,7 +811,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 3,
-      "audit_finding": "任务—提交—Review—返工—通过主干存在；AI 自查、提交确认、等待页与五类结果标签缺失.",
+      "audit_finding": "任务详情—行动工作区—双阶段正式提交—等待审核—结构化返工—追加重提—通过结果与激励/复核回链已连通并复用既有状态机；AI Advisory 和通用高影响申诉无批准合同时分别 GATED，异常升级细节依赖 HX-IMPL-004，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
@@ -807,7 +821,10 @@
         "apps/api/journey_api/review_routes.py",
         "apps/web/src/app/app/result/page.tsx",
         "apps/api/journey_api/outcome_routes.py",
-        "apps/api/journey_api/shared_domain.py"
+        "apps/api/journey_api/shared_domain.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs",
+        "tests/test_formal_journey_vertical_slice.py",
+        "tests/test_reviewer_workbench.py"
       ]
     },
     {

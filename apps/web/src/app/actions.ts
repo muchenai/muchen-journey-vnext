@@ -13,6 +13,7 @@ import {
   CSRF_COOKIE,
   JOIN_COOKIE,
   SESSION_COOKIE,
+  SubmissionDraft,
   TaskContentInput,
 } from "@/lib/server/api";
 
@@ -166,6 +167,8 @@ function attachmentIds(data: FormData): string[] {
 export type SubmissionActionState = {
   error?: string;
   requestId?: string;
+  savedAt?: string;
+  draftRevision?: number;
 };
 
 function aiUseDisclosure(data: FormData, prefix: "learner_ai" | "reviewer_ai") {
@@ -467,20 +470,24 @@ export async function saveSubmissionDraft(
     return { error: "草稿内容不能超过 8000 个字符。" };
   }
   try {
-    await apiRequest(`/api/v1/me/assignments/${assignmentId}/draft`, "LEARNER", {
-      method: "PUT",
-      headers: { "Idempotency-Key": idempotencyKey },
-      body: JSON.stringify({
-        expected_revision: expectedRevision,
-        body,
-        attachment_ids: attachmentIds(data),
-      }),
-    });
+    const saved = await apiRequest<SubmissionDraft>(
+      `/api/v1/me/assignments/${assignmentId}/draft`,
+      "LEARNER",
+      {
+        method: "PUT",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({
+          expected_revision: expectedRevision,
+          body,
+          attachment_ids: attachmentIds(data),
+        }),
+      },
+    );
+    revalidatePath(`/app/tasks/${assignmentId}`);
+    return { savedAt: saved.updated_at, draftRevision: saved.revision };
   } catch (error) {
     return submissionError(error);
   }
-  revalidatePath(`/app/tasks/${assignmentId}`);
-  redirect(`/app/tasks/${assignmentId}?draft=saved`);
 }
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([

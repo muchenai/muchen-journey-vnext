@@ -1102,8 +1102,13 @@ def assignment_detail(
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
     row = session.execute(
-        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion)
+        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion, User)
         .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
+        .join(
+            User,
+            (User.id == Enrollment.reviewer_id)
+            & (User.organization_id == Enrollment.organization_id),
+        )
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .outerjoin(
@@ -1121,7 +1126,7 @@ def assignment_detail(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
-    assignment, task, definition, journey_stage = row
+    assignment, task, definition, journey_stage, reviewer = row
     commands = () if assignment.status == AssignmentStatus.CANCELLED else assignment_action(assignment.status)[4]
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
@@ -1138,6 +1143,8 @@ def assignment_detail(
             ),
         ),
         revision=assignment.revision,
+        assigned_at=assignment.assigned_at,
+        reviewer_display_name=reviewer.display_name,
         allowed_commands=list(commands),
         stable_task_key=definition.stable_key,
         task_version=task.version,
@@ -1169,6 +1176,9 @@ def assignment_detail(
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
         feedback_sla_business_days=task.feedback_sla_business_days,
+        reviewer_role=task.reviewer_role,
+        sensitivity=task.sensitivity,
+        audience=task.audience,
         rubric=task.rubric,
         submission=submission,
         draft=draft,

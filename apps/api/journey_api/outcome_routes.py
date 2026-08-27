@@ -1001,6 +1001,14 @@ def result(
     outcome, handoff, evaluation, owner, next_stage_decision, delivery, receipt = row
     if evaluation.decision != Decision.PASS:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少有效的通过结论。")
+    reviewer = session.scalar(
+        select(User).where(
+            User.id == evaluation.reviewer_id,
+            User.organization_id == actor.organization_id,
+        )
+    )
+    if reviewer is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少具名 Reviewer。")
     formal_rows = session.execute(
         select(JourneyStageVersion, Evaluation, TaskVersion)
         .join(
@@ -1105,6 +1113,8 @@ def result(
             ),
             reviewer_conclusion=ResultReviewerConclusionOut(
                 reviewer_id=evaluation.reviewer_id,
+                reviewer_display_name=reviewer.display_name,
+                submission_version_id=evaluation.submission_version_id,
                 overall_feedback=evaluation.feedback,
                 ai_use=evaluation.ai_use,
                 concluded_at=evaluation.created_at,

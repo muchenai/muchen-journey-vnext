@@ -1,0 +1,163 @@
+{
+  "schema_version": "1.0",
+  "phase": "V3-04",
+  "requirement_batch": "HX-IMPL-003",
+  "evidence_scope": "PHASE_MACHINE_EVIDENCE_NOT_CANDIDATE_GATE",
+  "tested_worktree_base_sha": "6c1ce1b304cc2c565f991cc36b02c4c0bebd65f0",
+  "candidate_sha": null,
+  "result": "PASS_FOR_BATCH_COMMIT_WITH_SCOPED_GATES",
+  "implemented_flow": [
+    "authoritative task detail and responsibility boundary",
+    "server autosave receipt and explicit local recovery copy",
+    "two-step formal submission confirmation",
+    "submitted and in-review waiting projection",
+    "structured human revision feedback and immutable old-version link",
+    "five separate result fact labels and append-only incentive projection",
+    "approved next-training-stage review lineage"
+  ],
+  "scoped_gates": [
+    {
+      "scope": "AI_ADVISORY_RUNTIME",
+      "status": "GATED",
+      "reason": "No approved model, Prompt version, advisory service, or versioned advisory record is bound to this runtime.",
+      "runtime_behavior": "The AI self-check surface says current unavailable, shows unbound provenance, permits skip, and performs no mutation.",
+      "minimum_unlock": "Owner and Security approval plus a versioned AI Advisory contract, provenance store, and non-mutation tests."
+    },
+    {
+      "scope": "GENERAL_HIGH_IMPACT_APPEAL",
+      "status": "GATED",
+      "reason": "The product contract records real_appeal_policy_approved=false.",
+      "runtime_behavior": "Only the already approved next-training-stage independent review path is exposed; no new appeal state or SLA is invented.",
+      "minimum_unlock": "Approved appeal policy, accountable roles, evidence scope, service rules, and persisted state contract."
+    }
+  ],
+  "machine_checks": [
+    {
+      "command": "npm run lint",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm test",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "59 passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "pytest -q tests/test_formal_journey_vertical_slice.py tests/test_reviewer_workbench.py tests/test_incentive_ledger_runtime.py tests/test_outcome_notifications_timeline.py tests/test_submission_attachments.py",
+      "execution": "read-only candidate mount in disposable Docker test database",
+      "exit_code": 0,
+      "result": "27 passed"
+    },
+    {
+      "command": "human-experience traceability functions",
+      "exit_code": 0,
+      "result": "4 passed"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "browser_checks": {
+    "engine": "Firefox",
+    "local_url": "http://127.0.0.1:3141/",
+    "fixture_scope": "LOCAL_SYNTHETIC_MACHINE_FIXTURE_ONLY",
+    "fixture_human_evidence": false,
+    "viewports": [
+      390,
+      768,
+      1280
+    ],
+    "verified_states": [
+      "IN_PROGRESS_TWO_STEP_CONFIRMATION",
+      "SUBMITTED_WAITING",
+      "NEEDS_REVISION"
+    ],
+    "server_draft_receipt_visible": true,
+    "ai_advisory_failed_closed": true,
+    "premature_submission_request_after_fix": false,
+    "waiting_mobile_horizontal_overflow": false,
+    "console_errors_after_fix": 0,
+    "console_warnings_after_fix": 0
+  },
+  "artifacts": [
+    {
+      "path": "output/playwright/hx-v3-04-submit-confirmation-1280.png",
+      "sha256": "3666d7ab7013b00448b5acc41dc28710848c67a650ec733bcf1f36c30638c3e0"
+    },
+    {
+      "path": "output/playwright/hx-v3-04-waiting-390.png",
+      "sha256": "38c3b77c25165b506e5ecc84a61693b00ee9ea193813197d8b26001df029ed42"
+    },
+    {
+      "path": "output/playwright/hx-v3-04-revision-768.png",
+      "sha256": "722d8158e524dfec23ce1d6e95f70239940e0a62c4c61ef63e503730ffe15e32"
+    },
+    {
+      "path": "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json",
+      "sha256": "b7502e2929ad691e7b21a9f80f654cd25e35eee57b53f5b2498754ca372db4f7"
+    }
+  ],
+  "diagnostic_failures": [
+    {
+      "stage": "red_learner_loop_contract",
+      "result": "EXPECTED_FAIL_RESOLVED",
+      "cause": "Five learner-loop contract checks failed before the implementation.",
+      "resolution": "Implemented the authoritative task, recovery, confirmation, gated AI, and five-ledger result surfaces; 5/5 checks pass."
+    },
+    {
+      "stage": "formal_confirmation_browser_negative",
+      "result": "RESOLVED",
+      "cause": "React reused the first-step button node as a submit button during the click default-action window, causing a premature POST to the local synthetic fixture.",
+      "resolution": "The first-step handler now prevents the browser default action explicitly; a 1.8-second browser regression produced zero submission POSTs."
+    },
+    {
+      "stage": "standalone_static_assets",
+      "result": "RESOLVED",
+      "cause": "The standalone test server was initially started before generated static assets were copied into its runtime directory.",
+      "resolution": "Copied build-only static artifacts, restarted the local server, and repeated checks with zero console errors."
+    },
+    {
+      "stage": "incremental_typecheck_cache",
+      "result": "RESOLVED",
+      "cause": "A stale generated Next.js incremental cache produced a false LayoutRoutes constraint error after build.",
+      "resolution": "Removed only generated tsbuildinfo caches and reran the unchanged npm typecheck command successfully."
+    },
+    {
+      "stage": "disposable_container_package_refresh",
+      "result": "RESOLVED",
+      "cause": "An unnecessary apk package-refresh step stalled before pytest started in a disposable test container.",
+      "resolution": "Stopped only that disposable container and reran the same five suites with the existing pinned image; 27 tests passed."
+    }
+  ],
+  "human_evidence": {
+    "human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release_authorization": "NOT_RUN"
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

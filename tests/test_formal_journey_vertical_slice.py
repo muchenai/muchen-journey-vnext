@@ -222,6 +222,11 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         learner.get(f"/api/v1/me/assignments/{action['resource_id']}")
     )
     day_zero_experience = day_zero["learning_experience"]
+    assert day_zero["reviewer_display_name"]
+    assert day_zero["assigned_at"]
+    assert day_zero["reviewer_role"]
+    assert day_zero["sensitivity"]
+    assert day_zero["audience"]
     assert day_zero_experience["version"] == 2
     assert day_zero_experience["mode"] == "ORIENTATION"
     assert len(day_zero_experience["learning_blocks"]) >= 2
@@ -302,6 +307,8 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     }
     assert result["reviewer_conclusion"]["status"] == "FINALIZED"
     assert result["reviewer_conclusion"]["decision"] == "PASS"
+    assert result["reviewer_conclusion"]["reviewer_display_name"]
+    assert result["reviewer_conclusion"]["submission_version_id"]
     assert result["next_training_stage"] == {
         "decision_scope": "NEXT_TRAINING_STAGE",
         "display_name": "下一训练阶段决定",
@@ -346,6 +353,9 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
             .order_by(Evaluation.created_at.desc(), Evaluation.id.desc())
         )
         assert final_evaluation is not None
+        assert result["reviewer_conclusion"]["submission_version_id"] == str(
+            final_evaluation.submission_version_id
+        )
         assignment = session.get(Assignment, final_evaluation.assignment_id)
         submission = session.get(Submission, final_evaluation.submission_id)
         submission_version = session.get(
