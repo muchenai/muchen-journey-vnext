@@ -16,7 +16,7 @@ WP08_LOCAL_API_PORT ?= 38000
 API_TEST_APK_PACKAGES := bash=5.3.9-r1 git=2.54.0-r0 grep=3.12-r0
 API_TEST_PYTEST_ARGS := -q -o cache_dir=/tmp/pytest-cache --ignore=tests/test_construction_legacy_zero_migration.py
 
-.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke
+.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit human-experience-machine-gate wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke
 
 bootstrap:
 	docker compose build api worker
@@ -84,6 +84,10 @@ secret-scan:
 dependency-audit:
 	python3 scripts/web_dependency_audit.py
 	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off -r /src/requirements.lock'
+
+human-experience-machine-gate:
+	$(MAKE) api-test
+	$(MAKE) web-check
 
 wp12-hardening-check:
 	python3 scripts/wp12_candidate_hardening.py

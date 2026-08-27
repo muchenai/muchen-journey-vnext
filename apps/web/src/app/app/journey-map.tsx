@@ -128,6 +128,8 @@ export function JourneyMap({
         <span>{current.reason}</span>
         {current.href && current.actionLabel ? (
           <Link className="button primary" href={current.href}>{current.actionLabel}<b aria-hidden="true">→</b></Link>
+        ) : current.href ? (
+          <strong className="journey-waiting">当前动作见下方权威任务卡</strong>
         ) : (
           <strong className="journey-waiting">等待下一步开放</strong>
         )}

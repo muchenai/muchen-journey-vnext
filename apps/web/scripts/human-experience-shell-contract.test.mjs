@@ -41,3 +41,14 @@ test("waiting work exposes the submitted version as the single current action", 
   assert.match(learnerHome, /查看已提交版本/);
   assert.match(learnerHome, /href: opensTask \|\| waitsForReview \? taskHref/);
 });
+
+test("the current task card projects immutable task, assignment, SLA and review facts", () => {
+  assert.match(learnerHome, /current-task-card/);
+  for (const field of ["任务类型", "预计时间", "截止时间", "审核边界", "首次反馈", "当前状态来源"]) {
+    assert.match(learnerHome, new RegExp(field));
+  }
+  assert.match(learnerHome, /TaskVersion v\{assignment\.task_version\}/);
+  assert.match(learnerHome, /Assignment revision \{assignment\.revision\}/);
+  assert.match(learnerHome, /未单独配置；不虚构日期/);
+  assert.match(learnerHome, /打开当前任务/);
+});

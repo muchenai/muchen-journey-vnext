@@ -3,6 +3,7 @@ import Link from "next/link";
 import { logoutSession } from "@/app/actions";
 import { ExperienceState, FactLegend } from "@/app/human-experience";
 import {
+  Assignment,
   CurrentAction,
   hasVNextSession,
   LearnerEnrollment,
@@ -32,6 +33,9 @@ export default async function LearnerHome({
   );
   const waitsForReview = action.action_type === "WAIT_FOR_REVIEW";
   const opensResult = action.action_type === "VIEW_RESULT_OR_HANDOFF";
+  const assignment = opensTask || waitsForReview
+    ? await learnerPageRequest<Assignment>(`/api/v1/me/assignments/${action.resource_id}`)
+    : null;
   const currentNode = action.journey?.nodes.find((node) => node.status === "CURRENT");
   const opensFirstMaterial = opensTask && currentNode?.position === 0;
   const taskHref = `/app/tasks/${action.resource_id}${
@@ -52,17 +56,32 @@ export default async function LearnerHome({
               title: currentNode?.title ?? action.title,
               reason: action.reason,
               href: opensTask || waitsForReview ? taskHref : opensResult ? resultHref : null,
-              actionLabel: opensResult
-                ? "打开旅程结果"
-                : waitsForReview
-                  ? "查看已提交版本"
-                : opensFirstMaterial
-                  ? "打开第一份必读材料"
-                  : opensTask
-                    ? "进入这一站"
-                    : null,
+              actionLabel: opensResult ? "打开旅程结果" : null,
             }}
           />
+          {assignment ? (
+            <section className="current-task-card" aria-labelledby="current-task-card-title">
+              <header>
+                <div>
+                  <p className="eyebrow">当前应做的一项 · TaskVersion v{assignment.task_version}</p>
+                  <h2 id="current-task-card-title">{assignment.task_title}</h2>
+                  <p>{assignment.task_purpose}</p>
+                </div>
+                <strong>{assignment.status}</strong>
+              </header>
+              <dl>
+                <div><dt>任务类型</dt><dd>{assignment.journey_stage?.stage_kind ?? "正式任务"}</dd></div>
+                <div><dt>预计时间</dt><dd>{assignment.estimated_duration_minutes} 分钟</dd></div>
+                <div><dt>截止时间</dt><dd>未单独配置；不虚构日期</dd></div>
+                <div><dt>审核边界</dt><dd>{assignment.journey_stage?.completion_policy === "LEARNER_EVIDENCE" ? "低风险学习证据；无需真人评审" : `正式任务；由 ${assignment.reviewer_display_name} 真人审核`}</dd></div>
+                <div><dt>首次反馈</dt><dd>{assignment.feedback_sla_business_days} 个工作日内</dd></div>
+                <div><dt>当前状态来源</dt><dd>Assignment revision {assignment.revision}</dd></div>
+              </dl>
+              <Link className="button primary" href={taskHref}>
+                {waitsForReview ? "查看已提交版本" : opensFirstMaterial ? "打开第一份必读材料" : "打开当前任务"}
+              </Link>
+            </section>
+          ) : null}
         </>
       ) : opensTask || waitsForReview || opensResult ? (
         <article className="status-card">

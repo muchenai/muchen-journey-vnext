@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json"
 ORDER = ROOT / "outputs/controller-integration/human-experience-v1.0/p0-implementation-order.v1.json"
 REGRESSION = ROOT / "outputs/controller-integration/human-experience-v1.0/regression-matrix.v1.json"
+MACHINE_CASES = ROOT / "config/human_experience_machine_cases.v1.json"
+UAT_PLAN = ROOT / "docs/uat/HX_V1.0_REAL_HUMAN_UAT_PLAN.md"
+OWNER_PACKAGE = ROOT / "docs/uat/HX_V1.0_OWNER_REVIEW_PACKAGE.md"
 CONTRACT = ROOT / "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
 EXPECTED_SHA = "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08"
 
@@ -71,3 +74,15 @@ def test_p0_order_and_regression_matrix_are_complete_before_runtime_changes() ->
         f"HX-REG-{number:03d}" for number in range(1, 11)
     ]
     assert all(item["command"] and item["expected"] for item in suites)
+
+
+def test_human_plans_remain_not_run_and_machine_cases_deny_release_inference() -> None:
+    cases = json.loads(MACHINE_CASES.read_text())
+    assert "NOT_HUMAN_UAT" in cases["semantics"]
+    assert "NOT_OWNER_SIGNOFF" in cases["semantics"]
+    assert "NOT_RELEASE" in cases["semantics"]
+    uat = UAT_PLAN.read_text()
+    owner = OWNER_PACKAGE.read_text()
+    assert uat.count("`NOT_RUN`") >= 20
+    for fact in ("真人 UAT：`NOT_RUN`", "Owner 签署：`NOT_RUN`", "Canary：`NOT_RUN`", "Release：`NOT_AUTHORIZED`"):
+        assert fact in owner

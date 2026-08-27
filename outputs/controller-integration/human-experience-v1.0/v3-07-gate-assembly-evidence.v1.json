@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "phase": "V3-07_HX_IMPL_006_GATE_ASSEMBLY",
+  "status": "READY_FOR_V3_08_MACHINE_EXECUTION_NOT_A_FINAL_GATE",
+  "source_checkpoint_sha": "860933bf7d920bda7ac873d683f16f00252137c6",
+  "candidate_sha": "NOT_YET_FIXED_V3_08",
+  "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
+  "machine_case_manifest": {
+    "path": "config/human_experience_machine_cases.v1.json",
+    "sha256": "98977c64d0c11acd32e18d0ae8a9632029c15f04e26a1db78306db85bc28c0b2",
+    "state_projection_cases": 56,
+    "enabled_primary_cta_cases": 21,
+    "ai_incentive_negative_cases": 28,
+    "failure_recovery_cases": 64
+  },
+  "execution": {
+    "web_contract": {
+      "command": "cd apps/web && npm test",
+      "exit_code": 0,
+      "result": "68 passed"
+    },
+    "web_static_and_build": {
+      "command": "cd apps/web && npm run lint && npm run typecheck && npm run build",
+      "exit_code": 0,
+      "result": "lint, TypeScript and Next.js production build passed; 16 routes emitted"
+    },
+    "hx_machine_and_trace_first_run": {
+      "command": "pytest tests/test_human_experience_machine_gate.py tests/test_human_experience_traceability.py",
+      "exit_code": 1,
+      "result": "89 passed, 1 failed",
+      "failure": "Makefile proof binding did not recognize npm test glob execution"
+    },
+    "hx_machine_and_trace_retry": {
+      "command": "pytest tests/test_human_experience_machine_gate.py tests/test_human_experience_traceability.py",
+      "exit_code": 0,
+      "result": "91 passed"
+    }
+  },
+  "metric_execution": {
+    "HX-METRIC-004": {
+      "status": "PARTIAL",
+      "machine_server_projection": "56/56",
+      "browser_snapshot_reconciliation": "NOT_RUN"
+    },
+    "HX-METRIC-005": {
+      "status": "NOT_RUN",
+      "planned_denominator": 21
+    },
+    "HX-METRIC-006": {
+      "status": "PARTIAL",
+      "domain_negative_cases": "28/28 rejected",
+      "full_api_ledger_audit_gate": "NOT_RUN"
+    },
+    "HX-METRIC-008": {
+      "status": "NOT_RUN",
+      "planned_denominator": 64
+    }
+  },
+  "human_evidence": {
+    "uat_plan": {
+      "path": "docs/uat/HX_V1.0_REAL_HUMAN_UAT_PLAN.md",
+      "sha256": "748724382428ba7c3d78433eb709d2f553bcaa79c4b7bd000147f8d50fd21356",
+      "status": "NOT_RUN"
+    },
+    "owner_review_package": {
+      "path": "docs/uat/HX_V1.0_OWNER_REVIEW_PACKAGE.md",
+      "sha256": "2ae3f566e80434d6c1a89e23cdde04318207e32ee095467decabc26e0b17f4b9",
+      "status": "PREPARATION_ONLY_NOT_SUBMITTED"
+    },
+    "human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release": "NOT_AUTHORIZED"
+  },
+  "gap_matrix": {
+    "path": "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json",
+    "sha256": "dafae8e819fce4f4c472b187fbaa946a9504578c95aac141e614ac30182da257",
+    "status_counts": {
+      "IMPLEMENTED": 14,
+      "PARTIAL": 38,
+      "NOT_IMPLEMENTED": 3,
+      "GATED": 19,
+      "P1_DEFERRED": 5
+    }
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

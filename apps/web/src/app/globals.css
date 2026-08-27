@@ -421,6 +421,16 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .journey-route-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .journey-map-hint { position: relative; z-index: 3; margin: -10px 0 0; color: #bce0df; font-size: 11px; }
 .current-stage-card { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 24px 28px; background: #fff; border: 1px solid #d8e3df; border-radius: 22px; box-shadow: 0 14px 36px rgba(23, 75, 92, .08); }
+.current-task-card { display: grid; gap: 20px; padding: clamp(24px, 5vw, 36px); background: #fff; border: 1px solid #d8e3df; border-radius: 24px; box-shadow: 0 14px 36px rgba(23, 75, 92, .08); }
+.current-task-card > header { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.current-task-card h2 { margin: 3px 0 8px; }
+.current-task-card header p:last-child { max-width: 64ch; margin: 0; color: var(--text-secondary); }
+.current-task-card header > strong { padding: 7px 10px; color: #155d59; background: #e6f5f1; border-radius: 999px; font-size: 12px; }
+.current-task-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin: 0; background: #d8e3df; border: 1px solid #d8e3df; border-radius: 14px; }
+.current-task-card dl > div { padding: 13px 15px; background: #fff; }
+.current-task-card dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
+.current-task-card dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.current-task-card > .button { width: fit-content; }
 .current-stage-card > div { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 14px; }
 .current-stage-card .stage-pulse { grid-row: 1 / 4; align-self: center; width: 10px; height: 10px; background: #efb43e; border-radius: 50%; box-shadow: 0 0 0 7px #fdf1d2; }
 .current-stage-card .eyebrow { margin: 0; font-size: 12px; }
@@ -615,6 +625,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .journey-route-accessible li { padding: 9px 10px; color: #d8e9e6; background: rgba(5, 26, 39, .7); border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; font-size: 10px; line-height: 1.4; }
   .journey-map-hint { margin-top: 12px; }
   .current-stage-card { align-items: stretch; flex-direction: column; }
+  .current-task-card > header { flex-direction: column; }
+  .current-task-card dl { grid-template-columns: 1fr; }
+  .current-task-card > .button { width: 100%; }
   .task-hero-card { min-height: 320px; border-radius: 28px; }
   .task-hero-card h1 { margin-top: 40px; }
   .task-contract-columns { grid-template-columns: 1fr; }

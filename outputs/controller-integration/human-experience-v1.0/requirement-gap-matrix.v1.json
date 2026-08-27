@@ -13,10 +13,10 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 35,
-    "NOT_IMPLEMENTED": 7,
+    "PARTIAL": 38,
+    "NOT_IMPLEMENTED": 3,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 13,
+    "IMPLEMENTED": 14,
     "GATED": 19
   },
   "requirements": [
@@ -85,13 +85,13 @@
     },
     {
       "id": "HX-PAGE-006",
-      "status": "NOT_IMPLEMENTED",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 2,
-      "audit_finding": "当前只有唯一任务入口，没有满足合同字段的任务卡列表投影。",
+      "audit_finding": "当前任务卡直接投影不可变 TaskVersion、Assignment revision、任务类型、预计时间、Reviewer 与已批准 SLA；上游没有独立截止字段时明确显示未配置且不虚构日期，同页只保留一个主动作。",
       "trace_paths": [
-        "apps/web/src/app/app/program-overview.tsx",
-        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx"
+        "apps/web/src/app/app/page.tsx",
+        "apps/web/scripts/human-experience-shell-contract.test.mjs"
       ]
     },
     {
@@ -718,13 +718,13 @@
     },
     {
       "id": "HX-METRIC-004",
-      "status": "NOT_IMPLEMENTED",
+      "status": "PARTIAL",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "56 个页面/服务端快照对账矩阵尚未建立。",
+      "audit_finding": "8 个本地合成机器 learner ref × 7 个权威状态的 56 个服务端投影已全部执行通过；真实浏览器截图对账与固定候选绑定留待 V3-08，因此不宣称完整指标通过。",
       "trace_paths": [
-        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
-        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py"
       ]
     },
     {
@@ -732,21 +732,22 @@
       "status": "NOT_IMPLEMENTED",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "固定 route×state×viewport 的启用主 CTA 探测尚未建立。",
+      "audit_finding": "7 个状态 × 390/768/1280 三个 viewport 的 21 个固定启用主 CTA 分母已冻结，但 V3-08 浏览器可达性探测尚未执行。",
       "trace_paths": [
-        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
-        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py"
       ]
     },
     {
       "id": "HX-METRIC-006",
-      "status": "NOT_IMPLEMENTED",
+      "status": "PARTIAL",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "4 模块×7 类 AI/激励越权 28 个样例尚未齐备。",
+      "audit_finding": "4 模块 × 7 类 AI/激励/低风险越权 28 个领域合同负向样例已执行为 0 正式结果；完整 API、账本与审计回归将在 V3-08 全 Gate 后绑定候选。",
       "trace_paths": [
-        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
-        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "tests/test_incentive_ledger_runtime.py"
       ]
     },
     {
@@ -765,10 +766,11 @@
       "status": "NOT_IMPLEMENTED",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "64 个弱网/错误故障注入矩阵尚未建立。",
+      "audit_finding": "4 模块 × 4 故障模式 × 4 写操作的 64 个固定分母与共享证明绑定已冻结；全 API/Web 证明套件和浏览器故障注入尚未在 V3-08 固定候选执行。",
       "trace_paths": [
-        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
-        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
       ]
     },
     {
@@ -884,13 +886,15 @@
     },
     {
       "id": "HX-IMPL-006",
-      "status": "NOT_IMPLEMENTED",
+      "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 6,
-      "audit_finding": "HX 专用完整机器 Gate、证据 manifest 与 NOT_RUN 真人计划尚未形成.",
+      "audit_finding": "HX 专用机器目标、固定机器分母、NOT_RUN 真人 UAT 计划和 Owner Review 准备包已形成；固定候选 SHA、完整 Gate 结果与证据 manifest 留待 V3-08。",
       "trace_paths": [
         "Makefile",
-        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+        "config/human_experience_machine_cases.v1.json",
+        "docs/uat/HX_V1.0_REAL_HUMAN_UAT_PLAN.md",
+        "docs/uat/HX_V1.0_OWNER_REVIEW_PACKAGE.md"
       ]
     },
     {
