@@ -10,6 +10,8 @@
 
 开发解锁入口：`../Muchen_Journey_全模块开发解锁决议_V0.1.md`。六模块已获直接开发授权，未签署事项转为发布前Gate；正式发布仍未授权。
 
+人本体验层构建输入：`01A_Shared_Human_Experience_Layer_Contract_V1.0.md`，固定 SHA-256 为 `ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08`，状态为 `CONTRACT_COMPLETE_READY_FOR_OWNER_REVIEW / CONTRACT_ERRATA_1_APPLIED`。该合同只覆盖跨模块呈现与交互行为，不替代本索引及上游合同定义的产品语义、领域状态机、证据账本、安全与隐私、人工 Gate、Canary 或 Release 合同；机器实现和测试也不得据此推断 Owner 签署或真人 UAT。
+
 ## 1. 第一发布模块
 
 | Contract | 模块 | MAP-ID | 使用者结果 | 当前状态 | 开发条件 |
