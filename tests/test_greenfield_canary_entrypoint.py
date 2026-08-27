@@ -22,7 +22,7 @@ def test_greenfield_package_is_exact_candidate_and_confirmation_bound() -> None:
     assert f"inputs.candidate == '{CANDIDATE}'" in job
     assert "inputs.confirmation == 'PACKAGE_1BCCBBF_GREENFIELD_CANARY'" in job
     assert "ref: ${{ inputs.candidate }}" in job
-    assert "test \"$(git rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
+    assert "test \"$(git -C candidate rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
 
 
 def test_greenfield_package_has_no_production_environment_or_infrastructure_secrets() -> None:
@@ -37,7 +37,7 @@ def test_greenfield_package_has_no_production_environment_or_infrastructure_secr
 
 def test_greenfield_package_only_pushes_exact_commit_tags() -> None:
     job = greenfield_package_job()
-    assert "make candidate-registry-check" in job
+    assert "make -C candidate candidate-registry-check" in job
     assert job.count("docker push") == 1
     assert 'candidate=\'${{ inputs.candidate }}\'' in job
     assert 'muchen-journey-vnext-$service:$candidate' in job
@@ -47,8 +47,10 @@ def test_greenfield_package_only_pushes_exact_commit_tags() -> None:
 def test_greenfield_package_rechecks_candidate_and_uploads_digest_evidence() -> None:
     job = greenfield_package_job()
     assert "python3 scripts/wp07_candidate.py preflight" in job
-    assert "make ci-main" in job
-    assert "make candidate-package" in job
+    assert "make -C candidate ci-main" in job
+    assert "--platform linux/amd64" in job
+    assert "wp31_prepare_amd64_dockerfiles.py" in job
+    assert "amd64-build-definition-manifest.json" in job
     assert "python3 scripts/wp07_candidate.py registry" in job
     assert "python3 scripts/wp07_candidate.py verify" in job
     assert "name: wp07-candidate-${{ inputs.candidate }}" in job
