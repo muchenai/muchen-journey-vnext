@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "baseline_sha": "5260424eac6e3565ca5b2642fb2b3fdfb44b8039",
+  "suites": [
+    {
+      "id": "HX-REG-001",
+      "risk": "traceability",
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest -q -o cache_dir=/tmp/pytest-cache tests/test_human_experience_traceability.py",
+      "expected": "all 79 IDs unique, continuous, classified, and path-backed"
+    },
+    {
+      "id": "HX-REG-002",
+      "risk": "formal-state",
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest -q -o cache_dir=/tmp/pytest-cache tests/test_formal_assignment_workflow.py tests/test_submission_attachments.py tests/test_reviewer_workbench.py",
+      "expected": "no skipped review, overwrite, or wrong actor"
+    },
+    {
+      "id": "HX-REG-003",
+      "risk": "ai-incentive",
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest -q -o cache_dir=/tmp/pytest-cache tests/test_shared_domain_projection.py tests/test_incentive_ledger_runtime.py",
+      "expected": "AI and incentives cannot create formal results"
+    },
+    {
+      "id": "HX-REG-004",
+      "risk": "module-binding",
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest -q -o cache_dir=/tmp/pytest-cache tests/test_construction_module_content_package.py tests/test_construction_module_runtime.py",
+      "expected": "four modules reuse one runtime truth and missing approved values fail closed"
+    },
+    {
+      "id": "HX-REG-005",
+      "risk": "web-contract",
+      "command": "npm test",
+      "workdir": "apps/web",
+      "expected": "route, CTA, controlled scope and recovery contracts pass"
+    },
+    {
+      "id": "HX-REG-006",
+      "risk": "web-static",
+      "command": "npm run lint && npm run typecheck && npm run build",
+      "workdir": "apps/web",
+      "expected": "lint, type and production build pass"
+    },
+    {
+      "id": "HX-REG-007",
+      "risk": "browser-responsive",
+      "command": "playwright scripted 390/768/1280 route-state sweep",
+      "expected": "0 dead CTA, no horizontal overflow, authoritative states match"
+    },
+    {
+      "id": "HX-REG-008",
+      "risk": "accessibility",
+      "command": "automated axe plus keyboard/focus/reduced-motion sweep",
+      "expected": "no critical/serious automated violation and no keyboard blocker"
+    },
+    {
+      "id": "HX-REG-009",
+      "risk": "failure-recovery",
+      "command": "local fault-injection state/action matrix",
+      "expected": "no false success, duplicate mutation, or lost draft"
+    },
+    {
+      "id": "HX-REG-010",
+      "risk": "full-machine-gate",
+      "command": "make verify",
+      "expected": "repository-proportional complete local machine gate"
+    }
+  ]
+}
