@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0",
+  "phase": "V3-05",
+  "requirement_batch": "HX-IMPL-004",
+  "evidence_scope": "PHASE_MACHINE_EVIDENCE_NOT_CANDIDATE_GATE",
+  "tested_worktree_base_sha": "024ef46a1acc2a6a236ea264bd0a9438195c98f3",
+  "candidate_sha": null,
+  "result": "PASS_FOR_BATCH_COMMIT_WITH_SCOPED_GATES",
+  "implemented_flow": [
+    "reviewer queue authoritative priority and fixed submission facts",
+    "review detail fixed evidence, separated AI disclosure, complete rubric and named-human conclusion boundary",
+    "operator approved reviewer workload, primary and backup mapping, SLA and overdue facts",
+    "highest-priority exception entry and notification-failure linkage",
+    "successful empty queue distinct from unavailable data",
+    "fail-closed capacity, conflict-check and incomplete-module denominator projections"
+  ],
+  "scoped_gates": [
+    {
+      "scope": "REVIEWER_CAPACITY",
+      "status": "GATED",
+      "reason": "The approved workload binding intentionally provides capacity_limit=null and capacity_status=PENDING_OWNER_CONTENT.",
+      "runtime_behavior": "Reviewer and operator pages render capacity as unapproved and uncomputable; review counts are never used as a capacity guess.",
+      "minimum_unlock": "Owner-approved versioned capacity values and their source binding."
+    },
+    {
+      "scope": "CONFLICT_AVOIDANCE",
+      "status": "GATED",
+      "reason": "No approved conflict or recusal decision contract is bound to the review queue.",
+      "runtime_behavior": "The queue and detail expose conflict_status=NOT_EVALUATED and do not claim that the assignment is conflict-free.",
+      "minimum_unlock": "Approved conflict rules, authoritative inputs, recusal actor and persisted audit contract."
+    },
+    {
+      "scope": "GENERAL_HIGH_IMPACT_APPEAL",
+      "status": "GATED",
+      "reason": "The product contract records real_appeal_policy_approved=false.",
+      "runtime_behavior": "Review detail states that no generic appeal path or SLA is promised; the already approved next-training-stage review remains separate.",
+      "minimum_unlock": "Approved appeal policy, accountable roles, evidence scope, service rules and persisted state contract."
+    },
+    {
+      "scope": "FOUR_MODULE_OPERATIONAL_DENOMINATOR",
+      "status": "GATED",
+      "reason": "Reviewer workload bindings currently cover only approved bound content packages, not all four controlled-release modules.",
+      "runtime_behavior": "The operator page labels missing module denominators uncomputable and does not render a misleading zero.",
+      "minimum_unlock": "Approved ModuleContentPackageBinding coverage for each intended module."
+    }
+  ],
+  "machine_checks": [
+    {
+      "command": "npm run lint",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm test",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "63 passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "make api-test",
+      "execution": "repository-pinned Python 3.14 API image and disposable Docker test database",
+      "exit_code": 0,
+      "result": "513 passed"
+    },
+    {
+      "command": "pytest -q tests/test_human_experience_traceability.py",
+      "execution": "read-only candidate mount in repository-pinned API image",
+      "exit_code": 0,
+      "result": "4 passed"
+    }
+  ],
+  "browser_checks": {
+    "engine": "Firefox",
+    "local_url": "http://127.0.0.1:3142/",
+    "fixture_scope": "LOCAL_SYNTHETIC_MACHINE_FIXTURE_ONLY",
+    "fixture_human_evidence": false,
+    "viewports": [390, 1280],
+    "verified_states": [
+      "REVIEW_QUEUE_WITH_SCOPED_GATES",
+      "REVIEW_DETAIL_HUMAN_CONCLUSION_BOUNDARY",
+      "OPS_WORKLOAD_WITH_UNCOMPUTABLE_CAPACITY"
+    ],
+    "reviewer_primary_action_reached_detail": true,
+    "capacity_failed_closed": true,
+    "conflict_check_failed_closed": true,
+    "incomplete_module_denominator_failed_closed": true,
+    "console_errors": 0,
+    "console_warnings": 0
+  },
+  "artifacts": [
+    {
+      "path": "output/playwright/hx-v3-05-review-queue-1280.png",
+      "sha256": "6c4ac1d4a96b5d29e21e6c6db953d40a1e718931d1c9ef5bcd657339befba74a"
+    },
+    {
+      "path": "output/playwright/hx-v3-05-review-detail-390.png",
+      "sha256": "ea4d3d6b0539c13a9ffe0613dc3f201ab75d31d4cda983febb4153d7e70a8bab"
+    },
+    {
+      "path": "output/playwright/hx-v3-05-ops-workload-1280.png",
+      "sha256": "110197d34e7b6b8b6722d245df252140a4ad8324257810cc0cbc130fd3eed5ee"
+    },
+    {
+      "path": "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json",
+      "sha256": "8e87619546b06de7e15e0c14fd1eab53678e6b7b660f87507a0413c0de876545"
+    }
+  ],
+  "diagnostic_failures": [
+    {
+      "stage": "red_reviewer_ops_contract",
+      "result": "EXPECTED_FAIL_RESOLVED",
+      "cause": "All four new Reviewer and operator presentation contract checks failed before implementation.",
+      "resolution": "Implemented authoritative queue facts, human/AI detail boundaries, workload projection and explicit empty state; 4/4 checks pass within the 63-test Web suite."
+    },
+    {
+      "stage": "full_api_regression_first_run",
+      "result": "RESOLVED",
+      "cause": "One pre-existing domain assertion still expected an invented two-business-day promise after the runtime wording had been corrected to approved-SLA semantics.",
+      "resolution": "Updated the stale assertion without changing runtime behavior; the repeated full API Gate passed 513/513."
+    }
+  ],
+  "human_evidence": {
+    "human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release_authorization": "NOT_RUN"
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

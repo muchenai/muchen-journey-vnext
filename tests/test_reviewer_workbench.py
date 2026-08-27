@@ -644,6 +644,12 @@ def test_queue_detail_scope_priority_and_get_are_side_effect_free():
     assert own_item["material_status"] == "COMPLETE"
     assert own_item["submission_version_id"] == own["submission"]["submission_version_id"]
     assert own_item["priority_reason"] == "按等待时间排序"
+    assert own_item["submitted_at"]
+    assert own_item["feedback_sla_business_days"] >= 1
+    assert own_item["revision_count"] == 0
+    assert own_item["sensitivity"]
+    assert own_item["audience"]
+    assert own_item["conflict_status"] == "NOT_EVALUATED"
     queue_ids = {item["id"] for item in queue["items"]}
     assert str(other["review_id"]) not in queue_ids
     assert str(cross_org_review_id) not in queue_ids

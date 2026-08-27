@@ -295,10 +295,16 @@ def queue_item(
         task_title=context.task.title,
         task_version=context.task.version,
         submission_version_no=context.version.version_no,
+        submitted_at=context.version.created_at,
         assigned_at=context.review.assigned_at,
         started_at=context.review.started_at,
         priority_reason=priority_reason(context.review, context.version),
         material_status=material_state.status,
+        feedback_sla_business_days=context.task.feedback_sla_business_days,
+        revision_count=max(context.version.version_no - 1, 0),
+        sensitivity=context.task.sensitivity,
+        audience=context.task.audience,
+        conflict_status="NOT_EVALUATED",
     )
 
 

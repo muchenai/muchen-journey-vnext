@@ -206,10 +206,16 @@ export type ReviewItem = {
   task_title: string;
   task_version: number;
   submission_version_no: number;
+  submitted_at: string;
   assigned_at: string;
   started_at: string | null;
   priority_reason: string;
   material_status: "COMPLETE" | "INCOMPLETE";
+  feedback_sla_business_days: number;
+  revision_count: number;
+  sensitivity: string;
+  audience: string;
+  conflict_status: "NOT_EVALUATED";
 };
 
 export type ReviewDetail = ReviewItem & {
@@ -648,6 +654,25 @@ export type OpsNotificationDelivery = {
   next_attempt_at: string | null;
   delivered_at: string | null;
   external_receipt_recorded: boolean;
+};
+
+export type ReviewerWorkload = {
+  binding_id: string;
+  module_key: "ai-academy" | "delivery-guild";
+  package_id: string;
+  package_version: string;
+  primary_reviewer_id: string;
+  primary_reviewer_display_name: string;
+  backup_reviewer_id: string;
+  backup_reviewer_display_name: string;
+  first_response_sla_minutes: number;
+  completion_sla_minutes: number;
+  active_enrollment_count: number;
+  open_review_count: number;
+  overdue_review_count: number;
+  capacity_limit: null;
+  capacity_status: "PENDING_OWNER_CONTENT";
+  replacement_scope: "PRIMARY_OR_NAMED_BACKUP_ONLY";
 };
 
 export type RuntimeStatus = {

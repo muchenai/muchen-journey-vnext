@@ -1269,10 +1269,16 @@ class ReviewQueueItemOut(StrictModel):
     task_title: str
     task_version: int
     submission_version_no: int
+    submitted_at: datetime
     assigned_at: datetime
     started_at: datetime | None
     priority_reason: str
     material_status: Literal["COMPLETE", "INCOMPLETE"]
+    feedback_sla_business_days: int
+    revision_count: int
+    sensitivity: str
+    audience: str
+    conflict_status: Literal["NOT_EVALUATED"] = "NOT_EVALUATED"
 
 
 class ReviewQueueOut(StrictModel):

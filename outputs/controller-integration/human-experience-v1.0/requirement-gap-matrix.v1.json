@@ -208,11 +208,14 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "队列按指定 Reviewer 裁剪并显示优先理由；缺 SLA、风险/回避、主备和升级。",
+      "audit_finding": "服务端队列按组织和指定 Reviewer 裁剪并排序，现显示模块/任务、安全标识、提交时间、版本、返工次数、TaskVersion SLA、敏感/受众和材料风险；冲突检查明确为 NOT_EVALUATED，队列接口无批准主备/升级映射时失败关闭，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/review/page.tsx",
         "apps/web/src/app/review/[reviewId]/page.tsx",
-        "apps/api/journey_api/review_routes.py"
+        "apps/api/journey_api/review_routes.py",
+        "apps/api/journey_api/schemas.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-review-queue-1280.png"
       ]
     },
     {
@@ -220,11 +223,13 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "固定提交/Rubric、理由、AI 披露、真人定稿和不可变历史已实现；缺申诉提示与结果未知查询提示。",
+      "audit_finding": "固定 SubmissionVersion、Task/Rubric、原始正文/附件、AI 分区、完整 Rubric/理由、结论影响、真人定稿和只读 Evaluation 历史已实现；通用高影响申诉未获批准而明确 GATED，未知结果仅提示保留 request ID 并重查，且详情尚无完整修订版本谱系，故保持 PARTIAL。",
       "trace_paths": [
-        "apps/web/src/app/review/page.tsx",
         "apps/web/src/app/review/[reviewId]/page.tsx",
-        "apps/api/journey_api/review_routes.py"
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
+        "apps/api/journey_api/review_routes.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-review-detail-390.png"
       ]
     },
     {
@@ -244,12 +249,13 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "共享空态可显示服务端已知事实与唯一恢复动作；Reviewer/运营仍需区分成功空结果、未配置与未加载。",
+      "audit_finding": "共享空态及 Reviewer 队列现区分查询成功空结果、检查范围和最近检查时间，运营 workload 空结果也明确主备/SLA/容量不可计算；其他运营列表仍未统一同步时间、模块与帮助入口，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/human-experience.tsx",
         "apps/web/src/app/review/page.tsx",
         "apps/web/src/app/app/page.tsx",
-        "apps/web/src/app/ops/page.tsx"
+        "apps/web/src/app/ops/page.tsx",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs"
       ]
     },
     {
@@ -269,11 +275,14 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "运营页有运行、通知、任务、Enrollment 与审计事实；未消费 workload、四模块分母、容量/超时/最高异常。",
+      "audit_finding": "运营总览现消费已批准 workload，显示主备、SLA、逾期、通知失败、最高异常和更新时间相关运行事实；容量为 PENDING_OWNER_CONTENT 时不可计算，四模块分母不完整时不显示误导性 0。锁定异常 Owner 与完整四模块绑定仍缺，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/ops/page.tsx",
         "apps/api/journey_api/ops_routes.py",
-        "tests/test_construction_module_runtime.py"
+        "apps/web/src/lib/server/api.ts",
+        "tests/test_construction_module_runtime.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-ops-workload-1280.png"
       ]
     },
     {
@@ -832,11 +841,16 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 4,
-      "audit_finding": "Reviewer/运营基础工作台与 workload API 存在；队列 SLA/主备/容量/升级呈现不完整.",
+      "audit_finding": "Reviewer 队列/详情与运营总览现呈现权威优先级、固定证据、批准 SLA、主备、逾期、通知失败和异常入口；容量无批准值时为 PENDING_OWNER_CONTENT/不可计算，冲突检查为 NOT_EVALUATED，缺完整回避和升级合同，故保持 PARTIAL。",
       "trace_paths": [
+        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/[reviewId]/page.tsx",
         "apps/web/src/app/ops/page.tsx",
+        "apps/api/journey_api/review_routes.py",
         "apps/api/journey_api/ops_routes.py",
-        "tests/test_construction_module_runtime.py"
+        "tests/test_reviewer_workbench.py",
+        "tests/test_construction_module_runtime.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs"
       ]
     },
     {

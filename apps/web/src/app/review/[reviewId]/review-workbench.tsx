@@ -203,7 +203,7 @@ export function ReviewWorkbench({
           type="submit"
           disabled={finalPending || materialStatus === "INCOMPLETE"}
         >
-          {finalPending ? "正在提交结论…" : "提交不可变最终结论"}
+          {finalPending ? "正在提交结论…" : "提交真人结论"}
         </button>
       </form>
     </section>
