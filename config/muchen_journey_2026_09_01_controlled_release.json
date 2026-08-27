@@ -127,7 +127,7 @@
     "exploration_sheet_version_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
     "exploration_full_export_sha256": null,
     "formal_content_package_index_path": "config/module-content-packages/module-content-package-index.v1.json",
-    "formal_content_package_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
+    "formal_content_package_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
     "reviewer_pool": {
       "primary": ["万雨欣"],
       "backup": ["屠元琦"],
@@ -154,7 +154,7 @@
     "migration_revision": null,
     "web_artifact_sha256": null,
     "api_artifact_sha256": null,
-    "content_package_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e",
+    "content_package_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
     "state": "NOT_FROZEN"
   },
   "execution_control": {

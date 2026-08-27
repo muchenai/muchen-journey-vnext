@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+
+from journey_api.content_hash import canonical_document_sha256
 
 try:
     from .validate_module_content_candidates import validate as validate_candidates
@@ -53,9 +57,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def package_hash(package: dict[str, object]) -> str:
-    payload = copy.deepcopy(package)
-    payload.pop("sha256", None)
-    return sha256(payload)
+    return canonical_document_sha256(package)
 
 
 def approval_index(evidence: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -102,52 +104,49 @@ def build_package(
 
     content_items = []
     for item in module["content_items"]:
-        content_items.append(
-            {
-                "content_id": item["content_id"],
-                "title": item["title"],
-                "version": "1.0.0",
-                "source_ref": PRIMARY_CONTENT_SOURCE[module_key],
-                "owner": module["module_owner"],
-                "estimated_minutes": item["estimated_minutes"],
-                "visibility": ["LEARNER", "REVIEWER", "OPERATOR"],
-                "data_classification": "INTERNAL",
-                "sha256": sha256(item),
-            }
-        )
+        content_item = {
+            "content_id": item["content_id"],
+            "title": item["title"],
+            "version": "1.0.0",
+            "source_ref": PRIMARY_CONTENT_SOURCE[module_key],
+            "owner": module["module_owner"],
+            "estimated_minutes": item["estimated_minutes"],
+            "visibility": ["LEARNER", "REVIEWER", "OPERATOR"],
+            "data_classification": "INTERNAL",
+        }
+        content_item["sha256"] = canonical_document_sha256(content_item)
+        content_items.append(content_item)
 
     task_versions = []
     rubrics = []
     for task in module["tasks"]:
         rubric = task["rubric"]
-        task_versions.append(
-            {
-                "task_key": task["task_key"],
-                "version": "1.0.0",
-                "purpose": task["purpose"],
-                "non_goals": task["non_goals"],
-                "inputs": task["inputs"],
-                "deliverables": task["deliverables"],
-                "rubric_id": rubric["rubric_id"],
-                "reviewer_pool_ref": reviewer["pool_ref"],
-                "help_path": f"{reviewer['pool_ref']} → {reviewer['escalation_owner']}",
-                "execution_environment": task["execution_environment"],
-                "retention_policy": f"{data_policy['default_retention_days']}_DAYS",
-                "sha256": sha256(task),
-            }
-        )
-        rubrics.append(
-            {
-                "rubric_id": rubric["rubric_id"],
-                "version": "1.0.0",
-                "dimensions": rubric["dimensions"],
-                "human_decision_required": True,
-                "calibration_evidence_ref": (
-                    f"config/module-content-candidates.v1.json#{rubric['rubric_id']}"
-                ),
-                "sha256": sha256(rubric),
-            }
-        )
+        task_version = {
+            "task_key": task["task_key"],
+            "version": "1.0.0",
+            "purpose": task["purpose"],
+            "non_goals": task["non_goals"],
+            "inputs": task["inputs"],
+            "deliverables": task["deliverables"],
+            "rubric_id": rubric["rubric_id"],
+            "reviewer_pool_ref": reviewer["pool_ref"],
+            "help_path": f"{reviewer['pool_ref']} → {reviewer['escalation_owner']}",
+            "execution_environment": task["execution_environment"],
+            "retention_policy": f"{data_policy['default_retention_days']}_DAYS",
+        }
+        task_version["sha256"] = canonical_document_sha256(task_version)
+        task_versions.append(task_version)
+        package_rubric = {
+            "rubric_id": rubric["rubric_id"],
+            "version": "1.0.0",
+            "dimensions": rubric["dimensions"],
+            "human_decision_required": True,
+            "calibration_evidence_ref": (
+                f"config/module-content-candidates.v1.json#{rubric['rubric_id']}"
+            ),
+        }
+        package_rubric["sha256"] = canonical_document_sha256(package_rubric)
+        rubrics.append(package_rubric)
 
     package = {
         "schema_version": "module-content-package.v1",

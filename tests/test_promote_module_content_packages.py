@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from journey_api.construction_module_content import ConstructionModuleContentPackage
 from scripts.promote_module_content_packages import promote
+from scripts.validate_module_content_candidates import manifest_hash, module_hash
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,11 @@ class PromoteModuleContentPackagesTests(unittest.TestCase):
             self.assertEqual(index["state"], "G1_CONTENT_BINDING_PASS")
             self.assertEqual(len(index["packages"]), 4)
             self.assertFalse(index["production_release_authorized"])
+            for entry in index["packages"]:
+                path = Path(tmp) / Path(entry["path"]).name
+                ConstructionModuleContentPackage.model_validate_json(
+                    path.read_text(encoding="utf-8")
+                )
 
     def test_candidate_hash_drift_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -48,6 +55,23 @@ class PromoteModuleContentPackagesTests(unittest.TestCase):
             approval_path.write_text(json.dumps(approvals, ensure_ascii=False), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "approval missing"):
                 promote(CANDIDATES, approval_path, BINDING, Path(tmp) / "out")
+
+    def test_business_field_change_requires_owner_reapproval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            candidates = json.loads(CANDIDATES.read_text(encoding="utf-8"))
+            module = candidates["modules"][0]
+            module["content_items"][0]["title"] += "（业务变更）"
+            module["candidate_sha256"] = module_hash(module)
+            candidates["manifest_sha256"] = manifest_hash(candidates)
+            candidate_path = Path(tmp) / "candidates.json"
+            candidate_path.write_text(
+                json.dumps(candidates, ensure_ascii=False), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "approval evidence points to wrong manifest"
+            ):
+                promote(candidate_path, APPROVALS, BINDING, Path(tmp) / "out")
 
 
 if __name__ == "__main__":

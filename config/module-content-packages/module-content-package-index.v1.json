@@ -8,28 +8,28 @@
     {
       "module_key": "exploration-camp",
       "path": "config/module-content-packages/exploration-camp.module-content-package.v1.json",
-      "package_sha256": "99b03cde7e0ffa600d3a95a7b56498887394d6f05f7c28b6aaed2a5b38446a45",
-      "file_sha256": "a1599b8f786491a569f2ded4ce1f4c92a43699c8c98fafe27e3f96997d1f575f"
+      "package_sha256": "0da335dc06e9e22a82dce863efb52eb7124d7845102323fbc05494625376e3f8",
+      "file_sha256": "0a8c03f55122d94fcc481ec95a5eface1800f3f6a709a0ad5ffd26e36638c113"
     },
     {
       "module_key": "newcomer-village",
       "path": "config/module-content-packages/newcomer-village.module-content-package.v1.json",
-      "package_sha256": "71bb1f0429b2595f342d0966400dda362e8b72ecf44b9e38256fe58bb5267802",
-      "file_sha256": "c5202273eb0f9124af41502e57cce16a3cee8bf865d93839a097c44f44eb96c5"
+      "package_sha256": "d81d6dd3ef179196db6f652867e05de89e9985bc8670f9601a21e9c5ed9b0802",
+      "file_sha256": "187c544a585d531d623f98a819d01f9a80626121363e6457312dbde2613a421d"
     },
     {
       "module_key": "ai-academy",
       "path": "config/module-content-packages/ai-academy.module-content-package.v1.json",
-      "package_sha256": "4d9d28c50e695e582d7a5025870f77736ea4801c45062da5aba35ce0ecc43bd0",
-      "file_sha256": "aba7b5d6e2714315566bbb57093c88b980a2da1c178fc0b65031f5cb37521b9a"
+      "package_sha256": "42c6359312f66158fabcc3508f042e62b387d43ed9a2d0739a0462b8722329cf",
+      "file_sha256": "3e13fde8c0d8418dfc52f78e044ca24a6c50f602d5ff964b08e8d0cf501ec36a"
     },
     {
       "module_key": "delivery-guild",
       "path": "config/module-content-packages/delivery-guild.module-content-package.v1.json",
-      "package_sha256": "cb14f8c14c2887d494f939758187d7b1c632c385e11f23eb864235ed10f00d5d",
-      "file_sha256": "3c9c28a12c14c7c3d2e11bf76e7ce8aa9a491028a66f0eab9132ff69fbee35b9"
+      "package_sha256": "682726a89084f1cbe5cfb3a84e3207ee353d594796a00e27ad815c0a69f890bc",
+      "file_sha256": "98454301377df6cc7da5924e04fa02e964bb86a4d2b197e276cd618df31a0c2c"
     }
   ],
   "production_release_authorized": false,
-  "index_sha256": "041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e"
+  "index_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd"
 }

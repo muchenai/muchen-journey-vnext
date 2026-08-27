@@ -30,7 +30,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "4b84b6dd7076d01bed6011174b959c24ca001a0da3bf7fcfed4a189877301c5b"
+      "sha256": "7b6f5c50fb6cf34e6cc07fe2e9b504126b104be0bd0ee93c0e0fdbfd3953a998"
     },
     {
       "content_id": "EXP-TREASURE-02",
@@ -45,7 +45,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "8a33bb3ebc83fa20003cb7180ad323a8279e2a2e19eb401ae6ced449d56302a7"
+      "sha256": "20fba4f527993a99ca15493c5ec47d38ce505da75489a5693768d315c623655f"
     },
     {
       "content_id": "EXP-TREASURE-03",
@@ -60,7 +60,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "ef13548fa36172e92b35f2588fc198fe5418385d67144343668b262d02794abe"
+      "sha256": "fef8738414c677a8b0d3afda489339a0fbafd44bcc354cfbd97da5d09f1a26a6"
     },
     {
       "content_id": "EXP-TREASURE-04",
@@ -75,7 +75,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "1fffc1aeaa4e8667e21fa995ae4476eaade1e6050a5a8ec0fb46221cc6130feb"
+      "sha256": "0a6e6a4665cdfae1d05da201934f877b37c981c81372ac05a8425cc3b7971eaa"
     }
   ],
   "task_versions": [
@@ -104,7 +104,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "867e0f340490c5d5bf3c500f012aad2405d6bd0b232e3af4ea5b7636a334b773"
+      "sha256": "53d8c6a2414b33a97ab38d6c045832670025200a6f5a0162b85979af99045d65"
     },
     {
       "task_key": "EXP-P2",
@@ -131,7 +131,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "a4f3d7e66d4906598613c4118cf593ac8899c8139f8e2f1a3defc15aaa0ce9fd"
+      "sha256": "04f063c6500b4ca0d2af1e7cb7fdbb2a658286969ae8cbc3edd6fb6d34af31e1"
     },
     {
       "task_key": "EXP-P3",
@@ -158,7 +158,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "0974e9ab585ad9e2f130090ca2574a7c37fee1859f5d3ec3ecad24e13d8a7023"
+      "sha256": "93570a93566f6f80f699663dd0ab166529bbd36a6da8bf657dd51daf6c7a540b"
     }
   ],
   "rubrics": [
@@ -174,7 +174,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P1-R1",
-      "sha256": "d9065dbc6e28745032dbd721b63049f223ce5411451ed1c5a6c3c8eaead5622f"
+      "sha256": "7c958d1bcc2ba4a2c49539ec52e6982a752f5e69aa35a79b22fa7be41ac322b6"
     },
     {
       "rubric_id": "EXP-P2-R1",
@@ -188,7 +188,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P2-R1",
-      "sha256": "9c45f214d93a99e27b1f070189fb72fec1eb0eb03ccd32a386dd5ca00e19cbe6"
+      "sha256": "0574c15b474f160bdc808875a422ae038d76d534771c9980bd2f0c94e3269fff"
     },
     {
       "rubric_id": "EXP-P3-R1",
@@ -202,7 +202,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#EXP-P3-R1",
-      "sha256": "2d06158224e030ca491fdd4bbda973890337d3b00b14b7aa6bb045eeb2e576e0"
+      "sha256": "32b7962cc5c835a6020d654db960b23a5fab15ec809fbf4868fb463472ff12a2"
     }
   ],
   "reviewer_policy": {
@@ -228,5 +228,5 @@
     ],
     "retention_policy": "180_DAYS"
   },
-  "sha256": "99b03cde7e0ffa600d3a95a7b56498887394d6f05f7c28b6aaed2a5b38446a45"
+  "sha256": "0da335dc06e9e22a82dce863efb52eb7124d7845102323fbc05494625376e3f8"
 }

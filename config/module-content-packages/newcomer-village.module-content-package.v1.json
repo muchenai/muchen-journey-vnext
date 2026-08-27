@@ -29,7 +29,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "0efb64474a7c7a1dc8c43ccbe83718e94a5b6e66191775ab35d31f71ddbf83ab"
+      "sha256": "1b3f915a124aa2ff0e3600b631142c4eddee7bc780552982cd57fd771d95ac30"
     },
     {
       "content_id": "NV-TASK-24",
@@ -44,7 +44,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "71218ecf535fc4c1cdd17145e319abfd9c6c228e34360591b8b3266feeb5f2d1"
+      "sha256": "2229a2cbf8064387723f34dfd0d4cc721a05ec370dc4b251a53f7fca04cebd8e"
     }
   ],
   "task_versions": [
@@ -74,7 +74,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "2251587a6b9d58b50fb2dec5c39392b1771010f352063e37c2ed8fcb2df61464"
+      "sha256": "7ae2ca367a8e6e601aebacf3a7609a04df2e03abc3761b73e0ccbf1319168563"
     },
     {
       "task_key": "NV-T2-AI-DELIVERY-GLOSSARY",
@@ -102,7 +102,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "c8fd4fc9f48ef050cbe991361ee89c91b0751fa9e0418cc08171b0eb4e4fc39d"
+      "sha256": "bb0c41bd9a5af040d3584bfe88e75b4c5df916b9e6336bc6c31d89e1050a770b"
     }
   ],
   "rubrics": [
@@ -118,7 +118,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#NV-T1-R1",
-      "sha256": "d7bd4ad48141ebe9c5753427e5dd8a296705c8654e1cf7fbc3db76a24fe30907"
+      "sha256": "88f547fd02d8750a7e3e9d8209cc4c7ce33112f28e5d107b9d8374a6d936a896"
     },
     {
       "rubric_id": "NV-T2-R1",
@@ -132,7 +132,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#NV-T2-R1",
-      "sha256": "16c0b806bc3af4925a94f974e547935cdb63c2fe2ecb971a6256a329a46f7eab"
+      "sha256": "647445f40058f6df7e771788407530dd7c4932eb47b843c183baa628fb30b332"
     }
   ],
   "reviewer_policy": {
@@ -158,5 +158,5 @@
     ],
     "retention_policy": "180_DAYS"
   },
-  "sha256": "71bb1f0429b2595f342d0966400dda362e8b72ecf44b9e38256fe58bb5267802"
+  "sha256": "d81d6dd3ef179196db6f652867e05de89e9985bc8670f9601a21e9c5ed9b0802"
 }

@@ -29,7 +29,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "84e6c3542e7c2bc365b9950a86d319f4701a691ff16c8873f46c26ef4cc2ad24"
+      "sha256": "c3346b312265b85d01042fae1a44d3255a73683cd5ad20935b67ac68822ec65e"
     },
     {
       "content_id": "AIA-M1-MATERIAL-02",
@@ -44,7 +44,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "b508e297f32b06bc3daefea0186c2b5d5653cefebb5523771ddfd671b447cee0"
+      "sha256": "5b70eb82fffdfc2d988730007608cdbf601daabbca14e9273b638bea39eb4d31"
     },
     {
       "content_id": "AIA-M1-PRACTICE-GUIDE",
@@ -59,7 +59,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "cbd7f9e83d7d9e6e7ab6f9ec55c62995f79f9fe19fdaac90915fa66b18836d9d"
+      "sha256": "e970b90b9e2acdb66eeb0b176cfd5c29f0b1e17a049ae627363a3bdd1dc99dca"
     }
   ],
   "task_versions": [
@@ -92,7 +92,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "a41443b0a92a9e61a361f8ea5aebda68322334f0f06e0c1391deeea0baeab848"
+      "sha256": "667bff72b7f73ca42414997138742fc9615cbafa5c6f039aef6873352330b0fa"
     }
   ],
   "rubrics": [
@@ -108,7 +108,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#AIA-M1-R1",
-      "sha256": "583f9ef64ff75683973a7a1a749eb4fcbc526fd5bbb6243bcf8c0f093d16d23d"
+      "sha256": "6a8bb42b2660817cd7d8e09faa106695de76b3d75f7f5e45101b2f0a6a587df8"
     }
   ],
   "reviewer_policy": {
@@ -134,5 +134,5 @@
     ],
     "retention_policy": "180_DAYS"
   },
-  "sha256": "4d9d28c50e695e582d7a5025870f77736ea4801c45062da5aba35ce0ecc43bd0"
+  "sha256": "42c6359312f66158fabcc3508f042e62b387d43ed9a2d0739a0462b8722329cf"
 }

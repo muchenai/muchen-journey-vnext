@@ -29,7 +29,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "246a016a4cb85d4ab0ad1320a077324c6712a12bfc633cab183bc151bddab383"
+      "sha256": "6ad81335658e3c12b6c66f1c85775e025018f980537d8ed8a343a059441782c9"
     },
     {
       "content_id": "DLG-HANDOFF-GUIDE-01",
@@ -44,7 +44,7 @@
         "OPERATOR"
       ],
       "data_classification": "INTERNAL",
-      "sha256": "dc96a9cea07307a093bcb88816d6969356b4a357b2de95073e880f88a951ad75"
+      "sha256": "71451720e908681cb4b3acb92a6321f9c00be16bf6844ed52d1dd02261495e09"
     }
   ],
   "task_versions": [
@@ -78,7 +78,7 @@
       "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
       "execution_environment": "SIMULATION",
       "retention_policy": "180_DAYS",
-      "sha256": "3586ec35f4abc56bc97f89814573ad037f9d975b34367b38c2e8e5ecefe65f0f"
+      "sha256": "055d9090cdc47a0979d9c321258f1f9209b264a0bd9cb12cf13441916e8885bc"
     }
   ],
   "rubrics": [
@@ -94,7 +94,7 @@
       ],
       "human_decision_required": true,
       "calibration_evidence_ref": "config/module-content-candidates.v1.json#DLG-P1-R1",
-      "sha256": "3507ea16f90b1d23c1c68b5203b381ed8071bc195c57b0f5b8fb3d8537140c9c"
+      "sha256": "c28efb22ecdb8a4bb7e398544778dc12b9f3addf3b224fe381f7973ca08c50b1"
     }
   ],
   "reviewer_policy": {
@@ -120,5 +120,5 @@
     ],
     "retention_policy": "180_DAYS"
   },
-  "sha256": "cb14f8c14c2887d494f939758187d7b1c632c385e11f23eb864235ed10f00d5d"
+  "sha256": "682726a89084f1cbe5cfb3a84e3207ee353d594796a00e27ad815c0a69f890bc"
 }

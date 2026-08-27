@@ -51,7 +51,7 @@
 - 产品 Owner 已正式证明郑田源、屠元琦、段超群作出上述精确 hash 批准；证据为 `config/module-content-approval-evidence.v1.json`。
 - 探索营目标 Sheet 已绑定可复核版本元数据：文档 token、sheet id、标题、可见 Owner、最近修改时间、当前 Sheet 标题和只读状态；绑定 hash 为 `4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b`。
 - 该绑定不是 XLSX/CSV 全文 hash。任何最近修改时间、sheet id、标题或候选 hash 变化，均触发重新批准。
-- 四个正式内容包索引为 `config/module-content-packages/module-content-package-index.v1.json`，内置 hash 为 `041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e`。
+- 四个正式内容包索引为 `config/module-content-packages/module-content-package-index.v1.json`，内置 hash 为 `76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd`。
 
 结论：`G1_CONTENT_BINDING=PASS`。这一结论不替代最终候选冻结、同候选机器 Gate、恢复验证、真人 UAT、独立复核或发布决定。
 

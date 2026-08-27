@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -9,6 +11,15 @@ from journey_api.construction_module_content import (
     ConstructionModuleContentPackage,
     canonical_document_sha256,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_DIR = ROOT / "config" / "module-content-packages"
+
+
+def _formal_package(module_key: str = "ai-academy") -> dict[str, object]:
+    path = PACKAGE_DIR / f"{module_key}.module-content-package.v1.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _signed_package(*, module_key: str = "ai-academy") -> dict[str, object]:
@@ -95,6 +106,65 @@ def test_owner_signed_package_binds_every_nested_digest(module_key: str):
     assert package.module_key == module_key
     assert package.owner.decision == "APPROVED"
     assert package.data_policy.production_write_allowed is False
+
+
+def test_four_formal_packages_pass_runtime_and_every_hash_layer():
+    paths = sorted(PACKAGE_DIR.glob("*.module-content-package.v1.json"))
+
+    assert len(paths) == 4
+    for path in paths:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        package = ConstructionModuleContentPackage.model_validate(document)
+        assert package.sha256 == canonical_document_sha256(document)
+        for collection in ("content_items", "task_versions", "rubrics"):
+            for item in document[collection]:
+                assert item["sha256"] == canonical_document_sha256(item)
+
+
+@pytest.mark.parametrize(
+    ("collection", "field", "value"),
+    [
+        ("content_items", "title", "篡改后的正式内容标题"),
+        ("task_versions", "purpose", "篡改后的正式任务用途，不得通过嵌套 hash 校验。"),
+        ("rubrics", "dimensions", ["篡改后的评分维度"]),
+    ],
+)
+def test_formal_package_rejects_every_nested_hash_drift(
+    collection: str, field: str, value: object
+):
+    document = _formal_package()
+    document[collection][0][field] = value
+    document["sha256"] = canonical_document_sha256(document)
+
+    with pytest.raises(ValidationError, match=collection):
+        ConstructionModuleContentPackage.model_validate(document)
+
+
+def test_formal_package_rejects_root_owner_reviewer_and_policy_drift():
+    root_drift = _formal_package()
+    root_drift["reviewer_policy"]["completion_sla_minutes"] -= 1
+    with pytest.raises(ValidationError, match="package sha256"):
+        ConstructionModuleContentPackage.model_validate(root_drift)
+
+    wrong_owner = _formal_package()
+    wrong_owner["owner"]["role"] = "delivery_guild_owner"
+    wrong_owner["sha256"] = canonical_document_sha256(wrong_owner)
+    with pytest.raises(ValidationError, match="owner role"):
+        ConstructionModuleContentPackage.model_validate(wrong_owner)
+
+    overlap = _formal_package()
+    overlap["reviewer_policy"]["backup_reviewers"] = overlap["reviewer_policy"][
+        "primary_reviewers"
+    ]
+    overlap["sha256"] = canonical_document_sha256(overlap)
+    with pytest.raises(ValidationError, match="must be separate"):
+        ConstructionModuleContentPackage.model_validate(overlap)
+
+    unsafe = _formal_package()
+    unsafe["data_policy"]["production_write_allowed"] = True
+    unsafe["sha256"] = canonical_document_sha256(unsafe)
+    with pytest.raises(ValidationError):
+        ConstructionModuleContentPackage.model_validate(unsafe)
 
 
 def test_package_fails_closed_on_nested_or_top_level_hash_drift():

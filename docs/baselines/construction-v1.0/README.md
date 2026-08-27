@@ -70,7 +70,7 @@ SHA256SUMS
 - 已确定：产品继承公式、四个首发模块、共享任务闭环、AI/真人边界、真实任务边界、历史数据参考策略、Owner 名单、9 月 1 日受控发布范围。
 - 已生效：郑田源、屠元琦、段超群分别批准四模块精确候选 hash；屠元琦同时接受 Reviewer 运营合同。批准证据 hash 为 `2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc`。
 - 已绑定：探索营目标 Sheet 的文档 token、sheet ID、标题、Owner、只读状态和页面可见修改时间；版本绑定 hash 为 `4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b`。该证据不是完整导出 hash，任一绑定字段变化均触发重新批准。
-- 已生成：四模块正式内容包，索引 hash 为 `041d60c1c909aa656dffd8f4853a474703f9f5278b6aa6669024a8d09f10c43e`；`G1_CONTENT_BINDING=PASS`。
+- 已生成：四模块正式内容包，索引 hash 为 `76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd`；`G1_CONTENT_BINDING=PASS`。
 - 待技术形成：干净发布候选、不可移动 tag/候选 SHA、当前工作树资产收口、候选部署物与迁移版本绑定。
 - 待真人完成：在 `PRODUCTION_CANARY_UAT` 中每模块至少 2 名真实目标用户 UAT、独立 QA、发布复核和小名单放行。
 
