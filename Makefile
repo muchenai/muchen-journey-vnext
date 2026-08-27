@@ -83,7 +83,7 @@ secret-scan:
 
 dependency-audit:
 	python3 scripts/web_dependency_audit.py
-	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off -r /src/requirements.lock'
+	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off --no-deps --disable-pip -r /src/requirements.lock'
 
 human-experience-machine-gate:
 	$(MAKE) api-test

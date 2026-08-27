@@ -25,6 +25,10 @@ from journey_api.shared_domain import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / "config/human_experience_machine_cases.v1.json"
+BROWSER_RESULTS = (
+    ROOT
+    / "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json"
+)
 NAMESPACE = UUID("d329f63a-a96a-4e64-bcc8-a99aed4fcf37")
 
 
@@ -50,6 +54,39 @@ def test_machine_case_denominators_are_exact_and_non_human() -> None:
     assert len(ctas["viewports"]) * len(ctas["states"]) == ctas["expected_case_count"] == 21
     assert len(modules) * len(escalation["attempt_types"]) == escalation["expected_case_count"] == 28
     assert len(modules) * len(recovery["fault_modes"]) * len(recovery["operations"]) == recovery["expected_case_count"] == 64
+
+
+def test_21_browser_cta_results_are_complete_and_fail_closed() -> None:
+    manifest = payload()
+    results = json.loads(BROWSER_RESULTS.read_text())
+    assert results["semantics"] == (
+        "LOCAL_SYNTHETIC_BROWSER_EVIDENCE_ONLY_NOT_HUMAN_UAT_NOT_OWNER_SIGNOFF_NOT_CANARY_NOT_RELEASE"
+    )
+    expected = {
+        (state, viewport)
+        for state in manifest["enabled_primary_ctas"]["states"]
+        for viewport in manifest["enabled_primary_ctas"]["viewports"]
+    }
+    actual = {(case["state"], case["width"]) for case in results["cases"]}
+    assert actual == expected
+    assert len(results["cases"]) == results["assertions"]["passed_case_count"] == 21
+    assert all(
+        case["page_status"] == 200
+        and case["primary_count"] == 1
+        and case["focused"] is True
+        and case["overflow"] is False
+        and case["target_status"] == 200
+        for case in results["cases"]
+    )
+    for key in (
+        "dead_primary_cta_count",
+        "page_non_200_count",
+        "target_non_200_count",
+        "unfocusable_primary_cta_count",
+        "horizontal_overflow_count",
+        "console_error_count",
+    ):
+        assert results["assertions"][key] == 0
 
 
 @pytest.mark.parametrize("learner_number", range(1, 9))
@@ -173,7 +210,30 @@ def test_28_ai_and_incentive_attempts_cannot_create_a_formal_result(
     assert (person, evidence, gate) == before
 
 
-def test_64_failure_recovery_cases_bind_to_executed_shared_runtime_proofs() -> None:
+@pytest.mark.parametrize(
+    "module_key",
+    [
+        "exploration-camp",
+        "newcomer-village",
+        "ai-academy",
+        "delivery-guild",
+    ],
+)
+@pytest.mark.parametrize(
+    "fault_mode",
+    [
+        "REQUEST_NOT_SENT",
+        "RESPONSE_LOST_RETRY",
+        "VALIDATION_REJECTED",
+        "CONCURRENT_REPLAY",
+    ],
+)
+@pytest.mark.parametrize("operation", ["DRAFT", "ATTACHMENT", "SUBMIT", "REVIEW"])
+def test_64_failure_recovery_cases_bind_to_executed_shared_runtime_proofs(
+    module_key: str,
+    fault_mode: str,
+    operation: str,
+) -> None:
     cases = payload()
     recovery = cases["failure_recovery"]
     proof_paths = {
@@ -184,6 +244,10 @@ def test_64_failure_recovery_cases_bind_to_executed_shared_runtime_proofs() -> N
     assert all((ROOT / path).is_file() for path in proof_paths)
     assert recovery["minimum_safe_recovery_count"] == 61
     assert recovery["expected_formal_miswrite_count"] == 0
+    assert module_key in cases["modules"]
+    assert fault_mode in recovery["fault_modes"]
+    assert operation in recovery["operations"]
+    assert recovery["proof_tests"][fault_mode]
     # Execution of these proof files is required by the HX machine target; this
     # test only freezes the 4×4×4 denominator and prevents silent proof drift.
     makefile = (ROOT / "Makefile").read_text()

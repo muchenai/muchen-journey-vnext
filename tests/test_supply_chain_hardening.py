@@ -24,6 +24,7 @@ def test_python_runtime_images_use_the_reviewed_digest_and_non_root_user() -> No
 
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert f"WP07_PYTHON_IMAGE := {PYTHON_RUNTIME}" in makefile
+    assert "pip_audit --progress-spinner=off --no-deps --disable-pip" in makefile
 
 
 def test_web_runtime_removes_package_manager_toolchain_before_non_root_user() -> None:

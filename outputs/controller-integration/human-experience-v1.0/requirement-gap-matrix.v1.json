@@ -14,9 +14,9 @@
   "requirement_count": 79,
   "status_counts": {
     "PARTIAL": 38,
-    "NOT_IMPLEMENTED": 3,
+    "NOT_IMPLEMENTED": 0,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 14,
+    "IMPLEMENTED": 17,
     "GATED": 19
   },
   "requirements": [
@@ -638,13 +638,15 @@
     },
     {
       "id": "HX-GATE-001",
-      "status": "NOT_IMPLEMENTED",
+      "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 6,
-      "audit_finding": "机器 Gate 尚未形成绑定当前候选 SHA 的完整 manifest。",
+      "audit_finding": "完整本地机器 Gate、依赖/密钥扫描、21 个浏览器 CTA 探测与候选证据已执行；最终 manifest 在 V3-08 证据提交中绑定运行时 checkpoint。Tech Lead、QA/UAT Owner 与 Security/Privacy Owner 尚未签署，因此不得宣称 HX-GATE-001 正式通过。",
       "trace_paths": [
         "Makefile",
         ".github/workflows/ci.yml",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-machine-gate-evidence.v1.json",
         "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
       ]
     },
@@ -721,29 +723,31 @@
       "status": "PARTIAL",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "8 个本地合成机器 learner ref × 7 个权威状态的 56 个服务端投影已全部执行通过；真实浏览器截图对账与固定候选绑定留待 V3-08，因此不宣称完整指标通过。",
+      "audit_finding": "8 个本地合成机器 learner ref × 7 个权威状态的 56 个服务端投影全部通过，并对同一 7 状态完成 3 viewport 的 21 个真实浏览器对账；尚未为 8 个独立浏览器学员逐一生成 56 份快照，因此保持 PARTIAL，不把 21 个浏览器样例冒充 56 个页面快照。",
       "trace_paths": [
         "config/human_experience_machine_cases.v1.json",
-        "tests/test_human_experience_machine_gate.py"
+        "tests/test_human_experience_machine_gate.py",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json"
       ]
     },
     {
       "id": "HX-METRIC-005",
-      "status": "NOT_IMPLEMENTED",
+      "status": "IMPLEMENTED",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "7 个状态 × 390/768/1280 三个 viewport 的 21 个固定启用主 CTA 分母已冻结，但 V3-08 浏览器可达性探测尚未执行。",
+      "audit_finding": "7 个权威状态 × 390/768/1280 三个 viewport 的 21/21 启用主 CTA 已在隔离 Chromium 中执行：每页唯一主 CTA、键盘可聚焦、无横向溢出，目标页面均返回 200，死 CTA 为 0。",
       "trace_paths": [
         "config/human_experience_machine_cases.v1.json",
-        "tests/test_human_experience_machine_gate.py"
+        "tests/test_human_experience_machine_gate.py",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json"
       ]
     },
     {
       "id": "HX-METRIC-006",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "4 模块 × 7 类 AI/激励/低风险越权 28 个领域合同负向样例已执行为 0 正式结果；完整 API、账本与审计回归将在 V3-08 全 Gate 后绑定候选。",
+      "audit_finding": "4 模块 × 7 类 AI/激励/低风险越权的 28/28 领域负向样例均拒绝形成正式结果；完整 API 600 项、激励账本、正式结果数据库 Gate 与审计回归通过，越权正式 mutation 为 0。",
       "trace_paths": [
         "config/human_experience_machine_cases.v1.json",
         "tests/test_human_experience_machine_gate.py",
@@ -763,10 +767,10 @@
     },
     {
       "id": "HX-METRIC-008",
-      "status": "NOT_IMPLEMENTED",
+      "status": "IMPLEMENTED",
       "priority": "P0_MACHINE",
       "implementation_phase": 6,
-      "audit_finding": "4 模块 × 4 故障模式 × 4 写操作的 64 个固定分母与共享证明绑定已冻结；全 API/Web 证明套件和浏览器故障注入尚未在 V3-08 固定候选执行。",
+      "audit_finding": "四模块复用同一正式写入运行时；4 模块 × 4 故障模式 × 4 写操作的 64/64 证明单元均绑定已执行的离线阻断、幂等重放、验证拒绝、并发单赢家、不可变历史和浏览器恢复测试。完整 API/Web 套件通过，安全恢复不少于 61/64，正式状态误写为 0。",
       "trace_paths": [
         "config/human_experience_machine_cases.v1.json",
         "tests/test_human_experience_machine_gate.py",

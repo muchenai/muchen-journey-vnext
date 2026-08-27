@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
+  "executed_at_utc": "2026-08-27T17:17:53Z",
+  "semantics": "LOCAL_SYNTHETIC_BROWSER_EVIDENCE_ONLY_NOT_HUMAN_UAT_NOT_OWNER_SIGNOFF_NOT_CANARY_NOT_RELEASE",
+  "source_checkpoint_sha": "d35dd89bfa220af1200b0ec721657ae102565638",
+  "runtime": {
+    "web_origin": "http://127.0.0.1:3317",
+    "api_origin": "http://127.0.0.1:38000",
+    "database": "isolated temporary Compose named volume journey-next_journey_next_hx_v308_db",
+    "identity": "LOCAL_SYNTHETIC_ONLY learner session plus fixture reviewer",
+    "browser": "Playwright Chromium headless shell",
+    "production_effects": false
+  },
+  "workflow": {
+    "states": [
+      "PENDING_IDENTITY",
+      "AVAILABLE",
+      "IN_PROGRESS",
+      "SUBMITTED",
+      "IN_REVIEW",
+      "NEEDS_REVISION",
+      "COMPLETED"
+    ],
+    "transition_basis": "authoritative local API and isolated database; submit -> fixture reviewer requests revision -> resubmit -> fixture reviewer approves",
+    "completed_state_mapping": "authoritative AssignmentStatus.PASSED projects to VIEW_RESULT_OR_HANDOFF / COMPLETED experience state",
+    "human_gate_semantics": "fixture reviewer is a machine test actor and is not human UAT or Owner approval"
+  },
+  "assertions": {
+    "expected_case_count": 21,
+    "executed_case_count": 21,
+    "passed_case_count": 21,
+    "dead_primary_cta_count": 0,
+    "page_non_200_count": 0,
+    "target_non_200_count": 0,
+    "unfocusable_primary_cta_count": 0,
+    "horizontal_overflow_count": 0,
+    "console_error_count": 0
+  },
+  "cases": [
+    {"state":"PENDING_IDENTITY","width":390,"page_status":200,"primary_count":1,"label":"返回安全入口","href":"/","focused":true,"overflow":false,"target_status":200,"target_url":"/"},
+    {"state":"PENDING_IDENTITY","width":768,"page_status":200,"primary_count":1,"label":"返回安全入口","href":"/","focused":true,"overflow":false,"target_status":200,"target_url":"/"},
+    {"state":"PENDING_IDENTITY","width":1280,"page_status":200,"primary_count":1,"label":"返回安全入口","href":"/","focused":true,"overflow":false,"target_status":200,"target_url":"/"},
+    {"state":"AVAILABLE","width":390,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"AVAILABLE","width":768,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"AVAILABLE","width":1280,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_PROGRESS","width":390,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_PROGRESS","width":768,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_PROGRESS","width":1280,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"SUBMITTED","width":390,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"SUBMITTED","width":768,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"SUBMITTED","width":1280,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_REVIEW","width":390,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_REVIEW","width":768,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"IN_REVIEW","width":1280,"page_status":200,"primary_count":1,"label":"查看已提交版本","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"NEEDS_REVISION","width":390,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"NEEDS_REVISION","width":768,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"NEEDS_REVISION","width":1280,"page_status":200,"primary_count":1,"label":"进入当前任务","href":"/app/tasks/10000000-0000-4000-8000-000000000008","focused":true,"overflow":false,"target_status":200,"target_url":"/app/tasks/10000000-0000-4000-8000-000000000008"},
+    {"state":"COMPLETED","authoritative_assignment_status":"PASSED","width":390,"page_status":200,"primary_count":1,"label":"查看当前结果","href":"/app/result","focused":true,"overflow":false,"target_status":200,"target_url":"/app/result"},
+    {"state":"COMPLETED","authoritative_assignment_status":"PASSED","width":768,"page_status":200,"primary_count":1,"label":"查看当前结果","href":"/app/result","focused":true,"overflow":false,"target_status":200,"target_url":"/app/result"},
+    {"state":"COMPLETED","authoritative_assignment_status":"PASSED","width":1280,"page_status":200,"primary_count":1,"label":"查看当前结果","href":"/app/result","focused":true,"overflow":false,"target_status":200,"target_url":"/app/result"}
+  ],
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

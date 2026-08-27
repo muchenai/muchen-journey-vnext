@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "phase": "V3-08_MACHINE_CLOSEOUT",
+  "status": "MACHINE_EXECUTION_COMPLETE_CANDIDATE_SHA_PENDING",
+  "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
+  "fixed_start_sha": "80be672810af1dcc066591b13e2a730bb7fc0fee",
+  "source_checkpoint_sha": "d35dd89bfa220af1200b0ec721657ae102565638",
+  "runtime_candidate_sha": "PENDING_V3_08_IMPLEMENTATION_COMMIT",
+  "checkpoint_head": "PENDING_V3_08_EVIDENCE_COMMIT",
+  "migration_head": "0027_next_stage_review",
+  "execution": {
+    "full_verify_initial": {
+      "exit_code": 130,
+      "result": "interrupted after test-only Alpine package install stalled; failure retained"
+    },
+    "api_without_test_tool_packages": {
+      "exit_code": 1,
+      "result": "588 passed, 1 skipped, 11 failed; all failures required fixed bash/git/GNU grep test tooling"
+    },
+    "full_verify_default_dev_volume": {
+      "exit_code": 2,
+      "result": "API 600 passed; Web lint/type/68 tests/build/runtime and isolation passed; HTTP negative failed closed because preserved local dev volume contained retired migration 0021_p0_identity_principal"
+    },
+    "full_verify_isolated_volume": {
+      "command": "COMPOSE_FILE=compose.yaml:/private/tmp/mj-hx-v308-compose.yaml make verify",
+      "exit_code": 0,
+      "result": "API 600 passed; migration, Web lint/type/68 tests/build/runtime, isolation and HTTP negative passed; release gate correctly returned NO_GO with human/production prerequisites NOT_RUN"
+    },
+    "misinvoked_targeted_runtime_image": {
+      "exit_code": 1,
+      "result": "30 passed, 64 failed because the command omitted the repository read-only bind mount; tool invocation failure, not product failure"
+    },
+    "host_pytest_unavailable": {
+      "exit_code": 127,
+      "result": "pytest is intentionally not installed on the host path; returned to the repository Gate"
+    },
+    "hx_machine_gate_first_final_attempt": {
+      "exit_code": 2,
+      "result": "663 passed, 1 failed because HX-GATE-001 trace referenced this evidence file before it existed; no product assertion failed"
+    },
+    "hx_machine_gate_retry": {
+      "command": "COMPOSE_FILE=compose.yaml:/private/tmp/mj-hx-v308-compose.yaml make human-experience-machine-gate",
+      "exit_code": 0,
+      "result": "API/HX 664 passed; Web lint and TypeScript passed; 68/68 Web contract tests passed; Next.js production build emitted 16 routes; Web runtime check passed"
+    },
+    "secret_scan": {
+      "exit_code": 0,
+      "result": "gitleaks scanned approximately 6.17 MB; 0 leaks"
+    },
+    "dependency_audit": {
+      "exit_code": 0,
+      "result": "Web vulnerability packages 0; Python pip-audit found no known vulnerabilities in the fully resolved hash-locked graph"
+    }
+  },
+  "machine_metrics": {
+    "HX-METRIC-004": "56/56 authoritative server projections; 21 browser reconciliations; remains PARTIAL because 56 distinct browser learner snapshots were not run",
+    "HX-METRIC-005": "21/21 browser CTA cases; 0 dead CTA",
+    "HX-METRIC-006": "28/28 negative formal-result attempts rejected; 0 formal mutation",
+    "HX-METRIC-008": "64/64 shared-runtime proof cells bound; safe recovery threshold at least 61/64; 0 formal miswrite"
+  },
+  "browser_evidence": {
+    "path": "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json",
+    "sha256": "450038cdf9d8d16d93799e30b8c7a863fd79a8c9881d9e0e84b826140daafa65",
+    "result": "21/21 passed in isolated local Chromium"
+  },
+  "build_identifiers": {
+    "api_local_manifest_list_sha256": "312e92cbbcb2dc0574eb5dd67bf39c61c5033ca64d1091cf1c771dccdf3794dc",
+    "web_local_manifest_list_sha256": "6597ee10d3ebf5eb8944961a08fe5f9207a872eacfb8f4bb4d4895c3f59945a1",
+    "migration_head": "0027_next_stage_review"
+  },
+  "human_evidence": {
+    "real_human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "tech_lead_signoff": "NOT_RUN",
+    "qa_uat_owner_signoff": "NOT_RUN",
+    "security_privacy_owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release": "NOT_AUTHORIZED"
+  },
+  "machine_conclusion": "READY_FOR_REAL_HUMAN_UAT_PREPARATION_PENDING_FINAL_EVIDENCE_BINDING_COMMIT",
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}
