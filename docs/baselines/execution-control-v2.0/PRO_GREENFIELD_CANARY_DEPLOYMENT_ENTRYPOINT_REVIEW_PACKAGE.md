@@ -47,6 +47,7 @@
 - 合同：`WP31_GREENFIELD_CANARY={"pro_review_status":"PENDING","status":"PASS"}`。
 - 包绑定：manifest hash `49f95c…`，PASS。
 - 未签 Pro evidence 负向：退出码 `2`，在任何基础设施读取前失败关闭。
+- GitHub 负向 dispatch `33064145301`：`failure`、`steps=[]`、`runner_name=""`，三个业务 job 中仅 Greenfield job 失败，旧 `operate` 与 package 均 skipped；没有 Runner、Terraform、SSH 或 RDS 执行。该现象与 environment/branch 的 pre-run policy Gate 一致，但 GitHub 未提供日志，故不冒充为入口内部 review-check 的远端 PASS。
 - Compose 合成验证：服务严格为 `api,web`，`worker_started=false`。
 - Python compile、四个 Shell `bash -n`、YAML parse、`git diff --check`：PASS。
 - gitleaks：`no leaks found`。
@@ -77,6 +78,8 @@ c4eeda0af0ad9e502ea45aabf0d2309209528184e3d143480e5b4d34ca6a8325  scripts/wp15_r
 ## Pro 必审与 evidence 合同
 
 Pro 必须独立核对：固定 SHA、构建派生边界、独立数据库创建/非空拒绝、备份 HMAC 与 off-host artifact、零 Worker、Edge 自动恢复、回滚目标 `ff530528…`、allowlist hash、临时 SSH 关闭以及旧 Wartime 路径未被降级复用。
+
+当前分支尚不能取得 `staging` environment 中复用的生产运维 secrets：run `33064145301` 在分配 Runner 前即失败。独立 Pro PASS 后，还必须由获批流程让固定运维提交使用该 environment，或将已审查入口合入 environment 允许的受保护分支；不得由 Mini 修改 environment policy 或绕过 secrets Gate。
 
 若且仅若通过，Pro 提供单行 UTF-8 JSON evidence，至少含：
 
