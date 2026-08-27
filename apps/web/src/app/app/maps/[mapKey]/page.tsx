@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ExperienceState, FactLabel } from "@/app/human-experience";
 import { getJourneyModule, JOURNEY_MODULES } from "@/lib/journey-program";
+import { LearnerEnrollment, learnerPageRequest } from "@/lib/server/api";
+
+function normalizedKey(value: string): string {
+  return value.toLowerCase().replaceAll("_", "-");
+}
 
 export function generateStaticParams() {
   return JOURNEY_MODULES.map((module) => ({ mapKey: module.key }));
@@ -19,6 +25,18 @@ export default async function JourneyModulePage({
     notFound();
   }
 
+  const enrollments = await learnerPageRequest<{ items: LearnerEnrollment[] }>(
+    "/api/v1/me/enrollments",
+  );
+  const enrollment = enrollments.items.find(
+    (item) => item.journey_stable_key
+      && normalizedKey(item.journey_stable_key) === normalizedKey(journeyModule.runtimeKey),
+  );
+  const isAssigned = Boolean(
+    enrollment && ["ACTIVE", "COMPLETED"].includes(enrollment.status),
+  );
+  const contentBinding = journeyModule.contentBinding;
+
   return (
     <section className="module-page">
       <Link className="back-link" href="/app">← 返回四模块首页</Link>
@@ -32,11 +50,27 @@ export default async function JourneyModulePage({
           <p>{journeyModule.promise}</p>
         </div>
         <aside>
-          <span>{journeyModule.status === "CURRENT" ? "当前阶段" : "内容 Gate 待通过"}</span>
+          <span>{isAssigned ? "正式任务已分配" : "受控入口 · 当前未分配"}</span>
           <p>这一站带走</p>
           <strong>{journeyModule.output}</strong>
         </aside>
       </header>
+
+      <section className="module-binding" aria-labelledby="module-binding-title">
+        <header>
+          <FactLabel kind="system" />
+          <h2 id="module-binding-title">进入前先核对这些绑定事实</h2>
+        </header>
+        <dl className="module-binding-facts">
+          <div><dt>适用身份</dt><dd>已获当前模块 Enrollment 的学员</dd></div>
+          <div><dt>学习输入预计</dt><dd>{contentBinding.contentEstimatedMinutes} 分钟；实操时间以固定任务版本为准</dd></div>
+          <div><dt>正式产出</dt><dd>{journeyModule.output}</dd></div>
+          <div><dt>Reviewer 配置</dt><dd>{contentBinding.reviewerPoolRef} · 主 Reviewer {contentBinding.primaryReviewers.join("、")} · 备用 {contentBinding.backupReviewers.join("、")}</dd></div>
+          <div><dt>数据边界</dt><dd>禁止生产写入；禁止原始客户数据；AI 不得作高影响决定；保留策略 {contentBinding.dataPolicy.retentionPolicy}</dd></div>
+          <div><dt>内容绑定</dt><dd>v{contentBinding.version} · {contentBinding.taskVersionCount} 个任务版本 · {contentBinding.rubricCount} 个 Rubric · 生效于 {contentBinding.effectiveAt}</dd></div>
+          <div className="module-binding-hash"><dt>内容包 SHA-256</dt><dd><code>{contentBinding.packageSha256}</code></dd></div>
+        </dl>
+      </section>
 
       <section className="module-next-action" aria-labelledby="module-next-action-title">
         <div>
@@ -44,10 +78,22 @@ export default async function JourneyModulePage({
           <h2 id="module-next-action-title">{journeyModule.nextAction}</h2>
           <span>内容依据：{journeyModule.source}</span>
         </div>
-        {journeyModule.status === "CURRENT" ? (
-          <Link className="button primary" href="/app">继续当前任务 →</Link>
+        {isAssigned && enrollment ? (
+          <Link className="button primary" href={`/app?enrollment_id=${enrollment.id}`}>
+            {enrollment.status === "COMPLETED" ? "查看已完成结果" : "开始或继续本模块"} →
+          </Link>
         ) : (
-          <strong>尚未开放正式任务 · 不会创建虚构任务</strong>
+          <ExperienceState
+            kind="locked"
+            title="正式任务尚未分配"
+            summary="内容包已绑定，但没有当前模块的有效 Enrollment；入口不会创建虚构任务或自动解锁。"
+            knownFacts={[
+              `已绑定内容包：${contentBinding.packageId}`,
+              `缺失条件：当前模块 ACTIVE 或 COMPLETED Enrollment`,
+              `责任 Owner：${contentBinding.ownerName}`,
+            ]}
+            action={{ href: "/app", label: "返回当前可行动任务" }}
+          />
         )}
       </section>
 

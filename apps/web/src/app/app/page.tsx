@@ -92,6 +92,7 @@ export default async function LearnerHome({
       )}
       <JourneyProgramOverview
         currentAction={currentNode?.title ?? action.title}
+        currentJourneyKey={action.journey?.stable_key}
         enrollments={enrollmentsResponse.items}
       />
       {!action.journey ? null : (

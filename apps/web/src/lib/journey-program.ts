@@ -1,5 +1,6 @@
 import journeyProduct from "./muchen-journey-product.generated.json";
 import controlledRelease from "./muchen-journey-controlled-release.generated.json";
+import moduleBindings from "./muchen-journey-module-bindings.generated.json";
 
 export type JourneyModuleKey =
   | "exploration-camp"
@@ -17,7 +18,6 @@ export type JourneyModule = {
   shortName: string;
   owner: string;
   role: "STAGE" | "CROSS_CUTTING_RESULT";
-  status: "CURRENT" | "CONTENT_GATE_PENDING";
   promise: string;
   question: string;
   nextAction: string;
@@ -27,6 +27,30 @@ export type JourneyModule = {
   evidence: readonly string[];
   humanGate: string;
   prohibited: string;
+  contentBinding: ModuleContentBinding;
+};
+
+export type ModuleContentBinding = {
+  packageId: string;
+  packageSha256: string;
+  version: string;
+  effectiveAt: string;
+  ownerName: string;
+  ownerDecision: "APPROVED";
+  contentEstimatedMinutes: number;
+  contentItemCount: number;
+  taskVersionCount: number;
+  rubricCount: number;
+  reviewerPoolRef: string;
+  primaryReviewers: readonly string[];
+  backupReviewers: readonly string[];
+  dataPolicy: {
+    productionWriteAllowed: boolean;
+    rawCustomerDataAllowed: boolean;
+    aiHighImpactDecisionAllowed: boolean;
+    visibility: readonly string[];
+    retentionPolicy: string;
+  };
 };
 
 type JourneyModuleContract = {
@@ -41,7 +65,7 @@ type JourneyModuleContract = {
 
 type JourneyModuleExperience = Omit<
   JourneyModule,
-  "key" | "runtimeKey" | "order" | "name" | "owner" | "role" | "status" | "output"
+  "key" | "runtimeKey" | "order" | "name" | "owner" | "role" | "output" | "contentBinding"
 >;
 
 const MODULE_EXPERIENCE: Record<JourneyModuleKey, JourneyModuleExperience> = {
@@ -116,22 +140,55 @@ const MODULE_EXPERIENCE: Record<JourneyModuleKey, JourneyModuleExperience> = {
 const CONTROLLED_RELEASE_MODULE_KEYS = new Set<string>(controlledRelease.modules);
 const APPROVED_MODULES = (journeyProduct.approved_product_modules.modules as JourneyModuleContract[])
   .filter((contract) => CONTROLLED_RELEASE_MODULE_KEYS.has(contract.key));
+const CONTENT_BINDINGS = new Map(
+  moduleBindings.modules.map((binding) => [binding.module_key, binding]),
+);
 
-if (APPROVED_MODULES.length !== controlledRelease.modules.length) {
-  throw new Error("Controlled release module projection does not match the product contract");
+if (
+  APPROVED_MODULES.length !== controlledRelease.modules.length
+  || CONTENT_BINDINGS.size !== controlledRelease.modules.length
+) {
+  throw new Error("Controlled release module or content binding projection is incomplete");
 }
 
-export const JOURNEY_MODULES: readonly JourneyModule[] = APPROVED_MODULES.map((contract) => ({
-  key: contract.key,
-  runtimeKey: contract.runtime_key,
-  order: contract.order,
-  name: contract.name,
-  owner: contract.owner,
-  role: contract.role,
-  output: contract.output,
-  status: contract.key === "exploration-camp" ? "CURRENT" : "CONTENT_GATE_PENDING",
-  ...MODULE_EXPERIENCE[contract.key],
-}));
+export const JOURNEY_MODULES: readonly JourneyModule[] = APPROVED_MODULES.map((contract) => {
+  const binding = CONTENT_BINDINGS.get(contract.key);
+  if (!binding || binding.owner_decision !== "APPROVED") {
+    throw new Error(`Missing approved content binding for ${contract.key}`);
+  }
+  return {
+    key: contract.key,
+    runtimeKey: contract.runtime_key,
+    order: contract.order,
+    name: contract.name,
+    owner: contract.owner,
+    role: contract.role,
+    output: contract.output,
+    ...MODULE_EXPERIENCE[contract.key],
+    contentBinding: {
+      packageId: binding.package_id,
+      packageSha256: binding.package_sha256,
+      version: binding.version,
+      effectiveAt: binding.effective_at,
+      ownerName: binding.owner_name,
+      ownerDecision: binding.owner_decision,
+      contentEstimatedMinutes: binding.content_estimated_minutes,
+      contentItemCount: binding.content_item_count,
+      taskVersionCount: binding.task_version_count,
+      rubricCount: binding.rubric_count,
+      reviewerPoolRef: binding.reviewer_pool_ref,
+      primaryReviewers: binding.primary_reviewers,
+      backupReviewers: binding.backup_reviewers,
+      dataPolicy: {
+        productionWriteAllowed: binding.data_policy.production_write_allowed,
+        rawCustomerDataAllowed: binding.data_policy.raw_customer_data_allowed,
+        aiHighImpactDecisionAllowed: binding.data_policy.ai_high_impact_decision_allowed,
+        visibility: binding.data_policy.visibility,
+        retentionPolicy: binding.data_policy.retention_policy,
+      },
+    },
+  };
+});
 
 export function getJourneyModule(key: string): JourneyModule | undefined {
   return JOURNEY_MODULES.find((module) => module.key === key);

@@ -13,10 +13,10 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 39,
+    "PARTIAL": 37,
     "NOT_IMPLEMENTED": 8,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 9,
+    "IMPLEMENTED": 11,
     "GATED": 18
   },
   "requirements": [
@@ -70,14 +70,17 @@
     },
     {
       "id": "HX-PAGE-005",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 1,
-      "audit_finding": "四模块受控详情页与未开放 Gate 存在；运行入口尚未展示全部内容/Reviewer/数据边界绑定事实。",
+      "audit_finding": "四模块入口逐项显示 Enrollment 开放事实、内容包版本与 hash、投入、正式产出、Reviewer 配置和数据边界；无有效分配时锁定且不创建任务。",
       "trace_paths": [
         "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/lib/muchen-journey-module-bindings.generated.json",
+        "apps/web/src/app/app/program-overview.tsx",
         "apps/web/src/app/app/maps/[mapKey]/page.tsx",
-        "config/module-content-packages/module-content-package-index.v1.json"
+        "config/module-content-packages/module-content-package-index.v1.json",
+        "apps/web/scripts/four-module-entry-contract.test.mjs"
       ]
     },
     {
@@ -776,14 +779,17 @@
     },
     {
       "id": "HX-IMPL-002",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 2,
-      "audit_finding": "四模块入口受 controlled release 约束；内容绑定事实的可见性仍不完整.",
+      "audit_finding": "探索营、新手村、AI 学院与交付线工会入口由 controlled release、canonical content packages 和 Enrollment 共同投影；认证竞技场与 Career Map 不进入路由投影。",
       "trace_paths": [
         "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/lib/muchen-journey-module-bindings.generated.json",
+        "apps/web/src/app/app/program-overview.tsx",
         "apps/web/src/app/app/maps/[mapKey]/page.tsx",
-        "config/module-content-packages/module-content-package-index.v1.json"
+        "config/module-content-packages/module-content-package-index.v1.json",
+        "apps/web/scripts/four-module-entry-contract.test.mjs"
       ]
     },
     {

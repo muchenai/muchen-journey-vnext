@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { FactLabel } from "@/app/human-experience";
 import { JOURNEY_MODULES } from "@/lib/journey-program";
 import type { LearnerEnrollment } from "@/lib/server/api";
 
@@ -9,11 +10,18 @@ function normalizedKey(value: string): string {
 
 export function JourneyProgramOverview({
   currentAction,
+  currentJourneyKey,
   enrollments,
 }: {
   currentAction: string;
+  currentJourneyKey?: string | null;
   enrollments: LearnerEnrollment[];
 }) {
+  const currentModule = currentJourneyKey
+    ? JOURNEY_MODULES.find(
+      (module) => normalizedKey(module.runtimeKey) === normalizedKey(currentJourneyKey),
+    )
+    : undefined;
   return (
     <section className="program-overview" aria-labelledby="program-overview-title">
       <header className="program-overview-heading">
@@ -26,7 +34,7 @@ export function JourneyProgramOverview({
         </div>
         <aside aria-label="当前位置">
           <span>你现在在</span>
-          <strong>探索营</strong>
+          <strong>{currentModule?.name ?? "状态待确认"}</strong>
           <small>{currentAction}</small>
         </aside>
       </header>
@@ -40,9 +48,10 @@ export function JourneyProgramOverview({
           const isAssigned = Boolean(
             enrollment && ["ACTIVE", "COMPLETED"].includes(enrollment.status),
           );
+          const isCompleted = enrollment?.status === "COMPLETED";
           return (
             <li
-              className={isAssigned || module.status === "CURRENT" ? "is-current" : "is-building"}
+              className={isAssigned ? "is-current" : "is-building"}
               key={module.key}
             >
               <div className="program-module-index">{String(module.order).padStart(2, "0")}</div>
@@ -51,6 +60,17 @@ export function JourneyProgramOverview({
                 <h2>{module.name}</h2>
                 <strong>{module.shortName}</strong>
                 <span>{module.question}</span>
+                <p className="program-module-binding">
+                  <FactLabel kind="system" />
+                  {isCompleted
+                    ? "已完成 · 可回看"
+                    : isAssigned
+                      ? "进行中 · 正式任务已分配"
+                      : "未分配 · 当前不可启动"}
+                </p>
+                <small>
+                  内容包 v{module.contentBinding.version} · {module.contentBinding.taskVersionCount} 个固定任务版本
+                </small>
               </div>
               <Link
                 href={
@@ -59,11 +79,11 @@ export function JourneyProgramOverview({
                     : `/app/maps/${module.key}`
                 }
               >
-                {enrollment?.status === "COMPLETED"
+                {isCompleted
                   ? "查看已完成结果"
                   : isAssigned
                     ? "进入已分配任务"
-                    : "查看模块范围与开放条件"}
+                    : "查看开放条件与数据边界"}
               </Link>
             </li>
           );
