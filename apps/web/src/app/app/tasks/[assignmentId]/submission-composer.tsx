@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { saveSubmissionDraft, submitAssignment, type SubmissionActionState } from "@/app/actions";
 import { FactLabel } from "@/app/human-experience";
@@ -20,6 +20,23 @@ type LocalDraft = { body: string; attachmentIds: string[]; savedAt: string };
 
 function snapshot(body: string, attachmentIds: string[]) {
   return JSON.stringify({ body, attachmentIds: [...attachmentIds].sort() });
+}
+
+function subscribeToNetworkState(onChange: () => void) {
+  window.addEventListener("offline", onChange);
+  window.addEventListener("online", onChange);
+  return () => {
+    window.removeEventListener("offline", onChange);
+    window.removeEventListener("online", onChange);
+  };
+}
+
+function onlineSnapshot() {
+  return window.navigator.onLine;
+}
+
+function serverOnlineSnapshot() {
+  return true;
 }
 
 export function SubmissionComposer({
@@ -59,6 +76,9 @@ export function SubmissionComposer({
 }) {
   const storageKey = `muchen-journey:draft:${assignmentId}:${assignmentRevision}`;
   const formRef = useRef<HTMLFormElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const pendingSnapshot = useRef<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot(initialBody, initialAttachmentIds));
   const [body, setBody] = useState(initialBody);
@@ -68,6 +88,7 @@ export function SubmissionComposer({
   const [localError, setLocalError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState<LocalDraft | null>(null);
   const [storageReady, setStorageReady] = useState(false);
+  const isOnline = useSyncExternalStore(subscribeToNetworkState, onlineSnapshot, serverOnlineSnapshot);
   const [learnerAiUsed, setLearnerAiUsed] = useState(false);
   const [learnerAiPurpose, setLearnerAiPurpose] = useState("");
   const [learnerAiModelVersion, setLearnerAiModelVersion] = useState("");
@@ -106,7 +127,7 @@ export function SubmissionComposer({
   }, [body, currentSnapshot, savedSnapshot, selectedAttachmentIds, storageKey, storageReady]);
 
   const saveDraft = useCallback(() => {
-    if (!formRef.current || draftPending || currentSnapshot === savedSnapshot) return;
+    if (!formRef.current || !isOnline || draftPending || currentSnapshot === savedSnapshot) return;
     const data = new FormData(formRef.current);
     data.set("body", body);
     data.set("draft_idempotency_key", crypto.randomUUID());
@@ -114,13 +135,13 @@ export function SubmissionComposer({
     selectedAttachmentIds.forEach((id) => data.append("attachment_ids", id));
     pendingSnapshot.current = currentSnapshot;
     startTransition(() => draftAction(data));
-  }, [body, currentSnapshot, draftAction, draftPending, savedSnapshot, selectedAttachmentIds]);
+  }, [body, currentSnapshot, draftAction, draftPending, isOnline, savedSnapshot, selectedAttachmentIds]);
 
   useEffect(() => {
-    if (!storageReady || confirming || currentSnapshot === savedSnapshot) return;
+    if (!storageReady || !isOnline || confirming || currentSnapshot === savedSnapshot) return;
     const timer = window.setTimeout(saveDraft, 1_200);
     return () => window.clearTimeout(timer);
-  }, [confirming, currentSnapshot, saveDraft, savedSnapshot, storageReady]);
+  }, [confirming, currentSnapshot, isOnline, saveDraft, savedSnapshot, storageReady]);
 
   useEffect(() => {
     if (!draftState.savedAt || !pendingSnapshot.current) return;
@@ -135,6 +156,14 @@ export function SubmissionComposer({
       }
     }
   }, [currentSnapshot, draftState.savedAt, storageKey]);
+
+  useEffect(() => {
+    if (confirming) confirmationHeadingRef.current?.focus();
+  }, [confirming]);
+
+  useEffect(() => {
+    if (localError || errorState.error) errorRef.current?.focus();
+  }, [errorState.error, localError]);
 
   function beginConfirmation() {
     if (body.trim().length < 40 || body.length > 8_000) {
@@ -154,6 +183,12 @@ export function SubmissionComposer({
     setBody(recovery.body);
     setSelectedAttachmentIds(recovery.attachmentIds.filter((id) => attachments.some((attachment) => attachment.id === id)));
     setRecovery(null);
+    window.requestAnimationFrame(() => bodyRef.current?.focus());
+  }
+
+  function returnToEditing() {
+    setConfirming(false);
+    window.requestAnimationFrame(() => bodyRef.current?.focus());
   }
 
   return (
@@ -206,7 +241,8 @@ export function SubmissionComposer({
           ) : null}
 
           <label htmlFor="submission-body">{requiresReview ? "你的作答" : "你的学习记录"}</label>
-          <textarea id="submission-body" name="body" minLength={40} maxLength={8000} required placeholder={responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          <textarea ref={bodyRef} id="submission-body" name="body" minLength={40} maxLength={8000} required aria-describedby="submission-body-help submission-save-status" placeholder={responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          <p id="submission-body-help" className="status-meta">40–8000 字符。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
 
           <section className="ai-self-check-gated" aria-labelledby="ai-self-check-title">
             <FactLabel kind="ai" />
@@ -244,7 +280,7 @@ export function SubmissionComposer({
         <section className="submission-confirmation" aria-labelledby="submission-confirmation-title">
           <FactLabel kind="system" />
           <p className="section-label">最终确认</p>
-          <h3 id="submission-confirmation-title">确认提交的是固定版本</h3>
+          <h3 ref={confirmationHeadingRef} id="submission-confirmation-title" tabIndex={-1}>确认提交的是固定版本</h3>
           <p>{requiresReview ? "提交后进入人工审核，等待具名 Reviewer 结论。" : "提交后形成本阶段的完成事实，不产生人才结论。"}</p>
           <dl>
             <div><dt>任务版本</dt><dd>v{taskVersion}</dd></div>
@@ -261,21 +297,22 @@ export function SubmissionComposer({
       )}
 
       {localError || errorState.error ? (
-        <div className="inline-error" role="alert">
+        <div ref={errorRef} className="inline-error" role="alert" tabIndex={-1}>
           <strong>操作没有完成</strong><span>{localError ?? errorState.error}</span>
           {errorState.requestId ? <code>request ID: {errorState.requestId}</code> : null}
         </div>
       ) : null}
 
-      <p className="draft-save-status" aria-live="polite">
-        {draftPending ? "正在自动保存到服务器…" : draftState.savedAt ? `已自动保存到服务器 · 草稿 revision ${draftState.draftRevision} · ${new Date(draftState.savedAt).toLocaleString("zh-CN")}` : initialDraftUpdatedAt ? `服务器草稿 revision ${initialDraftRevision} · ${new Date(initialDraftUpdatedAt).toLocaleString("zh-CN")}` : "尚未保存；编辑后会自动保存到服务器，并保留本地恢复副本。"}
+      <p id="submission-save-status" className="draft-save-status" role="status" aria-live="polite">
+        {!isOnline ? "当前离线：修改已保留为本浏览器未同步副本；恢复网络后再保存或正式提交。" : draftPending ? "正在自动保存到服务器…" : draftState.savedAt ? `已自动保存到服务器 · 草稿 revision ${draftState.draftRevision} · ${new Date(draftState.savedAt).toLocaleString("zh-CN")}` : initialDraftUpdatedAt ? `服务器草稿 revision ${initialDraftRevision} · ${new Date(initialDraftUpdatedAt).toLocaleString("zh-CN")}` : "尚未保存；编辑后会自动保存到服务器，并保留本地恢复副本。"}
       </p>
 
       <div className="action-row">
+        {!isOnline ? <span className="sticky-action-status" aria-hidden="true">离线 · 正式提交已暂停</span> : null}
         {confirming ? (
           <>
-            <button className="button primary" type="submit" disabled={submitPending || draftPending}>{submitPending ? "正在提交…" : "确认正式提交"}</button>
-            <button className="button secondary" type="button" onClick={() => setConfirming(false)} disabled={submitPending}>返回修改</button>
+            <button className="button primary" type="submit" disabled={submitPending || draftPending || !isOnline}>{submitPending ? "正在提交…" : "确认正式提交"}</button>
+            <button className="button secondary" type="button" onClick={returnToEditing} disabled={submitPending}>返回修改</button>
           </>
         ) : (
           <>
@@ -291,7 +328,7 @@ export function SubmissionComposer({
             >
               检查并提交
             </button>
-            <button className="button secondary" type="button" onClick={saveDraft} disabled={submitPending || draftPending || currentSnapshot === savedSnapshot}>{draftPending ? "正在保存…" : "保存草稿"}</button>
+            <button className="button secondary" type="button" onClick={saveDraft} disabled={submitPending || draftPending || !isOnline || currentSnapshot === savedSnapshot}>{draftPending ? "正在保存…" : "保存草稿"}</button>
           </>
         )}
       </div>

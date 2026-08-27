@@ -13,10 +13,10 @@
   ],
   "requirement_count": 79,
   "status_counts": {
-    "PARTIAL": 36,
+    "PARTIAL": 35,
     "NOT_IMPLEMENTED": 7,
     "P1_DEFERRED": 5,
-    "IMPLEMENTED": 12,
+    "IMPLEMENTED": 13,
     "GATED": 19
   },
   "requirements": [
@@ -290,11 +290,14 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 5,
-      "audit_finding": "响应式布局与服务端草稿恢复存在；弱网、本地未同步、移动端持久主动作尚无完整机器证据。",
+      "audit_finding": "390px 正式任务路径现有持久主动作、服务器保存回执、本地未同步副本、离线检测与恢复联网门禁；离线时正式 mutation 禁用且正文保留，附件上传提供阶段播报。安全超时没有独立批准配置，跨全部页面的返回位置仍未统一，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/globals.css",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "tests/test_submission_attachments.py"
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs",
+        "tests/test_submission_attachments.py",
+        "output/playwright/hx-v3-06-offline-confirmation-390-viewport.png"
       ]
     },
     {
@@ -302,11 +305,15 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 5,
-      "audit_finding": "语义结构、跳转主内容、焦点与减少动态效果基础存在；缺自动 a11y、读屏与完整关键路径证据。",
+      "audit_finding": "正式任务路径现有语义标题、跳转主内容、可见焦点、表单说明关联、状态文字、48px 触控目标、减少动态效果、确认/错误焦点管理；Firefox 键盘首焦点与 axe WCAG A/AA 0 violation 已验证。Reviewer/运营完整读屏脚本仍待 V3-07 Gate，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/layout.tsx",
         "apps/web/src/app/globals.css",
-        "apps/web/scripts/product-entry-contract.test.mjs"
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/error.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
+        "apps/web/scripts/product-entry-contract.test.mjs",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
       ]
     },
     {
@@ -619,11 +626,14 @@
       "status": "PARTIAL",
       "priority": "P0",
       "implementation_phase": 5,
-      "audit_finding": "已有焦点、语义、响应式与减少动态效果基础；完整正式路径 a11y 仍未验证。",
+      "audit_finding": "正式学员任务路径已补齐键盘首焦点、确认/错误焦点、表单说明、状态播报、触控与减少动态效果，并修复 axe 发现的 2 个 serious 对比度缺陷至 WCAG A/AA 0 violation；全角色完整读屏 Gate 尚待 V3-07，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/layout.tsx",
         "apps/web/src/app/globals.css",
-        "apps/web/scripts/product-entry-contract.test.mjs"
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/scripts/product-entry-contract.test.mjs",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
       ]
     },
     {
@@ -855,15 +865,21 @@
     },
     {
       "id": "HX-IMPL-005",
-      "status": "PARTIAL",
+      "status": "IMPLEMENTED",
       "priority": "P0",
       "implementation_phase": 5,
-      "audit_finding": "幂等、响应式、焦点和错误基础存在；弱网、本地恢复与完整 a11y Gate 未完成.",
+      "audit_finding": "P0 弱网/未知结果恢复、草稿与正式 mutation 幂等、390px 持久主动作、键盘首焦点、确认/错误焦点、表单说明、状态播报、48px 触控目标、减少动态效果和 axe 正式任务 Gate 已实现并有故障注入证据；全候选 Gate 属 HX-IMPL-006。",
       "trace_paths": [
         "apps/web/src/app/layout.tsx",
         "apps/web/src/app/globals.css",
+        "apps/web/src/app/error.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
         "apps/web/scripts/product-entry-contract.test.mjs",
-        "tests/test_submission_attachments.py"
+        "apps/web/scripts/resilience-a11y-contract.test.mjs",
+        "tests/test_submission_attachments.py",
+        "output/playwright/hx-v3-06-offline-confirmation-390-viewport.png"
       ]
     },
     {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 
 import {
   finalizeReview,
@@ -21,9 +21,15 @@ type RubricDimension = {
 };
 
 function ActionError({ state }: { state: ReviewActionState }) {
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (state.error) errorRef.current?.focus();
+  }, [state.error]);
+
   if (!state.error) return null;
   return (
-    <div className="inline-error" role="alert">
+    <div ref={errorRef} className="inline-error" role="alert" tabIndex={-1}>
       <strong>操作没有完成</strong>
       <span>{state.error}</span>
       {state.requestId ? <code>request ID: {state.requestId}</code> : null}

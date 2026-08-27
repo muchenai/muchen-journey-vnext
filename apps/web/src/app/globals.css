@@ -265,6 +265,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   nav { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
   .page-shell { padding-top: 48px; }
   .action-row .button { width: 100%; }
+  .submission-composer > .action-row { position: sticky; bottom: 8px; z-index: 10; padding: 10px; background: rgba(246, 247, 251, 0.96); border: 1px solid var(--border-default); border-radius: 14px; box-shadow: 0 10px 28px rgba(23, 32, 51, 0.16); }
   .journey-steps { grid-template-columns: 1fr; }
   .section-heading-row { align-items: flex-start; flex-direction: column; gap: 8px; }
   .decision-grid { grid-template-columns: 1fr; }
@@ -446,7 +447,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-moves > ol li { min-height: 144px; padding: 20px; background: #f4f8f7; border-radius: 16px; counter-increment: task-move; }
 .task-moves > ol li::before { display: block; margin-bottom: 22px; color: #20877f; content: "0" counter(task-move); font-size: 13px; font-weight: 800; }
 .task-contract { cursor: default; }
-.task-contract summary { cursor: pointer; color: #20877f; font-weight: 750; }
+.task-contract summary { cursor: pointer; color: #176d70; font-weight: 750; }
 .task-contract[open] summary { margin-bottom: 22px; }
 .task-contract-columns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
 .task-workspace textarea { min-height: 300px; border-radius: 16px; }
@@ -515,6 +516,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .incentive-ledger code { overflow-wrap: anywhere; font-size: 11px; }
 .submission-composer { display: grid; gap: 18px; }
 .submission-composer > .action-row, .draft-recovery .action-row { margin: 0; }
+.sticky-action-status { flex-basis: 100%; color: #8a1c13; font-size: 13px; font-weight: 800; }
 .draft-recovery, .ai-self-check-gated, .submission-confirmation { padding: 20px; border-radius: 16px; }
 .draft-recovery { color: #533800; background: #fff8e6; border: 1px solid #e7cb78; }
 .draft-recovery p { margin: 5px 0 14px; }
