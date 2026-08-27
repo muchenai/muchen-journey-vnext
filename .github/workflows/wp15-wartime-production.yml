@@ -55,6 +55,16 @@ on:
         required: false
         default: ""
         type: string
+      pro_review_evidence_b64:
+        description: Non-sensitive base64 independent Pro review evidence JSON
+        required: false
+        default: ""
+        type: string
+      execution_authorization_sha256:
+        description: Exact protected Owner execution authorization evidence SHA-256
+        required: false
+        default: ""
+        type: string
 
 permissions:
   actions: read
@@ -92,7 +102,7 @@ jobs:
         with:
           node-version: 24.16.0
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: candidate/apps/web/package-lock.json
       - name: Verify exact clean application candidate
         run: |
           set -euo pipefail
@@ -208,8 +218,136 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  greenfield_canary:
+  greenfield_authorize:
     if: >-
+      inputs.candidate == '1bccbbf1706a8216892f5b9b512b1e27ce784101' &&
+      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_1BCCBBF_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_1BCCBBF_TO_FF53052'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      reviewed_ops_commit_sha: ${{ steps.authorize.outputs.reviewed_ops_commit_sha }}
+      reviewed_ops_ref: ${{ steps.authorize.outputs.reviewed_ops_ref }}
+      pro_review_evidence_sha256: ${{ steps.authorize.outputs.pro_review_evidence_sha256 }}
+    steps:
+      - name: Check out the workflow dispatch commit without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Authorize exact immutable operations without environment or configured secrets
+        id: authorize
+        env:
+          PRO_REVIEW_EVIDENCE_B64: ${{ inputs.pro_review_evidence_b64 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = tag
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          test -n "$PRO_REVIEW_EVIDENCE_B64"
+          [[ '${{ inputs.pro_review_evidence_sha256 }}' =~ ^[0-9a-f]{64}$ ]]
+          [[ '${{ inputs.execution_authorization_sha256 }}' =~ ^[0-9a-f]{64}$ ]]
+          for name in VOLCENGINE_ACCESS_KEY VOLCENGINE_SECRET_KEY WP08_MIGRATION_DB_PASSWORD WP08_RUNTIME_DB_PASSWORD WP15_BACKUP_KEY WP31_EXECUTION_AUTHORIZATION_B64; do
+            test -z "${!name:-}"
+          done
+          evidence="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+          umask 077
+          printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$evidence"
+          python3 scripts/wp31_greenfield_canary.py contract-check
+          python3 scripts/wp31_ops_closure.py
+          python3 scripts/wp31_greenfield_canary.py review-check \
+            --evidence "$evidence" \
+            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
+            --executing-ref "$GITHUB_REF"
+          reviewed=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_commit_sha"])' "$evidence")
+          reviewed_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_ref"])' "$evidence")
+          test "$reviewed" = "$GITHUB_SHA"
+          test "$reviewed_ref" = "$GITHUB_REF"
+          if [[ '${{ inputs.phase }}' == greenfield-preflight ]]; then
+            test -z '${{ inputs.preflight_run_id }}'
+            test -z '${{ inputs.backup_run_id }}'
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-backup-restore ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            test -z '${{ inputs.backup_run_id }}'
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            test -z '${{ inputs.deploy_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-inspect || '${{ inputs.phase }}' == greenfield-rollback ]]; then
+            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+            [[ '${{ inputs.deploy_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
+          else
+            exit 2
+          fi
+          test -z '${{ inputs.archive_run_id }}'
+          {
+            echo "reviewed_ops_commit_sha=$reviewed"
+            echo "reviewed_ops_ref=$reviewed_ref"
+            echo "pro_review_evidence_sha256=${{ inputs.pro_review_evidence_sha256 }}"
+          } >>"$GITHUB_OUTPUT"
+          rm -f -- "$evidence"
+
+  greenfield_execution_authorize:
+    needs: greenfield_authorize
+    if: >-
+      needs.greenfield_authorize.result == 'success' &&
+      needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha &&
+      needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production-canary-uat
+    permissions:
+      contents: read
+    outputs:
+      execution_authorization_sha256: ${{ steps.owner_authorize.outputs.execution_authorization_sha256 }}
+    env:
+      WP31_EXECUTION_AUTHORIZATION_B64: ${{ secrets.WP31_EXECUTION_AUTHORIZATION_B64 }}
+    steps:
+      - name: Check out only the independently reviewed immutable commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}
+      - name: Verify protected Owner execution authorization only
+        id: owner_authorize
+        run: |
+          set -euo pipefail
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          test "$GITHUB_SHA" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}'
+          test "$GITHUB_REF" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_ref }}'
+          test -n "$WP31_EXECUTION_AUTHORIZATION_B64"
+          authorization="$RUNNER_TEMP/wp31-execution-authorization.json"
+          umask 077
+          printf '%s' "$WP31_EXECUTION_AUTHORIZATION_B64" | base64 --decode >"$authorization"
+          python3 scripts/wp31_greenfield_canary.py authorization-check \
+            --evidence "$authorization" \
+            --evidence-sha256 '${{ inputs.execution_authorization_sha256 }}' \
+            --pro-review-evidence-sha256 '${{ needs.greenfield_authorize.outputs.pro_review_evidence_sha256 }}' \
+            --phase '${{ inputs.phase }}' \
+            --executing-ref "$GITHUB_REF" \
+            --reviewed-ops-commit-sha "$GITHUB_SHA"
+          echo 'execution_authorization_sha256=${{ inputs.execution_authorization_sha256 }}' >>"$GITHUB_OUTPUT"
+          rm -f -- "$authorization"
+
+  greenfield_canary:
+    needs:
+      - greenfield_authorize
+      - greenfield_execution_authorize
+    if: >-
+      needs.greenfield_authorize.result == 'success' &&
+      needs.greenfield_execution_authorize.result == 'success' &&
+      needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha &&
+      needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref &&
+      needs.greenfield_execution_authorize.outputs.execution_authorization_sha256 == inputs.execution_authorization_sha256 &&
       inputs.candidate == '1bccbbf1706a8216892f5b9b512b1e27ce784101' &&
       ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_1BCCBBF_PRODUCTION_CANARY') ||
       (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_1BCCBBF_PRODUCTION_CANARY') ||
@@ -254,11 +392,43 @@ jobs:
       WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
       WP15_BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
       WP31_CANARY_LEARNER_USER_IDS: ${{ secrets.WP31_CANARY_LEARNER_USER_IDS }}
-      WP31_PRO_REVIEW_EVIDENCE_B64: ${{ secrets.WP31_PRO_REVIEW_EVIDENCE_B64 }}
+      WP31_EXECUTION_AUTHORIZATION_B64: ${{ secrets.WP31_EXECUTION_AUTHORIZATION_B64 }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check out only the independently reviewed immutable commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}
+      - name: Re-enforce exact Pro and protected Owner authorization before infrastructure tools
+        env:
+          PRO_REVIEW_EVIDENCE_B64: ${{ inputs.pro_review_evidence_b64 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          test "$GITHUB_SHA" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}'
+          test "$GITHUB_REF" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_ref }}'
+          test -n "$PRO_REVIEW_EVIDENCE_B64"
+          test -n "$WP31_EXECUTION_AUTHORIZATION_B64"
+          pro="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+          authorization="$RUNNER_TEMP/wp31-execution-authorization.json"
+          umask 077
+          printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$pro"
+          printf '%s' "$WP31_EXECUTION_AUTHORIZATION_B64" | base64 --decode >"$authorization"
+          python3 scripts/wp31_greenfield_canary.py contract-check
+          python3 scripts/wp31_ops_closure.py
+          python3 scripts/wp31_greenfield_canary.py review-check \
+            --evidence "$pro" \
+            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
+            --executing-ref "$GITHUB_REF"
+          python3 scripts/wp31_greenfield_canary.py authorization-check \
+            --evidence "$authorization" \
+            --evidence-sha256 '${{ inputs.execution_authorization_sha256 }}' \
+            --pro-review-evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
+            --phase '${{ inputs.phase }}' \
+            --executing-ref "$GITHUB_REF" \
+            --reviewed-ops-commit-sha "$GITHUB_SHA"
+          rm -f -- "$pro" "$authorization"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.15.8
@@ -270,40 +440,12 @@ jobs:
           path: artifacts/wp31-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 33062342289
-      - name: Enforce PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW
+      - name: Verify exact registry-bound package after both authorization Gates
         run: |
           set -euo pipefail
           test '${{ inputs.candidate }}' = 1bccbbf1706a8216892f5b9b512b1e27ce784101
-          test -n "$WP31_PRO_REVIEW_EVIDENCE_B64"
-          evidence="$RUNNER_TEMP/wp31-pro-review-evidence.json"
-          umask 077
-          printf '%s' "$WP31_PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$evidence"
-          python3 scripts/wp31_greenfield_canary.py contract-check
           python3 scripts/wp31_greenfield_canary.py package-check \
             --manifest artifacts/wp31-candidate/release-manifest.json
-          python3 scripts/wp31_greenfield_canary.py review-check \
-            --evidence "$evidence" \
-            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}'
-          if [[ '${{ inputs.phase }}' == greenfield-preflight ]]; then
-            test -z '${{ inputs.preflight_run_id }}'
-            test -z '${{ inputs.backup_run_id }}'
-            test -z '${{ inputs.deploy_run_id }}'
-          elif [[ '${{ inputs.phase }}' == greenfield-backup-restore ]]; then
-            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-            test -z '${{ inputs.backup_run_id }}'
-            test -z '${{ inputs.deploy_run_id }}'
-          elif [[ '${{ inputs.phase }}' == greenfield-deploy ]]; then
-            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-            test -z '${{ inputs.deploy_run_id }}'
-          elif [[ '${{ inputs.phase }}' == greenfield-inspect || '${{ inputs.phase }}' == greenfield-rollback ]]; then
-            [[ '${{ inputs.preflight_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-            [[ '${{ inputs.backup_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-            [[ '${{ inputs.deploy_run_id }}' =~ ^[1-9][0-9]{5,19}$ ]]
-          else
-            exit 2
-          fi
-          test -z '${{ inputs.archive_run_id }}'
       - name: Download exact preflight evidence before infrastructure access
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0

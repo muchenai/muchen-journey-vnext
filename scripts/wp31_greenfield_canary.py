@@ -8,7 +8,9 @@ import hashlib
 import json
 import re
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import UUID
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +48,7 @@ def _json_file(path: Path) -> dict[str, object]:
 
 def load() -> dict[str, object]:
     value = _json_file(CONTRACT)
-    if value.get("schema_version") != 2:
+    if value.get("schema_version") != 3:
         raise CanaryContractError("schema version differs")
     expected_scalars = {
         "environment": "PRODUCTION_CANARY_UAT",
@@ -84,10 +86,10 @@ def load() -> dict[str, object]:
         raise CanaryContractError("rollback candidate differs")
     if rollback.get("database") != value["source_database"]:
         raise CanaryContractError("rollback database differs")
-    if value.get("owner_canary_deployment_go") is not True:
-        raise CanaryContractError("Owner Canary deployment GO is absent")
-    if value.get("entrypoint_execution_granted") not in {True, False}:
-        raise CanaryContractError("entrypoint execution authorization is malformed")
+    if value.get("authorization_model") != (
+        "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+    ):
+        raise CanaryContractError("authorization model differs")
     workflow = (ROOT / ".github/workflows/wp15-wartime-production.yml").read_text()
     required = (
         "greenfield-package",
@@ -96,10 +98,13 @@ def load() -> dict[str, object]:
         "greenfield-deploy",
         "greenfield-inspect",
         "greenfield-rollback",
-        "PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW",
         "preflight_run_id",
         "deploy_run_id",
-        "WP31_PRO_REVIEW_EVIDENCE_B64",
+        "pro_review_evidence_b64",
+        "execution_authorization_sha256",
+        "greenfield_authorize",
+        "greenfield_execution_authorize",
+        "WP31_EXECUTION_AUTHORIZATION_B64",
     )
     if any(item not in workflow for item in required):
         raise CanaryContractError("workflow is not connected to every reviewed phase")
@@ -108,10 +113,18 @@ def load() -> dict[str, object]:
 
 def load_ops_manifest() -> dict[str, object]:
     value = _json_file(OPS_MANIFEST)
-    if value.get("schema_version") != 1:
+    if value.get("schema_version") != 2:
         raise CanaryContractError("ops manifest schema differs")
     if value.get("application_candidate_sha") != EXPECTED_CANDIDATE:
         raise CanaryContractError("ops manifest candidate differs")
+    if value.get("closure_model") != "REPOSITORY_GREENFIELD_TRANSITIVE_V2":
+        raise CanaryContractError("ops manifest closure model differs")
+    if value.get("candidate_bound_references") != ["scripts/wp07_candidate.py"]:
+        raise CanaryContractError("application candidate boundary differs")
+    if value.get("manifest_self_binding") != (
+        "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT"
+    ):
+        raise CanaryContractError("ops manifest self-binding differs")
     files = value.get("files")
     if not isinstance(files, dict) or len(files) < 10:
         raise CanaryContractError("ops manifest file set is incomplete")
@@ -138,8 +151,8 @@ def verify_reviewed_tree(reviewed_ops: str, manifest: dict[str, object]) -> None
     if _git("cat-file", "-e", f"{reviewed_ops}^{{commit}}", check=False).returncode:
         raise CanaryContractError("reviewed operations commit is unavailable")
     head = _git("rev-parse", "HEAD").stdout.decode().strip()
-    if _git("merge-base", "--is-ancestor", reviewed_ops, head, check=False).returncode:
-        raise CanaryContractError("reviewed operations commit is not an ancestor of HEAD")
+    if head != reviewed_ops:
+        raise CanaryContractError("executing HEAD is not the exact reviewed operations commit")
     reviewed_manifest = _git(
         "show", f"{reviewed_ops}:config/wp31_greenfield_canary_ops_manifest.json", check=False
     )
@@ -157,18 +170,34 @@ def verify_reviewed_tree(reviewed_ops: str, manifest: dict[str, object]) -> None
             raise CanaryContractError(f"reviewed ops commit bytes differ: {raw_path}")
 
 
-def review_check(evidence_path: Path, provided_sha256: str) -> dict[str, object]:
+def review_check(
+    evidence_path: Path, provided_sha256: str, executing_ref: str
+) -> dict[str, object]:
     value = load()
-    if value.get("entrypoint_execution_granted") is not True:
-        raise CanaryContractError("entrypoint execution is not granted")
     manifest = load_ops_manifest()
     manifest_hash = sha256(OPS_MANIFEST)
     if not SHA256.fullmatch(provided_sha256) or sha256(evidence_path) != provided_sha256:
         raise CanaryContractError("provided Pro evidence hash differs")
     evidence = _json_file(evidence_path)
+    review_fields = {
+        "application_candidate_sha",
+        "evidence_scope",
+        "ops_manifest_sha256",
+        "package_manifest_sha256",
+        "production_mutation",
+        "review_status",
+        "reviewed_at_utc",
+        "reviewed_ops_commit_sha",
+        "reviewed_ops_ref",
+        "reviewer",
+        "reviewer_independent",
+    }
+    if set(evidence) != review_fields:
+        raise CanaryContractError("Pro evidence fields differ")
     if evidence.get("review_status") != "PASS":
         raise CanaryContractError("independent Pro review is not PASS")
     reviewed_ops = evidence.get("reviewed_ops_commit_sha")
+    reviewed_ref = evidence.get("reviewed_ops_ref")
     expected = {
         "application_candidate_sha": value["application_candidate_sha"],
         "package_manifest_sha256": value["package_manifest_sha256"],
@@ -178,6 +207,9 @@ def review_check(evidence_path: Path, provided_sha256: str) -> dict[str, object]
         raise CanaryContractError("Pro evidence binding differs")
     if not isinstance(reviewed_ops, str):
         raise CanaryContractError("reviewed operations SHA is missing")
+    expected_ref = f"refs/tags/muchen-journey-greenfield-ops-{reviewed_ops}"
+    if reviewed_ref != expected_ref or executing_ref != expected_ref:
+        raise CanaryContractError("executing ref is not the exact reviewed immutable tag")
     reviewer = evidence.get("reviewer")
     reviewed_at = evidence.get("reviewed_at_utc")
     if reviewer != "CODEX_PRO_REVIEW_MACBOOK_PRO" or not isinstance(reviewed_at, str):
@@ -193,7 +225,99 @@ def review_check(evidence_path: Path, provided_sha256: str) -> dict[str, object]
         "status": "PASS",
         **expected,
         "reviewed_ops_commit_sha": reviewed_ops,
+        "reviewed_ops_ref": reviewed_ref,
         "pro_review_evidence_sha256": provided_sha256,
+    }
+
+
+def _utc(value: object, field: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise CanaryContractError(f"{field} is not UTC")
+    try:
+        result = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as error:
+        raise CanaryContractError(f"{field} is invalid") from error
+    if result.tzinfo != timezone.utc:
+        raise CanaryContractError(f"{field} is not UTC")
+    return result
+
+
+def authorization_check(
+    evidence_path: Path,
+    provided_sha256: str,
+    pro_review_evidence_sha256: str,
+    phase: str,
+    executing_ref: str,
+    reviewed_ops_commit_sha: str,
+) -> dict[str, object]:
+    value = load()
+    manifest_hash = sha256(OPS_MANIFEST)
+    if not SHA256.fullmatch(provided_sha256) or sha256(evidence_path) != provided_sha256:
+        raise CanaryContractError("provided Owner authorization evidence hash differs")
+    if not SHA256.fullmatch(pro_review_evidence_sha256):
+        raise CanaryContractError("Pro review evidence hash is invalid")
+    evidence = _json_file(evidence_path)
+    authorization_fields = {
+        "application_candidate_sha",
+        "authorization_id",
+        "authorization_status",
+        "authorized_at_utc",
+        "authorized_by",
+        "authority",
+        "environment",
+        "max_allowlisted_learners",
+        "not_after_utc",
+        "ops_manifest_sha256",
+        "phase",
+        "pro_review_evidence_sha256",
+        "production_job_execution_authorized",
+        "release_go",
+        "reviewed_ops_commit_sha",
+        "reviewed_ops_ref",
+        "worker_start_authorized",
+    }
+    if set(evidence) != authorization_fields:
+        raise CanaryContractError("Owner execution authorization fields differ")
+    expected = {
+        "authorization_status": "GRANTED",
+        "authorized_by": "刘默文",
+        "authority": "PRODUCT_OWNER_AND_RELEASE_OPS_OWNER",
+        "environment": "PRODUCTION_CANARY_UAT",
+        "application_candidate_sha": value["application_candidate_sha"],
+        "reviewed_ops_commit_sha": reviewed_ops_commit_sha,
+        "reviewed_ops_ref": executing_ref,
+        "ops_manifest_sha256": manifest_hash,
+        "pro_review_evidence_sha256": pro_review_evidence_sha256,
+        "phase": phase,
+        "max_allowlisted_learners": 8,
+        "production_job_execution_authorized": True,
+        "worker_start_authorized": False,
+        "release_go": False,
+    }
+    if any(evidence.get(key) != item for key, item in expected.items()):
+        raise CanaryContractError("Owner execution authorization binding differs")
+    if _git("rev-parse", "HEAD").stdout.decode().strip() != reviewed_ops_commit_sha:
+        raise CanaryContractError("Owner authorization is not executing at the reviewed commit")
+    if executing_ref != f"refs/tags/muchen-journey-greenfield-ops-{reviewed_ops_commit_sha}":
+        raise CanaryContractError("Owner authorization ref differs")
+    try:
+        authorization_id = UUID(str(evidence.get("authorization_id")))
+    except (ValueError, TypeError) as error:
+        raise CanaryContractError("Owner authorization ID is invalid") from error
+    if authorization_id.version != 4:
+        raise CanaryContractError("Owner authorization ID is not UUIDv4")
+    authorized_at = _utc(evidence.get("authorized_at_utc"), "authorized_at_utc")
+    not_after = _utc(evidence.get("not_after_utc"), "not_after_utc")
+    now = datetime.now(timezone.utc)
+    if not authorized_at <= now < not_after:
+        raise CanaryContractError("Owner execution authorization is not currently valid")
+    if not_after - authorized_at > timedelta(hours=6):
+        raise CanaryContractError("Owner execution authorization lifetime exceeds six hours")
+    return {
+        "status": "PASS",
+        "authorization_id": str(authorization_id),
+        "authorization_evidence_sha256": provided_sha256,
+        **expected,
     }
 
 
@@ -227,6 +351,14 @@ def main() -> int:
     review = commands.add_parser("review-check")
     review.add_argument("--evidence", type=Path, required=True)
     review.add_argument("--evidence-sha256", required=True)
+    review.add_argument("--executing-ref", required=True)
+    authorization = commands.add_parser("authorization-check")
+    authorization.add_argument("--evidence", type=Path, required=True)
+    authorization.add_argument("--evidence-sha256", required=True)
+    authorization.add_argument("--pro-review-evidence-sha256", required=True)
+    authorization.add_argument("--phase", required=True)
+    authorization.add_argument("--executing-ref", required=True)
+    authorization.add_argument("--reviewed-ops-commit-sha", required=True)
     package = commands.add_parser("package-check")
     package.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
@@ -234,13 +366,18 @@ def main() -> int:
         if args.command == "contract-check":
             value = load()
             load_ops_manifest()
-            result = {
-                "status": "PASS",
-                "owner_canary_deployment_go": value["owner_canary_deployment_go"],
-                "entrypoint_execution_granted": value["entrypoint_execution_granted"],
-            }
+            result = {"status": "PASS", "authorization_model": value["authorization_model"]}
         elif args.command == "review-check":
-            result = review_check(args.evidence, args.evidence_sha256)
+            result = review_check(args.evidence, args.evidence_sha256, args.executing_ref)
+        elif args.command == "authorization-check":
+            result = authorization_check(
+                args.evidence,
+                args.evidence_sha256,
+                args.pro_review_evidence_sha256,
+                args.phase,
+                args.executing_ref,
+                args.reviewed_ops_commit_sha,
+            )
         else:
             result = package_check(args.manifest)
     except (
