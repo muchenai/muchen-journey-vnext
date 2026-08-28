@@ -250,6 +250,15 @@
             "title": "Allowed Commands",
             "type": "array"
           },
+          "assigned_at": {
+            "format": "date-time",
+            "title": "Assigned At",
+            "type": "string"
+          },
+          "audience": {
+            "title": "Audience",
+            "type": "string"
+          },
           "available_attachments": {
             "items": {
               "$ref": "#/components/schemas/AttachmentOut"
@@ -349,6 +358,14 @@
             "title": "Required Deliverables",
             "type": "array"
           },
+          "reviewer_display_name": {
+            "title": "Reviewer Display Name",
+            "type": "string"
+          },
+          "reviewer_role": {
+            "title": "Reviewer Role",
+            "type": "string"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -357,6 +374,10 @@
             "additionalProperties": true,
             "title": "Rubric",
             "type": "object"
+          },
+          "sensitivity": {
+            "title": "Sensitivity",
+            "type": "string"
           },
           "stable_task_key": {
             "title": "Stable Task Key",
@@ -393,6 +414,8 @@
           "id",
           "status",
           "revision",
+          "assigned_at",
+          "reviewer_display_name",
           "allowed_commands",
           "stable_task_key",
           "task_version",
@@ -409,6 +432,9 @@
           "learning_experience",
           "estimated_duration_minutes",
           "feedback_sla_business_days",
+          "reviewer_role",
+          "sensitivity",
+          "audience",
           "rubric",
           "submission",
           "draft",
@@ -6750,6 +6776,10 @@
             "title": "Overall Feedback",
             "type": "string"
           },
+          "reviewer_display_name": {
+            "title": "Reviewer Display Name",
+            "type": "string"
+          },
           "reviewer_id": {
             "format": "uuid",
             "title": "Reviewer Id",
@@ -6760,10 +6790,17 @@
             "default": "FINALIZED",
             "title": "Status",
             "type": "string"
+          },
+          "submission_version_id": {
+            "format": "uuid",
+            "title": "Submission Version Id",
+            "type": "string"
           }
         },
         "required": [
           "reviewer_id",
+          "reviewer_display_name",
+          "submission_version_id",
           "overall_feedback",
           "ai_use",
           "concluded_at"
@@ -6872,12 +6909,22 @@
             "title": "Assignment Id",
             "type": "string"
           },
+          "audience": {
+            "title": "Audience",
+            "type": "string"
+          },
           "completion_criteria": {
             "items": {
               "type": "string"
             },
             "title": "Completion Criteria",
             "type": "array"
+          },
+          "conflict_status": {
+            "const": "NOT_EVALUATED",
+            "default": "NOT_EVALUATED",
+            "title": "Conflict Status",
+            "type": "string"
           },
           "evaluation": {
             "anyOf": [
@@ -6888,6 +6935,10 @@
                 "type": "null"
               }
             ]
+          },
+          "feedback_sla_business_days": {
+            "title": "Feedback Sla Business Days",
+            "type": "integer"
           },
           "finalized_at": {
             "anyOf": [
@@ -6936,10 +6987,18 @@
             "title": "Revision",
             "type": "integer"
           },
+          "revision_count": {
+            "title": "Revision Count",
+            "type": "integer"
+          },
           "rubric": {
             "additionalProperties": true,
             "title": "Rubric",
             "type": "object"
+          },
+          "sensitivity": {
+            "title": "Sensitivity",
+            "type": "string"
           },
           "started_at": {
             "anyOf": [
@@ -6978,6 +7037,11 @@
             "title": "Submission Version No",
             "type": "integer"
           },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          },
           "task_purpose": {
             "title": "Task Purpose",
             "type": "string"
@@ -7003,10 +7067,15 @@
           "task_title",
           "task_version",
           "submission_version_no",
+          "submitted_at",
           "assigned_at",
           "started_at",
           "priority_reason",
           "material_status",
+          "feedback_sla_business_days",
+          "revision_count",
+          "sensitivity",
+          "audience",
           "submission_body",
           "submission_ai_use",
           "task_purpose",
@@ -7187,6 +7256,20 @@
             "title": "Assignment Id",
             "type": "string"
           },
+          "audience": {
+            "title": "Audience",
+            "type": "string"
+          },
+          "conflict_status": {
+            "const": "NOT_EVALUATED",
+            "default": "NOT_EVALUATED",
+            "title": "Conflict Status",
+            "type": "string"
+          },
+          "feedback_sla_business_days": {
+            "title": "Feedback Sla Business Days",
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -7211,6 +7294,14 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
+          },
+          "revision_count": {
+            "title": "Revision Count",
+            "type": "integer"
+          },
+          "sensitivity": {
+            "title": "Sensitivity",
+            "type": "string"
           },
           "started_at": {
             "anyOf": [
@@ -7242,6 +7333,11 @@
             "title": "Submission Version No",
             "type": "integer"
           },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          },
           "task_title": {
             "title": "Task Title",
             "type": "string"
@@ -7263,10 +7359,15 @@
           "task_title",
           "task_version",
           "submission_version_no",
+          "submitted_at",
           "assigned_at",
           "started_at",
           "priority_reason",
-          "material_status"
+          "material_status",
+          "feedback_sla_business_days",
+          "revision_count",
+          "sensitivity",
+          "audience"
         ],
         "title": "ReviewQueueItemOut",
         "type": "object"
@@ -8524,6 +8625,14 @@
             ],
             "title": "Review Status"
           },
+          "rubric_feedback": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rubric Feedback",
+            "type": "array"
+          },
           "version_no": {
             "title": "Version No",
             "type": "integer"
@@ -8539,7 +8648,8 @@
           "review_id",
           "review_status",
           "decision",
-          "feedback"
+          "feedback",
+          "rubric_feedback"
         ],
         "title": "SubmissionVersionOut",
         "type": "object"
