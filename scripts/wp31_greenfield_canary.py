@@ -21,7 +21,7 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 DIGEST_IMAGE = re.compile(
     r"ghcr\.io/muchenai2024-creator/[a-z0-9-]+@sha256:[0-9a-f]{64}"
 )
-EXPECTED_CANDIDATE = "1bccbbf1706a8216892f5b9b512b1e27ce784101"
+EXPECTED_CANDIDATE = "1633ec4eabe381da3b56500c323005c0f363c0d9"
 EXPECTED_ROLLBACK = "ff53052847a268d025bceb93c3eab37986d50219"
 
 
@@ -53,14 +53,14 @@ def load() -> dict[str, object]:
     expected_scalars = {
         "environment": "PRODUCTION_CANARY_UAT",
         "application_candidate_sha": EXPECTED_CANDIDATE,
-        "package_workflow_run_id": "33062342289",
+        "package_workflow_run_id": "33141698913",
         "package_manifest_sha256": (
-            "49f95c33131932e113cc8bcdf252ff647a4d21782ce353d1b2038ffc75960eb1"
+            "566f6a60baf6cb2e8e279503489b70036edb071fc891d0653f77abd04f2f7db5"
         ),
         "migration_head": "0027_next_stage_review",
         "production_host": "journey.muchenai.com",
         "source_database": "journey_next_cutover_20260810",
-        "isolated_canary_database": "journey_next_canary_20260827_1bccbbf",
+        "isolated_canary_database": "journey_next_canary_20260828_1633ec4",
     }
     if any(value.get(key) != expected for key, expected in expected_scalars.items()):
         raise CanaryContractError("immutable contract value differs")
