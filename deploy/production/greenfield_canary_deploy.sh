@@ -2,8 +2,8 @@
 set -euo pipefail
 
 fail() { printf 'WP31_CANARY_DEPLOY_ERROR: %s\n' "$*" >&2; return 1; }
-candidate=1bccbbf1706a8216892f5b9b512b1e27ce784101
-database=journey_next_canary_20260827_1bccbbf
+candidate=1633ec4eabe381da3b56500c323005c0f363c0d9
+database=journey_next_canary_20260828_1633ec4
 migration=0027_next_stage_review
 root=/srv/journey-next-production/canary
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
@@ -15,8 +15,8 @@ root=/srv/journey-next-production/canary
 [[ "${WP31_OPS_MANIFEST_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "ops manifest hash is invalid"
 [[ "${WP31_DEPLOY_RUN_ID:-}" =~ ^[1-9][0-9]{5,19}$ ]] || fail "deploy run ID is invalid"
 [[ -n "${WP15_BACKUP_KEY:-}" && ${#WP15_BACKUP_KEY} -ge 32 ]] || fail "backup key is missing"
-[[ "${API_IMAGE:-}" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:772ea55221ab07fdec746c9098542c2e627a658239b2769cc214c969e1ed1a85 ]] || fail "API digest differs"
-[[ "${WEB_IMAGE:-}" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:743d441ef04c1d23e7cc77c34c4216028ec2b8f2499260a98283428803b6cdbb ]] || fail "Web digest differs"
+[[ "${API_IMAGE:-}" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:df6df5ca835f33697c84c8d2566d317cc538658a0b21a292051f2eb12fd12332 ]] || fail "API digest differs"
+[[ "${WEB_IMAGE:-}" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:56fc8f6f9d37960c9a39a1e209c44df19221536bc1208dca9fa60f1df9e040d6 ]] || fail "Web digest differs"
 
 for path in compose.canary.yaml compose.migrate.yaml grant_runtime.py edge.sh Caddyfile.canary Caddyfile.rollback allowlist-proof.json db_facts.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "required input is missing: $path"
@@ -54,8 +54,8 @@ assert hmac.compare_digest(signature, expected)
 assert value["run_id"] == sys.argv[2]
 assert value["preflight_run_id"] == sys.argv[3]
 assert value["ops_manifest_sha256"] == sys.argv[4]
-assert value["candidate_sha"] == "1bccbbf1706a8216892f5b9b512b1e27ce784101"
-assert value["isolated_canary_database"] == "journey_next_canary_20260827_1bccbbf"
+assert value["candidate_sha"] == "1633ec4eabe381da3b56500c323005c0f363c0d9"
+assert value["isolated_canary_database"] == "journey_next_canary_20260828_1633ec4"
 assert value["backup"] == value["restore"] == "PASS"
 assert value["source_modified"] is False
 root=sys.argv[5]
@@ -117,8 +117,8 @@ api_health=$(docker compose -f compose.canary.yaml exec -T api python -c "import
 web_release=$(docker compose -f compose.canary.yaml exec -T web printenv APP_RELEASE)
 python3 - "$api_health" "$web_release" <<'PY'
 import json, sys
-assert json.loads(sys.argv[1]) == {"status": "ok", "release": "1bccbbf1706a8216892f5b9b512b1e27ce784101"}
-assert sys.argv[2] == "1bccbbf1706a8216892f5b9b512b1e27ce784101"
+assert json.loads(sys.argv[1]) == {"status": "ok", "release": "1633ec4eabe381da3b56500c323005c0f363c0d9"}
+assert sys.argv[2] == "1633ec4eabe381da3b56500c323005c0f363c0d9"
 PY
 install -d -m 0700 "$root"
 ln -sfn "$PWD" "$root/current"
@@ -126,7 +126,7 @@ WP31_EDGE_MODE=canary WP31_EDGE_SOURCE="$PWD/Caddyfile.canary" ./edge.sh
 ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
 python3 - "$ready" <<'PY'
 import json,sys
-assert json.loads(sys.argv[1]) == {"status":"ready","release":"1bccbbf1706a8216892f5b9b512b1e27ce784101"}
+assert json.loads(sys.argv[1]) == {"status":"ready","release":"1633ec4eabe381da3b56500c323005c0f363c0d9"}
 PY
 trap - ERR
 printf 'WP31_CANARY_DEPLOY=PASS candidate=%s database=%s migration=%s worker_started=false release_go=false\n' "$candidate" "$database" "$migration"

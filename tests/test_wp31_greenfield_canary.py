@@ -355,7 +355,7 @@ def test_ops_manifest_fails_closed_on_working_tree_drift(
 
 
 def test_exact_canary_database_is_the_only_new_rds_target() -> None:
-    expected = "journey_next_canary_20260827_1bccbbf"
+    expected = "journey_next_canary_20260828_1633ec4"
     assert wp15_rds_database.GREENFIELD_CANARY_DATABASE_NAME == expected
     assert wp15_rds_schema_owner.GREENFIELD_CANARY_DATABASE_NAME == expected
     assert expected in wp15_rds_database.ALLOWED_DATABASES

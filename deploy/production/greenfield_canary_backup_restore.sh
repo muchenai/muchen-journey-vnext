@@ -3,9 +3,9 @@ set -euo pipefail
 
 fail() { printf 'WP31_CANARY_BACKUP_RESTORE_ERROR: %s\n' "$*" >&2; exit 1; }
 
-candidate=1bccbbf1706a8216892f5b9b512b1e27ce784101
+candidate=1633ec4eabe381da3b56500c323005c0f363c0d9
 source_database=journey_next_cutover_20260810
-target_database=journey_next_canary_20260827_1bccbbf
+target_database=journey_next_canary_20260828_1633ec4
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
 [[ "${SOURCE_DATABASE:-}" == "$source_database" ]] || fail "unexpected source database"
 [[ "${TARGET_DATABASE:-}" == "$target_database" ]] || fail "unexpected target database"
@@ -95,10 +95,10 @@ body = {
     "schema_version": 2,
     "run_id": run_id,
     "preflight_run_id": preflight_run_id,
-    "candidate_sha": "1bccbbf1706a8216892f5b9b512b1e27ce784101",
+    "candidate_sha": "1633ec4eabe381da3b56500c323005c0f363c0d9",
     "ops_manifest_sha256": ops_manifest_sha,
     "source_database": "journey_next_cutover_20260810",
-    "isolated_canary_database": "journey_next_canary_20260827_1bccbbf",
+    "isolated_canary_database": "journey_next_canary_20260828_1633ec4",
     "source_migration": "0019_wp30_invitation_control",
     "decrypted_backup_sha256": plain_sha,
     "encrypted_backup_sha256": encrypted_sha,
