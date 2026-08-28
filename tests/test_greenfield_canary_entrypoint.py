@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "wp15-wartime-production.yml"
-CANDIDATE = "1bccbbf1706a8216892f5b9b512b1e27ce784101"
+PACKAGE_CANDIDATE = "1633ec4eabe381da3b56500c323005c0f363c0d9"
 
 
 def workflow_text() -> str:
@@ -24,8 +24,8 @@ def job(name: str, next_name: str) -> str:
 
 def test_greenfield_package_is_exact_candidate_and_confirmation_bound() -> None:
     job = greenfield_package_job()
-    assert f"inputs.candidate == '{CANDIDATE}'" in job
-    assert "inputs.confirmation == 'PACKAGE_1BCCBBF_GREENFIELD_CANARY'" in job
+    assert f"inputs.candidate == '{PACKAGE_CANDIDATE}'" in job
+    assert "inputs.confirmation == 'PACKAGE_1633EC4_GREENFIELD_CANARY'" in job
     assert "ref: ${{ inputs.candidate }}" in job
     assert "test \"$(git -C candidate rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
 
@@ -68,7 +68,7 @@ def test_legacy_wartime_candidate_guard_remains_distinct() -> None:
     text = workflow_text()
     legacy = text[text.index("  operate:\n") :]
     assert "inputs.candidate == 'ff53052847a268d025bceb93c3eab37986d50219'" in legacy
-    assert CANDIDATE not in legacy
+    assert PACKAGE_CANDIDATE not in legacy
 
 
 def test_no_environment_gate_has_no_environment_or_secret_context() -> None:

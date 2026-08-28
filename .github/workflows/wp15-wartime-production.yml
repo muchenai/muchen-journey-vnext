@@ -79,8 +79,8 @@ jobs:
   greenfield_package:
     if: >-
       inputs.phase == 'greenfield-package' &&
-      inputs.candidate == '1bccbbf1706a8216892f5b9b512b1e27ce784101' &&
-      inputs.confirmation == 'PACKAGE_1BCCBBF_GREENFIELD_CANARY'
+      inputs.candidate == '1633ec4eabe381da3b56500c323005c0f363c0d9' &&
+      inputs.confirmation == 'PACKAGE_1633EC4_GREENFIELD_CANARY'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
