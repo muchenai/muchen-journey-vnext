@@ -31,6 +31,40 @@ class Actor:
     session_id: UUID | None = None
 
 
+def enforce_canary_learner_scope(actor: Actor) -> Actor:
+    settings = get_settings()
+    if (
+        settings.release_marker == "PRODUCTION_CANARY_UAT"
+        and actor.role == Role.LEARNER
+        and actor.id not in set(settings.canary_learner_user_ids)
+    ):
+        raise ApiError(
+            403,
+            "CANARY_ACCESS_DENIED",
+            "当前账号不在受控内测范围内。",
+        )
+    return actor
+
+
+def enforce_canary_invite_target(target_user_id: UUID | None) -> None:
+    """Fail closed for every route that can activate a Learner identity.
+
+    Production Canary UAT never permits an untargeted invite, and an existing
+    invite or pending join context cannot bypass a later allowlist change.
+    """
+
+    settings = get_settings()
+    if (
+        settings.release_marker == "PRODUCTION_CANARY_UAT"
+        and target_user_id not in set(settings.canary_learner_user_ids)
+    ):
+        raise ApiError(
+            403,
+            "CANARY_ACCESS_DENIED",
+            "受控内测邀请必须绑定当前允许的学员身份。",
+        )
+
+
 def get_actor(
     request: Request,
     x_fixture_role: str | None = Header(default=None, alias="X-Fixture-Role"),
@@ -84,12 +118,14 @@ def get_actor(
                 or not compare_digest(identity_session.csrf_token_hash, expected_hash)
             ):
                 raise ApiError(403, "FORBIDDEN", "安全校验失败，请刷新后重试。")
-        return Actor(
-            user.id,
-            user.organization_id,
-            assignment.role,
-            user.display_name,
-            identity_session.id,
+        return enforce_canary_learner_scope(
+            Actor(
+                user.id,
+                user.organization_id,
+                assignment.role,
+                user.display_name,
+                identity_session.id,
+            )
         )
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:
         raise ApiError(401, "UNAUTHENTICATED", "需要有效的 vNext 会话。")
@@ -105,7 +141,9 @@ def get_actor(
     if row is None:
         raise ApiError(401, "UNAUTHENTICATED", "本地 fixture 身份不存在。")
     user, assignment = row
-    return Actor(user.id, user.organization_id, assignment.role, user.display_name, None)
+    return enforce_canary_learner_scope(
+        Actor(user.id, user.organization_id, assignment.role, user.display_name, None)
+    )
 
 
 def require_role(actor: Actor, role: Role) -> None:

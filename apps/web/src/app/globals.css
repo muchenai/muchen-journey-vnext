@@ -88,6 +88,15 @@ button, textarea, input, select { font: inherit; }
 .site-header { min-height: 72px; border-bottom: 1px solid rgba(152, 162, 179, 0.35); }
 .site-footer { min-height: 72px; color: var(--text-muted); border-top: 1px solid var(--border-default); }
 .brand { font-size: 18px; font-weight: 750; text-decoration: none; }
+.canary-banner {
+  padding: 8px 16px;
+  color: #6b3b00;
+  background: #fff4d6;
+  border-bottom: 1px solid #e9c46a;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 750;
+}
 nav { display: flex; gap: 20px; }
 nav a { color: var(--text-secondary); text-decoration: none; }
 nav a:hover { color: var(--action-hover); }
