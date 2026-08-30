@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import (
+    Actor,
+    enforce_canary_invite_target,
+    get_actor,
+    require_role,
+)
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -190,6 +195,7 @@ def create_invite(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.OPERATOR)
+    enforce_canary_invite_target(command.target_user_id)
     payload = command.model_dump(mode="json")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     replay = find_replay(
@@ -567,6 +573,7 @@ def create_learner_reentry(
     )
     if learner is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "Learner 身份已停用或角色已移除。")
+    enforce_canary_invite_target(learner.id)
     assignment = session.scalar(
         select(Assignment)
         .where(
@@ -749,6 +756,7 @@ def exchange_invite(
     if invite is None:
         deny_exchange(session, request, invite=None, message="邀请无效，请联系运营重新获取。")
     assert invite is not None
+    enforce_canary_invite_target(invite.target_user_id)
     now = utc_now()
     if invite.status != InviteStatus.ACTIVE:
         deny_exchange(session, request, invite=invite, message="邀请已失效，请联系运营重新获取。")
@@ -926,6 +934,7 @@ def confirm_identity(
         or user.status not in {UserStatus.PENDING_IDENTITY, UserStatus.ACTIVE}
     ):
         raise ApiError(410, "INVITE_EXPIRED_OR_REVOKED", "邀请已失效，请联系运营。")
+    enforce_canary_invite_target(user.id)
 
     if context.created_user:
         if command.display_name is None:
