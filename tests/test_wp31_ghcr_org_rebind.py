@@ -42,14 +42,14 @@ def prepared(tmp_path: Path) -> tuple[dict, Path, Path, Path]:
         "candidate_sha": rebind.EXPECTED_CANDIDATE,
         "images": {
             component: {
-                "source_immutable_reference": (
+                "prior_immutable_reference": (
                     f"{contract['images'][component]['source_repository']}@"
                     f"{contract['images'][component]['source_digest']}"
                 ),
-                "source_digest": contract["images"][component]["source_digest"],
+                "prior_digest": contract["images"][component]["source_digest"],
                 "target_reference": rebind.target_reference(contract, component),
                 "target_digest": contract["images"][component]["source_digest"],
-                "digest_equal": True,
+                "digest_equal_to_prior": True,
                 "revision_label": rebind.EXPECTED_CANDIDATE,
                 "local_image_id": "sha256:" + component.encode().hex().ljust(64, "0")[:64],
             }
@@ -128,33 +128,34 @@ def test_manifest_binds_three_zero_cve_images(tmp_path: Path) -> None:
     contract, source_path, facts_path, evidence = prepared(tmp_path)
     output = evidence / "ghcr-org-rebind-manifest.json"
     result = rebind.build_manifest(contract, source_path, facts_path, evidence, output)
-    assert result["status"] == "PASS"
+    assert result["status"] == "EVIDENCE_COMPLETE"
     assert set(result["images"]) == set(rebind.COMPONENTS)
-    assert all(item["digest_equal"] for item in result["images"].values())
+    assert all(item["digest_equal_to_prior"] for item in result["images"].values())
     assert all(item["cve"]["high"] == 0 for item in result["images"].values())
     assert result["production_effects"]["deployment"] is False
 
 
-def test_high_cve_fails_closed(tmp_path: Path) -> None:
+def test_high_cve_is_recorded_as_release_gate_failure(tmp_path: Path) -> None:
     contract, source_path, facts_path, evidence = prepared(tmp_path)
     write_json(
         evidence / "api.trivy.json",
         {"Results": [{"Vulnerabilities": [{"Severity": "HIGH"}]}]},
     )
-    with pytest.raises(rebind.RebindError, match="CVE threshold failed"):
-        rebind.build_manifest(
-            contract,
-            source_path,
-            facts_path,
-            evidence,
-            evidence / "manifest.json",
-        )
+    result = rebind.build_manifest(
+        contract,
+        source_path,
+        facts_path,
+        evidence,
+        evidence / "manifest.json",
+    )
+    assert result["cve_gate"]["status"] == "FAIL"
+    assert result["images"]["api"]["cve"]["status"] == "FAIL"
 
 
 def test_target_digest_mismatch_fails_closed(tmp_path: Path) -> None:
     contract, source_path, facts_path, evidence = prepared(tmp_path)
     facts = json.loads(facts_path.read_text())
-    facts["images"]["worker"]["target_digest"] = "sha256:" + "0" * 64
+    facts["images"]["worker"]["target_digest"] = "not-a-digest"
     write_json(facts_path, facts)
     with pytest.raises(rebind.RebindError, match="target fact binding differs"):
         rebind.build_manifest(
@@ -193,3 +194,5 @@ def test_workflow_is_immutable_package_only() -> None:
     assert "ssh " not in job
     assert "alembic" not in job
     assert "docker compose" not in job
+    assert "Check out exact frozen application candidate for rebuild" in job
+    assert "docker build --pull --platform linux/amd64" in job

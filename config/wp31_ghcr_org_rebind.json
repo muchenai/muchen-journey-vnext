@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "operation": "GHCR_ORGANIZATION_NAMESPACE_REBIND",
+  "operation": "GHCR_ORGANIZATION_NAMESPACE_REBIND_BY_FROZEN_CANDIDATE_REBUILD",
+  "rebind_mode": "FROZEN_CANDIDATE_REBUILD",
   "application_candidate_sha": "1633ec4eabe381da3b56500c323005c0f363c0d9",
   "application_candidate_tree": "6066a35e39bd104cf4eb24e77c1edbe9d041c24d",
   "source_artifact_run_id": "33141698913",

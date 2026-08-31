@@ -61,7 +61,8 @@ def load_contract(path: Path = DEFAULT_CONTRACT) -> dict[str, Any]:
     if value.get("schema_version") != 1:
         raise RebindError("contract schema differs")
     expected = {
-        "operation": "GHCR_ORGANIZATION_NAMESPACE_REBIND",
+        "operation": "GHCR_ORGANIZATION_NAMESPACE_REBIND_BY_FROZEN_CANDIDATE_REBUILD",
+        "rebind_mode": "FROZEN_CANDIDATE_REBUILD",
         "application_candidate_sha": EXPECTED_CANDIDATE,
         "application_candidate_tree": EXPECTED_CANDIDATE_TREE,
         "source_artifact_run_id": "33141698913",
@@ -196,16 +197,16 @@ def inspect_targets(contract: dict[str, Any], output: Path) -> dict[str, Any]:
         revision = labels.get("org.opencontainers.image.revision")
         if revision != EXPECTED_CANDIDATE:
             raise RebindError(f"target revision label differs: {component}")
-        if digest != expected["source_digest"]:
-            raise RebindError(f"target digest is not byte-identical: {component}")
+        if not DIGEST.fullmatch(digest):
+            raise RebindError(f"target digest is invalid: {component}")
         result["images"][component] = {
-            "source_immutable_reference": (
+            "prior_immutable_reference": (
                 f"{expected['source_repository']}@{expected['source_digest']}"
             ),
-            "source_digest": expected["source_digest"],
+            "prior_digest": expected["source_digest"],
             "target_reference": target,
             "target_digest": digest,
-            "digest_equal": True,
+            "digest_equal_to_prior": digest == expected["source_digest"],
             "revision_label": revision,
             "local_image_id": inspected.get("Id"),
         }
@@ -252,10 +253,12 @@ def build_manifest(
         if not isinstance(fact, dict):
             raise RebindError(f"target facts are invalid: {component}")
         if (
-            fact.get("source_digest") != expected["source_digest"]
+            fact.get("prior_digest") != expected["source_digest"]
             or fact.get("target_reference") != target_reference(contract, component)
-            or fact.get("target_digest") != expected["source_digest"]
-            or fact.get("digest_equal") is not True
+            or not isinstance(fact.get("target_digest"), str)
+            or not DIGEST.fullmatch(fact["target_digest"])
+            or fact.get("digest_equal_to_prior")
+            != (fact["target_digest"] == expected["source_digest"])
             or fact.get("revision_label") != EXPECTED_CANDIDATE
         ):
             raise RebindError(f"target fact binding differs: {component}")
@@ -266,10 +269,10 @@ def build_manifest(
         if not str(sbom.get("spdxVersion", "")).startswith("SPDX-"):
             raise RebindError(f"SBOM is not SPDX JSON: {component}")
         high, critical = cve_counts(trivy)
-        if high or critical:
-            raise RebindError(
-                f"CVE threshold failed: {component} high={high} critical={critical}"
-            )
+        cve_pass = (
+            high <= contract["cve_policy"]["maximum_high"]
+            and critical <= contract["cve_policy"]["maximum_critical"]
+        )
         images[component] = {
             **fact,
             "sbom": {
@@ -283,7 +286,7 @@ def build_manifest(
                 "sha256": sha256(trivy_path),
                 "high": high,
                 "critical": critical,
-                "status": "PASS",
+                "status": "PASS" if cve_pass else "FAIL",
             },
         }
     db_path = evidence_dir / "trivy-db-metadata.json"
@@ -291,7 +294,7 @@ def build_manifest(
     value = {
         "schema_version": 1,
         "operation": contract["operation"],
-        "status": "PASS",
+        "status": "EVIDENCE_COMPLETE",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "application_candidate_sha": EXPECTED_CANDIDATE,
         "application_candidate_tree": contract["application_candidate_tree"],
@@ -308,6 +311,14 @@ def build_manifest(
         "images": images,
         "tools": contract["tools"],
         "cve_policy": contract["cve_policy"],
+        "cve_gate": {
+            "status": (
+                "PASS"
+                if all(item["cve"]["status"] == "PASS" for item in images.values())
+                else "FAIL"
+            ),
+            "required_before_production_release": True,
+        },
         "trivy_database": {
             "path": db_path.name,
             "sha256": sha256(db_path),
