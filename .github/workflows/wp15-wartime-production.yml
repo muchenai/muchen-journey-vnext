@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - greenfield-package
+          - greenfield-org-rebind
           - greenfield-preflight
           - greenfield-backup-restore
           - greenfield-deploy
@@ -216,6 +217,142 @@ jobs:
             candidate/artifacts/wp07-candidate/amd64-build-definition-manifest.json
             candidate/artifacts/wp07-candidate/SHA256SUMS
           if-no-files-found: error
+          retention-days: 30
+
+  greenfield_org_rebind:
+    if: >-
+      inputs.phase == 'greenfield-org-rebind' &&
+      inputs.candidate == '1633ec4eabe381da3b56500c323005c0f363c0d9' &&
+      inputs.confirmation == 'REBIND_1633EC4_GHCR_MUCHENAI' &&
+      inputs.backup_run_id == '' && inputs.preflight_run_id == '' &&
+      inputs.deploy_run_id == '' && inputs.archive_run_id == '' &&
+      inputs.pro_review_evidence_sha256 == '' &&
+      inputs.pro_review_evidence_b64 == '' &&
+      inputs.execution_authorization_sha256 == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    steps:
+      - name: Check out exact package-only namespace rebind implementation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Enforce immutable package-only contract before registry access
+        run: |
+          set -euo pipefail
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          test "$GITHUB_REF_TYPE" = tag
+          test "$GITHUB_REF" = "refs/tags/muchen-journey-ghcr-org-rebind-$GITHUB_SHA"
+          test "$(git rev-parse 1633ec4eabe381da3b56500c323005c0f363c0d9^{tree})" = \
+            6066a35e39bd104cf4eb24e77c1edbe9d041c24d
+          python3 scripts/wp31_ghcr_org_rebind.py contract-check
+      - name: Download exact original registry-bound candidate evidence
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp07-candidate-1633ec4eabe381da3b56500c323005c0f363c0d9
+          path: ${{ runner.temp }}/wp31-source-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 33141698913
+      - name: Verify exact original release manifest
+        run: |
+          set -euo pipefail
+          python3 scripts/wp31_ghcr_org_rebind.py source-check \
+            --manifest "$RUNNER_TEMP/wp31-source-artifact/release-manifest.json"
+      - name: Log in to GHCR only for package rebind
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fail closed unless all three organization commit tags are absent
+        run: python3 scripts/wp31_ghcr_org_rebind.py targets-absent
+      - name: Preload all sources, pinned evidence tools, and current Trivy database
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/wp31-org-rebind-evidence"
+          cache="$RUNNER_TEMP/wp31-trivy-cache"
+          install -d -m 0700 "$evidence" "$cache"
+          syft=$(jq -er '.tools.syft_image' config/wp31_ghcr_org_rebind.json)
+          trivy=$(jq -er '.tools.trivy_image' config/wp31_ghcr_org_rebind.json)
+          docker pull "$syft"
+          docker pull "$trivy"
+          for service in api web worker; do
+            source=$(jq -er ".images.$service.source_repository" config/wp31_ghcr_org_rebind.json)
+            digest=$(jq -er ".images.$service.source_digest" config/wp31_ghcr_org_rebind.json)
+            docker pull "$source@$digest"
+          done
+          docker run --rm -v "$cache:/root/.cache/trivy" "$trivy" \
+            image --skip-version-check --download-db-only
+          cp "$cache/db/metadata.json" "$evidence/trivy-db-metadata.json"
+      - name: Mirror exactly three immutable images to the organization namespace
+        run: |
+          set -euo pipefail
+          for service in api web worker; do
+            source=$(jq -er ".images.$service.source_repository" config/wp31_ghcr_org_rebind.json)
+            digest=$(jq -er ".images.$service.source_digest" config/wp31_ghcr_org_rebind.json)
+            target="$(jq -er ".images.$service.target_repository" config/wp31_ghcr_org_rebind.json):${{ inputs.candidate }}"
+            docker tag "$source@$digest" "$target"
+            docker push "$target"
+            docker pull "$target"
+          done
+      - name: Read back exact target digests and candidate labels
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/wp31-org-rebind-evidence"
+          python3 scripts/wp31_ghcr_org_rebind.py inspect-targets \
+            --output "$RUNNER_TEMP/wp31-org-rebind-evidence/target-facts.json"
+      - name: Regenerate three SPDX SBOMs from target images
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/wp31-org-rebind-evidence"
+          syft=$(jq -er '.tools.syft_image' config/wp31_ghcr_org_rebind.json)
+          for service in api web worker; do
+            target="$(jq -er ".images.$service.target_repository" config/wp31_ghcr_org_rebind.json):${{ inputs.candidate }}"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$evidence:/out" "$syft" "$target" \
+              -o "spdx-json=/out/$service.spdx.json"
+          done
+      - name: Scan all target images with current Trivy database
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/wp31-org-rebind-evidence"
+          cache="$RUNNER_TEMP/wp31-trivy-cache"
+          trivy=$(jq -er '.tools.trivy_image' config/wp31_ghcr_org_rebind.json)
+          for service in api web worker; do
+            target="$(jq -er ".images.$service.target_repository" config/wp31_ghcr_org_rebind.json):${{ inputs.candidate }}"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$cache:/root/.cache/trivy" -v "$evidence:/out" "$trivy" \
+              image --skip-version-check --scanners vuln \
+              --severity HIGH,CRITICAL --format json \
+              --output "/out/$service.trivy.json" "$target"
+          done
+      - name: Generate and verify organization namespace evidence manifest
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/wp31-org-rebind-evidence"
+          cp "$RUNNER_TEMP/wp31-source-artifact/release-manifest.json" \
+            "$evidence/source-release-manifest.json"
+          python3 scripts/wp31_ghcr_org_rebind.py build-manifest \
+            --source-manifest "$evidence/source-release-manifest.json" \
+            --target-facts "$evidence/target-facts.json" \
+            --evidence-dir "$evidence" \
+            --output "$evidence/ghcr-org-rebind-manifest.json"
+          cd "$evidence"
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | \
+            xargs -0 sha256sum | sort -k2 >SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Upload immutable organization namespace evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-ghcr-org-rebind-${{ inputs.candidate }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp31-org-rebind-evidence
+          if-no-files-found: warn
           retention-days: 30
 
   greenfield_authorize:

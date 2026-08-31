@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "operation": "GHCR_ORGANIZATION_NAMESPACE_REBIND",
+  "application_candidate_sha": "1633ec4eabe381da3b56500c323005c0f363c0d9",
+  "application_candidate_tree": "6066a35e39bd104cf4eb24e77c1edbe9d041c24d",
+  "source_artifact_run_id": "33141698913",
+  "source_artifact_name": "wp07-candidate-1633ec4eabe381da3b56500c323005c0f363c0d9",
+  "source_manifest_sha256": "566f6a60baf6cb2e8e279503489b70036edb071fc891d0653f77abd04f2f7db5",
+  "confirmation": "REBIND_1633EC4_GHCR_MUCHENAI",
+  "images": {
+    "api": {
+      "source_repository": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api",
+      "source_digest": "sha256:df6df5ca835f33697c84c8d2566d317cc538658a0b21a292051f2eb12fd12332",
+      "target_repository": "ghcr.io/muchenai/muchen-journey-vnext-api"
+    },
+    "web": {
+      "source_repository": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web",
+      "source_digest": "sha256:56fc8f6f9d37960c9a39a1e209c44df19221536bc1208dca9fa60f1df9e040d6",
+      "target_repository": "ghcr.io/muchenai/muchen-journey-vnext-web"
+    },
+    "worker": {
+      "source_repository": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker",
+      "source_digest": "sha256:5465f34aa030b2de7a071faeb5b2f0115cbb90aba37fdd3c5fbf47fa370ac5af",
+      "target_repository": "ghcr.io/muchenai/muchen-journey-vnext-worker"
+    }
+  },
+  "tools": {
+    "syft_image": "anchore/syft@sha256:b4f1df79f97b817682d8b5ff941eb6bfe74f6172553a5e312c75bbc2eabc405c",
+    "trivy_image": "aquasec/trivy@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c"
+  },
+  "cve_policy": {
+    "severities": ["HIGH", "CRITICAL"],
+    "maximum_high": 0,
+    "maximum_critical": 0,
+    "ignore_unfixed": false
+  },
+  "scope": {
+    "worker_start_authorized": false,
+    "deployment_authorized": false,
+    "production_database_write_authorized": false,
+    "dns_edge_cloud_mutation_authorized": false,
+    "release_go": false
+  }
+}
