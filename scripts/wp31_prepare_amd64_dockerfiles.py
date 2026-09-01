@@ -13,9 +13,9 @@ from pathlib import Path
 
 CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
 FILES = {
-    "api": ("apps/api/Dockerfile", "275b3a0fb72a5739583e4300595032b99efd37119351874a3baa1ed75d2e246f"),
-    "worker": ("apps/worker/Dockerfile", "73c527d7c7dd901483a7bf17519ffe094cad4a6cf648caf00d3c7e55de702eb9"),
-    "web": ("apps/web/Dockerfile", "6b14531b8573f06ba240e82353297104519e8a3a579264fbe6a6f6d270519a60"),
+    "api": ("apps/api/Dockerfile", "1fa62338133de375f12fc169b220fb361b902c99159dfe8ec17cdc82e28577a9"),
+    "worker": ("apps/worker/Dockerfile", "762be601360c5178c52bc734926493cf10ca503e08ac29a065e5254ba370feb8"),
+    "web": ("apps/web/Dockerfile", "98e50a465f51214b64ba93d85cde20abaca5db6608368f0196fadd76d6681cff"),
 }
 
 

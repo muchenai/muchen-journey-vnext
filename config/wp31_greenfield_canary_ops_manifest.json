@@ -33,7 +33,7 @@
     "scripts/wp31_greenfield_canary.py": "761b217a2713225b205954491867bd134cd957cfb01c1e563606f73ae610cacc",
     "scripts/wp31_ops_closure.py": "a2f1e4a23d036e30c621484370100522e03691ce01a3a3d792f943e44cba2707",
     "scripts/wp31_phase_evidence.py": "b15dd3b19c7cd6f2e46c693e69fe436565bff1e458c82e11d83ead8d8e8b62b2",
-    "scripts/wp31_prepare_amd64_dockerfiles.py": "2d6bbe0271da57fba90aa8be503c4e74b21073919c51307e74824bc2287b9b1f",
+    "scripts/wp31_prepare_amd64_dockerfiles.py": "aa151f00224dfc2eba875db870d09fa08ed44e933a3a590f31f34258e48af515",
     "scripts/wp31_prepare_greenfield_canary.py": "7182582145a4df36e2df962f8f7a9bef1179b7385e63287e318493eabc935e0d",
     "tests/test_greenfield_canary_entrypoint.py": "498caa52066bcdf72ebec40c68235b83d26a1aebf3775fe7d971246b34f3fce5",
     "tests/test_wp31_greenfield_canary.py": "e4c9d6ec7d295ca013485449956a0d9a2bf7a55477605f9901e0607bec35b070"
