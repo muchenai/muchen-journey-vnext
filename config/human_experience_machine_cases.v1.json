@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
+  "semantics": "LOCAL_SYNTHETIC_MACHINE_CASES_ONLY_NOT_HUMAN_UAT_NOT_OWNER_SIGNOFF_NOT_RELEASE",
+  "modules": [
+    "exploration-camp",
+    "newcomer-village",
+    "ai-academy",
+    "delivery-guild"
+  ],
+  "authoritative_state_projection": {
+    "fixture_learner_refs": [
+      "machine-learner-01",
+      "machine-learner-02",
+      "machine-learner-03",
+      "machine-learner-04",
+      "machine-learner-05",
+      "machine-learner-06",
+      "machine-learner-07",
+      "machine-learner-08"
+    ],
+    "states": [
+      {"key": "PENDING_IDENTITY", "expected_action": "CONFIRM_IDENTITY", "expected_primary_route": "/"},
+      {"key": "AVAILABLE", "expected_action": "START_OR_CONTINUE_TASK", "expected_primary_route": "/app/tasks/{resource_id}"},
+      {"key": "IN_PROGRESS", "expected_action": "START_OR_CONTINUE_TASK", "expected_primary_route": "/app/tasks/{resource_id}"},
+      {"key": "SUBMITTED", "expected_action": "WAIT_FOR_REVIEW", "expected_primary_route": "/app/tasks/{resource_id}"},
+      {"key": "IN_REVIEW", "expected_action": "WAIT_FOR_REVIEW", "expected_primary_route": "/app/tasks/{resource_id}"},
+      {"key": "NEEDS_REVISION", "expected_action": "REVISE_SUBMISSION", "expected_primary_route": "/app/tasks/{resource_id}"},
+      {"key": "COMPLETED", "expected_action": "VIEW_RESULT_OR_HANDOFF", "expected_primary_route": "/app/result"}
+    ],
+    "expected_case_count": 56
+  },
+  "enabled_primary_ctas": {
+    "viewports": [390, 768, 1280],
+    "states": [
+      "PENDING_IDENTITY",
+      "AVAILABLE",
+      "IN_PROGRESS",
+      "SUBMITTED",
+      "IN_REVIEW",
+      "NEEDS_REVISION",
+      "COMPLETED"
+    ],
+    "expected_case_count": 21,
+    "expected_dead_cta_count": 0
+  },
+  "ai_incentive_escalation": {
+    "attempt_types": [
+      "AI_ADVISORY",
+      "POINTS",
+      "BADGE",
+      "STREAK",
+      "RANK",
+      "SELF_ATTESTATION",
+      "LOW_RISK_COMPLETION"
+    ],
+    "expected_case_count": 28,
+    "expected_formal_mutation_count": 0
+  },
+  "failure_recovery": {
+    "fault_modes": [
+      "REQUEST_NOT_SENT",
+      "RESPONSE_LOST_RETRY",
+      "VALIDATION_REJECTED",
+      "CONCURRENT_REPLAY"
+    ],
+    "operations": [
+      "DRAFT",
+      "ATTACHMENT",
+      "SUBMIT",
+      "REVIEW"
+    ],
+    "proof_tests": {
+      "REQUEST_NOT_SENT": "apps/web/scripts/resilience-a11y-contract.test.mjs",
+      "RESPONSE_LOST_RETRY": "tests/test_submission_attachments.py::test_draft_first_submit_revision_history_and_database_immutability",
+      "VALIDATION_REJECTED": "tests/test_formal_assignment_workflow.py",
+      "CONCURRENT_REPLAY": "tests/test_submission_attachments.py::test_concurrent_submit_retry_and_duplicate_command_create_one_version;tests/test_reviewer_workbench.py::test_concurrent_finalize_has_one_winner_and_same_key_replays"
+    },
+    "expected_case_count": 64,
+    "minimum_safe_recovery_count": 61,
+    "expected_formal_miswrite_count": 0
+  }
+}

@@ -49,6 +49,7 @@ from journey_api.review_routes import locked_scoped_context_query
 
 REVIEWER_HEADERS = {"X-Fixture-Role": "REVIEWER"}
 OPERATOR_HEADERS = {"X-Fixture-Role": "OPERATOR"}
+CONTENT_EDITOR_HEADERS = {"X-Fixture-Role": "CONTENT_EDITOR"}
 RUBRIC_KEYS = (
     "problem_clarity",
     "evidence_quality",
@@ -74,6 +75,16 @@ def test_reviewer_transition_locks_context_in_one_scoped_postgres_query():
     assert "reviews.organization_id =" in sql
     assert "reviews.reviewer_id =" in sql
     assert "assignments.organization_id =" in sql
+    assert "enrollments.status =" in sql
+    assert "enrollments.reviewer_id = reviews.reviewer_id" in sql
+    assert "task_versions.task_definition_id = assignments.task_definition_id" in sql
+    assert (
+        "journey_stage_versions.journey_version_id = enrollments.journey_version_id"
+        in sql
+    )
+    assert (
+        "journey_stage_versions.task_version_id = assignments.task_version_id" in sql
+    )
 
 
 def client_for(label: str) -> TestClient:
@@ -95,7 +106,12 @@ def submission_body(label: str) -> str:
     )
 
 
-def create_submission(label: str, reviewer_id: uuid.UUID = REVIEWER_ID):
+def create_submission(
+    label: str,
+    reviewer_id: uuid.UUID = REVIEWER_ID,
+    *,
+    ai_use: dict[str, object] | None = None,
+):
     operator = client_for(f"operator-{label}")
     invite = assert_ok(
         operator.post(
@@ -154,6 +170,7 @@ def create_submission(label: str, reviewer_id: uuid.UUID = REVIEWER_ID):
                 "expected_revision": started["revision"],
                 "body": submission_body(label),
                 "attachment_ids": [],
+                **({"ai_use": ai_use} if ai_use is not None else {}),
             },
         )
     )
@@ -173,6 +190,120 @@ def create_submission(label: str, reviewer_id: uuid.UUID = REVIEWER_ID):
         "submission": submitted,
         "review_id": review_id,
     }
+
+
+def test_ai_provenance_is_durable_visible_and_advisory_only():
+    learner_ai = {
+        "used": True,
+        "purpose": "check structure before learner submission",
+        "model_version": "advisory-model-v1",
+        "prompt_version": "learner-self-check-v1",
+        "output_is_advisory_only": True,
+    }
+    flow = create_submission("ai-provenance", ai_use=learner_ai)
+    reviewer = client_for("reviewer-ai-provenance")
+    detail = assert_ok(reviewer.get(f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS))
+    assert detail["submission_ai_use"] == learner_ai
+
+    started = assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/start",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"ai-review-start-{uuid.uuid4()}",
+            },
+            json={"expected_revision": detail["revision"]},
+        )
+    )
+    reviewer_ai = {
+        "used": True,
+        "purpose": "organize rubric notes before human decision",
+        "model_version": "advisory-model-v1",
+        "prompt_version": "reviewer-note-check-v1",
+        "output_is_advisory_only": True,
+    }
+    payload = finalize_payload(started["review_revision"], decision="APPROVE")
+    payload["ai_use"] = reviewer_ai
+    assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/finalize",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"ai-review-finalize-{uuid.uuid4()}",
+            },
+            json=payload,
+        )
+    )
+    finalized = assert_ok(
+        reviewer.get(f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS)
+    )
+    assert finalized["evaluation"]["ai_use"] == reviewer_ai
+    with SessionLocal() as session:
+        version = session.get(
+            SubmissionVersion,
+            uuid.UUID(flow["submission"]["submission_version_id"]),
+        )
+        evaluation = session.scalar(
+            select(Evaluation).where(Evaluation.review_id == uuid.UUID(str(flow["review_id"])))
+        )
+        assert version is not None and version.ai_use == learner_ai
+        assert evaluation is not None and evaluation.ai_use == reviewer_ai
+        submission_id = version.submission_id
+    try:
+        with SessionLocal.begin() as session:
+            session.add(
+                SubmissionVersion(
+                    id=uuid.uuid4(),
+                    submission_id=submission_id,
+                    version_no=99,
+                    body=submission_body("invalid-db-ai-provenance"),
+                    ai_use={
+                        "used": True,
+                        "purpose": "draft answer",
+                        "model_version": "advisory-model-v1",
+                        "prompt_version": "learner-self-check-v1",
+                        "output_is_advisory_only": False,
+                    },
+                    created_by=uuid.UUID(assert_ok(flow["learner"].get("/api/v1/session"))["user_id"]),
+                )
+            )
+    except DBAPIError as error:
+        assert "ck_submission_versions_ai_provenance" in str(error)
+    else:
+        raise AssertionError("database accepted non-advisory AI provenance")
+
+
+def test_incomplete_or_non_advisory_ai_provenance_fails_closed():
+    flow = create_submission("ai-invalid-baseline")
+    reviewer = client_for("reviewer-ai-invalid")
+    detail = assert_ok(reviewer.get(f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS))
+    started = assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/start",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"ai-invalid-start-{uuid.uuid4()}",
+            },
+            json={"expected_revision": detail["revision"]},
+        )
+    )
+    payload = finalize_payload(started["review_revision"], decision="APPROVE")
+    payload["ai_use"] = {
+        "used": True,
+        "purpose": "draft reviewer notes",
+        "model_version": "advisory-model-v1",
+        "prompt_version": "reviewer-note-check-v1",
+        "output_is_advisory_only": False,
+    }
+    response = reviewer.post(
+        f"/api/v1/reviews/{flow['review_id']}/finalize",
+        headers={
+            **REVIEWER_HEADERS,
+            "Idempotency-Key": f"ai-invalid-finalize-{uuid.uuid4()}",
+        },
+        json=payload,
+    )
+    assert response.status_code == 422
 
 
 def create_linked_reviewer(display_name: str) -> uuid.UUID:
@@ -723,6 +854,12 @@ def test_queue_detail_scope_priority_and_get_are_side_effect_free():
     assert own_item["material_status"] == "COMPLETE"
     assert own_item["submission_version_id"] == own["submission"]["submission_version_id"]
     assert own_item["priority_reason"] == "按等待时间排序"
+    assert own_item["submitted_at"]
+    assert own_item["feedback_sla_business_days"] >= 1
+    assert own_item["revision_count"] == 0
+    assert own_item["sensitivity"]
+    assert own_item["audience"]
+    assert own_item["conflict_status"] == "NOT_EVALUATED"
     queue_ids = {item["id"] for item in queue["items"]}
     assert str(other["review_id"]) not in queue_ids
     assert str(cross_org_review_id) not in queue_ids
@@ -767,6 +904,118 @@ def test_queue_detail_scope_priority_and_get_are_side_effect_free():
             session.scalar(select(func.count(OutboxEvent.id))),
             session.scalar(select(func.count(Review.id))),
         ) == counts_before
+
+
+def test_non_reviewer_roles_cannot_read_or_sign_the_business_review_gate():
+    flow = create_submission("role-permission-matrix")
+    content_editor_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        session.add(
+            User(
+                id=content_editor_id,
+                organization_id=ORGANIZATION_ID,
+                display_name="合成内容编辑",
+                status=UserStatus.ACTIVE,
+            )
+        )
+        session.flush()
+        session.add(
+            RoleAssignment(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=content_editor_id,
+                role=Role.CONTENT_EDITOR,
+            )
+        )
+
+    with SessionLocal() as session:
+        review = session.get(Review, flow["review_id"])
+        assert review is not None
+        state_before = (review.status, review.revision, review.started_at)
+        counts_before = (
+            session.scalar(select(func.count(Evaluation.id))),
+            session.scalar(select(func.count(AuditEntry.id))),
+            session.scalar(select(func.count(OutboxEvent.id))),
+        )
+
+    actors = (
+        (client_for("operator-cannot-sign-review"), OPERATOR_HEADERS),
+        (client_for("content-editor-cannot-sign-review"), CONTENT_EDITOR_HEADERS),
+        (flow["learner"], {"X-CSRF-Token": flow["csrf"]}),
+    )
+    for actor, role_headers in actors:
+        assert (
+            actor.get(
+                f"/api/v1/reviews/{flow['review_id']}", headers=role_headers
+            ).status_code
+            == 403
+        )
+        assert (
+            actor.post(
+                f"/api/v1/reviews/{flow['review_id']}/start",
+                headers={
+                    **role_headers,
+                    "Idempotency-Key": f"forbidden-start-{uuid.uuid4()}",
+                },
+                json={"expected_revision": 1},
+            ).status_code
+            == 403
+        )
+        assert (
+            actor.post(
+                f"/api/v1/reviews/{flow['review_id']}/finalize",
+                headers={
+                    **role_headers,
+                    "Idempotency-Key": f"forbidden-finalize-{uuid.uuid4()}",
+                },
+                json=finalize_payload(1, decision="APPROVE"),
+            ).status_code
+            == 403
+        )
+
+    with SessionLocal() as session:
+        review = session.get(Review, flow["review_id"])
+        assert review is not None
+        assert (review.status, review.revision, review.started_at) == state_before
+        assert (
+            session.scalar(select(func.count(Evaluation.id))),
+            session.scalar(select(func.count(AuditEntry.id))),
+            session.scalar(select(func.count(OutboxEvent.id))),
+        ) == counts_before
+
+
+def test_inactive_enrollment_closes_review_mutation_window_without_hiding_history():
+    flow = create_submission("inactive-enrollment-window")
+    with SessionLocal.begin() as session:
+        assignment = session.get(Assignment, uuid.UUID(flow["assignment_id"]))
+        assert assignment is not None
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        assert enrollment is not None
+        enrollment.status = EnrollmentStatus.CANCELLED
+
+    reviewer = client_for("reviewer-inactive-enrollment")
+    historical = assert_ok(
+        reviewer.get(
+            f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS
+        )
+    )
+    assert historical["allowed_commands"] == []
+    denied = reviewer.post(
+        f"/api/v1/reviews/{flow['review_id']}/start",
+        headers={
+            **REVIEWER_HEADERS,
+            "Idempotency-Key": f"inactive-start-{uuid.uuid4()}",
+        },
+        json={"expected_revision": 1},
+    )
+    assert denied.status_code == 404
+    assert denied.json()["error"]["code"] == "NOT_FOUND"
+    with SessionLocal() as session:
+        review = session.get(Review, flow["review_id"])
+        assert review is not None
+        assert review.status == ReviewStatus.ASSIGNED
+        assert review.revision == 1
+        assert review.started_at is None
 
 
 def test_request_revision_is_structured_replayable_and_history_is_immutable():
@@ -874,6 +1123,10 @@ def test_request_revision_is_structured_replayable_and_history_is_immutable():
     )
     assert learner_detail["allowed_commands"] == ["submit_revision"]
     assert learner_detail["latest_revision_feedback"] == payload["overall_feedback"]
+    reviewed_version = learner_detail["submission"]["versions"][-1]
+    assert reviewed_version["decision"] == "REVISION_REQUIRED"
+    assert len(reviewed_version["rubric_feedback"]) == 4
+    assert all(item["feedback"] for item in reviewed_version["rubric_feedback"])
     current = assert_ok(flow["learner"].get("/api/v1/me/current-action"))
     assert current["action_type"] == "REVISE_SUBMISSION"
 
@@ -1032,7 +1285,7 @@ def test_approve_completes_assignment_and_keeps_minimal_result_compatibility():
         )
     )
     assert approved["decision"] == "PASS"
-    assert approved["assignment_status"] == "COMPLETED"
+    assert approved["assignment_status"] == "PASSED"
     result = assert_ok(flow["learner"].get("/api/v1/me/result"))
     assert result["decision"] == "PASS"
     current = assert_ok(flow["learner"].get("/api/v1/me/current-action"))

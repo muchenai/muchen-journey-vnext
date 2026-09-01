@@ -52,7 +52,7 @@ def assignment_action(
             "WAIT_FOR_REVIEW",
             "等待反馈",
             "等待主管开始评审",
-            "提交已经保存，主管将在两个工作日内反馈。",
+            "提交已经保存，等待已分配 Reviewer 按批准 SLA 处理。",
             (),
         ),
         AssignmentStatus.IN_REVIEW: (

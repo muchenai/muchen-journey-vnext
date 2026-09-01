@@ -1,0 +1,997 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "contract_sha256": "ff5190c472556440730d489cda707d1c6b4e23c1ce1fa29ceb14795e7c3b4f08",
+  "audit_baseline_sha": "5260424eac6e3565ca5b2642fb2b3fdfb44b8039",
+  "audit_semantics": "Statuses are evidence-backed implementation observations, not Owner signoff, human UAT, Canary, or Release facts.",
+  "allowed_statuses": [
+    "IMPLEMENTED",
+    "PARTIAL",
+    "NOT_IMPLEMENTED",
+    "GATED",
+    "P1_DEFERRED"
+  ],
+  "requirement_count": 79,
+  "status_counts": {
+    "PARTIAL": 37,
+    "NOT_IMPLEMENTED": 0,
+    "P1_DEFERRED": 5,
+    "IMPLEMENTED": 18,
+    "GATED": 19
+  },
+  "requirements": [
+    {
+      "id": "HX-PAGE-001",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "访客入口、受控范围与真人边界存在；隐私/支持路径与 API 不确定态仍不完整。",
+      "trace_paths": [
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/app/app/page.tsx",
+        "apps/api/journey_api/domain.py"
+      ]
+    },
+    {
+      "id": "HX-PAGE-002",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "服务端 CurrentAction 提供唯一动作；页面缺安全身份、任务预计时间、截止/SLA 与求助信息。",
+      "trace_paths": [
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/app/app/page.tsx",
+        "apps/api/journey_api/domain.py"
+      ]
+    },
+    {
+      "id": "HX-PAGE-003",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "会话失效说明成果保留并提供重新验证；尚无本地未同步输入的精确保存事实。",
+      "trace_paths": [
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/lib/server/api.ts",
+        "apps/web/scripts/learner-reentry-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-004",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "探索营地图使用服务端 Journey 投影；节点来源/更新时间/冲突态未逐项显示。",
+      "trace_paths": [
+        "apps/web/src/app/app/journey-map.tsx",
+        "apps/web/src/app/app/program-overview.tsx",
+        "apps/api/journey_api/routes.py"
+      ]
+    },
+    {
+      "id": "HX-PAGE-005",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "四模块入口逐项显示 Enrollment 开放事实、内容包版本与 hash、投入、正式产出、Reviewer 配置和数据边界；无有效分配时锁定且不创建任务。",
+      "trace_paths": [
+        "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/lib/muchen-journey-module-bindings.generated.json",
+        "apps/web/src/app/app/program-overview.tsx",
+        "apps/web/src/app/app/maps/[mapKey]/page.tsx",
+        "config/module-content-packages/module-content-package-index.v1.json",
+        "apps/web/scripts/four-module-entry-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-006",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 2,
+      "audit_finding": "当前任务卡直接投影不可变 TaskVersion、Assignment revision、任务类型、预计时间、Reviewer 与已批准 SLA；上游没有独立截止字段时明确显示未配置且不虚构日期，同页只保留一个主动作。",
+      "trace_paths": [
+        "apps/web/src/app/app/page.tsx",
+        "apps/web/scripts/human-experience-shell-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-007",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "权威任务摘要现显示目的、版本、正式性质、Reviewer、时长、SLA、可见/敏感级别和积分非正式边界；TaskVersion 未提供的任务专属非目标、截止和求助字段被明确标为未配置，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/api/journey_api/routes.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-008",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "行动工作区现有 1.2 秒服务端自动保存、回执、本浏览器未同步副本与显式恢复，且提交前切换为唯一“检查并提交”；任务专属求助/升级和客户端敏感数据检测仍不完整，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/src/app/actions.ts",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-009",
+      "status": "GATED",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "页面提供明确标记且可跳过的 AI 自查区；因无经批准模型、Prompt、版本化 Advisory 服务或记录，显示“当前不可用/未绑定”并保持无 mutation。最小解锁条件为 Owner/Security 批准并绑定版本化 AI Advisory 合同。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/shared_domain.py",
+        "config/muchen_journey_product.json",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-010",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "两阶段确认现展示正文、附件、Task/Rubric 版本、Reviewer、可见范围、AI 披露和人工审核后果；浏览器负向回归证明第一步不触发提交。重复结果未知仍缺独立幂等查询反馈，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs",
+        "output/playwright/hx-v3-04-submit-confirmation-1280.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-011",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "任务页现按权威状态展示 SUBMITTED/IN_REVIEW、固定 SubmissionVersion、提交时间、具名 Reviewer、TaskVersion SLA、通知回执缺失和未批准撤回边界；主备/超时升级需 HX-IMPL-004，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/page.tsx",
+        "apps/api/journey_api/domain.py",
+        "apps/api/journey_api/review_routes.py",
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "output/playwright/hx-v3-04-waiting-390.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-012",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "返工页显示 NEEDS_REVISION、具名 Reviewer、理由、逐项结构化 Rubric 反馈、旧 SubmissionVersion、可保留项、未配置截止边界和追加式重提入口；固定旧版本或逐项 Rubric 缺失时专用错误态阻断修订并回运营纠正。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/api/journey_api/submission_service.py",
+        "output/playwright/hx-v3-04-revision-768.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-013",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "结果页现以五类固定标签分开展示完成事实、具名真人结论及固定 SubmissionVersion、AI 边界、append-only 激励账本和系统下一步；证据有效期与跨源冲突停止态仍不完整，通用高影响申诉因未批准而失败关闭，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/result/page.tsx",
+        "apps/api/journey_api/outcome_routes.py",
+        "apps/api/journey_api/shared_domain.py",
+        "apps/api/journey_api/incentive_ledger.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-014",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "结果包已统一五类事实标签、真人签署版本、下一阶段、独立复核谱系与激励边界；结构化优势/发展项及完整证据回链尚未由现有 Result 合同提供，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/result/page.tsx",
+        "apps/api/journey_api/outcome_routes.py",
+        "apps/api/journey_api/shared_domain.py"
+      ]
+    },
+    {
+      "id": "HX-PAGE-015",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "服务端队列按组织和指定 Reviewer 裁剪并排序，现显示模块/任务、安全标识、提交时间、版本、返工次数、TaskVersion SLA、敏感/受众和材料风险；冲突检查明确为 NOT_EVALUATED，队列接口无批准主备/升级映射时失败关闭，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/[reviewId]/page.tsx",
+        "apps/api/journey_api/review_routes.py",
+        "apps/api/journey_api/schemas.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-review-queue-1280.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-016",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "固定 SubmissionVersion、Task/Rubric、原始正文/附件、AI 分区、完整 Rubric/理由、结论影响、真人定稿和只读 Evaluation 历史已实现；通用高影响申诉未获批准而明确 GATED，未知结果仅提示保留 request ID 并重查，且详情尚无完整修订版本谱系，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/review/[reviewId]/page.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
+        "apps/api/journey_api/review_routes.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-review-detail-390.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-017",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "未开放模块无绕过动作且服务端权限拒绝；缺统一锁定对象、缺项、责任角色、检查时间与升级视图。",
+      "trace_paths": [
+        "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/app/app/maps/[mapKey]/page.tsx",
+        "config/module-content-packages/module-content-package-index.v1.json"
+      ]
+    },
+    {
+      "id": "HX-PAGE-018",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "共享空态及 Reviewer 队列现区分查询成功空结果、检查范围和最近检查时间，运营 workload 空结果也明确主备/SLA/容量不可计算；其他运营列表仍未统一同步时间、模块与帮助入口，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
+        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/app/page.tsx",
+        "apps/web/src/app/ops/page.tsx",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-PAGE-019",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "全局/表单错误有人话说明、重试与 request ID；保存范围和连续失败现场保留未统一。",
+      "trace_paths": [
+        "apps/web/src/app/error.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx"
+      ]
+    },
+    {
+      "id": "HX-PAGE-020",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "运营总览现消费已批准 workload，显示主备、SLA、逾期、通知失败、最高异常和更新时间相关运行事实；容量为 PENDING_OWNER_CONTENT 时不可计算，四模块分母不完整时不显示误导性 0。锁定异常 Owner 与完整四模块绑定仍缺，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/ops/page.tsx",
+        "apps/api/journey_api/ops_routes.py",
+        "apps/web/src/lib/server/api.ts",
+        "tests/test_construction_module_runtime.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "output/playwright/hx-v3-05-ops-workload-1280.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-021",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "390px 正式任务路径现有持久主动作、服务器保存回执、本地未同步副本、离线检测与恢复联网门禁；离线时正式 mutation 禁用且正文保留，附件上传提供阶段播报。安全超时没有独立批准配置，跨全部页面的返回位置仍未统一，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/globals.css",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs",
+        "tests/test_submission_attachments.py",
+        "output/playwright/hx-v3-06-offline-confirmation-390-viewport.png"
+      ]
+    },
+    {
+      "id": "HX-PAGE-022",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "正式任务路径现有语义标题、跳转主内容、可见焦点、表单说明关联、状态文字、48px 触控目标、减少动态效果、确认/错误焦点管理；Firefox 键盘首焦点与 axe WCAG A/AA 0 violation 已验证。Reviewer/运营完整读屏脚本仍待 V3-07 Gate，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/globals.css",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/error.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
+        "apps/web/scripts/product-entry-contract.test.mjs",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-LEARN-001",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "服务端 CurrentAction 已做唯一任务入口，但页面字段与失败关闭仍不完整.",
+      "trace_paths": [
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/app/app/page.tsx",
+        "apps/api/journey_api/domain.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-002",
+      "status": "P1_DEFERRED",
+      "priority": "P1",
+      "implementation_phase": 2,
+      "audit_finding": "支线任务属于 Canary 后范围；当前不实现，不影响主任务.",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-LEARN-003",
+      "status": "PARTIAL",
+      "priority": "P0/P1",
+      "implementation_phase": 2,
+      "audit_finding": "P0 的当前路径/模块范围分离存在；复杂个性化排序按 P1 延后.",
+      "trace_paths": [
+        "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/app/app/maps/[mapKey]/page.tsx",
+        "config/module-content-packages/module-content-package-index.v1.json"
+      ]
+    },
+    {
+      "id": "HX-LEARN-004",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "固定步骤、完成条件、输出结构、草稿回执和提交前唯一动作存在；逐步勾选仍仅为页面说明而非统一版本化草稿步骤投影，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-005",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "本地/服务端校验、附件扫描、AI 建议标签及不可用时可跳过路径存在；经批准的版本化 AI Advisory 与细化风险提示尚未绑定，安全扫描不确定继续由服务端阻断，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-006",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "Journey 节点来自服务端；证据来源、更新时间与冲突态不完整.",
+      "trace_paths": [
+        "apps/web/src/app/app/journey-map.tsx",
+        "apps/web/src/app/app/program-overview.tsx",
+        "apps/api/journey_api/routes.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-007",
+      "status": "P1_DEFERRED",
+      "priority": "P1",
+      "implementation_phase": 3,
+      "audit_finding": "阶段庆祝按 Canary 后另行批准；当前不作为发布前置.",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-LEARN-008",
+      "status": "P1_DEFERRED",
+      "priority": "P1",
+      "implementation_phase": 3,
+      "audit_finding": "徽章机制按 Canary 后另行批准；当前不存在授予入口.",
+      "trace_paths": [
+        "apps/api/journey_api/incentive_ledger.py",
+        "tests/test_incentive_ledger_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-009",
+      "status": "PARTIAL",
+      "priority": "P0/P1",
+      "implementation_phase": 3,
+      "audit_finding": "追加式独立积分账本和 formal_effect=NONE 已实现；真实显示/来源回链未进入结果页.",
+      "trace_paths": [
+        "apps/api/journey_api/incentive_ledger.py",
+        "tests/test_incentive_ledger_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-010",
+      "status": "P1_DEFERRED",
+      "priority": "P1",
+      "implementation_phase": 3,
+      "audit_finding": "连续学习按 Canary 后范围延后，且不得影响正式状态.",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-LEARN-011",
+      "status": "PARTIAL",
+      "priority": "P0/P1",
+      "implementation_phase": 3,
+      "audit_finding": "AI 使用身份与真人责任披露存在；任务解释/真人求助入口不统一，复杂伙伴延后.",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py"
+      ]
+    },
+    {
+      "id": "HX-LEARN-012",
+      "status": "P1_DEFERRED",
+      "priority": "P1",
+      "implementation_phase": 3,
+      "audit_finding": "协作任务按 Canary 后另行批准，当前不创建团队状态.",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-LEARN-013",
+      "status": "PARTIAL",
+      "priority": "P0/P1",
+      "implementation_phase": 3,
+      "audit_finding": "结果证据与个人起点诊断可复用；个人复盘卡未形成，跨人聚合延后.",
+      "trace_paths": [
+        "apps/web/src/app/app/result/page.tsx",
+        "apps/api/journey_api/outcome_routes.py",
+        "apps/api/journey_api/shared_domain.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-001",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "正式 Assignment 拒绝 AI actor，正式结果要求真人 PASS Gate。",
+      "trace_paths": [
+        "apps/api/journey_api/formal_assignment_workflow.py",
+        "apps/api/journey_api/shared_domain.py",
+        "tests/test_formal_assignment_workflow.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-002",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "阅读/学习完成不能生成正式 PASS；正式结果要求实操与真人评价。",
+      "trace_paths": [
+        "apps/api/journey_api/formal_assignment_workflow.py",
+        "apps/api/journey_api/shared_domain.py",
+        "tests/test_formal_assignment_workflow.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-003",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "激励账本与正式状态隔离，formal_effect 固定 NONE。",
+      "trace_paths": [
+        "apps/api/journey_api/incentive_ledger.py",
+        "tests/test_incentive_ledger_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-004",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "当前无公开人才排行表面且权限按角色裁剪；缺专门负向契约测试。",
+      "trace_paths": [
+        "apps/api/journey_api/auth.py",
+        "apps/api/journey_api/ops_routes.py",
+        "tests/test_shared_domain_projection.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-005",
+      "status": "GATED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "连续学习功能未开放，当前无惩罚性 streak；未来启用前需负向测试。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-BAN-006",
+      "status": "GATED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "当前无无限激励循环或兑换入口；未来激励扩展前需重签与负向测试。",
+      "trace_paths": [
+        "apps/api/journey_api/incentive_ledger.py",
+        "tests/test_incentive_ledger_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-007",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "mutation 失败保留事实；首页会话或 CurrentAction 不可用时显式失败关闭，不再推断 active。",
+      "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/app/error.tsx"
+      ]
+    },
+    {
+      "id": "HX-BAN-008",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "幂等记录、expected revision 与不可变提交/评价已有 DB/API 测试。",
+      "trace_paths": [
+        "apps/api/journey_api/idempotency.py",
+        "tests/test_submission_attachments.py",
+        "tests/test_reviewer_workbench.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-009",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "任务授权与接受固定 Journey/Stage/Task/Reviewer scope，Journey 不执行生产作业。",
+      "trace_paths": [
+        "apps/api/journey_api/controlled_task_authorization.py",
+        "tests/test_controlled_task_acceptance_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-010",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "内容包、TaskVersion、Rubric hash 与 Owner/Reviewer 绑定不可变。",
+      "trace_paths": [
+        "apps/api/journey_api/construction_module_content.py",
+        "tests/test_construction_module_content_package.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-011",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "AI 使用披露固定版本并标记 advisory；尚无独立 AI 自查记录/来源漂移负向路径。",
+      "trace_paths": [
+        "migrations/versions/0020_shared_ai_provenance.py",
+        "tests/test_shared_domain_projection.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-012",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "附件在 READY/CLEAN 前不能提交，扫描不确定时隔离。",
+      "trace_paths": [
+        "apps/api/journey_api/attachments.py",
+        "tests/test_submission_attachments.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-013",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "下一训练阶段不利决定具备独立复核谱系；尚非所有正式结果的通用申诉呈现。",
+      "trace_paths": [
+        "apps/api/journey_api/next_stage_review_routes.py",
+        "tests/test_next_training_stage_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-014",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "邀请目的同意显式且 AI 披露默认关闭；分享/数据撤回等范围未形成统一测试。",
+      "trace_paths": [
+        "apps/web/src/app/join/page.tsx",
+        "apps/web/src/app/actions.ts",
+        "tests/test_identity_invites.py"
+      ]
+    },
+    {
+      "id": "HX-BAN-015",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "正式学员任务路径已补齐键盘首焦点、确认/错误焦点、表单说明、状态播报、触控与减少动态效果，并修复 axe 发现的 2 个 serious 对比度缺陷至 WCAG A/AA 0 violation；全角色完整读屏 Gate 尚待 V3-07，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/globals.css",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/scripts/product-entry-contract.test.mjs",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-GATE-001",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 6,
+      "audit_finding": "完整本地机器 Gate、依赖/密钥扫描、21 个浏览器 CTA 探测与候选证据已执行；最终 manifest 在 V3-08 证据提交中绑定运行时 checkpoint。Tech Lead、QA/UAT Owner 与 Security/Privacy Owner 尚未签署，因此不得宣称 HX-GATE-001 正式通过。",
+      "trace_paths": [
+        "Makefile",
+        ".github/workflows/ci.yml",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-machine-gate-evidence.v1.json",
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-GATE-002",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "8 人真人 UAT 明确 NOT_RUN；本任务只能准备计划。",
+      "trace_paths": [
+        "config/wp13_uat_plan.json",
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-GATE-003",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 6,
+      "audit_finding": "主备与批准 24h/48h SLA 已绑定，workload API 存在；容量 Owner 值仍失败关闭，真人 Gate 未运行。",
+      "trace_paths": [
+        "apps/web/src/app/ops/page.tsx",
+        "apps/api/journey_api/ops_routes.py",
+        "tests/test_construction_module_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-GATE-004",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 6,
+      "audit_finding": "权限、审计、幂等、不可变和三账隔离已有机器覆盖；完整绑定 Gate 尚未收口。",
+      "trace_paths": [
+        "tests/test_shared_people_domain_contract.py",
+        "tests/test_incentive_ledger_runtime.py",
+        "tests/test_reviewer_workbench.py"
+      ]
+    },
+    {
+      "id": "HX-METRIC-001",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "8 人真人 10 秒理解指标只能计划，不能机器推断。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-METRIC-002",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "10 次真人角色脚本指标未运行。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-METRIC-003",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "正式提交机器幂等可测；16 次真人有效尝试未运行。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-METRIC-004",
+      "status": "PARTIAL",
+      "priority": "P0_MACHINE",
+      "implementation_phase": 6,
+      "audit_finding": "8 个本地合成机器 learner ref × 7 个权威状态的 56 个服务端投影全部通过，并对同一 7 状态完成 3 viewport 的 21 个真实浏览器对账；尚未为 8 个独立浏览器学员逐一生成 56 份快照，因此保持 PARTIAL，不把 21 个浏览器样例冒充 56 个页面快照。",
+      "trace_paths": [
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json"
+      ]
+    },
+    {
+      "id": "HX-METRIC-005",
+      "status": "IMPLEMENTED",
+      "priority": "P0_MACHINE",
+      "implementation_phase": 6,
+      "audit_finding": "7 个权威状态 × 390/768/1280 三个 viewport 的 21/21 启用主 CTA 已在隔离 Chromium 中执行：每页唯一主 CTA、键盘可聚焦、无横向溢出，目标页面均返回 200，死 CTA 为 0。",
+      "trace_paths": [
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json"
+      ]
+    },
+    {
+      "id": "HX-METRIC-006",
+      "status": "IMPLEMENTED",
+      "priority": "P0_MACHINE",
+      "implementation_phase": 6,
+      "audit_finding": "4 模块 × 7 类 AI/激励/低风险越权的 28/28 领域负向样例均拒绝形成正式结果；完整 API 600 项、激励账本、正式结果数据库 Gate 与审计回归通过，越权正式 mutation 为 0。",
+      "trace_paths": [
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "tests/test_incentive_ledger_runtime.py"
+      ]
+    },
+    {
+      "id": "HX-METRIC-007",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "8 个真人 Reviewer 闭环指标未运行。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-METRIC-008",
+      "status": "IMPLEMENTED",
+      "priority": "P0_MACHINE",
+      "implementation_phase": 6,
+      "audit_finding": "四模块复用同一正式写入运行时；4 模块 × 4 故障模式 × 4 写操作的 64/64 证明单元均绑定已执行的离线阻断、幂等重放、验证拒绝、并发单赢家、不可变历史和浏览器恢复测试。完整 API/Web 套件通过，安全恢复不少于 61/64，正式状态误写为 0。",
+      "trace_paths": [
+        "config/human_experience_machine_cases.v1.json",
+        "tests/test_human_experience_machine_gate.py",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-METRIC-009",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "12 次键盘/读屏角色路径真人执行未运行。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-METRIC-010",
+      "status": "GATED",
+      "priority": "HUMAN_GATE",
+      "implementation_phase": 6,
+      "audit_finding": "8 人五类事实区分访谈未运行。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md",
+        "docs/09_TEST_UAT_AND_QUALITY_STRATEGY.md"
+      ]
+    },
+    {
+      "id": "HX-IMPL-001",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 1,
+      "audit_finding": "共享壳提供五类文字标签与统一锁定/空/错误态；首页只消费服务端会话和 CurrentAction，失败时不猜测状态。",
+      "trace_paths": [
+        "apps/web/src/app/human-experience.tsx",
+        "apps/web/scripts/human-experience-shell-contract.test.mjs",
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/app/app/page.tsx",
+        "apps/api/journey_api/domain.py",
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/globals.css",
+        "apps/web/scripts/product-entry-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-IMPL-002",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 2,
+      "audit_finding": "探索营、新手村、AI 学院与交付线工会入口由 controlled release、canonical content packages 和 Enrollment 共同投影；认证竞技场与 Career Map 不进入路由投影。",
+      "trace_paths": [
+        "apps/web/src/lib/journey-program.ts",
+        "apps/web/src/lib/muchen-journey-module-bindings.generated.json",
+        "apps/web/src/app/app/program-overview.tsx",
+        "apps/web/src/app/app/maps/[mapKey]/page.tsx",
+        "config/module-content-packages/module-content-package-index.v1.json",
+        "apps/web/scripts/four-module-entry-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-IMPL-003",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 3,
+      "audit_finding": "任务详情—行动工作区—双阶段正式提交—等待审核—结构化返工—追加重提—通过结果与激励/复核回链已连通并复用既有状态机；AI Advisory 和通用高影响申诉无批准合同时分别 GATED，异常升级细节依赖 HX-IMPL-004，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/[reviewId]/page.tsx",
+        "apps/api/journey_api/review_routes.py",
+        "apps/web/src/app/app/result/page.tsx",
+        "apps/api/journey_api/outcome_routes.py",
+        "apps/api/journey_api/shared_domain.py",
+        "apps/web/scripts/learner-loop-contract.test.mjs",
+        "tests/test_formal_journey_vertical_slice.py",
+        "tests/test_reviewer_workbench.py"
+      ]
+    },
+    {
+      "id": "HX-IMPL-004",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "implementation_phase": 4,
+      "audit_finding": "Reviewer 队列/详情与运营总览现呈现权威优先级、固定证据、批准 SLA、主备、逾期、通知失败和异常入口；容量无批准值时为 PENDING_OWNER_CONTENT/不可计算，冲突检查为 NOT_EVALUATED，缺完整回避和升级合同，故保持 PARTIAL。",
+      "trace_paths": [
+        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/[reviewId]/page.tsx",
+        "apps/web/src/app/ops/page.tsx",
+        "apps/api/journey_api/review_routes.py",
+        "apps/api/journey_api/ops_routes.py",
+        "tests/test_reviewer_workbench.py",
+        "tests/test_construction_module_runtime.py",
+        "apps/web/scripts/reviewer-ops-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "HX-IMPL-005",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 5,
+      "audit_finding": "P0 弱网/未知结果恢复、草稿与正式 mutation 幂等、390px 持久主动作、键盘首焦点、确认/错误焦点、表单说明、状态播报、48px 触控目标、减少动态效果和 axe 正式任务 Gate 已实现并有故障注入证据；全候选 Gate 属 HX-IMPL-006。",
+      "trace_paths": [
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/globals.css",
+        "apps/web/src/app/error.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/app/tasks/[assignmentId]/attachment-uploader.tsx",
+        "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
+        "apps/web/scripts/product-entry-contract.test.mjs",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs",
+        "tests/test_submission_attachments.py",
+        "output/playwright/hx-v3-06-offline-confirmation-390-viewport.png"
+      ]
+    },
+    {
+      "id": "HX-IMPL-006",
+      "status": "IMPLEMENTED",
+      "priority": "P0",
+      "implementation_phase": 6,
+      "audit_finding": "HX 专用机器目标、固定运行时候选 SHA、完整 API/Web/构建/安全/依赖/浏览器结果、证据 manifest、NOT_RUN 真人 UAT 计划和 Owner Review 准备包均已形成。该实施完成不代表 HX-GATE-001 的具名真人签署，不代表真人 UAT、Canary 或 Release。",
+      "trace_paths": [
+        "Makefile",
+        "config/human_experience_machine_cases.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-browser-results.v1.json",
+        "outputs/controller-integration/human-experience-v1.0/v3-08-machine-gate-evidence.v1.json",
+        "docs/uat/HX_V1.0_REAL_HUMAN_UAT_PLAN.md",
+        "docs/uat/HX_V1.0_OWNER_REVIEW_PACKAGE.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-001",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-002",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-003",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-004",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-005",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-006",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-007",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-008",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    },
+    {
+      "id": "HX-RESIGN-009",
+      "status": "GATED",
+      "priority": "GOVERNANCE",
+      "implementation_phase": 6,
+      "audit_finding": "当前未触发；若对应合同条件变化，必须冻结旧证据并取得条款指定真人重签，机器不得代签。",
+      "trace_paths": [
+        "docs/baselines/build-contracts/01A_Shared_Human_Experience_Layer_Contract_V1.0.md"
+      ]
+    }
+  ]
+}

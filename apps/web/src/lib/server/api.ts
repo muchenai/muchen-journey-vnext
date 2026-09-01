@@ -9,6 +9,10 @@ export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
 
 export type Role = "LEARNER" | "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR";
 
+export type LearnerSessionState =
+  | { status: "ABSENT" | "INVALID" | "UNAVAILABLE" }
+  | { status: "VALID"; roles: string[]; safeEntry: string };
+
 export type CurrentAction = {
   action_type: string;
   stage: string;
@@ -20,6 +24,17 @@ export type CurrentAction = {
   responsible_party: string;
   feedback_expectation: string;
   journey: JourneyProgress | null;
+};
+
+export type LearnerEnrollment = {
+  id: string;
+  status: "PENDING_IDENTITY" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+  revision: number;
+  journey_version_id: string | null;
+  journey_stable_key: string | null;
+  journey_title: string | null;
+  journey_version: number | null;
+  reviewer_display_name: string;
 };
 
 export type JourneyProgressNode = {
@@ -39,7 +54,7 @@ export type JourneyProgress = {
   version: number;
   title: string;
   completed_stages: number;
-  total_stages: 8;
+  total_stages: number;
   current_stage_key: string | null;
   nodes: JourneyProgressNode[];
 };
@@ -78,6 +93,8 @@ export type Assignment = {
     | "COMPLETED"
     | "CANCELLED";
   revision: number;
+  assigned_at: string;
+  reviewer_display_name: string;
   allowed_commands: string[];
   stable_task_key: string;
   task_version: number;
@@ -94,6 +111,9 @@ export type Assignment = {
   learning_experience: LearningExperience | Record<string, never>;
   estimated_duration_minutes: number;
   feedback_sla_business_days: number;
+  reviewer_role: string;
+  sensitivity: string;
+  audience: string;
   rubric: {
     version: number;
     dimensions: Array<{
@@ -139,16 +159,31 @@ export type Attachment = {
   scan_status: string;
 };
 
+export type AiUseDisclosure = {
+  used: boolean;
+  purpose: string | null;
+  model_version: string | null;
+  prompt_version: string | null;
+  output_is_advisory_only: true;
+};
+
 export type SubmissionVersion = {
   id: string;
   version_no: number;
   body: string;
+  ai_use: AiUseDisclosure;
   created_at: string;
   attachments: Attachment[];
   review_id: string | null;
   review_status: string | null;
   decision: string | null;
   feedback: string | null;
+  rubric_feedback: Array<{
+    dimension_key: string;
+    rating: string;
+    score: number | null;
+    feedback: string;
+  }>;
 };
 
 export type Submission = {
@@ -178,14 +213,21 @@ export type ReviewItem = {
   task_title: string;
   task_version: number;
   submission_version_no: number;
+  submitted_at: string;
   assigned_at: string;
   started_at: string | null;
   priority_reason: string;
   material_status: "COMPLETE" | "INCOMPLETE";
+  feedback_sla_business_days: number;
+  revision_count: number;
+  sensitivity: string;
+  audience: string;
+  conflict_status: "NOT_EVALUATED";
 };
 
 export type ReviewDetail = ReviewItem & {
   submission_body: string;
+  submission_ai_use: AiUseDisclosure;
   task_purpose: string;
   completion_criteria: string[];
   required_deliverables: string[];
@@ -230,6 +272,7 @@ export type ReviewDetail = ReviewItem & {
     feedback_structure_version: number;
     reviewer_id: string;
     review_revision: number;
+    ai_use: AiUseDisclosure;
     created_at: string;
   } | null;
 };
@@ -248,21 +291,28 @@ export type Result = {
     status: "FINALIZED";
     decision: "PASS";
     reviewer_id: string;
+    reviewer_display_name: string;
+    submission_version_id: string;
     overall_feedback: string;
+    ai_use: AiUseDisclosure;
     concluded_at: string;
   };
-  system_recommendation: {
-    status: "PENDING_OPERATOR_INPUT" | "RECORDED";
-    advisory_only: true;
-    recommendation_tier: "A" | "B" | "C" | "D" | null;
-    recommended_decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
-  };
-  operator_admission: {
-    status: "PENDING" | "DECIDED";
-    decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
+  next_training_stage: {
+    decision_scope: "NEXT_TRAINING_STAGE";
+    display_name: "下一训练阶段决定";
+    status: "PENDING_HUMAN_DECISION" | "RECORDED";
+    decision_id: string | null;
+    decision: "READY" | "DEFER" | "NOT_READY" | null;
     decision_reason: string | null;
-    total_score: number | null;
-    decided_at: string | null;
+    signed_by: string | null;
+    signed_at: string | null;
+    decision_evidence_ref: string | null;
+    review_request_status:
+      | "NOT_AVAILABLE_UNTIL_DECISION"
+      | "NOT_APPLICABLE"
+      | "AVAILABLE"
+      | "RECEIVED";
+    can_request_review: boolean;
   };
   evaluation: {
     id: string;
@@ -275,6 +325,7 @@ export type Result = {
       rating: string;
       feedback: string | null;
     }>;
+    ai_use: AiUseDisclosure;
     created_at: string;
   };
   journey_evaluations: Array<{
@@ -288,6 +339,7 @@ export type Result = {
       rating: string;
       feedback: string | null;
     }>;
+    ai_use: AiUseDisclosure;
     created_at: string;
     stage_key: string;
     stage_title: string;
@@ -319,6 +371,92 @@ export type Result = {
     message: string;
   };
   created_at: string;
+};
+
+export type IncentiveLedger = {
+  points_total: number;
+  xp_total: number;
+  formal_effect: "NONE";
+  can_unlock_human_gate: false;
+  entries: Array<{
+    id: string;
+    module_key: string;
+    incentive_type: "POINTS" | "XP" | "BADGE" | "RANK";
+    amount: number | null;
+    label: string | null;
+    source_outcome_id: string;
+    rule_ref: string;
+    rule_sha256: string;
+    correction_of_entry_id: string | null;
+    correction_reason: string | null;
+    created_at: string;
+  }>;
+};
+
+export type NextTrainingStageReviewRequest = {
+  id: string;
+  next_training_stage_decision_id: string;
+  source_decision: "DEFER" | "NOT_READY";
+  reason: string;
+  evidence_refs: string[];
+  status:
+    | "RECEIVED"
+    | "IN_REVIEW"
+    | "UPHELD"
+    | "OVERTURNED"
+    | "RETURNED_FOR_REVIEW";
+  requested_at: string;
+  assigned_reviewer_user_id: string | null;
+  assigned_at: string | null;
+  resolution_reason: string | null;
+  resolved_at: string | null;
+  replacement_decision_id: string | null;
+};
+
+export type NextTrainingStageReviewRequestList = {
+  items: NextTrainingStageReviewRequest[];
+};
+
+export type HandoffAcceptance = {
+  id: string;
+  handoff_id: string;
+  next_training_stage_decision_id: string;
+  controlled_task_authorization_id: string;
+  target_journey_version_id: string;
+  target_journey_stage_version_id: string;
+  target_task_version_id: string;
+  target_reviewer_user_id: string;
+  target_enrollment_id: string;
+  target_assignment_id: string;
+  accepted_at: string;
+  idempotency_replay: boolean;
+};
+
+export type HandoffDetail = {
+  handoff: Result["handoff"];
+  next_training_stage_decision_id: string | null;
+  next_training_stage_decision: "READY" | null;
+  controlled_task_authorization: {
+    id: string;
+    status: "ACTIVE";
+    revision: number;
+    target_journey_version_id: string;
+    target_journey_stage_version_id: string;
+    target_task_version_id: string;
+    task_version_sha256: string;
+    scope_sha256: string;
+    policy_snapshot_sha256: string;
+    primary_reviewer_user_id: string;
+    valid_from: string;
+    expires_at: string;
+  } | null;
+  acceptance: HandoffAcceptance | null;
+  acceptance_status:
+    | "DECISION_REQUIRED"
+    | "AUTHORIZATION_REQUIRED"
+    | "READY_TO_ACCEPT"
+    | "ALREADY_ACCEPTED";
+  production_execution_allowed: false;
 };
 
 export type TimelineItem = {
@@ -424,10 +562,6 @@ export type OpsEnrollment = {
   assignment_statuses: string[];
   open_review_status: string | null;
   open_review_revision: number | null;
-  admission_decision_id: string | null;
-  admission_total_score: number | null;
-  admission_tier: "A" | "B" | "C" | "D" | null;
-  admission_decision: "ADMIT" | "DEFER" | "NOT_ADMIT" | null;
   allowed_commands: string[];
 };
 
@@ -538,6 +672,25 @@ export type OpsNotificationDelivery = {
   next_attempt_at: string | null;
   delivered_at: string | null;
   external_receipt_recorded: boolean;
+};
+
+export type ReviewerWorkload = {
+  binding_id: string;
+  module_key: "ai-academy" | "delivery-guild";
+  package_id: string;
+  package_version: string;
+  primary_reviewer_id: string;
+  primary_reviewer_display_name: string;
+  backup_reviewer_id: string;
+  backup_reviewer_display_name: string;
+  first_response_sla_minutes: number;
+  completion_sla_minutes: number;
+  active_enrollment_count: number;
+  open_review_count: number;
+  overdue_review_count: number;
+  capacity_limit: null;
+  capacity_status: "PENDING_OWNER_CONTENT";
+  replacement_scope: "PRIMARY_OR_NAMED_BACKUP_ONLY";
 };
 
 export type RuntimeStatus = {
@@ -712,6 +865,29 @@ export function cookieValue(setCookies: string[], name: string): string | undefi
 
 export async function hasVNextSession(): Promise<boolean> {
   return Boolean((await cookies()).get(SESSION_COOKIE)?.value);
+}
+
+export async function resolveLearnerSessionState(): Promise<LearnerSessionState> {
+  if (!(await cookies()).get(SESSION_COOKIE)?.value) return { status: "ABSENT" };
+  try {
+    const session = await apiRequest<{ roles: string[]; safe_entry: string }>(
+      "/api/v1/session",
+      "LEARNER",
+    );
+    if (!session.roles.includes("LEARNER") || session.safe_entry !== "/app") {
+      return { status: "INVALID" };
+    }
+    return { status: "VALID", roles: session.roles, safeEntry: session.safe_entry };
+  } catch (error) {
+    if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+      return { status: "INVALID" };
+    }
+    return { status: "UNAVAILABLE" };
+  }
+}
+
+export async function hasValidLearnerSession(): Promise<boolean> {
+  return (await resolveLearnerSessionState()).status === "VALID";
 }
 
 export async function hasLearnerSession(): Promise<boolean> {

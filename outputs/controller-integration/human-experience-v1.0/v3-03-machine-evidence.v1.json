@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0",
+  "phase": "V3-03",
+  "requirement_batch": "HX-IMPL-002",
+  "evidence_scope": "PHASE_MACHINE_EVIDENCE_NOT_CANDIDATE_GATE",
+  "tested_worktree_base_sha": "9e8afbca837fc6775a62242b61f0ceed87c4cc89",
+  "candidate_sha": null,
+  "result": "PASS_FOR_BATCH_COMMIT",
+  "canonical_content_binding": {
+    "index_path": "config/module-content-packages/module-content-package-index.v1.json",
+    "index_file_sha256": "7af33c00803458d5d69288cb628a328f7998d1f3a2e2b3c555f52ee1252c4481",
+    "declared_index_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
+    "runtime_projection_path": "apps/web/src/lib/muchen-journey-module-bindings.generated.json",
+    "runtime_projection_sha256": "b63c0f899f5f7a557bd43f528c75f99e80adc91adef4af76fa79ae4f4f544013",
+    "modules": [
+      "exploration-camp",
+      "newcomer-village",
+      "ai-academy",
+      "delivery-guild"
+    ],
+    "unapproved_extensions_exposed": false
+  },
+  "machine_checks": [
+    {
+      "command": "npm test",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "54 passed"
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest tests/test_construction_module_content_package.py tests/test_promote_module_content_packages.py tests/test_human_experience_traceability.py -q",
+      "exit_code": 0,
+      "result": "20 passed"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "browser_checks": {
+    "engine": "Firefox",
+    "local_url": "http://127.0.0.1:3137/",
+    "fixture_scope": "LOCAL_SYNTHETIC_MACHINE_FIXTURE_ONLY",
+    "fixture_human_evidence": false,
+    "module_entry_count": 4,
+    "module_routes": {
+      "exploration-camp": 200,
+      "newcomer-village": 200,
+      "ai-academy": 200,
+      "delivery-guild": 200,
+      "certification-arena": 404,
+      "career-map": 404
+    },
+    "assigned_entry": {
+      "module": "exploration-camp",
+      "label": "进入已分配任务",
+      "source": "synthetic Enrollment fixture"
+    },
+    "locked_entry": {
+      "module": "ai-academy",
+      "heading": "正式任务尚未分配",
+      "primary_actions": [
+        {
+          "text": "返回当前可行动任务",
+          "href": "/app"
+        }
+      ],
+      "content_package_hash_visible": true,
+      "state_inference": false
+    },
+    "horizontal_overflow": {
+      "module_home_1280": false,
+      "locked_module_390": false
+    },
+    "console_errors": 0,
+    "console_warnings": 0
+  },
+  "artifacts": [
+    {
+      "path": "output/playwright/hx-v3-03-four-module-home-1280.png",
+      "sha256": "eb06e453cd4cc6b7f84b2bc3a86ac21bad7be355f4ceff23127228541c01a471"
+    },
+    {
+      "path": "output/playwright/hx-v3-03-ai-academy-locked-1280.png",
+      "sha256": "032dbb9fa86786a174be674696cddecc3f73a62e2b51ab155effc2cca41996a5"
+    },
+    {
+      "path": "output/playwright/hx-v3-03-ai-academy-locked-390.png",
+      "sha256": "7d523c5a34e0148a10d5e1cf5bb56b9738963ee18bda193214640f70ba6b8753"
+    }
+  ],
+  "diagnostic_failures": [
+    {
+      "stage": "red_contract_test",
+      "result": "EXPECTED_FAIL",
+      "cause": "runtime content-binding projection did not exist before implementation",
+      "resolution": "added the exact four-module projection and canonical hash test"
+    },
+    {
+      "stage": "typecheck_after_projection",
+      "result": "RESOLVED",
+      "cause": "JourneyModuleExperience initially inherited the new contentBinding field",
+      "resolution": "excluded generated binding data from the handwritten experience type"
+    },
+    {
+      "stage": "browser_fixture_start",
+      "result": "RESOLVED",
+      "cause": "local one-line fixture referenced current action before initialization",
+      "resolution": "bound the assignment id before constructing the current action"
+    }
+  ],
+  "human_evidence": {
+    "human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release_authorization": "NOT_RUN"
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

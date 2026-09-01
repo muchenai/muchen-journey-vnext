@@ -4,6 +4,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from journey_api.construction_module_content import ConstructionModuleContentPackage
+from journey_api.shared_domain import AiUseDisclosure
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -20,6 +23,9 @@ class CompleteLearningMaterialCommand(StrictModel):
 class SubmissionCommand(RevisionCommand):
     body: str = Field(min_length=40, max_length=8_000)
     attachment_ids: list[UUID] = Field(default_factory=list, max_length=5)
+    ai_use: AiUseDisclosure = Field(
+        default_factory=lambda: AiUseDisclosure(used=False)
+    )
 
     @field_validator("attachment_ids")
     @classmethod
@@ -83,6 +89,9 @@ class FinalizeReviewCommand(RevisionCommand):
     overall_feedback: str = Field(min_length=10, max_length=2_000)
     rubric_evaluations: list[RubricEvaluationCommand] = Field(
         min_length=1, max_length=6
+    )
+    ai_use: AiUseDisclosure = Field(
+        default_factory=lambda: AiUseDisclosure(used=False)
     )
 
     @field_validator("overall_feedback")
@@ -722,7 +731,7 @@ class JourneyProgressOut(StrictModel):
     version: int
     title: str
     completed_stages: int
-    total_stages: Literal[8]
+    total_stages: int = Field(ge=0)
     current_stage_key: str | None
     nodes: list[JourneyProgressNodeOut]
 
@@ -732,10 +741,32 @@ class CurrentActionResponse(StrictModel):
     request_id: str
 
 
+class LearnerEnrollmentOut(StrictModel):
+    id: UUID
+    status: Literal["PENDING_IDENTITY", "ACTIVE", "COMPLETED", "CANCELLED"]
+    revision: int
+    journey_version_id: UUID | None
+    journey_stable_key: str | None
+    journey_title: str | None
+    journey_version: int | None
+    reviewer_display_name: str
+
+
+class LearnerEnrollmentListOut(StrictModel):
+    items: list[LearnerEnrollmentOut]
+
+
+class LearnerEnrollmentListResponse(StrictModel):
+    data: LearnerEnrollmentListOut
+    request_id: str
+
+
 class AssignmentOut(StrictModel):
     id: UUID
     status: str
     revision: int
+    assigned_at: datetime
+    reviewer_display_name: str
     allowed_commands: list[str]
     stable_task_key: str
     task_version: int
@@ -752,6 +783,9 @@ class AssignmentOut(StrictModel):
     learning_experience: dict[str, object]
     estimated_duration_minutes: int
     feedback_sla_business_days: int
+    reviewer_role: str
+    sensitivity: str
+    audience: str
     rubric: dict[str, object]
     submission: "SubmissionOut | None"
     draft: "SubmissionDraftOut | None"
@@ -941,6 +975,38 @@ class FormalJourneyVersionOut(StrictModel):
     idempotency_replay: bool = False
 
 
+class PublishConstructionModulePackageCommand(StrictModel):
+    package: ConstructionModuleContentPackage
+    task_version_id: UUID
+    owner_user_id: UUID
+    primary_reviewer_user_id: UUID
+    backup_reviewer_user_id: UUID
+    reviewed_by: UUID
+    expected_current_version: int = Field(ge=0)
+    review_acknowledged: Literal[True]
+
+
+class ConstructionModulePackageOut(StrictModel):
+    binding_id: UUID
+    module_key: Literal["ai-academy", "delivery-guild"]
+    package_id: str
+    package_version: str
+    package_sha256: str
+    journey_version_id: UUID
+    journey_version: int
+    journey_stage_version_id: UUID
+    task_version_id: UUID
+    effective_at: datetime
+    expires_at: datetime | None
+    status: Literal["PUBLISHED_CONTENT_BOUND"]
+    idempotency_replay: bool = False
+
+
+class ConstructionModulePackageResponse(StrictModel):
+    data: ConstructionModulePackageOut
+    request_id: str
+
+
 class FormalJourneyVersionResponse(StrictModel):
     data: FormalJourneyVersionOut
     request_id: str
@@ -979,10 +1045,6 @@ class EnrollmentOpsOut(StrictModel):
     assignment_statuses: list[str]
     open_review_status: str | None
     open_review_revision: int | None
-    admission_decision_id: UUID | None
-    admission_total_score: int | None
-    admission_tier: Literal["A", "B", "C", "D"] | None
-    admission_decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
     allowed_commands: list[str]
 
 
@@ -1001,6 +1063,34 @@ class EnrollmentMutationOut(CommandOut):
 
 class EnrollmentMutationResponse(StrictModel):
     data: EnrollmentMutationOut
+    request_id: str
+
+
+class ReviewerWorkloadOut(StrictModel):
+    binding_id: UUID
+    module_key: Literal["ai-academy", "delivery-guild"]
+    package_id: str
+    package_version: str
+    primary_reviewer_id: UUID
+    primary_reviewer_display_name: str
+    backup_reviewer_id: UUID
+    backup_reviewer_display_name: str
+    first_response_sla_minutes: int
+    completion_sla_minutes: int
+    active_enrollment_count: int
+    open_review_count: int
+    overdue_review_count: int
+    capacity_limit: None = None
+    capacity_status: Literal["PENDING_OWNER_CONTENT"]
+    replacement_scope: Literal["PRIMARY_OR_NAMED_BACKUP_ONLY"]
+
+
+class ReviewerWorkloadListOut(StrictModel):
+    items: list[ReviewerWorkloadOut]
+
+
+class ReviewerWorkloadListResponse(StrictModel):
+    data: ReviewerWorkloadListOut
     request_id: str
 
 
@@ -1178,12 +1268,14 @@ class SubmissionVersionOut(StrictModel):
     id: UUID
     version_no: int
     body: str
+    ai_use: AiUseDisclosure
     created_at: datetime
     attachments: list[AttachmentOut]
     review_id: UUID | None
     review_status: str | None
     decision: str | None
     feedback: str | None
+    rubric_feedback: list[dict[str, object]]
 
 
 class SubmissionOut(StrictModel):
@@ -1239,10 +1331,16 @@ class ReviewQueueItemOut(StrictModel):
     task_title: str
     task_version: int
     submission_version_no: int
+    submitted_at: datetime
     assigned_at: datetime
     started_at: datetime | None
     priority_reason: str
     material_status: Literal["COMPLETE", "INCOMPLETE"]
+    feedback_sla_business_days: int
+    revision_count: int
+    sensitivity: str
+    audience: str
+    conflict_status: Literal["NOT_EVALUATED"] = "NOT_EVALUATED"
 
 
 class ReviewQueueOut(StrictModel):
@@ -1350,11 +1448,13 @@ class EvaluationOut(StrictModel):
     feedback_structure_version: int
     reviewer_id: UUID
     review_revision: int
+    ai_use: AiUseDisclosure
     created_at: datetime
 
 
 class ReviewDetailOut(ReviewQueueItemOut):
     submission_body: str
+    submission_ai_use: AiUseDisclosure
     task_purpose: str
     completion_criteria: list[str]
     required_deliverables: list[str]
@@ -1399,6 +1499,7 @@ class ResultEvaluationOut(StrictModel):
     decision: Literal["PASS"]
     overall_feedback: str
     rubric_feedback: list[ResultRubricFeedbackOut]
+    ai_use: AiUseDisclosure
     created_at: datetime
 
 
@@ -1417,6 +1518,203 @@ class HandoffOut(StrictModel):
     next_step_title: str
     instructions: str
     created_at: datetime
+
+
+class HandoffAcceptanceCommand(StrictModel):
+    next_training_stage_decision_id: UUID
+    controlled_task_authorization_id: UUID
+    expected_authorization_revision: int = Field(ge=1)
+    expected_scope_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_task_version_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_policy_snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_target_journey_version_id: UUID
+    expected_target_journey_stage_version_id: UUID
+    expected_target_task_version_id: UUID
+
+
+class HandoffAcceptanceOut(StrictModel):
+    id: UUID
+    handoff_id: UUID
+    next_training_stage_decision_id: UUID
+    controlled_task_authorization_id: UUID
+    target_journey_version_id: UUID
+    target_journey_stage_version_id: UUID
+    target_task_version_id: UUID
+    target_reviewer_user_id: UUID
+    target_enrollment_id: UUID
+    target_assignment_id: UUID
+    accepted_at: datetime
+    idempotency_replay: bool = False
+
+
+class HandoffAcceptanceResponse(StrictModel):
+    data: HandoffAcceptanceOut
+    request_id: str
+
+
+class HandoffControlledTaskAuthorizationOut(StrictModel):
+    id: UUID
+    status: Literal["ACTIVE"]
+    revision: int
+    target_journey_version_id: UUID
+    target_journey_stage_version_id: UUID
+    target_task_version_id: UUID
+    task_version_sha256: str
+    scope_sha256: str
+    policy_snapshot_sha256: str
+    primary_reviewer_user_id: UUID
+    valid_from: datetime
+    expires_at: datetime
+
+
+class HandoffDetailOut(StrictModel):
+    handoff: HandoffOut
+    next_training_stage_decision_id: UUID | None
+    next_training_stage_decision: Literal["READY"] | None
+    controlled_task_authorization: HandoffControlledTaskAuthorizationOut | None
+    acceptance: HandoffAcceptanceOut | None
+    acceptance_status: Literal[
+        "DECISION_REQUIRED",
+        "AUTHORIZATION_REQUIRED",
+        "READY_TO_ACCEPT",
+        "ALREADY_ACCEPTED",
+    ]
+    production_execution_allowed: Literal[False] = False
+
+
+class HandoffDetailResponse(StrictModel):
+    data: HandoffDetailOut
+    request_id: str
+
+
+class ControlledTaskPolicySnapshotCommand(StrictModel):
+    policy_schema: Literal["muchen-journey-controlled-task-policy.v1"]
+    policy_version: str = Field(min_length=3, max_length=80)
+    training_purpose: str = Field(min_length=3, max_length=500)
+    allowed_input_schema_ref: str = Field(min_length=3, max_length=500)
+    data_classification: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL_PEOPLE"]
+    deidentification_rule_ref: str = Field(min_length=3, max_length=500)
+    production_isolation_rule_ref: str = Field(min_length=3, max_length=500)
+    production_actions_allowed: Literal[False]
+    production_credential_allowed: Literal[False]
+    prohibited_action_codes: list[str] = Field(min_length=1, max_length=30)
+    learner_visibility: list[str] = Field(min_length=1, max_length=30)
+    reviewer_visibility: list[str] = Field(min_length=1, max_length=30)
+    operator_visibility: list[str] = Field(min_length=1, max_length=30)
+    reviewer_substitution_rule_ref: str = Field(min_length=3, max_length=500)
+    evidence_retention_days: int = Field(ge=1, le=3650)
+    evidence_disposition: Literal["DELETE", "ARCHIVE"]
+    help_escalation_ref: str = Field(min_length=3, max_length=500)
+
+
+class CreateControlledTaskAuthorizationCommand(StrictModel):
+    authorized_project_ref: str = Field(min_length=3, max_length=500)
+    target_journey_version_id: UUID
+    target_journey_stage_version_id: UUID
+    target_task_version_id: UUID
+    authorization_version: int = Field(ge=1)
+    project_owner_user_id: UUID
+    newcomer_operations_owner_user_id: UUID
+    data_security_owner_user_id: UUID
+    reviewer_owner_user_id: UUID
+    primary_reviewer_user_id: UUID
+    backup_reviewer_user_id: UUID
+    policy_snapshot_ref: str = Field(min_length=3, max_length=500)
+    policy_snapshot: ControlledTaskPolicySnapshotCommand
+    policy_evidence_ref: str = Field(min_length=3, max_length=500)
+    policy_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    valid_from: datetime
+    expires_at: datetime
+
+
+class ControlledTaskAuthorizationOut(StrictModel):
+    id: UUID
+    authorization_scope: Literal["NEWCOMER_CONTROLLED_TRAINING"]
+    authorized_project_ref: str
+    target_journey_version_id: UUID
+    target_journey_stage_version_id: UUID
+    target_task_version_id: UUID
+    task_version_sha256: str
+    authorization_version: int
+    scope_sha256: str
+    project_owner_user_id: UUID
+    newcomer_operations_owner_user_id: UUID
+    data_security_owner_user_id: UUID
+    reviewer_owner_user_id: UUID
+    primary_reviewer_user_id: UUID
+    backup_reviewer_user_id: UUID
+    policy_snapshot_ref: str
+    policy_snapshot_version: str
+    policy_snapshot_sha256: str
+    policy_evidence_ref: str
+    policy_evidence_sha256: str
+    valid_from: datetime
+    expires_at: datetime
+    status: Literal["DRAFT", "PENDING_APPROVALS", "ACTIVE", "REVOKED", "EXPIRED"]
+    revision: int
+    activated_at: datetime | None
+    revoked_at: datetime | None
+    expired_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    idempotency_replay: bool = False
+
+
+class ControlledTaskAuthorizationResponse(StrictModel):
+    data: ControlledTaskAuthorizationOut
+    request_id: str
+
+
+class ControlledTaskAuthorizationRevisionCommand(StrictModel):
+    expected_revision: int = Field(ge=1)
+
+
+class ActivateControlledTaskAuthorizationCommand(
+    ControlledTaskAuthorizationRevisionCommand
+):
+    expected_scope_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_task_version_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_policy_snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ControlledTaskAuthorizationApprovalCommand(StrictModel):
+    expected_authorization_revision: int = Field(ge=1)
+    approval_role: Literal[
+        "NEWCOMER_OPERATIONS_OWNER",
+        "PROJECT_OWNER",
+        "DATA_SECURITY_OWNER",
+        "REVIEWER_OWNER",
+    ]
+    decision: Literal["APPROVE", "REJECT"]
+    expected_scope_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    signature_evidence_ref: str = Field(min_length=3, max_length=500)
+    signature_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    signed_at: datetime
+
+
+class ControlledTaskAuthorizationApprovalOut(StrictModel):
+    id: UUID
+    authorization_id: UUID
+    approval_role: str
+    signer_user_id: UUID
+    decision: str
+    signed_scope_sha256: str
+    signature_evidence_ref: str
+    signature_evidence_sha256: str
+    signed_at: datetime
+    created_at: datetime
+    idempotency_replay: bool = False
+
+
+class ControlledTaskAuthorizationApprovalResponse(StrictModel):
+    data: ControlledTaskAuthorizationApprovalOut
+    request_id: str
+
+
+class RevokeControlledTaskAuthorizationCommand(
+    ControlledTaskAuthorizationRevisionCommand
+):
+    reason: str = Field(min_length=10, max_length=500)
 
 
 class NotificationDeliveryOut(StrictModel):
@@ -1446,23 +1744,147 @@ class ResultReviewerConclusionOut(StrictModel):
     status: Literal["FINALIZED"] = "FINALIZED"
     decision: Literal["PASS"] = "PASS"
     reviewer_id: UUID
+    reviewer_display_name: str
+    submission_version_id: UUID
     overall_feedback: str
+    ai_use: AiUseDisclosure
     concluded_at: datetime
 
 
-class ResultSystemRecommendationOut(StrictModel):
-    status: Literal["PENDING_OPERATOR_INPUT", "RECORDED"]
-    advisory_only: Literal[True] = True
-    recommendation_tier: Literal["A", "B", "C", "D"] | None
-    recommended_decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
-
-
-class ResultOperatorAdmissionOut(StrictModel):
-    status: Literal["PENDING", "DECIDED"]
-    decision: Literal["ADMIT", "DEFER", "NOT_ADMIT"] | None
+class ResultNextTrainingStageOut(StrictModel):
+    decision_scope: Literal["NEXT_TRAINING_STAGE"] = "NEXT_TRAINING_STAGE"
+    display_name: Literal["下一训练阶段决定"] = "下一训练阶段决定"
+    status: Literal["PENDING_HUMAN_DECISION", "RECORDED"]
+    decision_id: UUID | None
+    decision: Literal["READY", "DEFER", "NOT_READY"] | None
     decision_reason: str | None
-    total_score: int | None = Field(default=None, ge=0, le=100)
-    decided_at: datetime | None
+    signed_by: UUID | None
+    signed_at: datetime | None
+    decision_evidence_ref: str | None
+    review_request_status: Literal[
+        "NOT_AVAILABLE_UNTIL_DECISION", "NOT_APPLICABLE", "AVAILABLE", "RECEIVED"
+    ]
+    can_request_review: bool
+
+
+class NextTrainingStageReviewRequestCommand(StrictModel):
+    reason: str = Field(min_length=10, max_length=2_000)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("evidence_refs")
+    @classmethod
+    def validate_evidence_refs(cls, values: list[str]) -> list[str]:
+        normalized = [value.strip() for value in values]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Evidence references must be unique")
+        if any(not 3 <= len(value) <= 300 for value in normalized):
+            raise ValueError("Evidence references must contain 3 to 300 characters")
+        return normalized
+
+
+class NextTrainingStageReviewRequestOut(StrictModel):
+    id: UUID
+    next_training_stage_decision_id: UUID
+    source_decision: Literal["DEFER", "NOT_READY"]
+    reason: str
+    evidence_refs: list[str]
+    status: Literal[
+        "RECEIVED", "IN_REVIEW", "UPHELD", "OVERTURNED", "RETURNED_FOR_REVIEW"
+    ] = "RECEIVED"
+    requested_at: datetime
+    assigned_reviewer_user_id: UUID | None = None
+    assigned_at: datetime | None = None
+    resolution_reason: str | None = None
+    resolved_at: datetime | None = None
+    replacement_decision_id: UUID | None = None
+    already_received: bool = False
+    idempotency_replay: bool = False
+
+
+class NextTrainingStageReviewRequestResponse(StrictModel):
+    data: NextTrainingStageReviewRequestOut
+    request_id: str
+
+
+class NextTrainingStageReviewRequestListOut(StrictModel):
+    items: list[NextTrainingStageReviewRequestOut]
+
+
+class NextTrainingStageReviewRequestListResponse(StrictModel):
+    data: NextTrainingStageReviewRequestListOut
+    request_id: str
+
+
+class NextTrainingStageReviewAssignmentCommand(StrictModel):
+    reviewer_user_id: UUID
+    assignment_reason: str = Field(min_length=10, max_length=1_000)
+    assignment_evidence_ref: str = Field(min_length=3, max_length=300)
+
+
+class NextTrainingStageReviewAssignmentOut(StrictModel):
+    id: UUID
+    review_request_id: UUID
+    source_decision_id: UUID
+    person_id: UUID
+    reviewer_user_id: UUID
+    assigned_by_user_id: UUID
+    assignment_reason: str
+    assignment_evidence_ref: str
+    assigned_at: datetime
+    idempotency_replay: bool = False
+
+
+class NextTrainingStageReviewAssignmentResponse(StrictModel):
+    data: NextTrainingStageReviewAssignmentOut
+    request_id: str
+
+
+class NextTrainingStageReplacementDecisionCommand(StrictModel):
+    decision: Literal["READY", "DEFER", "NOT_READY"]
+    decision_reason: str = Field(min_length=10, max_length=2_000)
+    decision_evidence_ref: str = Field(min_length=3, max_length=500)
+    decision_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class NextTrainingStageReviewResolutionCommand(StrictModel):
+    status: Literal["UPHELD", "OVERTURNED", "RETURNED_FOR_REVIEW"]
+    resolution_reason: str = Field(min_length=10, max_length=2_000)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+    replacement_decision: NextTrainingStageReplacementDecisionCommand | None = None
+
+    @field_validator("evidence_refs")
+    @classmethod
+    def validate_resolution_evidence_refs(cls, values: list[str]) -> list[str]:
+        normalized = [value.strip() for value in values]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Evidence references must be unique")
+        if any(not 3 <= len(value) <= 300 for value in normalized):
+            raise ValueError("Evidence references must contain 3 to 300 characters")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_replacement_shape(self):
+        if (self.status == "OVERTURNED") != (self.replacement_decision is not None):
+            raise ValueError("OVERTURNED requires exactly one replacement decision")
+        return self
+
+
+class NextTrainingStageReviewResolutionOut(StrictModel):
+    id: UUID
+    review_request_id: UUID
+    assignment_id: UUID
+    reviewer_user_id: UUID
+    status: Literal["UPHELD", "OVERTURNED", "RETURNED_FOR_REVIEW"]
+    resolution_reason: str
+    evidence_refs: list[str]
+    resolved_at: datetime
+    replacement_decision_id: UUID | None = None
+    idempotency_replay: bool = False
+
+
+class NextTrainingStageReviewResolutionResponse(StrictModel):
+    data: NextTrainingStageReviewResolutionOut
+    request_id: str
 
 
 class ResultOut(StrictModel):
@@ -1472,8 +1894,7 @@ class ResultOut(StrictModel):
     summary: str
     learning_completion: ResultLearningCompletionOut
     reviewer_conclusion: ResultReviewerConclusionOut
-    system_recommendation: ResultSystemRecommendationOut
-    operator_admission: ResultOperatorAdmissionOut
+    next_training_stage: ResultNextTrainingStageOut
     evaluation: ResultEvaluationOut
     journey_evaluations: list[JourneyResultEvaluationOut]
     handoff: HandoffOut
@@ -1484,6 +1905,33 @@ class ResultOut(StrictModel):
 
 class ResultResponse(StrictModel):
     data: ResultOut
+    request_id: str
+
+
+class IncentiveLedgerEntryOut(StrictModel):
+    id: UUID
+    module_key: str
+    incentive_type: Literal["POINTS", "XP", "BADGE", "RANK"]
+    amount: int | None
+    label: str | None
+    source_outcome_id: UUID
+    rule_ref: str
+    rule_sha256: str
+    correction_of_entry_id: UUID | None
+    correction_reason: str | None
+    created_at: datetime
+
+
+class IncentiveLedgerOut(StrictModel):
+    points_total: int
+    xp_total: int
+    entries: list[IncentiveLedgerEntryOut]
+    formal_effect: Literal["NONE"] = "NONE"
+    can_unlock_human_gate: Literal[False] = False
+
+
+class IncentiveLedgerResponse(StrictModel):
+    data: IncentiveLedgerOut
     request_id: str
 
 

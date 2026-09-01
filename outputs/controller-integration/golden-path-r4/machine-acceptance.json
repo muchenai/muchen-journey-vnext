@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "candidate_id": "controller-golden-path-home-to-first-material-20260823-r4",
+  "evaluated_on": "2026-08-23",
+  "fixture_classification": "SYNTHETIC_NO_REAL_PII",
+  "builder_machine_verdict": "MACHINE_PASS",
+  "checks": [
+    {
+      "id": "clean-source-reproducibility",
+      "result": "PASS",
+      "evidence": "A clean detached worktree at the integrated source passed 35/35 web tests, TypeScript, ESLint, and a webpack production build; the final follow-up change is whitespace-only."
+    },
+    {
+      "id": "whole-journey-home",
+      "result": "PASS",
+      "evidence": "The visitor home presents Muchen Journey as one People AI growth world, visibly includes all five ordered maps, and has one invitation CTA above the fold."
+    },
+    {
+      "id": "natural-golden-path",
+      "result": "PASS",
+      "evidence": "A fresh synthetic visitor followed / to /join to /app and opened the first required material without route injection or facilitator rescue."
+    },
+    {
+      "id": "single-primary-action",
+      "result": "PASS",
+      "evidence": "Every audited decision surface exposes one truthful primary action; the five-map orientation is informative and non-interactive."
+    },
+    {
+      "id": "three-viewport-visual-continuity",
+      "result": "PASS",
+      "evidence": "At 390x844, 768x1024, and 1280x900 the home and /app match viewport width, have no horizontal overflow, and keep the primary CTA visible in the first viewport."
+    },
+    {
+      "id": "input-before-output",
+      "result": "PASS",
+      "evidence": "The first required material is visible while the learner output remains explicitly locked until material completion."
+    },
+    {
+      "id": "strict-csp-runtime",
+      "result": "PASS",
+      "evidence": "The journey art is rendered with a CSS background rather than next/image inline styles; a fresh production-mode session recorded zero console errors and zero warnings."
+    },
+    {
+      "id": "token-and-data-boundary",
+      "result": "PASS",
+      "evidence": "The invitation fragment is removed, the token is absent from page body and resulting URL, and only local synthetic data was used."
+    }
+  ],
+  "browser_target": {
+    "web": "local Docker Compose on 127.0.0.1:34082",
+    "api": "local Docker Compose on 127.0.0.1:39082",
+    "database": "local Docker Compose synthetic volume",
+    "production_mode": true,
+    "real_business_data_used": false
+  },
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false
+}
+

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823-r3",
+  "supersedes_candidate_ids": [
+    "exploration-private-invite-orientation-v2-20260823",
+    "exploration-private-invite-orientation-v2-20260823-r2"
+  ],
+  "map": "exploration-camp",
+  "golden_path_id": "exploration-camp-first-meaningful-action",
+  "authoritative_contract_ref": "config/muchen_journey_product.json#/current_golden_path",
+  "remediation_contract_ref": "outputs/map-workstreams/exploration-camp/remediation-v2/contract.json",
+  "state": "FROZEN_AWAITING_INDEPENDENT_EVALUATION",
+  "source_commit": "6e4a4d0",
+  "evidence_commit": "6e4a4d0",
+  "builder_machine_verdict": "MACHINE_PASS",
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "fixture_classification": "SYNTHETIC_NO_REAL_PII",
+  "starts_at": "private-invitation-entry",
+  "ends_at": "first-required-learning-material-opened",
+  "routes": [
+    "/join",
+    "/app",
+    "/app/tasks/:assignmentId#first-learning-input"
+  ],
+  "creates_second_golden_path": false,
+  "frozen_on": "2026-08-23",
+  "r3_scope": "Manifest-only pin to immutable Git objects. Later dirty-worktree drafts are outside this candidate.",
+  "frozen_runtime_files": {
+    "apps/web/src/app/join/page.tsx": "275b9e39d43b0b5f9fc9f94b80548cd5526bb6ac025a9bdea94af1fa0775a101",
+    "apps/web/src/app/join/invite-token-exchange-form.tsx": "72f45338e8f86dac88d53dc48564ba3ac317f6f06b8c9381cdb8ed60b2259ae3",
+    "apps/web/src/app/join/private-invite-orientation.tsx": "8266f695ebf02ad3818a218567440de0e97d19d165ea6abd918d2888d3183c6c",
+    "apps/web/src/app/join/private-invite-orientation.module.css": "c22f9ec2e46d5d3e097e6d92b368f6752013b3a0ead085c12b8860e267a2bece",
+    "apps/web/scripts/exploration-camp-private-invite-orientation-contract.test.mjs": "09314b8fa7211d93dbcc79d762adeb7f2df80c7c0ea5af04191245c3709e3013"
+  },
+  "frozen_evidence_files": {
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/join-390.png": "5fe6fe8ed49db9fb957121cbd913eb858d6ea0ac4bf0b5dd8d5594c8d1de697c",
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/join-768.png": "0bb9177829d67687c54c0783bdd2033cdf8a707fae8d414c9b8e03b830e881a9",
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/join-1280.png": "19c8f49992c056e7a5388d3c32eb70aa597723771918221de14113152f721822",
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/app-390.png": "6a87d4de3048169e4baf0b12e540bf4355bfcbde80051cc6457dfca288db214f",
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/app-768.png": "a8348ab89798b923646dccb495fc736d1da5b639fb265f797b2e74ad1728b103",
+    "outputs/controller-integration/exploration-private-invite-orientation-v2/evidence/first-required-material-1280.png": "7e5e6100944fd71fa7101989b3f2340bbadc1f7a78067560a3129a60b6fe82cb"
+  },
+  "machine_acceptance_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2/machine-acceptance.json",
+  "browser_evidence_ref": "outputs/controller-integration/exploration-private-invite-orientation-v2/browser-evidence.md",
+  "human_acceptance_ref": "config/muchen_journey_product.json#/current_golden_path/human_acceptance",
+  "human_validation_record": "outputs/controller-integration/exploration-private-invite-orientation-v2/human-validation/results.json"
+}

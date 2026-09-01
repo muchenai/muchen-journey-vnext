@@ -4,17 +4,19 @@ WP07_SHA := $(shell git rev-parse --verify HEAD 2>/dev/null || printf no-head)
 WP07_API_IMAGE := $(WP07_IMAGE_PREFIX)-api:$(WP07_SHA)
 WP07_WEB_IMAGE := $(WP07_IMAGE_PREFIX)-web:$(WP07_SHA)
 WP07_WORKER_IMAGE := $(WP07_IMAGE_PREFIX)-worker:$(WP07_SHA)
-WP07_GHCR_PREFIX ?= ghcr.io/muchenai2024-creator/muchen-journey-vnext
+WP07_GHCR_PREFIX ?= ghcr.io/muchenai/muchen-journey-vnext
 WP07_API_GHCR_IMAGE := $(WP07_GHCR_PREFIX)-api:$(WP07_SHA)
 WP07_WEB_GHCR_IMAGE := $(WP07_GHCR_PREFIX)-web:$(WP07_SHA)
 WP07_WORKER_GHCR_IMAGE := $(WP07_GHCR_PREFIX)-worker:$(WP07_SHA)
 WP07_GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
 WP07_SYFT_IMAGE := anchore/syft@sha256:b4f1df79f97b817682d8b5ff941eb6bfe74f6172553a5e312c75bbc2eabc405c
-WP07_PYTHON_IMAGE := python:3.14.6-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6
+WP07_PYTHON_IMAGE := python:3.14.6-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
 WP08_LOCAL_DB_PORT ?= 35432
 WP08_LOCAL_API_PORT ?= 38000
+API_TEST_APK_PACKAGES := bash=5.3.9-r1 coreutils=9.11-r0 git=2.54.0-r0 grep=3.12-r0
+API_TEST_PYTEST_ARGS := -q -o cache_dir=/tmp/pytest-cache --ignore=tests/test_construction_legacy_zero_migration.py
 
-.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push candidate-image-archives http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke browser-p0-journey-v3 browser-p0-identity
+.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit human-experience-machine-gate wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push candidate-image-archives http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke browser-p0-journey-v3 browser-p0-identity
 
 bootstrap:
 	docker compose build api worker
@@ -37,7 +39,9 @@ api-test:
 	docker compose build api
 	docker compose exec -T db-test dropdb -U journey_next --if-exists --force journey_next_test
 	docker compose exec -T db-test createdb -U journey_next journey_next_test
-	docker compose run --rm --no-deps -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_next_test api sh -ec 'alembic upgrade head; python -m journey_api.seed; pytest -q'
+	# The Legacy reference archive is deliberately outside the Runtime candidate;
+	# its immutable artifact integrity remains an external evidence gate.
+	docker compose run --rm --no-deps --user root -v "$(CURDIR):/app:ro" -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_next_test api sh -ec 'apk add --no-cache $(API_TEST_APK_PACKAGES) >/dev/null; su journey -s /bin/sh -c "alembic upgrade head; python -m journey_api.seed; pytest $(API_TEST_PYTEST_ARGS)"'
 
 migration-check:
 	MJ_DB_PORT=$${MJ_DB_PORT:-$(WP08_LOCAL_DB_PORT)} python3 scripts/wp06_ops.py migration-check
@@ -79,7 +83,11 @@ secret-scan:
 
 dependency-audit:
 	python3 scripts/web_dependency_audit.py
-	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off -r /src/requirements.lock'
+	docker run --rm -v "$(CURDIR):/src:ro" -w /tmp $(WP07_PYTHON_IMAGE) sh -ec 'python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.10.1 >/dev/null && python -m pip_audit --progress-spinner=off --no-deps --disable-pip -r /src/requirements.lock'
+
+human-experience-machine-gate:
+	$(MAKE) api-test
+	$(MAKE) web-check
 
 wp12-hardening-check:
 	python3 scripts/wp12_candidate_hardening.py

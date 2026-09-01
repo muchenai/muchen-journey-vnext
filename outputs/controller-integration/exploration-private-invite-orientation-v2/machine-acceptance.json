@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823",
+  "evaluated_on": "2026-08-23",
+  "fixture_classification": "SYNTHETIC_NO_REAL_PII",
+  "builder_machine_verdict": "MACHINE_PASS",
+  "checks": [
+    {
+      "id": "private-invite-orientation",
+      "result": "PASS",
+      "evidence": "The natural private invitation begins at /join and exposes 5 maps, Exploration Camp as 01/05, and the immediate and following actions before the first form action."
+    },
+    {
+      "id": "single-primary-action",
+      "result": "PASS",
+      "evidence": "VERIFY_INVITE, CONFIRM_IDENTITY, invalid recovery, JOIN, and REENTRY states retain one truthful primary action; the orientation block has zero interactive descendants."
+    },
+    {
+      "id": "three-viewport-continuity",
+      "result": "PASS",
+      "evidence": "390x844, 768x1024, and 1280x900 have document width equal to viewport width; the /join and /app primary actions remain visible and unobstructed."
+    },
+    {
+      "id": "input-before-output",
+      "result": "PASS",
+      "evidence": "A Journey V3 generated only through existing local APIs exposes the first required TEXT material and keeps the learner output region locked until material completion."
+    },
+    {
+      "id": "interaction-and-recovery",
+      "result": "PASS",
+      "evidence": "Fragment removal, no token body/URL leakage, keyboard/touch paths, invalid error recovery, JOIN and REENTRY copy, reduced motion, refresh recovery, and zero console errors/warnings were verified."
+    },
+    {
+      "id": "quality-gates",
+      "result": "PASS",
+      "evidence": "Focused contract tests 4/4, web test suite 30/30, TypeScript, ESLint, and webpack production build passed before candidate freeze."
+    },
+    {
+      "id": "controller-boundary",
+      "result": "PASS",
+      "evidence": "Runtime changes are restricted to the five-file remediation write set; no home, shared API, schema, migration, or production configuration is changed by this candidate."
+    }
+  ],
+  "browser_target": {
+    "web": "local Docker Compose on 127.0.0.1:33082",
+    "api": "local Docker Compose on 127.0.0.1:38082",
+    "database": "local Docker Compose synthetic volume",
+    "production_mode": true,
+    "real_business_data_used": false
+  },
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false
+}

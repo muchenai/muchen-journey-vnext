@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Muchen Journey 新手村第一条黄金路径的隔离可运行原型；只使用合成 fixture，不写共享事实源。">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../shared/five-map-visual-tokens.css">
+  <link rel="stylesheet" href="./styles.css">
+  <title>新手村 · 第一次真实融入行动</title>
+</head>
+<body>
+  <div class="prototype-ribbon" role="status">
+    <span>隔离原型</span>
+    <strong>合成 fixture · 不连接真实身份、业务数据或共享事实源</strong>
+  </div>
+  <header class="site-header">
+    <a class="brand" href="#experience" aria-label="Muchen Journey 新手村原型起点">Muchen Journey</a>
+    <div class="map-identity"><span>MAP 02 / 05</span><strong>新手村</strong></div>
+  </header>
+
+  <main id="experience" class="experience-shell">
+    <nav class="journey-rail" aria-label="五地图成长顺序">
+      <ol>
+        <li class="previous"><span>01</span><div><strong>探索营</strong><small>候选等待真人</small></div></li>
+        <li class="current" aria-current="step"><span>02</span><div><strong>新手村</strong><small>隔离黄金路径草稿</small></div></li>
+        <li><span>03</span><div><strong>AI 学院</strong><small>未进入</small></div></li>
+        <li><span>04</span><div><strong>交付线工会</strong><small>未进入</small></div></li>
+        <li><span>05</span><div><strong>BOSS 副本</strong><small>未进入</small></div></li>
+      </ol>
+    </nav>
+
+    <section class="workbench" aria-label="新手村第一条黄金路径">
+      <div class="progress-wrap">
+        <div class="progress-copy"><span id="step-label">第 1 步，共 6 步</span><strong id="step-name">抵达新手村</strong></div>
+        <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+      </div>
+      <div id="live-region" class="sr-only" aria-live="polite"></div>
+
+      <section class="screen is-active" data-screen="arrival" aria-labelledby="screen-title">
+        <div class="arrival-grid">
+          <div class="arrival-copy">
+            <p class="eyebrow">FIRST REAL INTEGRATION ACTION</p>
+            <h1 id="screen-title">把“我知道了”，变成一次真实协作。</h1>
+            <p class="lede">先核对成长基线与岗位上下文，再完成一项工作场景里的小行动。点击不会替你完成协作，也不会把任何内容写入共享证据账本。</p>
+            <div class="gate-warning">
+              <strong>探索营真人状态：未验证</strong>
+              <span>本原型不假设探索营已经真人通过；合成基线只用于验证这条路径是否可理解。</span>
+            </div>
+            <button class="primary-action" type="button" data-next="context-review">读取我的融入起点 <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="village-scene" role="img" aria-label="暖绿色山谷中，一条道路从探索营方向通往有协作桌的新手村">
+            <span class="sun" aria-hidden="true"></span><span class="mountain mountain-left" aria-hidden="true"></span><span class="mountain mountain-right" aria-hidden="true"></span><span class="road" aria-hidden="true"></span><span class="house house-one" aria-hidden="true"></span><span class="house house-two" aria-hidden="true"></span><span class="meeting-table" aria-hidden="true"></span>
+            <div class="scene-caption"><span>本轮目标</span><strong>完成 1 次真实融入行动</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="context-review" aria-labelledby="context-title" hidden>
+        <div class="screen-heading">
+          <p class="eyebrow">READ-ONLY CONTEXT</p>
+          <h2 id="context-title">先看清起点，再决定做什么。</h2>
+          <p>下面只展示授权字段在新手村里的读法。所有内容均为合成演练样本，不代表任何真人或公司事实。</p>
+        </div>
+        <div class="source-grid">
+          <article class="source-card baseline-card">
+            <div class="source-meta"><span>来自探索营</span><strong>合成基线</strong></div>
+            <dl>
+              <div><dt>成长意图</dt><dd>理解角色期待，并把协作方式变成可复用习惯</dd></div>
+              <div><dt>学员自述偏好</dt><dd>重要事项先对齐完成标准，再开始行动</dd></div>
+              <div><dt>新手村证据</dt><dd>尚无</dd></div>
+            </dl>
+            <p class="source-status warning">READY_FOR_HUMAN · 真人未验证，不外推人才结论</p>
+          </article>
+          <article class="source-card context-card">
+            <div class="source-meta"><span>岗位 / 组织上下文</span><strong>字段结构演练</strong></div>
+            <dl>
+              <div><dt>组织单元</dt><dd>示例组织 · 非真实公司资料</dd></div>
+              <div><dt>岗位角色</dt><dd>示例岗位 · 等待授权源接入</dd></div>
+              <div><dt>可协作角色</dt><dd>角色负责人、协作伙伴、项目伙伴</dd></div>
+            </dl>
+            <p class="source-status">READ ONLY · 本原型不修改这些字段</p>
+          </article>
+        </div>
+        <aside class="boundary-note" aria-label="事实边界"><strong>你现在能确定什么？</strong><p>你需要先对齐期待，再用一次真实行动留下可复盘的观察。你不能从这些合成字段判断任何真人是否胜任。</p></aside>
+        <button class="primary-action" type="button" data-next="action-plan">选择第一项真实行动 <span aria-hidden="true">→</span></button>
+      </section>
+
+      <section class="screen" data-screen="action-plan" aria-labelledby="action-title" hidden>
+        <div class="screen-heading">
+          <p class="eyebrow">CHOOSE ONE ACTION</p>
+          <h2 id="action-title">今天，只完成一项真实融入行动。</h2>
+          <p>选择最贴近当前工作的一项，并约定发生时间。没有真实对象或场景时，不要勾选完成。</p>
+        </div>
+        <form id="action-form" novalidate>
+          <fieldset class="choice-list">
+            <legend>我准备完成</legend>
+            <label class="choice-card"><input type="radio" name="action" value="align-role-expectation" data-evidence-kind="角色准备度"><span><strong>对齐一项角色期待</strong><small>与角色负责人确认一项当前优先事项及完成标准。</small></span></label>
+            <label class="choice-card"><input type="radio" name="action" value="confirm-collaboration-rhythm" data-evidence-kind="协作习惯"><span><strong>确认一次协作节奏</strong><small>与一位协作伙伴确认更新渠道、节奏与需要提前同步的风险。</small></span></label>
+            <label class="choice-card"><input type="radio" name="action" value="restate-team-decision" data-evidence-kind="协作习惯"><span><strong>复述一条团队决策</strong><small>阅读一条近期团队决策记录，并向相关角色复述自己的下一步。</small></span></label>
+          </fieldset>
+          <label class="field-label" for="action-time">我会在什么时候完成？</label>
+          <select id="action-time" name="action-time"><option value="">请选择时间</option><option value="今天下班前">今天下班前</option><option value="下一次相关会议中">下一次相关会议中</option><option value="下一个工作日上午">下一个工作日上午</option></select>
+          <p id="action-error" class="form-error" role="alert" tabindex="-1" hidden>请选择一项行动和发生时间。</p>
+          <button class="primary-action" type="submit">生成行动卡 <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+
+      <section class="screen" data-screen="action-check" aria-labelledby="check-title" hidden>
+        <div class="screen-heading"><p class="eyebrow">DO IT IN THE REAL WORLD</p><h2 id="check-title">带着这张行动卡，去完成真实协作。</h2><p>这一步发生在工作场景中，不在原型里。回来前，按钮不会替你证明行动已经发生。</p></div>
+        <article class="action-ticket">
+          <span class="ticket-kicker">NEWCOMER ACTION 01</span><h3 id="ticket-action">—</h3>
+          <dl><div><dt>完成时间</dt><dd id="ticket-time">—</dd></div><div><dt>准备观察</dt><dd>对方明确了什么期待、约定或下一步？</dd></div><div><dt>隐私边界</dt><dd>回来只记录角色，不填写真人姓名或机密项目细节。</dd></div></dl>
+        </article>
+        <button class="secondary-action" type="button" data-back="action-plan">返回调整行动</button>
+        <button class="primary-action" type="button" data-next="evidence-capture">我已真实完成，留下证据 <span aria-hidden="true">→</span></button>
+      </section>
+
+      <section class="screen" data-screen="evidence-capture" aria-labelledby="evidence-title" hidden>
+        <div class="screen-heading"><p class="eyebrow">CAPTURE MINIMUM EVIDENCE</p><h2 id="evidence-title">把观察写成下一次还能复用的习惯。</h2><p>只写必要信息。这是当前浏览器里的临时草稿，不会提交共享 Evidence Ledger。</p></div>
+        <form id="evidence-form" class="evidence-form" novalidate>
+          <label class="field-label" for="counterpart-role">我与哪类角色完成了行动？</label>
+          <select id="counterpart-role" name="counterpart-role"><option value="">请选择角色，不填姓名</option><option value="角色负责人">角色负责人</option><option value="协作伙伴">协作伙伴</option><option value="项目伙伴">项目伙伴</option><option value="其他工作角色">其他工作角色</option></select>
+          <label class="field-label" for="observation">我确认到的期待或协作约定</label>
+          <textarea id="observation" name="observation" rows="4" minlength="12" maxlength="180" placeholder="例如：重要进展在固定渠道同步；若交付时间可能变化，需要提前说明影响。"></textarea>
+          <small class="field-hint">12–180 字，不写人名、客户名或机密项目细节。</small>
+          <label class="field-label" for="repeat-behavior">下一次我会重复的具体行为</label>
+          <textarea id="repeat-behavior" name="repeat-behavior" rows="4" minlength="12" maxlength="180" placeholder="例如：每次开始任务前，先用一句话复述完成标准，并确认风险同步时间。"></textarea>
+          <small class="field-hint">写可观察的行为，不写“我会努力”一类结论。</small>
+          <label class="privacy-check"><input id="privacy-attestation" type="checkbox" name="privacy-attestation"><span>我确认这次行动真实发生，且草稿不含真人姓名、客户信息或机密细节。</span></label>
+          <p id="evidence-error" class="form-error" role="alert" tabindex="-1" hidden>请补全角色、两段至少 12 字的观察，并确认隐私边界。</p>
+          <button class="primary-action" type="submit">生成证据草稿 <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+
+      <section class="screen" data-screen="receipt" aria-labelledby="receipt-title" hidden>
+        <div class="screen-heading receipt-heading"><div class="completion-mark" aria-hidden="true">✓</div><p class="eyebrow">LOCAL DRAFT READY</p><h2 id="receipt-title">第一次真实融入行动，已有可复盘的证据草稿。</h2><p>这里的“完成”只表示你自述已行动并补全草稿；它不是共享写入、人工认可或角色胜任结论。</p></div>
+        <article class="evidence-receipt" aria-label="本地证据草稿摘要">
+          <div class="receipt-meta"><span id="receipt-kind">—</span><strong>本地临时草稿 · 未提交</strong></div>
+          <dl><div><dt>真实行动</dt><dd id="receipt-action">—</dd></div><div><dt>协作角色</dt><dd id="receipt-role">—</dd></div><div><dt>观察到的期待 / 约定</dt><dd id="receipt-observation">—</dd></div><div><dt>下一次重复行为</dt><dd id="receipt-repeat">—</dd></div></dl>
+        </article>
+        <div class="handoff-note"><strong>若未来接入共享平台</strong><p>需由总控读取授权上下文、写入 Evidence Ledger，并保留来源、权限、人工复核与审计；本地图原型不执行这些动作。</p></div>
+        <button class="primary-action" type="button" id="restart-button">重新演练 <span aria-hidden="true">↺</span></button>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-footer"><p><strong>候选边界：</strong>ISOLATED_DRAFT_BUILD · 无真实邀请 · 无生产变更 · 无共享事实写入</p><p>机器证据不能替代真人对方向感、行动价值与继续意愿的判断。</p></footer>
+  <script src="./app.js" defer></script>
+</body>
+</html>

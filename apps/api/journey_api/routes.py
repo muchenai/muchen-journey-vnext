@@ -9,6 +9,13 @@ from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.domain import AssignmentActionState, assignment_action, resolve_current_action
 from journey_api.errors import ApiError
+from journey_api.formal_assignment_workflow import (
+    FormalAssignmentEvent,
+    FormalAssignmentTransitionError,
+    WorkflowActorKind,
+    public_assignment_status,
+    transition_formal_assignment,
+)
 from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import (
     completed_materials,
@@ -67,11 +74,12 @@ from journey_api.schemas import (
     FormalJourneyVersionOut,
     FormalJourneyVersionResponse,
     FormalAdmissionDecisionOut,
-    FormalAdmissionDecisionResponse,
     FormalAdmissionPreviewOut,
-    FormalAdmissionPreviewResponse,
     JourneyProgressNodeOut,
     JourneyProgressOut,
+    LearnerEnrollmentListOut,
+    LearnerEnrollmentListResponse,
+    LearnerEnrollmentOut,
     LearningMaterialCompletionOut,
     LearningMaterialCompletionResponse,
     LearningMaterialOut,
@@ -715,10 +723,6 @@ def assemble_formal_journey_v3(
     return envelope(request, formal_journey_out(session, version))
 
 
-@api.post(
-    "/ops/enrollments/{enrollment_id}/formal-admission/preview",
-    response_model=FormalAdmissionPreviewResponse,
-)
 def preview_formal_admission(
     enrollment_id: uuid.UUID,
     command: PreviewFormalAdmissionCommand,
@@ -755,10 +759,6 @@ def preview_formal_admission(
     )
 
 
-@api.post(
-    "/ops/enrollments/{enrollment_id}/formal-admission",
-    response_model=FormalAdmissionDecisionResponse,
-)
 def create_formal_admission_decision(
     enrollment_id: uuid.UUID,
     command: CreateFormalAdmissionDecisionCommand,
@@ -867,17 +867,19 @@ def create_formal_admission_decision(
 @api.get("/me/current-action", response_model=CurrentActionResponse)
 def current_action(
     request: Request,
+    enrollment_id: uuid.UUID | None = None,
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
-    enrollment = session.scalar(
-        select(Enrollment)
-        .where(
-            Enrollment.organization_id == actor.organization_id,
-            Enrollment.learner_id == actor.id,
-        )
-        .order_by(
+    enrollment_query = select(Enrollment).where(
+        Enrollment.organization_id == actor.organization_id,
+        Enrollment.learner_id == actor.id,
+    )
+    if enrollment_id is not None:
+        enrollment_query = enrollment_query.where(Enrollment.id == enrollment_id)
+    else:
+        enrollment_query = enrollment_query.order_by(
             case(
                 (Enrollment.status == EnrollmentStatus.ACTIVE, 0),
                 (Enrollment.status == EnrollmentStatus.PENDING_IDENTITY, 1),
@@ -886,7 +888,9 @@ def current_action(
             ),
             Enrollment.revision.desc(),
         )
-    )
+    enrollment = session.scalar(enrollment_query)
+    if enrollment_id is not None and enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "找不到当前账号可访问的模块加入记录。")
     assignment_rows: list[
         tuple[Assignment, TaskVersion, JourneyStageVersion | None]
     ] = []
@@ -992,7 +996,7 @@ def current_action(
             version=journey_version.version,
             title=journey_version.title,
             completed_stages=completed_stages,
-            total_stages=8,
+            total_stages=sum(stage is not None for _, _, stage in assignment_rows),
             current_stage_key=current_stage_key,
             nodes=[
                 JourneyProgressNodeOut(
@@ -1046,6 +1050,67 @@ def current_action(
     return envelope(request, data)
 
 
+@api.get("/me/enrollments", response_model=LearnerEnrollmentListResponse)
+def learner_enrollments(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.LEARNER)
+    rows = session.execute(
+        select(Enrollment, JourneyVersion, JourneyDefinition, User)
+        .outerjoin(
+            JourneyVersion,
+            (JourneyVersion.id == Enrollment.journey_version_id)
+            & (JourneyVersion.organization_id == Enrollment.organization_id),
+        )
+        .outerjoin(
+            JourneyDefinition,
+            (JourneyDefinition.id == JourneyVersion.journey_definition_id)
+            & (JourneyDefinition.organization_id == Enrollment.organization_id),
+        )
+        .join(
+            User,
+            (User.id == Enrollment.reviewer_id)
+            & (User.organization_id == Enrollment.organization_id),
+        )
+        .where(
+            Enrollment.organization_id == actor.organization_id,
+            Enrollment.learner_id == actor.id,
+        )
+        .order_by(
+            case(
+                (Enrollment.status == EnrollmentStatus.ACTIVE, 0),
+                (Enrollment.status == EnrollmentStatus.PENDING_IDENTITY, 1),
+                (Enrollment.status == EnrollmentStatus.COMPLETED, 2),
+                else_=3,
+            ),
+            JourneyDefinition.stable_key,
+            Enrollment.id,
+        )
+    ).all()
+    return envelope(
+        request,
+        LearnerEnrollmentListOut(
+            items=[
+                LearnerEnrollmentOut(
+                    id=enrollment.id,
+                    status=enrollment.status.value,
+                    revision=enrollment.revision,
+                    journey_version_id=enrollment.journey_version_id,
+                    journey_stable_key=(
+                        definition.stable_key if definition is not None else None
+                    ),
+                    journey_title=version.title if version is not None else None,
+                    journey_version=version.version if version is not None else None,
+                    reviewer_display_name=reviewer.display_name,
+                )
+                for enrollment, version, definition, reviewer in rows
+            ]
+        ),
+    )
+
+
 @api.get("/me/assignments/{assignment_id}", response_model=AssignmentResponse)
 def assignment_detail(
     assignment_id: uuid.UUID,
@@ -1055,8 +1120,13 @@ def assignment_detail(
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
     row = session.execute(
-        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion)
+        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion, User)
         .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
+        .join(
+            User,
+            (User.id == Enrollment.reviewer_id)
+            & (User.organization_id == Enrollment.organization_id),
+        )
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .outerjoin(
@@ -1076,7 +1146,7 @@ def assignment_detail(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
-    assignment, task, definition, journey_stage = row
+    assignment, task, definition, journey_stage, reviewer = row
     commands = () if assignment.status == AssignmentStatus.CANCELLED else assignment_action(assignment.status)[4]
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
@@ -1084,8 +1154,17 @@ def assignment_detail(
     material_completions = completed_materials(session, assignment)
     data = AssignmentOut(
         id=assignment.id,
-        status=assignment.status.value,
+        status=public_assignment_status(
+            assignment.status,
+            formal=(
+                journey_stage is None
+                or journey_stage.completion_policy
+                is JourneyCompletionPolicy.REVIEW_REQUIRED
+            ),
+        ),
         revision=assignment.revision,
+        assigned_at=assignment.assigned_at,
+        reviewer_display_name=reviewer.display_name,
         allowed_commands=list(commands),
         stable_task_key=definition.stable_key,
         task_version=task.version,
@@ -1116,6 +1195,9 @@ def assignment_detail(
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
         feedback_sla_business_days=task.feedback_sla_business_days,
+        reviewer_role=task.reviewer_role,
+        sensitivity=task.sensitivity,
+        audience=task.audience,
         rubric=task.rubric,
         submission=submission,
         draft=draft,
@@ -1287,10 +1369,24 @@ def start_assignment(
     if replay is not None:
         return envelope(request, CommandOut(**replay))
     ensure_revision(assignment.revision, command.expected_revision)
-    if assignment.status != AssignmentStatus.AVAILABLE:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能执行开始操作。")
+    enrollment = session.get(Enrollment, assignment.enrollment_id)
+    if enrollment is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
+    try:
+        target_status = transition_formal_assignment(
+            current=assignment.status,
+            event=FormalAssignmentEvent.START,
+            actor_kind=WorkflowActorKind.LEARNER,
+            actor_id=actor.id,
+            learner_id=enrollment.learner_id,
+            assigned_reviewer_id=enrollment.reviewer_id,
+        )
+    except FormalAssignmentTransitionError as exc:
+        raise ApiError(
+            409, "INVALID_STATE_TRANSITION", "当前任务不能执行开始操作。"
+        ) from exc
     ensure_required_materials_completed(session, assignment)
-    assignment.status = AssignmentStatus.IN_PROGRESS
+    assignment.status = target_status
     assignment.revision += 1
     result = {"resource_id": str(assignment.id), "status": assignment.status.value, "revision": assignment.revision}
     store_result(

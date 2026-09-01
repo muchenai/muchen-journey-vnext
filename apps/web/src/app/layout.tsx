@@ -19,6 +19,8 @@ export default async function RootLayout({
   // framework scripts. Keep the whole application request-rendered so Next.js
   // can apply the nonce supplied by proxy.ts.
   await connection();
+  const isProductionCanary =
+    process.env.RELEASE_MARKER === "PRODUCTION_CANARY_UAT";
 
   return (
     <html lang="zh-CN">
@@ -31,6 +33,11 @@ export default async function RootLayout({
             Muchen Journey
           </Link>
         </header>
+        {isProductionCanary ? (
+          <div className="canary-banner" role="status">
+            生产受控内测 · 仅限获授权参与者 · 不代表正式发布
+          </div>
+        ) : null}
         <main id="main-content" className="page-shell">
           {children}
         </main>

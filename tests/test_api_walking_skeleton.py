@@ -1,6 +1,8 @@
+import uuid
+
 from fastapi.testclient import TestClient
 
-from journey_api.fixtures import ASSIGNMENT_ID
+from journey_api.fixtures import ASSIGNMENT_ID, ENROLLMENT_ID
 from journey_api.main import app
 
 client = TestClient(app, base_url="http://localhost")
@@ -152,6 +154,30 @@ def test_standard_walking_skeleton_and_idempotency():
     result = assert_ok(client.get("/api/v1/me/result", headers=learner_headers))
     assert result["status"] == "HANDOFF_READY"
     assert result["decision"] == "PASS"
+
+    scoped_result = assert_ok(
+        client.get(
+            f"/api/v1/me/result?enrollment_id={ENROLLMENT_ID}",
+            headers=learner_headers,
+        )
+    )
+    assert scoped_result["outcome_id"] == result["outcome_id"]
+    scoped_timeline = assert_ok(
+        client.get(
+            f"/api/v1/me/timeline?limit=100&enrollment_id={ENROLLMENT_ID}",
+            headers=learner_headers,
+        )
+    )
+    assert any(item["event_type"] == "OUTCOME_CREATED" for item in scoped_timeline["items"])
+    unknown_enrollment_id = uuid.uuid4()
+    assert client.get(
+        f"/api/v1/me/result?enrollment_id={unknown_enrollment_id}",
+        headers=learner_headers,
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/me/timeline?enrollment_id={unknown_enrollment_id}",
+        headers=learner_headers,
+    ).status_code == 404
 
     completed = assert_ok(client.get("/api/v1/me/current-action", headers=learner_headers))
     assert completed["action_type"] == "VIEW_RESULT_OR_HANDOFF"

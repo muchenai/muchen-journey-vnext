@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0",
+  "phase": "V3-02",
+  "requirement_batch": "HX-IMPL-001",
+  "evidence_scope": "PHASE_MACHINE_EVIDENCE_NOT_CANDIDATE_GATE",
+  "tested_worktree_base_sha": "a306444c18872e6589e32c96f840f5e146fbd031",
+  "candidate_sha": null,
+  "result": "PASS_FOR_BATCH_COMMIT",
+  "implemented": [
+    "shared human-experience shell primitives",
+    "five fixed fact labels",
+    "server-authoritative session and current-action projection",
+    "one primary next action",
+    "locked and empty surfaces",
+    "fail-closed unavailable-state recovery"
+  ],
+  "machine_checks": [
+    {
+      "command": "npm test",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "51 passed"
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "docker compose run --rm --no-deps --user root -v $PWD:/app:ro api pytest tests/test_human_experience_traceability.py -q",
+      "exit_code": 0,
+      "result": "4 passed"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "browser_checks": {
+    "engine": "Firefox",
+    "local_url": "http://127.0.0.1:3137/",
+    "horizontal_overflow": {
+      "390": false,
+      "768": false,
+      "1280": false
+    },
+    "first_keyboard_focus": {
+      "tag": "A",
+      "text": "跳到主要内容",
+      "href": "#main-content"
+    },
+    "invalid_session_fail_closed": {
+      "heading": "状态暂时无法确认",
+      "primary_actions": [
+        {
+          "text": "重试状态读取",
+          "href": "/"
+        }
+      ],
+      "state_inference": false
+    },
+    "console_errors": 0,
+    "console_warnings": 0
+  },
+  "artifacts": [
+    {
+      "path": "output/playwright/hx-v3-02-home-390.png",
+      "sha256": "ca6db463278e12b5a9d4d31a6a43936713197c7e3525c81af415af97f03a1538"
+    },
+    {
+      "path": "output/playwright/hx-v3-02-home-768.png",
+      "sha256": "b1bb9fbe57396cad6ca5a035501052fa47498ce7a9b1ed4cfe664fad9e703a94"
+    },
+    {
+      "path": "output/playwright/hx-v3-02-home-1280.png",
+      "sha256": "50800300a4c2f0fec6fa10810abee4be0bd8cafc90fcc22ad21ad2f3ed0709ed"
+    },
+    {
+      "path": "output/playwright/hx-v3-02-fail-closed-1280.png",
+      "sha256": "881c42f1d5a92d93d491892fde3027d8c9820f136ae14ccb20485601acac57b5"
+    }
+  ],
+  "diagnostic_failures": [
+    {
+      "stage": "red_contract_test",
+      "result": "EXPECTED_FAIL",
+      "cause": "shared human-experience component did not exist before implementation",
+      "resolution": "implemented the shared component and reran the suite"
+    },
+    {
+      "stage": "post_refactor_regression",
+      "result": "RESOLVED",
+      "cause": "one source-contract assertion still matched the superseded no-journey branch shape",
+      "resolution": "updated the assertion to the equivalent one-action branch and reran 51/51 tests"
+    }
+  ],
+  "human_evidence": {
+    "human_uat": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release_authorization": "NOT_RUN"
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

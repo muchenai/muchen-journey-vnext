@@ -29,6 +29,7 @@ from journey_api.models import (
     JourneyStageKind,
     JourneyStageVersion,
     JourneyVersion,
+    ModuleContentPackageBinding,
     Review,
     Outcome,
     TaskDefinition,
@@ -111,6 +112,45 @@ def validate_published_structure(stages: list[JourneyStageVersion]) -> None:
         )
         if stage.completion_policy != expected_policy:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "正式探索营阶段完成策略无效。")
+
+
+def invitable_journey_stages(
+    session: Session,
+    *,
+    journey_version_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
+) -> list[JourneyStageVersion]:
+    """Validate either the frozen exploration structure or one signed module package."""
+
+    stages = journey_stages(session, journey_version_id, organization_id)
+    binding = session.scalar(
+        select(ModuleContentPackageBinding).where(
+            ModuleContentPackageBinding.journey_version_id == journey_version_id,
+            ModuleContentPackageBinding.organization_id == organization_id,
+        )
+    )
+    if binding is None:
+        validate_published_structure(stages)
+        return stages
+    db_now = session.scalar(select(func.clock_timestamp()))
+    if (
+        len(stages) != 1
+        or stages[0].position != 0
+        or stages[0].stage_kind != JourneyStageKind.ASSESSMENT
+        or stages[0].completion_policy != JourneyCompletionPolicy.REVIEW_REQUIRED
+        or stages[0].task_version_id != binding.task_version_id
+        or reviewer_id != binding.primary_reviewer_user_id
+        or db_now is None
+        or db_now < binding.effective_at
+        or (binding.expires_at is not None and db_now >= binding.expires_at)
+    ):
+        raise ApiError(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "模块内容包、有效期、阶段或具名 Reviewer 谱系无效。",
+        )
+    return stages
 
 
 def publish_catalog_journey(
@@ -371,17 +411,19 @@ def publish_composed_v3_journey(
     return version
 
 
-def create_formal_assignments(
+def create_journey_assignments(
     session: Session,
     *,
     enrollment: Enrollment,
 ) -> list[Assignment]:
     if enrollment.journey_version_id is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "Enrollment 未绑定正式旅程版本。")
-    stages = journey_stages(
-        session, enrollment.journey_version_id, enrollment.organization_id
+    stages = invitable_journey_stages(
+        session,
+        journey_version_id=enrollment.journey_version_id,
+        organization_id=enrollment.organization_id,
+        reviewer_id=enrollment.reviewer_id,
     )
-    validate_published_structure(stages)
     assignments = [
         Assignment(
             id=uuid.uuid4(),

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "muchen-journey-production-canary-uat-authorization.v1",
+  "title": "Muchen Journey Production Canary UAT Authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_id",
+    "authorization_id",
+    "candidate_sha",
+    "candidate_manifest_sha256",
+    "deployment_manifest_sha256",
+    "configuration_sha256",
+    "content_package_sha256",
+    "migration_head",
+    "image_digests",
+    "release_marker",
+    "participant_refs",
+    "allowlist_sha256",
+    "module_coverage",
+    "guards",
+    "authorized_by",
+    "authorized_at",
+    "expires_at",
+    "canary_deployment_authorized",
+    "release_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "production-canary-uat-authorization.v1"},
+    "release_id": {"const": "muchen-journey-2026-09-01-controlled-cohort"},
+    "authorization_id": {"type": "string", "minLength": 8, "maxLength": 128},
+    "candidate_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "candidate_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "deployment_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "configuration_sha256": {"$ref": "#/$defs/sha256"},
+    "content_package_sha256": {"$ref": "#/$defs/sha256"},
+    "migration_head": {"type": "string", "minLength": 1, "maxLength": 128},
+    "image_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "api", "worker"],
+      "properties": {
+        "web": {"$ref": "#/$defs/image_digest"},
+        "api": {"$ref": "#/$defs/image_digest"},
+        "worker": {"$ref": "#/$defs/image_digest"}
+      }
+    },
+    "release_marker": {"const": "PRODUCTION_CANARY_UAT"},
+    "participant_refs": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "allowlist_sha256": {"$ref": "#/$defs/sha256"},
+    "module_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exploration-camp", "newcomer-village", "ai-academy", "delivery-guild"],
+      "properties": {
+        "exploration-camp": {"type": "integer", "minimum": 2},
+        "newcomer-village": {"type": "integer", "minimum": 2},
+        "ai-academy": {"type": "integer", "minimum": 2},
+        "delivery-guild": {"type": "integer", "minimum": 2}
+      }
+    },
+    "guards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_clean_and_frozen",
+        "owner_content_bound",
+        "machine_and_negative_tests_pass",
+        "current_image_scan_pass",
+        "backup_restore_rollback_pass",
+        "alerts_reach_named_human",
+        "server_side_allowlist_enforced",
+        "fixture_identity_disabled",
+        "freeze_invites_ready",
+        "external_production_writes_disabled",
+        "legacy_migration_disabled",
+        "high_impact_automation_disabled"
+      ],
+      "properties": {
+        "candidate_clean_and_frozen": {"const": true},
+        "owner_content_bound": {"const": true},
+        "machine_and_negative_tests_pass": {"const": true},
+        "current_image_scan_pass": {"const": true},
+        "backup_restore_rollback_pass": {"const": true},
+        "alerts_reach_named_human": {"const": true},
+        "server_side_allowlist_enforced": {"const": true},
+        "fixture_identity_disabled": {"const": true},
+        "freeze_invites_ready": {"const": true},
+        "external_production_writes_disabled": {"const": true},
+        "legacy_migration_disabled": {"const": true},
+        "high_impact_automation_disabled": {"const": true}
+      }
+    },
+    "authorized_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "roles", "decision"],
+      "properties": {
+        "name": {"const": "刘默文"},
+        "roles": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"enum": ["PRODUCT_OWNER", "SECURITY_PRIVACY_OWNER", "RELEASE_OPS_OWNER", "BUSINESS_DECIDER"]}
+        },
+        "decision": {"const": "CANARY_DEPLOYMENT_GO"}
+      }
+    },
+    "authorized_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "canary_deployment_authorized": {"const": true},
+    "release_authorized": {"const": false}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "image_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+  }
+}

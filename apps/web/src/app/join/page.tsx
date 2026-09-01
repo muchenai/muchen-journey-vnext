@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { confirmIdentity } from "@/app/actions";
 
 import { InviteTokenExchangeForm } from "./invite-token-exchange-form";
+import { JoinSubmitButton } from "./join-submit-button";
+import { PrivateInviteOrientation, type OrientationPhase } from "./private-invite-orientation";
 
 export const dynamic = "force-dynamic";
 
@@ -40,23 +42,25 @@ export default async function JoinPage({
   const summary = parseSummary(cookieStore.get("journey_next_join_summary")?.value);
   const errorMessage = query.code ? ERROR_MESSAGES[query.code] ?? "邀请处理失败，请联系运营。" : null;
   const isReentry = summary?.flow === "REENTRY";
+  const orientationDescriptionId = "join-whole-journey-next-action";
+  const orientationPhase: OrientationPhase = summary
+    ? isReentry
+      ? "REENTRY"
+      : "CONFIRM_IDENTITY"
+    : "VERIFY_INVITE";
 
   return (
     <section className="learner-join">
-      <div className="join-scene" aria-hidden="true">
-        <div className="join-scene-copy">
-          <span>DAY 0 · 启程</span>
-          <strong>第一站已经为你亮起</strong>
-          <small>一天 · 八站 · 一段由你完成的旅程</small>
-        </div>
-        <ol>
-          {Array.from({ length: 8 }, (_, index) => <li key={index} />)}
-        </ol>
+      <div className="join-intro">
+        <p className="journey-whisper">{isReentry ? "Welcome back." : "Private invitation · Map 01"}</p>
+        <h1>{isReentry ? "回到你离开的地方。" : "你的探索营，已经在等你。"}</h1>
+        <PrivateInviteOrientation phase={orientationPhase} descriptionId={orientationDescriptionId} />
       </div>
-      <div className="join-entry">
-        <p className="journey-whisper">{isReentry ? "Welcome back." : "Your journey starts here."}</p>
-        <h1>{isReentry ? "回到你离开的地方。" : "这张通行证，只属于你。"}</h1>
-        <p className="join-promise">从 Day 0 出发，找到四枚宝藏，完成三次真实判断。</p>
+      <div className="join-action-card">
+        <div className="join-action-heading">
+          <span>现在只做一件事</span>
+          <strong>{summary ? "确认身份，进入第一站" : "验证你的专属邀请"}</strong>
+        </div>
         {errorMessage ? (
           <div className="notice" role="alert">
             <strong>{errorMessage}</strong>
@@ -65,31 +69,32 @@ export default async function JoinPage({
         ) : null}
         {summary ? (
           <article className="join-pass">
-            <span className="join-pass-label">Muchen Journey · 邀请</span>
+            <span className="join-pass-label">邀请用途</span>
             <h2>{summary.purpose}</h2>
             <time dateTime={summary.expires_at}>
-              {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
+              有效至 {new Date(summary.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
             </time>
-            <form action={confirmIdentity}>
+            <form action={confirmIdentity} aria-describedby={orientationDescriptionId}>
               {!isReentry ? (
                 <>
-                  <label htmlFor="display-name">旅途中怎么称呼你</label>
+                  <label htmlFor="display-name">旅程中怎么称呼你？</label>
                   <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
                 </>
               ) : (
-                <p className="status-meta">从上次离开的地方继续。</p>
+                <p className="status-meta">从上次离开的地方继续，回到旅程；原有进度会被安全恢复，不会创建重复记录。</p>
               )}
               <label className="consent-row">
                 <input type="checkbox" name="accepted_purpose" value="yes" required />
                 我确认这是我的邀请
               </label>
-              <button className="button primary" type="submit">
-                {isReentry ? "回到旅程" : "走进第一站"}
-              </button>
+              <JoinSubmitButton
+                idleLabel={isReentry ? "继续当前一站" : "进入探索营"}
+                pendingLabel={isReentry ? "正在恢复…" : "正在开启…"}
+              />
             </form>
           </article>
         ) : (
-          <InviteTokenExchangeForm />
+          <InviteTokenExchangeForm orientationDescriptionId={orientationDescriptionId} />
         )}
       </div>
     </section>

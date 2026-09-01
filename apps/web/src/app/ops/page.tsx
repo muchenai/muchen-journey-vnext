@@ -20,12 +20,12 @@ import {
   OpsNotificationDelivery,
   OpsNotificationEndpoint,
   OpsTaskDefinition,
+  ReviewerWorkload,
   RuntimeStatus,
 } from "@/lib/server/api";
 import { IdentityAccessPanel } from "@/app/ops/identity-access-panel";
 import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
-import { FormalAdmissionPanel } from "@/app/ops/formal-admission-panel";
 import { ContentDraftPublicationPanel } from "@/app/ops/content-draft-publication-panel";
 import { JourneyV3AssemblyPanel } from "@/app/ops/journey-v3-assembly-panel";
 
@@ -57,6 +57,7 @@ export default async function OpsPage({
     notificationDeliveries,
     formalJourneys,
     contentDrafts,
+    reviewerWorkload,
   ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
@@ -85,7 +86,18 @@ export default async function OpsPage({
       "/api/v1/ops/content-drafts",
       "OPERATOR",
     ),
+    identityPageRequest<{ items: ReviewerWorkload[] }>(
+      "/api/v1/ops/reviewer-workload",
+      "OPERATOR",
+    ),
   ]);
+  const overdueReviewCount = reviewerWorkload.items.reduce(
+    (total, item) => total + item.overdue_review_count,
+    0,
+  );
+  const highestExceptionHref = notificationDeliveries.items.length > 0
+    ? "#notification-operations"
+    : "#reviewer-operations";
   const environmentNotice = {
     production: "当前为 production；仅已发布的固定旅程和受控邀请对真实用户生效，staging 继续用于后续验证。",
     staging: "当前为 Alpha staging；用于真人验证与后续修复，不代表 production 当前运行状态。",
@@ -105,7 +117,37 @@ export default async function OpsPage({
       </p>
       {query.updated ? <p className="success-text" role="status">受控命令已写入并记录审计。</p> : null}
 
-      <a className="button primary ops-primary-action" href="#learner-invites">邀请新人</a>
+      <a className="button primary ops-primary-action" href={highestExceptionHref}>
+        处理最高优先级异常
+      </a>
+      <a className="button secondary" href="#learner-invites">邀请新人</a>
+
+      <section className="panel ops-section" id="reviewer-operations" aria-labelledby="reviewer-operations-heading">
+        <p className="section-label">REVIEWER / SLA / CAPACITY / BACKUP</p>
+        <h2 id="reviewer-operations-heading">Reviewer 运行事实</h2>
+        <p>
+          当前接口仅覆盖已绑定内容包，不能代表四模块完整分母；缺少模块显示为“不可计算”，不会显示误导性 0。
+          已知逾期 Review 共 {overdueReviewCount} 条，DEAD 通知共 {notificationDeliveries.items.length} 条。
+        </p>
+        {reviewerWorkload.items.length === 0 ? (
+          <p className="notice">查询已成功，但尚无已绑定 Reviewer workload；容量、主备和 SLA 均不可计算。</p>
+        ) : (
+          <ul className="ops-list reviewer-workload-list">
+            {reviewerWorkload.items.map((item) => (
+              <li key={item.binding_id}>
+                <div>
+                  <strong>{item.module_key} · {item.package_id} {item.package_version}</strong>
+                  <span>主 Reviewer：{item.primary_reviewer_display_name} · 备 Reviewer：{item.backup_reviewer_display_name}</span>
+                </div>
+                <span>活跃 Enrollment {item.active_enrollment_count} · 待审 {item.open_review_count} · 已批准完成 SLA 内逾期 {item.overdue_review_count}</span>
+                <span>首次响应 {item.first_response_sla_minutes} 分钟 · 完成 {item.completion_sla_minutes} 分钟 · 替补范围 {item.replacement_scope}</span>
+                <span className="inline-error">容量 {item.capacity_status}：{item.capacity_limit === null ? "不可计算" : item.capacity_limit}；PENDING_OWNER_CONTENT 表示 Owner 尚未批准容量值</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="status-meta">未覆盖模块：探索营、新手村及任何无 ModuleContentPackageBinding 的范围均不可计算；需 Owner 完成绑定，不自动补值。</p>
+      </section>
 
       <section className="panel ops-section" id="learner-invites" aria-labelledby="invite-heading">
         <p className="section-label">LEARNER INVITE / FIRST REAL LOOP</p>
@@ -217,14 +259,8 @@ export default async function OpsPage({
                   已有 {enrollment.open_review_status} Review；仅尚未开始的 ASSIGNED 评审允许受控移交，其他状态继续阻断。
                 </p>
               ) : null}
-              {enrollment.admission_decision ? (
-                <div className="admission-preview">
-                  <strong>{enrollment.admission_total_score} / 100 · {enrollment.admission_tier} 档</strong>
-                  <span>人工结论：{enrollment.admission_decision} · 已不可变记录</span>
-                </div>
-              ) : null}
-              {enrollment.allowed_commands.includes("create_formal_admission") ? (
-                <FormalAdmissionPanel enrollmentId={enrollment.id} />
+              {enrollment.status === "COMPLETED" ? (
+                <p>下一训练阶段决定尚未启用；当前运营页不提供该高影响决定入口。</p>
               ) : null}
               {enrollment.allowed_commands.includes("create_learner_reentry") ? (
                 <LearnerReentryPanel
@@ -286,7 +322,7 @@ export default async function OpsPage({
         </ul>
       </section>
 
-      <section className="panel ops-section" aria-labelledby="notification-heading">
+      <section className="panel ops-section" id="notification-operations" aria-labelledby="notification-heading">
         <p className="section-label">RECIPIENT / DELIVERY / REDRIVE</p>
         <h2 id="notification-heading">飞书通知受控处置</h2>
         <p>

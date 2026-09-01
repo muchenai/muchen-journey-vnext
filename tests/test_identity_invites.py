@@ -1,3 +1,4 @@
+import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -16,6 +17,7 @@ from journey_api.models import (
     EnrollmentStatus,
     ExternalIdentity,
     IdentitySession,
+    IdempotencyRecord,
     Invite,
     InviteStatus,
     JoinContext,
@@ -132,6 +134,42 @@ def test_invite_create_is_idempotent_and_never_persists_plaintext_token():
         assert invite is not None
         assert invite.token_hash != created["invite_token"]
         assert session.scalar(select(func.count(Invite.id)).where(Invite.id == invite.id)) == 1
+
+
+def test_plaintext_invite_token_is_absent_from_audit_outbox_and_replay_storage():
+    key = f"invite-token-redaction-{uuid.uuid4()}"
+    created, _payload = create_invite(key=key)
+    token = str(created["invite_token"])
+    invite_id = uuid.UUID(str(created["id"]))
+    with SessionLocal() as session:
+        audit_details = list(
+            session.scalars(
+                select(AuditEntry.details).where(AuditEntry.resource_id == invite_id)
+            )
+        )
+        outbox_payloads = list(
+            session.scalars(
+                select(OutboxEvent.payload).where(OutboxEvent.aggregate_id == invite_id)
+            )
+        )
+        replay = session.scalar(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.command == "invite.create",
+                IdempotencyRecord.key == key,
+            )
+        )
+        assert replay is not None
+        persisted = json.dumps(
+            {
+                "audit": audit_details,
+                "outbox": outbox_payloads,
+                "replay": replay.response_body,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        assert token not in persisted
+        assert "invite_token" not in persisted
 
 
 def test_concurrent_invite_create_replays_one_atomic_result():

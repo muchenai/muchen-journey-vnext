@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Muchen Journey BOSS副本隔离合成模拟：完成第一个可核对决策。">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <title>BOSS副本 · 第一个可核对决策</title>
+</head>
+<body>
+  <div class="simulation-ribbon" role="status">
+    <span>合成模拟</span>
+    <strong>不连接真实公司、客户、人员或评估数据</strong>
+  </div>
+
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="product-name">Muchen Journey</p>
+        <p class="map-name">MAP 05 / BOSS副本</p>
+      </div>
+      <p class="draft-badge">隔离候选 · 未集成</p>
+    </header>
+
+    <section class="mission-header" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">大型项目安全演练 · 01</p>
+        <h1 id="page-title">在风暴抵达前，<br>做出第一个决定。</h1>
+      </div>
+      <p class="mission-copy">你将先读取前四图留下的合成能力证据，再进入“港湾计划恢复演练”。这里练习判断，不评价真人。</p>
+    </section>
+
+    <nav class="progress-rail" aria-label="演练进度">
+      <ol>
+        <li data-progress="briefing" aria-current="step"><span>01</span><strong>读取依据</strong></li>
+        <li data-progress="safety"><span>02</span><strong>确认边界</strong></li>
+        <li data-progress="team"><span>03</span><strong>确认协作</strong></li>
+        <li data-progress="decision"><span>04</span><strong>做出决策</strong></li>
+        <li data-progress="receipt"><span>05</span><strong>核对回执</strong></li>
+      </ol>
+    </nav>
+
+    <div id="app-status" class="sr-only" aria-live="polite"></div>
+
+    <section class="stage" data-stage="briefing" aria-labelledby="briefing-title">
+      <div class="stage-heading">
+        <div>
+          <p class="stage-number">01 · START / 能力简报</p>
+          <h2 id="briefing-title" tabindex="-1">先看见你带进副本的依据</h2>
+          <p>以下内容全部为本原型内置的合成示例，不代表任何真人或公司判断。</p>
+        </div>
+        <span class="truth-tag">合成事实</span>
+      </div>
+
+      <div class="brief-grid">
+        <article class="evidence-board" aria-labelledby="evidence-title">
+          <div class="section-label">
+            <h3 id="evidence-title">前四图能力证据</h3>
+            <span>只读 · 合成</span>
+          </div>
+          <ul class="evidence-list">
+            <li><span class="map-index">01</span><div><strong>探索营</strong><p>能把模糊问题改写为一个可验证问题。</p></div><small>E-SYN-01</small></li>
+            <li><span class="map-index">02</span><div><strong>新手村</strong><p>能在异步协作前复述目标与责任边界。</p></div><small>E-SYN-02</small></li>
+            <li><span class="map-index">03</span><div><strong>AI学院</strong><p>能标记模型建议的不确定性并请求人工复核。</p></div><small>E-SYN-03</small></li>
+            <li><span class="map-index">04</span><div><strong>交付线工会</strong><p>能在范围变化时保留决策依据和复盘线索。</p></div><small>E-SYN-04</small></li>
+          </ul>
+        </article>
+
+        <aside class="target-board" aria-labelledby="target-title">
+          <div class="section-label">
+            <h3 id="target-title">本次目标能力</h3>
+            <span>演练要求</span>
+          </div>
+          <ol>
+            <li><span>判断</span><p>在不完整信息下选择可逆方案。</p></li>
+            <li><span>协作</span><p>让角色、升级路径与决定责任可见。</p></li>
+            <li><span>可核对</span><p>让选择能追溯到证据与约束。</p></li>
+          </ol>
+        </aside>
+      </div>
+
+      <div class="action-row">
+        <p><strong>下一步：</strong>确认这是一场安全演练，再查看项目现场。</p>
+        <button class="primary-action" type="button" data-next="safety">依据已读，进入安全演练 <span aria-hidden="true">→</span></button>
+      </div>
+    </section>
+
+    <section class="stage" data-stage="safety" aria-labelledby="safety-title" hidden>
+      <div class="stage-heading">
+        <div>
+          <p class="stage-number">02 · SAFETY / 演练边界</p>
+          <h2 id="safety-title" tabindex="-1">这是项目模拟，不是真人考场</h2>
+          <p>先确认用途和禁区。未确认前，演练现场不会开放。</p>
+        </div>
+        <span class="truth-tag">系统状态</span>
+      </div>
+
+      <div class="scenario-card">
+        <div class="scenario-mark" aria-hidden="true">SYN<br>01</div>
+        <div>
+          <p class="eyebrow">合成模拟 · 港湾计划恢复演练</p>
+          <h3>48 小时后进行受控演示，当前存在范围与隐私冲突。</h3>
+          <p>所有名称、角色、事件、约束和反馈均为虚构；不会生成真实准备度、绩效或雇佣结论。</p>
+        </div>
+      </div>
+
+      <div class="boundary-grid" aria-label="安全演练边界">
+        <article><span aria-hidden="true">✓</span><div><strong>仅用于能力练习</strong><p>练习如何依据事实和约束做项目判断。</p></div></article>
+        <article><span aria-hidden="true">✓</span><div><strong>仅存于当前会话</strong><p>不调用共享 API，不写入 Person、Evidence 或 Progress。</p></div></article>
+        <article class="prohibited"><span aria-hidden="true">×</span><div><strong>禁止真实人才结论</strong><p>不能用于录用、晋升、淘汰、薪酬或绩效评级。</p></div></article>
+      </div>
+
+      <form data-form="safety" novalidate>
+        <label class="confirm-box">
+          <input type="checkbox" name="safety-confirmed">
+          <span><strong>我确认这是合成模拟。</strong>我的选择只形成本地练习回执，不形成任何真实人员结论。</span>
+        </label>
+        <p class="field-error" data-error="safety" tabindex="-1" hidden>请先确认合成模拟与用途边界。</p>
+        <div class="action-row">
+          <p><strong>下一步：</strong>查看团队角色与不可突破的项目约束。</p>
+          <button class="primary-action" type="submit">确认边界，查看项目现场 <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="stage" data-stage="team" aria-labelledby="team-title" hidden>
+      <div class="stage-heading">
+        <div>
+          <p class="stage-number">03 · TEAM / 角色与约束</p>
+          <h2 id="team-title" tabindex="-1">决定之前，先确认谁负责什么</h2>
+          <p>这四个角色和三项硬约束共同构成决策现场。</p>
+        </div>
+        <span class="truth-tag">合成事实</span>
+      </div>
+
+      <div class="team-layout">
+        <form data-form="team" novalidate>
+          <fieldset>
+            <legend>选择你在演练中承担的角色</legend>
+            <div class="role-grid">
+              <label><input type="radio" name="role" value="项目判断负责人"><span><b>你</b><strong>项目判断负责人</strong><small>整合依据，提出可逆决策</small></span></label>
+              <label><input type="radio" name="role" value="交付协调人"><span><b>协作</b><strong>交付协调人</strong><small>同步依赖与时间风险</small></span></label>
+              <label><input type="radio" name="role" value="数据守门人"><span><b>协作</b><strong>数据守门人</strong><small>核对隐私与最小必要范围</small></span></label>
+              <label><input type="radio" name="role" value="客户场景代表"><span><b>协作</b><strong>客户场景代表</strong><small>复述演示目标与验收边界</small></span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="constraint-set">
+            <legend>硬约束（全部只读）</legend>
+            <div class="constraint-grid">
+              <article><span>T</span><div><strong>时间</strong><p>48 小时后只能做一次受控演示。</p></div></article>
+              <article><span>S</span><div><strong>范围</strong><p>演示只覆盖核心恢复流程，不扩展新功能。</p></div></article>
+              <article><span>P</span><div><strong>隐私</strong><p>不得使用真实客户记录，必须保留人工复核。</p></div></article>
+            </div>
+          </fieldset>
+
+          <label class="confirm-box compact">
+            <input type="checkbox" name="team-confirmed">
+            <span>我已确认四个模拟团队角色，以及时间、范围、隐私三项约束。</span>
+          </label>
+          <p class="field-error" data-error="team" tabindex="-1" hidden>请选择本人模拟角色，并确认全部角色与约束。</p>
+          <div class="action-row">
+            <p><strong>下一步：</strong>用证据和约束完成第一个项目决定。</p>
+            <button class="primary-action" type="submit">角色与约束已确认，开始决策 <span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="stage" data-stage="decision" aria-labelledby="decision-title" hidden>
+      <div class="stage-heading">
+        <div>
+          <p class="stage-number">04 · DECISION / 第一个可核对决定</p>
+          <h2 id="decision-title" tabindex="-1">48 小时后，团队应该如何演示？</h2>
+          <p>AI 只提出选项，不替你决定。你的选择必须引用一条能力证据和一项硬约束。</p>
+        </div>
+        <span class="advice-tag">AI 建议 · 待人类判断</span>
+      </div>
+
+      <form data-form="decision" novalidate>
+        <fieldset>
+          <legend>选择一个处置方案</legend>
+          <div class="option-stack">
+            <label><input type="radio" name="decision" value="全量演示"><span><strong>A · 按原计划做全量演示</strong><small>覆盖所有流程，但范围和隐私风险最高。</small></span></label>
+            <label><input type="radio" name="decision" value="受控核心演示"><span><strong>B · 缩小为受控核心演示</strong><small>仅使用合成数据走通核心恢复流程，保留人工复核。</small><em>AI 建议优先核对</em></span></label>
+            <label><input type="radio" name="decision" value="取消演示"><span><strong>C · 直接取消本次演示</strong><small>规避即时风险，但不会验证核心恢复流程。</small></span></label>
+          </div>
+        </fieldset>
+
+        <div class="trace-grid">
+          <label><span>引用一条能力证据</span><select name="evidence"><option value="">请选择</option><option value="E-SYN-01 · 可验证问题">E-SYN-01 · 可验证问题</option><option value="E-SYN-02 · 责任边界">E-SYN-02 · 责任边界</option><option value="E-SYN-03 · 人工复核">E-SYN-03 · 人工复核</option><option value="E-SYN-04 · 决策留痕">E-SYN-04 · 决策留痕</option></select></label>
+          <label><span>引用一项项目约束</span><select name="constraint"><option value="">请选择</option><option value="时间 · 48小时后受控演示">时间 · 48 小时后受控演示</option><option value="范围 · 仅核心恢复流程">范围 · 仅核心恢复流程</option><option value="隐私 · 合成数据与人工复核">隐私 · 合成数据与人工复核</option></select></label>
+        </div>
+
+        <label class="rationale-field"><span>写下你的理由 <small>至少 20 个字符</small></span><textarea name="rationale" rows="4" maxlength="240" placeholder="例如：我选择……，因为证据……与约束……共同说明……"></textarea><small data-count>0 / 20</small></label>
+        <p class="field-error" data-error="decision" tabindex="-1" hidden>请完成方案、证据、约束和不少于 20 个字符的理由。</p>
+        <div class="action-row">
+          <p><strong>提交后：</strong>只生成本地合成回执，不写入共享成长记录。</p>
+          <button class="primary-action" type="submit">提交我的决定，生成回执 <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="stage" data-stage="receipt" aria-labelledby="receipt-title" hidden>
+      <div class="receipt-hero">
+        <span class="receipt-seal" aria-hidden="true">01<br><small>DECISION</small></span>
+        <div>
+          <p class="stage-number">05 · END / 本地决策回执</p>
+          <h2 id="receipt-title" tabindex="-1">第一个决定已可核对</h2>
+          <p>这不是能力评分或人才结论；它只是一次合成演练中的人类选择记录。</p>
+        </div>
+      </div>
+
+      <dl class="receipt-grid">
+        <div><dt>合成事实</dt><dd>港湾计划恢复演练；48 小时；核心流程；合成数据；人工复核。</dd></div>
+        <div><dt>AI 建议</dt><dd>优先核对“受控核心演示”，但 AI 未替你提交选择。</dd></div>
+        <div><dt>人类选择</dt><dd data-receipt="decision">—</dd></div>
+        <div><dt>引用依据</dt><dd><span data-receipt="evidence">—</span><br><span data-receipt="constraint">—</span></dd></div>
+        <div class="wide"><dt>你的理由</dt><dd data-receipt="rationale">—</dd></div>
+        <div><dt>模拟角色</dt><dd data-receipt="role">—</dd></div>
+        <div><dt>系统状态</dt><dd>仅当前浏览器会话 · 未写入共享平台 · 未晋级</dd></div>
+      </dl>
+
+      <div class="governance-note"><strong>保持人类责任</strong><p>本回执不得用于真实录用、晋升、淘汰、薪酬或绩效评级。正式能力证据仍需经授权流程与人工复核。</p></div>
+      <div class="action-row receipt-actions">
+        <p><strong>路径终点：</strong>local-decision-receipt-visible</p>
+        <button class="secondary-action" type="button" data-reset>清除本地演练并重新开始</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>BOSS副本隔离候选 · 全部项目、人员与评估内容均为合成模拟 · 不连接正式 Muchen Journey 数据</p>
+  </footer>
+  <script src="app.js" defer></script>
+</body>
+</html>

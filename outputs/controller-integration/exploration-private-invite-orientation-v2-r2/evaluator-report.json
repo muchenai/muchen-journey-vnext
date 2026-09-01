@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823-r2",
+  "evaluated_on": "2026-08-23",
+  "verdict": "SUPERSEDED_WRONG_SOURCE_REFERENCE",
+  "product_p0_p1_findings": [],
+  "reason": "R2 captured one post-freeze dirty-worktree hash. It does not describe the committed candidate and must not be promoted.",
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "next_action": "Use R3, which pins the immutable source commit and original evidence commit explicitly."
+}

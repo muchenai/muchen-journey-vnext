@@ -21,6 +21,13 @@ from journey_api.auth import Actor, get_actor, require_role
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
+from journey_api.formal_assignment_workflow import (
+    FormalAssignmentEvent,
+    FormalAssignmentTransitionError,
+    WorkflowActorKind,
+    public_assignment_status,
+    transition_formal_assignment,
+)
 from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import ensure_required_materials_completed
 from journey_api.journey_service import assignment_stage, lock_active_learner_assignment
@@ -658,7 +665,8 @@ def submit_assignment(
     if replay is not None:
         return envelope(request, SubmissionMutationOut(**replay))
     ensure_revision(assignment.revision, command.expected_revision)
-    if assignment.status not in {
+    source_status = assignment.status
+    if source_status not in {
         AssignmentStatus.IN_PROGRESS,
         AssignmentStatus.NEEDS_REVISION,
     }:
@@ -692,6 +700,7 @@ def submit_assignment(
         submission_id=submission.id,
         version_no=version_no,
         body=command.body.strip(),
+        ai_use=command.ai_use.model_dump(mode="json"),
         created_by=actor.id,
     )
     session.add(version)
@@ -720,6 +729,25 @@ def submit_assignment(
     if learner_evidence and assignment.status == AssignmentStatus.NEEDS_REVISION:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "认知证据阶段不进入评审修订。")
     if not learner_evidence:
+        try:
+            target_status = transition_formal_assignment(
+                current=source_status,
+                event=(
+                    FormalAssignmentEvent.RESUBMIT
+                    if source_status is AssignmentStatus.NEEDS_REVISION
+                    else FormalAssignmentEvent.SUBMIT
+                ),
+                actor_kind=WorkflowActorKind.LEARNER,
+                actor_id=actor.id,
+                learner_id=enrollment.learner_id,
+                assigned_reviewer_id=enrollment.reviewer_id,
+                new_submission_version=True,
+            )
+        except FormalAssignmentTransitionError as exc:
+            raise ApiError(
+                409, "INVALID_STATE_TRANSITION", "当前任务不能提交。"
+            ) from exc
+    if not learner_evidence:
         review = Review(
             id=uuid.uuid4(),
             organization_id=assignment.organization_id,
@@ -732,18 +760,16 @@ def submit_assignment(
         )
         session.add(review)
     submission.current_version_no = version_no
-    assignment.status = (
-        AssignmentStatus.COMPLETED
-        if learner_evidence
-        else AssignmentStatus.SUBMITTED
-    )
+    assignment.status = AssignmentStatus.COMPLETED if learner_evidence else target_status
     assignment.revision += 1
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
     )
     result = SubmissionMutationOut(
         assignment_id=assignment.id,
-        assignment_status=assignment.status.value,
+        assignment_status=public_assignment_status(
+            assignment.status, formal=not learner_evidence
+        ),
         assignment_revision=assignment.revision,
         submission_id=submission.id,
         submission_version_id=version.id,

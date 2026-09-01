@@ -1,0 +1,138 @@
+{
+  "schema_version": "module-content-package.v1",
+  "package_id": "ai-academy-p0-2026-09-01",
+  "module_key": "ai-academy",
+  "version": "1.0.0",
+  "owner": {
+    "role": "ai_academy_owner",
+    "person_name": "段超群",
+    "signed_at": "2026-08-27T07:30:29+08:00",
+    "decision": "APPROVED"
+  },
+  "source_refs": [
+    "SRC-OWNER-03",
+    "SRC-AIA-01",
+    "SRC-NV-01"
+  ],
+  "effective_at": "2026-08-27T07:30:29+08:00",
+  "content_items": [
+    {
+      "content_id": "AIA-M1-MATERIAL-01",
+      "title": "AI for Everyone 核心选段",
+      "version": "1.0.0",
+      "source_ref": "SRC-AIA-01",
+      "owner": "段超群",
+      "estimated_minutes": 30,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "c3346b312265b85d01042fae1a44d3255a73683cd5ad20935b67ac68822ec65e"
+    },
+    {
+      "content_id": "AIA-M1-MATERIAL-02",
+      "title": "Generative AI for Everyone 核心选段",
+      "version": "1.0.0",
+      "source_ref": "SRC-AIA-01",
+      "owner": "段超群",
+      "estimated_minutes": 30,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "5b70eb82fffdfc2d988730007608cdbf601daabbca14e9273b638bea39eb4d31"
+    },
+    {
+      "content_id": "AIA-M1-PRACTICE-GUIDE",
+      "title": "第1月 AI 通识与生成式 AI 认知任务指南",
+      "version": "1.0.0",
+      "source_ref": "SRC-AIA-01",
+      "owner": "段超群",
+      "estimated_minutes": 10,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "e970b90b9e2acdb66eeb0b176cfd5c29f0b1e17a049ae627363a3bdd1dc99dca"
+    }
+  ],
+  "task_versions": [
+    {
+      "task_key": "AIA-M1-AI-LITERACY-CARD",
+      "version": "1.0.0",
+      "purpose": "把AI通识迁移到一个沐晨真实或脱敏项目，解释交付物、模型能力、数据质量和业务价值之间的关系。",
+      "non_goals": [
+        "复述课程摘要",
+        "使用未授权客户数据",
+        "把AI生成内容冒充个人判断",
+        "自动形成岗位或能力等级"
+      ],
+      "inputs": [
+        "两个首发核心学习材料",
+        "一个公开、合成或获批脱敏的沐晨项目案例",
+        "AI使用披露模板"
+      ],
+      "deliverables": [
+        "所选项目和表面交付物",
+        "背后可能支持的模型能力",
+        "数据质量对模型和业务的影响",
+        "AI数据工程与传统标注的区别",
+        "一个可沉淀的组织表达",
+        "AI使用范围、模型和Prompt版本",
+        "可访问的提交链接"
+      ],
+      "rubric_id": "AIA-M1-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "667bff72b7f73ca42414997138742fc9615cbafa5c6f039aef6873352330b0fa"
+    }
+  ],
+  "rubrics": [
+    {
+      "rubric_id": "AIA-M1-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "项目与交付物描述准确",
+        "模型能力关联合理",
+        "数据质量影响有因果链",
+        "AI数据工程与传统标注区分清楚",
+        "来源、限制与AI使用披露完整"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#AIA-M1-R1",
+      "sha256": "6a8bb42b2660817cd7d8e09faa106695de76b3d75f7f5e45101b2f0a6a587df8"
+    }
+  ],
+  "reviewer_policy": {
+    "pool_ref": "REVIEW-POOL-2026-09-01-P0",
+    "primary_reviewers": [
+      "万雨欣"
+    ],
+    "backup_reviewers": [
+      "屠元琦"
+    ],
+    "first_response_sla_minutes": 1440,
+    "completion_sla_minutes": 2880,
+    "escalation_owner": "屠元琦"
+  },
+  "data_policy": {
+    "production_write_allowed": false,
+    "raw_customer_data_allowed": false,
+    "ai_high_impact_decision_allowed": false,
+    "visibility": [
+      "PERSON",
+      "ASSIGNED_REVIEWERS",
+      "AUTHORIZED_OPERATORS"
+    ],
+    "retention_policy": "180_DAYS"
+  },
+  "sha256": "42c6359312f66158fabcc3508f042e62b387d43ed9a2d0739a0462b8722329cf"
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": "module-content-signoff-manifest.v1",
+  "candidate_manifest_path": "config/module-content-candidates.v1.json",
+  "candidate_manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6",
+  "gate": "OWNER_SIGNATURES_ACCEPTED_SOURCE_VERSION_BOUND",
+  "approval_evidence_path": "config/module-content-approval-evidence.v1.json",
+  "exploration_source_binding_path": "config/exploration-sheet-version-binding.v1.json",
+  "production_release_authorized": false,
+  "signatures": [
+    {
+      "person_name": "郑田源",
+      "module_key": "exploration-camp",
+      "candidate_sha256": "1d9feb1672c847279c0b85cdc5a13ea9a9890d45cad4b223dd59ef2f05bbeb1c",
+      "decision": "APPROVED",
+      "signed_at": "2026-08-27T07:30:29+08:00",
+      "evidence_basis": "PRODUCT_OWNER_ATTESTATION_OF_NAMED_OWNER_APPROVAL"
+    },
+    {
+      "person_name": "屠元琦",
+      "module_key": "newcomer-village",
+      "candidate_sha256": "6dfedfa9e95e78b8ab06115b08f0b5e7379b988b87f59de5c166c37f45937f1b",
+      "decision": "APPROVED",
+      "signed_at": "2026-08-27T07:30:29+08:00",
+      "reviewer_operations_contract_accepted": true,
+      "evidence_basis": "PRODUCT_OWNER_ATTESTATION_OF_NAMED_OWNER_APPROVAL"
+    },
+    {
+      "person_name": "段超群",
+      "module_key": "ai-academy",
+      "candidate_sha256": "e58880f712ee6c1aa3e4e31e5a51e62e15ac1e8bd9a75ec3600ca8b03095a894",
+      "decision": "APPROVED",
+      "signed_at": "2026-08-27T07:30:29+08:00",
+      "evidence_basis": "PRODUCT_OWNER_ATTESTATION_OF_NAMED_OWNER_APPROVAL"
+    },
+    {
+      "person_name": "段超群",
+      "module_key": "delivery-guild",
+      "candidate_sha256": "4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba",
+      "decision": "APPROVED",
+      "signed_at": "2026-08-27T07:30:29+08:00",
+      "evidence_basis": "PRODUCT_OWNER_ATTESTATION_OF_NAMED_OWNER_APPROVAL"
+    }
+  ],
+  "updated_at": "2026-08-27T07:30:29+08:00"
+}

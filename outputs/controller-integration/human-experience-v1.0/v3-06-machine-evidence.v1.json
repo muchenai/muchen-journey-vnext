@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "phase": "V3-06",
+  "requirement_batch": "HX-IMPL-005",
+  "evidence_scope": "PHASE_MACHINE_EVIDENCE_NOT_CANDIDATE_GATE",
+  "tested_worktree_base_sha": "814b3f017e3499bfb31acd7f1fcbe91c82f114ff",
+  "candidate_sha": null,
+  "result": "PASS_FOR_BATCH_COMMIT_WITH_SCOPED_GATES",
+  "implemented_flow": [
+    "browser network-state subscription with explicit offline and unsynchronized-copy status",
+    "local recovery copy retained while server autosave is unavailable",
+    "formal submission disabled offline and re-enabled only after network recovery",
+    "stable submission idempotency key and server-side replay coverage",
+    "programmatic focus for validation errors, confirmation, global errors and reviewer action errors",
+    "form description and polite save/upload-stage announcements",
+    "390px sticky primary action with offline mutation boundary",
+    "keyboard-first skip link, visible focus, 48px touch targets and motion preference boundary",
+    "WCAG A/AA automated check with resolved contrast defects"
+  ],
+  "scoped_gates": [
+    {
+      "scope": "SAFE_SESSION_TIMEOUT",
+      "status": "GATED",
+      "reason": "No independent approved task-session timeout or warning duration is bound to the current task contract.",
+      "runtime_behavior": "The page does not invent a timeout; existing authenticated-session expiry preserves submitted facts and uses the approved re-entry path.",
+      "minimum_unlock": "Owner and Security-approved timeout values, warning behavior and recovery contract."
+    },
+    {
+      "scope": "HUMAN_SCREEN_READER_OBSERVATION",
+      "status": "NOT_RUN",
+      "reason": "Keyboard snapshots and axe are machine evidence and cannot establish human screen-reader understanding.",
+      "runtime_behavior": "Semantic and focus mechanisms are implemented; human observation remains explicitly pending for UAT preparation.",
+      "minimum_unlock": "Named human participant, fixed candidate, scripted assistive-technology observation and signed record."
+    }
+  ],
+  "machine_checks": [
+    {
+      "command": "npm run lint",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "npm test",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "67 passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "apps/web",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "make api-test",
+      "execution": "repository-pinned Python 3.14 API image and disposable Docker test database",
+      "exit_code": 0,
+      "result": "513 passed including draft, submission and evaluation idempotency/replay and immutability coverage"
+    },
+    {
+      "command": "pytest -q tests/test_human_experience_traceability.py",
+      "execution": "read-only candidate mount in repository-pinned API image",
+      "exit_code": 0,
+      "result": "4 passed"
+    }
+  ],
+  "browser_checks": {
+    "engine": "Firefox",
+    "local_url": "http://127.0.0.1:3143/",
+    "fixture_scope": "LOCAL_SYNTHETIC_MACHINE_FIXTURE_ONLY",
+    "fixture_human_evidence": false,
+    "viewport": { "width": 390, "height": 844 },
+    "keyboard_first_focus": {
+      "tag": "A",
+      "text": "跳到主要内容",
+      "href": "#main-content"
+    },
+    "invalid_submission_focus_role": "alert",
+    "confirmation_focus_id": "submission-confirmation-title",
+    "offline_navigator_state": false,
+    "offline_unsynchronized_copy_visible": true,
+    "offline_formal_submit_disabled": true,
+    "offline_formal_submission_requests": 0,
+    "online_formal_submit_reenabled": true,
+    "horizontal_overflow": false,
+    "console_errors": 0,
+    "console_warnings": 0,
+    "axe": {
+      "standard_tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+      "initial_violation_count": 1,
+      "initial_serious_nodes": 2,
+      "initial_rule": "color-contrast",
+      "final_online_violation_count": 0,
+      "final_offline_confirmation_violation_count": 0
+    }
+  },
+  "artifacts": [
+    {
+      "path": "output/playwright/hx-v3-06-offline-confirmation-390-viewport.png",
+      "sha256": "008d076013396339147db1e12979b0f1ad68207e51832c50ce330da688dc9aa0"
+    },
+    {
+      "path": "outputs/controller-integration/human-experience-v1.0/requirement-gap-matrix.v1.json",
+      "sha256": "f3dbb11110b6c38d93c96aaba600938992221c17a7cdb2e955d931b743b104ad"
+    }
+  ],
+  "diagnostic_failures": [
+    {
+      "stage": "red_resilience_a11y_contract",
+      "result": "EXPECTED_FAIL_RESOLVED",
+      "cause": "All four new weak-network, focus, upload-status and mobile-action checks failed before implementation.",
+      "resolution": "Implemented the recovery, focus, status and sticky-action mechanisms; 4/4 checks pass within the 67-test Web suite."
+    },
+    {
+      "stage": "axe_wcag_first_run",
+      "result": "RESOLVED",
+      "cause": "Two formal-path details summaries used #20877f on white at 4.34:1, below the required 4.5:1 contrast ratio.",
+      "resolution": "Changed the formal task summary color to #176d70 and reran axe on both online editing and offline confirmation states with zero violations."
+    }
+  ],
+  "human_evidence": {
+    "human_uat": "NOT_RUN",
+    "human_screen_reader_observation": "NOT_RUN",
+    "owner_signoff": "NOT_RUN",
+    "canary": "NOT_RUN",
+    "release_authorization": "NOT_RUN"
+  },
+  "production_effects": {
+    "production_mutation": false,
+    "deployment": false,
+    "production_database_write": false,
+    "dns_or_cloud_mutation": false,
+    "external_message": false,
+    "human_gate_inference": false,
+    "release_authorization": false
+  }
+}

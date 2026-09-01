@@ -1,0 +1,76 @@
+- generic [ref=e1]:
+  - status [ref=e2]:
+    - generic [ref=e3]: 合成模拟
+    - strong [ref=e4]: 不连接真实公司、客户、人员或评估数据
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - paragraph [ref=e8]: Muchen Journey
+        - paragraph [ref=e9]: MAP 05 / BOSS副本
+      - paragraph [ref=e10]: 隔离候选 · 未集成
+    - region [ref=e11]:
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: 大型项目安全演练 · 01
+        - heading "在风暴抵达前， 做出第一个决定。" [level=1] [ref=e14]: 在风暴抵达前，做出第一个决定。
+      - paragraph [ref=e15]: 你将先读取前四图留下的合成能力证据，再进入“港湾计划恢复演练”。这里练习判断，不评价真人。
+    - navigation "演练进度" [ref=e16]:
+      - list [ref=e17]:
+        - listitem [ref=e18]:
+          - generic [ref=e19]: "01"
+          - strong [ref=e20]: 读取依据
+        - listitem [ref=e21]:
+          - generic [ref=e22]: "02"
+          - strong [ref=e23]: 确认边界
+        - listitem [ref=e24]:
+          - generic [ref=e25]: "03"
+          - strong [ref=e26]: 确认协作
+        - listitem [ref=e27]:
+          - generic [ref=e28]: "04"
+          - strong [ref=e29]: 做出决策
+        - listitem [ref=e30]:
+          - generic [ref=e31]: "05"
+          - strong [ref=e32]: 核对回执
+    - generic [ref=e33]: 已进入第 2 步，共 5 步。
+    - region [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - paragraph [ref=e91]: 02 · SAFETY / 演练边界
+          - heading "这是项目模拟，不是真人考场" [level=2] [ref=e92]
+          - paragraph [ref=e93]: 先确认用途和禁区。未确认前，演练现场不会开放。
+        - generic [ref=e94]: 系统状态
+      - generic [ref=e95]:
+        - generic [ref=e96]: SYN 01
+        - generic [ref=e97]:
+          - paragraph [ref=e98]: 合成模拟 · 港湾计划恢复演练
+          - heading "48 小时后进行受控演示，当前存在范围与隐私冲突。" [level=3] [ref=e99]
+          - paragraph [ref=e100]: 所有名称、角色、事件、约束和反馈均为虚构；不会生成真实准备度、绩效或雇佣结论。
+      - generic "安全演练边界" [ref=e101]:
+        - article [ref=e102]:
+          - generic [ref=e103]: ✓
+          - generic [ref=e104]:
+            - strong [ref=e105]: 仅用于能力练习
+            - paragraph [ref=e106]: 练习如何依据事实和约束做项目判断。
+        - article [ref=e107]:
+          - generic [ref=e108]: ✓
+          - generic [ref=e109]:
+            - strong [ref=e110]: 仅存于当前会话
+            - paragraph [ref=e111]: 不调用共享 API，不写入 Person、Evidence 或 Progress。
+        - article [ref=e112]:
+          - generic [ref=e113]: ×
+          - generic [ref=e114]:
+            - strong [ref=e115]: 禁止真实人才结论
+            - paragraph [ref=e116]: 不能用于录用、晋升、淘汰、薪酬或绩效评级。
+      - generic [ref=e117]:
+        - generic [ref=e118] [cursor=pointer]:
+          - checkbox "我确认这是合成模拟。我的选择只形成本地练习回执，不形成任何真实人员结论。" [ref=e119]
+          - generic [ref=e120]:
+            - strong [ref=e121]: 我确认这是合成模拟。
+            - text: 我的选择只形成本地练习回执，不形成任何真实人员结论。
+        - paragraph [active] [ref=e126]: 请先确认合成模拟与用途边界。真实人员决定不属于本演练。
+        - generic [ref=e122]:
+          - paragraph [ref=e123]:
+            - strong [ref=e124]: 下一步：
+            - text: 查看团队角色与不可突破的项目约束。
+          - button "确认边界，查看项目现场" [ref=e125] [cursor=pointer]: 确认边界，查看项目现场 →
+  - contentinfo [ref=e86]:
+    - paragraph [ref=e87]: BOSS副本隔离候选 · 全部项目、人员与评估内容均为合成模拟 · 不连接正式 Muchen Journey 数据

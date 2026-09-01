@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823",
+  "evaluated_on": "2026-08-23",
+  "verdict": "BLOCKED_CANDIDATE_INTEGRITY",
+  "product_p0_p1_findings": [],
+  "integrity_findings": [
+    {
+      "id": "frozen-test-hash-mismatch",
+      "severity": "BLOCKER",
+      "file": "apps/web/scripts/exploration-camp-private-invite-orientation-contract.test.mjs",
+      "manifest_hash": "09314b8fa7211d93dbcc79d762adeb7f2df80c7c0ea5af04191245c3709e3013",
+      "committed_hash": "6b1eeaf807e0f14d2535705068beddf4166e4397d2ddc0d78dd100bff5fbd05c",
+      "cause": "The commit hook mechanically rewrote the test file after its pre-commit hash was recorded. Runtime files and browser evidence were unchanged."
+    }
+  ],
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "next_action": "Create a versioned R2 manifest from committed bytes; do not rewrite this candidate."
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muchen.local/schemas/module-content-candidates.v1.json",
+  "title": "Muchen Journey Module Content Candidates V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "release_target",
+    "decision_source",
+    "shared_reviewer_policy",
+    "shared_data_policy",
+    "modules",
+    "required_human_signatures",
+    "manifest_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "module-content-candidates.v1"
+    },
+    "status": {
+      "const": "PRODUCT_OWNER_SUPPLEMENT_COMPLETE_PENDING_MODULE_OWNER_HASH_SIGNATURE"
+    },
+    "release_target": {
+      "const": "2026-09-01-production-canary-uat"
+    },
+    "decision_source": {
+      "type": "object"
+    },
+    "shared_reviewer_policy": {
+      "type": "object"
+    },
+    "shared_data_policy": {
+      "type": "object"
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "module_key",
+          "package_id",
+          "version",
+          "module_owner",
+          "owner_confirmation_state",
+          "owner_hash_signature_state",
+          "source_refs",
+          "source_locators",
+          "content_items",
+          "tasks",
+          "module_policy",
+          "candidate_sha256"
+        ]
+      }
+    },
+    "required_human_signatures": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

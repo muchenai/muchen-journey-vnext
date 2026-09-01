@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "artifact_type": "PRIVACY_SAFE_HUMAN_EVIDENCE_POLICY",
+  "status": "NOT_RUN",
+  "purpose": "Validate the frozen delivery-guild golden path without collecting identity or real business data.",
+  "data_minimization": {
+    "anonymous_participant_ids_only": true,
+    "allowed_participant_ids": [
+      "participant-01",
+      "participant-02",
+      "participant-03"
+    ],
+    "prohibited_fields": [
+      "name",
+      "email",
+      "phone",
+      "employee_id",
+      "employee_number",
+      "department",
+      "manager",
+      "wechat",
+      "real_customer",
+      "real_project",
+      "real_person",
+      "business_secret"
+    ],
+    "audio_recording_default": false,
+    "video_recording_default": false,
+    "raw_transcript_storage": false,
+    "real_business_content_allowed": false
+  },
+  "allowed_human_evidence_types": [
+    "anonymous-eligibility-check",
+    "anonymous-consent-status",
+    "coded-comprehension-observation",
+    "elapsed-seconds",
+    "integer-rating-1-to-5",
+    "rescue-intervention-count",
+    "sanitized-session-stop-reason"
+  ],
+  "frozen_machine_baseline_refs": [
+    {
+      "path": "outputs/map-workstreams/delivery-guild/contract.json",
+      "purpose": "exact human criteria and governance boundary",
+      "human_result": false
+    },
+    {
+      "path": "outputs/map-workstreams/delivery-guild/candidate-manifest.json",
+      "purpose": "frozen candidate identity and hashes",
+      "human_result": false
+    },
+    {
+      "path": "outputs/map-workstreams/delivery-guild/evaluation-report.md",
+      "purpose": "machine READY_FOR_HUMAN verdict only",
+      "human_result": false
+    },
+    {
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-390-end.png",
+      "purpose": "privacy and pending-review boundary visible at 390 CSS pixels",
+      "human_result": false
+    },
+    {
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-768-end.png",
+      "purpose": "privacy and pending-review boundary visible at 768 CSS pixels",
+      "human_result": false
+    },
+    {
+      "path": "outputs/map-workstreams/delivery-guild/browser-evidence/evaluator-1280-end.png",
+      "purpose": "privacy and pending-review boundary visible at 1280 CSS pixels",
+      "human_result": false
+    }
+  ],
+  "human_evidence_refs": [],
+  "storage_rule": "Do not store completed human results in this blank package. Use an owner-approved private evidence location with minimum necessary access and retention.",
+  "machine_evidence_may_substitute_for_human": false
+}

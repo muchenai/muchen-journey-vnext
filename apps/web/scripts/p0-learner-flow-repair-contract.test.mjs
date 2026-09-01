@@ -138,9 +138,9 @@ test("material transitions preserve context while submissions show completion fi
   assert.match(learnerHome, /className="button transition-action"/);
 });
 
-test("completed stages remain available for review without unlocking future stages", () => {
-  assert.match(journeyMap, /node\.status !== "LOCKED"/);
-  assert.match(journeyMap, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
+test("route map remains orientation-only while the current task card owns navigation", () => {
+  assert.doesNotMatch(journeyMap, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
+  assert.doesNotMatch(journeyMap, /route-node-link/);
 });
 
 test("long links wrap and the three-step path becomes vertical on mobile", () => {

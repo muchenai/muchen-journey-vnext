@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "contract_role": "VERSIONED_CANDIDATE_STATE",
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "map": "boss-dungeon",
+  "phase": "ISOLATED_DRAFT_BUILD",
+  "status": "READY_FOR_HUMAN",
+  "status_basis": {
+    "evaluation_target": "evaluation-target.json",
+    "evaluation_target_sha256": "71d018bd10d9071ffcff6f27e1c87f05c10107858c35ce7c8fc8f936daa4562c",
+    "evaluator_report": "evaluator-report.json",
+    "evaluator_report_sha256": "f23a03a1ee1a7cc0d3ae76c8ccd9339347085d063e9d338ec4740fc39d69dec5",
+    "evaluator_verdict": "READY_FOR_HUMAN",
+    "p0_count": 0,
+    "p1_count": 0
+  },
+  "previous_candidate": {
+    "commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+    "status": "ACTIVE_DRAFT",
+    "contract_ref": "../../contract.json",
+    "contract_sha256": "efd9e472370c8c2a6d368eecc98fcfd987e6c36695b02853a4f879bf44187a97",
+    "fact_mutated": false
+  },
+  "golden_path": {
+    "id": "boss-dungeon-first-verifiable-decision",
+    "active": true,
+    "starts_at": "synthetic-capability-briefing",
+    "ends_at": "local-decision-receipt-visible",
+    "entry": "../../../../../prototypes/boss-dungeon/index.html",
+    "routes": [
+      "prototypes/boss-dungeon/index.html"
+    ],
+    "ordered_states": [
+      "synthetic-capability-briefing",
+      "safe-scenario-confirmation",
+      "team-and-constraints-confirmation",
+      "first-verifiable-decision",
+      "local-decision-receipt-visible"
+    ],
+    "criteria_ref": "evaluation-target.json"
+  },
+  "runtime": {
+    "changed_from_previous_candidate": false,
+    "hashes_match_evaluation_target": true,
+    "shared_fact_writes": false,
+    "production_mutation": false
+  },
+  "machine_acceptance": {
+    "status": "PASS",
+    "criteria_passed": 8,
+    "criteria_failed": 0,
+    "contract_tests_passed": 5,
+    "contract_tests_failed": 0,
+    "viewports_passed": [
+      390,
+      768,
+      1280
+    ],
+    "console_errors": 0,
+    "external_requests": 0
+  },
+  "human_acceptance": [
+    {
+      "id": "orientation-and-safety",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "evidence-to-decision-traceability",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "role-and-constraint-comprehension",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clarity-and-willingness",
+      "status": "NOT_RUN"
+    }
+  ],
+  "human_gate": {
+    "status": "UNTOUCHED",
+    "evidence": "NOT_RUN",
+    "machine_evidence_may_substitute": false
+  },
+  "freeze": {
+    "required": true,
+    "manifest": "candidate-freeze.json",
+    "scope": "THIS_CANDIDATE_ONLY",
+    "runtime_mutation_allowed": false,
+    "promotion_authorized": false,
+    "controller_integration_authorized": false,
+    "release_authorized": false
+  },
+  "formal_release_focus": false,
+  "full_journey_completion_claimed": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823",
+  "corrects": "outputs/controller-integration/exploration-private-invite-orientation-v2/evaluator-report.json",
+  "corrected_on": "2026-08-23",
+  "status": "SUPERSEDED_EVALUATOR_DIAGNOSIS",
+  "finding": "The candidate commit was not rewritten. A later parallel draft modified the integration worktree after freeze, while commit 6e4a4d0 retained the exact original five runtime hashes.",
+  "source_commit_hash_result": "5_OF_5_PASS",
+  "dirty_worktree_is_candidate": false,
+  "next_action": "Evaluate a versioned manifest that explicitly pins source_commit 6e4a4d0 instead of hashing the integration worktree."
+}

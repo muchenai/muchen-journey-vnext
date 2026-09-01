@@ -401,152 +401,28 @@
         }
       }
     },
-    "/api/v1/ops/enrollments/{enrollment_id}/formal-admission/preview": {
-      "post": {
-        "summary": "Preview Formal Admission",
-        "operationId": "preview_formal_admission_api_v1_ops_enrollments__enrollment_id__formal_admission_preview_post",
-        "parameters": [
-          {
-            "name": "enrollment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Enrollment Id"
-            }
-          },
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PreviewFormalAdmissionCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FormalAdmissionPreviewResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/ops/enrollments/{enrollment_id}/formal-admission": {
-      "post": {
-        "summary": "Create Formal Admission Decision",
-        "operationId": "create_formal_admission_decision_api_v1_ops_enrollments__enrollment_id__formal_admission_post",
-        "parameters": [
-          {
-            "name": "enrollment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Enrollment Id"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Idempotency-Key"
-            }
-          },
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFormalAdmissionDecisionCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FormalAdmissionDecisionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/me/current-action": {
       "get": {
         "summary": "Current Action",
         "operationId": "current_action_api_v1_me_current_action_get",
         "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Enrollment Id"
+            }
+          },
           {
             "name": "X-Fixture-Role",
             "in": "header",
@@ -571,6 +447,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CurrentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/enrollments": {
+      "get": {
+        "summary": "Learner Enrollments",
+        "operationId": "learner_enrollments_api_v1_me_enrollments_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnerEnrollmentListResponse"
                 }
               }
             }
@@ -1951,6 +1873,304 @@
         }
       }
     },
+    "/api/v1/ops/next-training-stage-review-requests": {
+      "get": {
+        "summary": "Operator Review Requests",
+        "operationId": "operator_review_requests_api_v1_ops_next_training_stage_review_requests_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewRequestListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/next-training-stage-review-requests/{review_request_id}/assignment": {
+      "post": {
+        "summary": "Assign Independent Reviewer",
+        "operationId": "assign_independent_reviewer_api_v1_ops_next_training_stage_review_requests__review_request_id__assignment_post",
+        "parameters": [
+          {
+            "name": "review_request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Request Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NextTrainingStageReviewAssignmentCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewAssignmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reviews/next-training-stage-review-requests": {
+      "get": {
+        "summary": "Reviewer Review Requests",
+        "operationId": "reviewer_review_requests_api_v1_reviews_next_training_stage_review_requests_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewRequestListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reviews/next-training-stage-review-requests/{review_request_id}/resolution": {
+      "post": {
+        "summary": "Resolve Independent Review",
+        "operationId": "resolve_independent_review_api_v1_reviews_next_training_stage_review_requests__review_request_id__resolution_post",
+        "parameters": [
+          {
+            "name": "review_request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Request Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NextTrainingStageReviewResolutionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewResolutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/next-training-stage-review-requests/{review_request_id}": {
+      "get": {
+        "summary": "Person Review Lineage",
+        "operationId": "person_review_lineage_api_v1_me_next_training_stage_review_requests__review_request_id__get",
+        "parameters": [
+          {
+            "name": "review_request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Request Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewRequestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reviews": {
       "get": {
         "summary": "Review Queue",
@@ -2203,11 +2423,326 @@
         }
       }
     },
+    "/api/v1/me/incentives": {
+      "get": {
+        "summary": "Learner Incentives",
+        "operationId": "learner_incentives_api_v1_me_incentives_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncentiveLedgerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/next-training-stage-review-requests": {
+      "get": {
+        "summary": "Learner Next Training Stage Review Requests",
+        "operationId": "learner_next_training_stage_review_requests_api_v1_me_next_training_stage_review_requests_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewRequestListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/next-training-stage-decisions/{decision_id}/review-requests": {
+      "post": {
+        "summary": "Request Next Training Stage Review",
+        "operationId": "request_next_training_stage_review_api_v1_me_next_training_stage_decisions__decision_id__review_requests_post",
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Decision Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NextTrainingStageReviewRequestCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextTrainingStageReviewRequestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/handoffs/{handoff_id}": {
+      "get": {
+        "summary": "Learner Handoff Detail",
+        "operationId": "learner_handoff_detail_api_v1_me_handoffs__handoff_id__get",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Handoff Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/handoffs/{handoff_id}/accept": {
+      "post": {
+        "summary": "Accept Handoff",
+        "operationId": "accept_handoff_api_v1_me_handoffs__handoff_id__accept_post",
+        "parameters": [
+          {
+            "name": "handoff_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Handoff Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffAcceptanceCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffAcceptanceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/result": {
       "get": {
         "summary": "Result",
         "operationId": "result_api_v1_me_result_get",
         "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Enrollment Id"
+            }
+          },
           {
             "name": "X-Fixture-Role",
             "in": "header",
@@ -2281,6 +2816,23 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "enrollment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Enrollment Id"
             }
           },
           {
@@ -2703,6 +3255,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnrollmentMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/reviewer-workload": {
+      "get": {
+        "summary": "Reviewer Workload",
+        "operationId": "reviewer_workload_api_v1_ops_reviewer_workload_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewerWorkloadListResponse"
                 }
               }
             }
@@ -4529,10 +5127,604 @@
           }
         }
       }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}": {
+      "get": {
+        "summary": "Get Controlled Task Authorization",
+        "operationId": "get_controlled_task_authorization_api_v1_ops_controlled_task_authorizations__authorization_id__get",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations": {
+      "post": {
+        "summary": "Create Controlled Task Authorization",
+        "operationId": "create_controlled_task_authorization_api_v1_ops_controlled_task_authorizations_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateControlledTaskAuthorizationCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}/submit-for-approvals": {
+      "post": {
+        "summary": "Submit Controlled Task Authorization For Approvals",
+        "operationId": "submit_controlled_task_authorization_for_approvals_api_v1_ops_controlled_task_authorizations__authorization_id__submit_for_approvals_post",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlledTaskAuthorizationRevisionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}/approvals": {
+      "post": {
+        "summary": "Approve Controlled Task Authorization",
+        "operationId": "approve_controlled_task_authorization_api_v1_ops_controlled_task_authorizations__authorization_id__approvals_post",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlledTaskAuthorizationApprovalCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationApprovalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}/activate": {
+      "post": {
+        "summary": "Activate Controlled Task Authorization",
+        "operationId": "activate_controlled_task_authorization_api_v1_ops_controlled_task_authorizations__authorization_id__activate_post",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateControlledTaskAuthorizationCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}/expire": {
+      "post": {
+        "summary": "Expire Controlled Task Authorization",
+        "operationId": "expire_controlled_task_authorization_api_v1_ops_controlled_task_authorizations__authorization_id__expire_post",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlledTaskAuthorizationRevisionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/controlled-task-authorizations/{authorization_id}/revoke": {
+      "post": {
+        "summary": "Revoke Controlled Task Authorization",
+        "operationId": "revoke_controlled_task_authorization_api_v1_ops_controlled_task_authorizations__authorization_id__revoke_post",
+        "parameters": [
+          {
+            "name": "authorization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Authorization Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeControlledTaskAuthorizationCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlledTaskAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/module-content-packages/publish": {
+      "post": {
+        "summary": "Publish Construction Module Package",
+        "operationId": "publish_construction_module_package_api_v1_ops_module_content_packages_publish_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishConstructionModulePackageCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConstructionModulePackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActivateControlledTaskAuthorizationCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "expected_scope_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Scope Sha256"
+          },
+          "expected_task_version_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Task Version Sha256"
+          },
+          "expected_policy_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Policy Snapshot Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "expected_scope_sha256",
+          "expected_task_version_sha256",
+          "expected_policy_snapshot_sha256"
+        ],
+        "title": "ActivateControlledTaskAuthorizationCommand"
+      },
       "AiSummaryOut": {
         "properties": {
           "status": {
@@ -4552,6 +5744,64 @@
           "message"
         ],
         "title": "AiSummaryOut"
+      },
+      "AiUseDisclosure": {
+        "properties": {
+          "used": {
+            "type": "boolean",
+            "title": "Used"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "output_is_advisory_only": {
+            "type": "boolean",
+            "title": "Output Is Advisory Only",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "used"
+        ],
+        "title": "AiUseDisclosure"
       },
       "AssembleFormalJourneyV3Command": {
         "properties": {
@@ -4689,6 +5939,15 @@
             "type": "integer",
             "title": "Revision"
           },
+          "assigned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Assigned At"
+          },
+          "reviewer_display_name": {
+            "type": "string",
+            "title": "Reviewer Display Name"
+          },
           "allowed_commands": {
             "items": {
               "type": "string"
@@ -4775,6 +6034,18 @@
             "type": "integer",
             "title": "Feedback Sla Business Days"
           },
+          "reviewer_role": {
+            "type": "string",
+            "title": "Reviewer Role"
+          },
+          "sensitivity": {
+            "type": "string",
+            "title": "Sensitivity"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          },
           "rubric": {
             "additionalProperties": true,
             "type": "object",
@@ -4835,6 +6106,8 @@
           "id",
           "status",
           "revision",
+          "assigned_at",
+          "reviewer_display_name",
           "allowed_commands",
           "stable_task_key",
           "task_version",
@@ -4851,6 +6124,9 @@
           "learning_experience",
           "estimated_duration_minutes",
           "feedback_sla_business_days",
+          "reviewer_role",
+          "sensitivity",
+          "audience",
           "rubric",
           "submission",
           "draft",
@@ -5226,6 +6502,227 @@
         ],
         "title": "ConfigureNotificationEndpointCommand"
       },
+      "ConstructionModuleContentPackage": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "module-content-package.v1",
+            "title": "Schema Version"
+          },
+          "package_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{2,119}$",
+            "title": "Package Id"
+          },
+          "module_key": {
+            "type": "string",
+            "enum": [
+              "exploration-camp",
+              "newcomer-village",
+              "ai-academy",
+              "delivery-guild"
+            ],
+            "title": "Module Key"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/OwnerApproval"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Source Refs"
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "content_items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentItem"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Content Items"
+          },
+          "task_versions": {
+            "items": {
+              "$ref": "#/components/schemas/PackageTaskVersion"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Task Versions"
+          },
+          "rubrics": {
+            "items": {
+              "$ref": "#/components/schemas/PackageRubric"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Rubrics"
+          },
+          "reviewer_policy": {
+            "$ref": "#/components/schemas/ReviewerPolicy"
+          },
+          "data_policy": {
+            "$ref": "#/components/schemas/DataPolicy"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "package_id",
+          "module_key",
+          "version",
+          "owner",
+          "source_refs",
+          "effective_at",
+          "content_items",
+          "task_versions",
+          "rubrics",
+          "reviewer_policy",
+          "data_policy",
+          "sha256"
+        ],
+        "title": "ConstructionModuleContentPackage"
+      },
+      "ConstructionModulePackageOut": {
+        "properties": {
+          "binding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Binding Id"
+          },
+          "module_key": {
+            "type": "string",
+            "enum": [
+              "ai-academy",
+              "delivery-guild"
+            ],
+            "title": "Module Key"
+          },
+          "package_id": {
+            "type": "string",
+            "title": "Package Id"
+          },
+          "package_version": {
+            "type": "string",
+            "title": "Package Version"
+          },
+          "package_sha256": {
+            "type": "string",
+            "title": "Package Sha256"
+          },
+          "journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Journey Version Id"
+          },
+          "journey_version": {
+            "type": "integer",
+            "title": "Journey Version"
+          },
+          "journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Journey Stage Version Id"
+          },
+          "task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Version Id"
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "status": {
+            "type": "string",
+            "const": "PUBLISHED_CONTENT_BOUND",
+            "title": "Status"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "binding_id",
+          "module_key",
+          "package_id",
+          "package_version",
+          "package_sha256",
+          "journey_version_id",
+          "journey_version",
+          "journey_stage_version_id",
+          "task_version_id",
+          "effective_at",
+          "expires_at",
+          "status"
+        ],
+        "title": "ConstructionModulePackageOut"
+      },
+      "ConstructionModulePackageResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConstructionModulePackageOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ConstructionModulePackageResponse"
+      },
       "ContentDraftListOut": {
         "properties": {
           "items": {
@@ -5429,6 +6926,614 @@
         ],
         "title": "ContentEditorResponse"
       },
+      "ContentItem": {
+        "properties": {
+          "content_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Content Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version"
+          },
+          "source_ref": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Source Ref"
+          },
+          "owner": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Owner"
+          },
+          "estimated_minutes": {
+            "type": "integer",
+            "maximum": 480.0,
+            "minimum": 1.0,
+            "title": "Estimated Minutes"
+          },
+          "visibility": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "LEARNER",
+                "REVIEWER",
+                "OPERATOR"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Visibility"
+          },
+          "data_classification": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "INTERNAL",
+              "CONFIDENTIAL_PEOPLE"
+            ],
+            "title": "Data Classification"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content_id",
+          "title",
+          "version",
+          "source_ref",
+          "owner",
+          "estimated_minutes",
+          "visibility",
+          "data_classification",
+          "sha256"
+        ],
+        "title": "ContentItem"
+      },
+      "ControlledTaskAuthorizationApprovalCommand": {
+        "properties": {
+          "expected_authorization_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Authorization Revision"
+          },
+          "approval_role": {
+            "type": "string",
+            "enum": [
+              "NEWCOMER_OPERATIONS_OWNER",
+              "PROJECT_OWNER",
+              "DATA_SECURITY_OWNER",
+              "REVIEWER_OWNER"
+            ],
+            "title": "Approval Role"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ],
+            "title": "Decision"
+          },
+          "expected_scope_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Scope Sha256"
+          },
+          "signature_evidence_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Signature Evidence Ref"
+          },
+          "signature_evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Signature Evidence Sha256"
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Signed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_authorization_revision",
+          "approval_role",
+          "decision",
+          "expected_scope_sha256",
+          "signature_evidence_ref",
+          "signature_evidence_sha256",
+          "signed_at"
+        ],
+        "title": "ControlledTaskAuthorizationApprovalCommand"
+      },
+      "ControlledTaskAuthorizationApprovalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "authorization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Authorization Id"
+          },
+          "approval_role": {
+            "type": "string",
+            "title": "Approval Role"
+          },
+          "signer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Signer User Id"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "signed_scope_sha256": {
+            "type": "string",
+            "title": "Signed Scope Sha256"
+          },
+          "signature_evidence_ref": {
+            "type": "string",
+            "title": "Signature Evidence Ref"
+          },
+          "signature_evidence_sha256": {
+            "type": "string",
+            "title": "Signature Evidence Sha256"
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Signed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "authorization_id",
+          "approval_role",
+          "signer_user_id",
+          "decision",
+          "signed_scope_sha256",
+          "signature_evidence_ref",
+          "signature_evidence_sha256",
+          "signed_at",
+          "created_at"
+        ],
+        "title": "ControlledTaskAuthorizationApprovalOut"
+      },
+      "ControlledTaskAuthorizationApprovalResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ControlledTaskAuthorizationApprovalOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ControlledTaskAuthorizationApprovalResponse"
+      },
+      "ControlledTaskAuthorizationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "authorization_scope": {
+            "type": "string",
+            "const": "NEWCOMER_CONTROLLED_TRAINING",
+            "title": "Authorization Scope"
+          },
+          "authorized_project_ref": {
+            "type": "string",
+            "title": "Authorized Project Ref"
+          },
+          "target_journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Version Id"
+          },
+          "target_journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Stage Version Id"
+          },
+          "target_task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Task Version Id"
+          },
+          "task_version_sha256": {
+            "type": "string",
+            "title": "Task Version Sha256"
+          },
+          "authorization_version": {
+            "type": "integer",
+            "title": "Authorization Version"
+          },
+          "scope_sha256": {
+            "type": "string",
+            "title": "Scope Sha256"
+          },
+          "project_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Owner User Id"
+          },
+          "newcomer_operations_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Newcomer Operations Owner User Id"
+          },
+          "data_security_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Security Owner User Id"
+          },
+          "reviewer_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Owner User Id"
+          },
+          "primary_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Reviewer User Id"
+          },
+          "backup_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Backup Reviewer User Id"
+          },
+          "policy_snapshot_ref": {
+            "type": "string",
+            "title": "Policy Snapshot Ref"
+          },
+          "policy_snapshot_version": {
+            "type": "string",
+            "title": "Policy Snapshot Version"
+          },
+          "policy_snapshot_sha256": {
+            "type": "string",
+            "title": "Policy Snapshot Sha256"
+          },
+          "policy_evidence_ref": {
+            "type": "string",
+            "title": "Policy Evidence Ref"
+          },
+          "policy_evidence_sha256": {
+            "type": "string",
+            "title": "Policy Evidence Sha256"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Valid From"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVALS",
+              "ACTIVE",
+              "REVOKED",
+              "EXPIRED"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "expired_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expired At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "authorization_scope",
+          "authorized_project_ref",
+          "target_journey_version_id",
+          "target_journey_stage_version_id",
+          "target_task_version_id",
+          "task_version_sha256",
+          "authorization_version",
+          "scope_sha256",
+          "project_owner_user_id",
+          "newcomer_operations_owner_user_id",
+          "data_security_owner_user_id",
+          "reviewer_owner_user_id",
+          "primary_reviewer_user_id",
+          "backup_reviewer_user_id",
+          "policy_snapshot_ref",
+          "policy_snapshot_version",
+          "policy_snapshot_sha256",
+          "policy_evidence_ref",
+          "policy_evidence_sha256",
+          "valid_from",
+          "expires_at",
+          "status",
+          "revision",
+          "activated_at",
+          "revoked_at",
+          "expired_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ControlledTaskAuthorizationOut"
+      },
+      "ControlledTaskAuthorizationResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ControlledTaskAuthorizationOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ControlledTaskAuthorizationResponse"
+      },
+      "ControlledTaskAuthorizationRevisionCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "ControlledTaskAuthorizationRevisionCommand"
+      },
+      "ControlledTaskPolicySnapshotCommand": {
+        "properties": {
+          "policy_schema": {
+            "type": "string",
+            "const": "muchen-journey-controlled-task-policy.v1",
+            "title": "Policy Schema"
+          },
+          "policy_version": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 3,
+            "title": "Policy Version"
+          },
+          "training_purpose": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Training Purpose"
+          },
+          "allowed_input_schema_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Allowed Input Schema Ref"
+          },
+          "data_classification": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "INTERNAL",
+              "CONFIDENTIAL_PEOPLE"
+            ],
+            "title": "Data Classification"
+          },
+          "deidentification_rule_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Deidentification Rule Ref"
+          },
+          "production_isolation_rule_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Production Isolation Rule Ref"
+          },
+          "production_actions_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Production Actions Allowed"
+          },
+          "production_credential_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Production Credential Allowed"
+          },
+          "prohibited_action_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Prohibited Action Codes"
+          },
+          "learner_visibility": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Learner Visibility"
+          },
+          "reviewer_visibility": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Reviewer Visibility"
+          },
+          "operator_visibility": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Operator Visibility"
+          },
+          "reviewer_substitution_rule_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reviewer Substitution Rule Ref"
+          },
+          "evidence_retention_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Evidence Retention Days"
+          },
+          "evidence_disposition": {
+            "type": "string",
+            "enum": [
+              "DELETE",
+              "ARCHIVE"
+            ],
+            "title": "Evidence Disposition"
+          },
+          "help_escalation_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Help Escalation Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy_schema",
+          "policy_version",
+          "training_purpose",
+          "allowed_input_schema_ref",
+          "data_classification",
+          "deidentification_rule_ref",
+          "production_isolation_rule_ref",
+          "production_actions_allowed",
+          "production_credential_allowed",
+          "prohibited_action_codes",
+          "learner_visibility",
+          "reviewer_visibility",
+          "operator_visibility",
+          "reviewer_substitution_rule_ref",
+          "evidence_retention_days",
+          "evidence_disposition",
+          "help_escalation_ref"
+        ],
+        "title": "ControlledTaskPolicySnapshotCommand"
+      },
       "CreateContentDraftCommand": {
         "properties": {
           "content": {
@@ -5464,6 +7569,118 @@
         ],
         "title": "CreateContentEditorCommand"
       },
+      "CreateControlledTaskAuthorizationCommand": {
+        "properties": {
+          "authorized_project_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Authorized Project Ref"
+          },
+          "target_journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Version Id"
+          },
+          "target_journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Stage Version Id"
+          },
+          "target_task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Task Version Id"
+          },
+          "authorization_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Authorization Version"
+          },
+          "project_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Owner User Id"
+          },
+          "newcomer_operations_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Newcomer Operations Owner User Id"
+          },
+          "data_security_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Security Owner User Id"
+          },
+          "reviewer_owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Owner User Id"
+          },
+          "primary_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Reviewer User Id"
+          },
+          "backup_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Backup Reviewer User Id"
+          },
+          "policy_snapshot_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Policy Snapshot Ref"
+          },
+          "policy_snapshot": {
+            "$ref": "#/components/schemas/ControlledTaskPolicySnapshotCommand"
+          },
+          "policy_evidence_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Policy Evidence Ref"
+          },
+          "policy_evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Policy Evidence Sha256"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Valid From"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "authorized_project_ref",
+          "target_journey_version_id",
+          "target_journey_stage_version_id",
+          "target_task_version_id",
+          "authorization_version",
+          "project_owner_user_id",
+          "newcomer_operations_owner_user_id",
+          "data_security_owner_user_id",
+          "reviewer_owner_user_id",
+          "primary_reviewer_user_id",
+          "backup_reviewer_user_id",
+          "policy_snapshot_ref",
+          "policy_snapshot",
+          "policy_evidence_ref",
+          "policy_evidence_sha256",
+          "valid_from",
+          "expires_at"
+        ],
+        "title": "CreateControlledTaskAuthorizationCommand"
+      },
       "CreateDataRightsRequestCommand": {
         "properties": {
           "subject_user_id": {
@@ -5494,68 +7711,6 @@
           "reason"
         ],
         "title": "CreateDataRightsRequestCommand"
-      },
-      "CreateFormalAdmissionDecisionCommand": {
-        "properties": {
-          "expected_absent": {
-            "type": "boolean",
-            "const": true,
-            "title": "Expected Absent",
-            "default": true
-          },
-          "human_judgement_acknowledged": {
-            "type": "boolean",
-            "const": true,
-            "title": "Human Judgement Acknowledged"
-          },
-          "scores": {
-            "$ref": "#/components/schemas/FormalAdmissionScoreInput"
-          },
-          "score_evidence": {
-            "type": "string",
-            "maxLength": 2000,
-            "minLength": 20,
-            "title": "Score Evidence"
-          },
-          "decision": {
-            "type": "string",
-            "enum": [
-              "ADMIT",
-              "DEFER",
-              "NOT_ADMIT"
-            ],
-            "title": "Decision"
-          },
-          "decision_reason": {
-            "type": "string",
-            "maxLength": 2000,
-            "minLength": 20,
-            "title": "Decision Reason"
-          },
-          "override_reason": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "minLength": 20
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Override Reason"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "human_judgement_acknowledged",
-          "scores",
-          "score_evidence",
-          "decision",
-          "decision_reason"
-        ],
-        "title": "CreateFormalAdmissionDecisionCommand"
       },
       "CreateIdentityLinkCommand": {
         "properties": {
@@ -5873,6 +8028,54 @@
           "request_id"
         ],
         "title": "CurrentActionResponse"
+      },
+      "DataPolicy": {
+        "properties": {
+          "production_write_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Production Write Allowed"
+          },
+          "raw_customer_data_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Raw Customer Data Allowed"
+          },
+          "ai_high_impact_decision_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Ai High Impact Decision Allowed"
+          },
+          "visibility": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "PERSON",
+                "ASSIGNED_REVIEWERS",
+                "AUTHORIZED_OPERATORS"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Visibility"
+          },
+          "retention_policy": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Retention Policy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "production_write_allowed",
+          "raw_customer_data_allowed",
+          "ai_high_impact_decision_allowed",
+          "visibility",
+          "retention_policy"
+        ],
+        "title": "DataPolicy"
       },
       "DataRightsRequestListOut": {
         "properties": {
@@ -6204,62 +8407,6 @@
             ],
             "title": "Open Review Revision"
           },
-          "admission_decision_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission Decision Id"
-          },
-          "admission_total_score": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission Total Score"
-          },
-          "admission_tier": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "A",
-                  "B",
-                  "C",
-                  "D"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission Tier"
-          },
-          "admission_decision": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ADMIT",
-                  "DEFER",
-                  "NOT_ADMIT"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admission Decision"
-          },
           "allowed_commands": {
             "items": {
               "type": "string"
@@ -6282,10 +8429,6 @@
           "assignment_statuses",
           "open_review_status",
           "open_review_revision",
-          "admission_decision_id",
-          "admission_total_score",
-          "admission_tier",
-          "admission_decision",
           "allowed_commands"
         ],
         "title": "EnrollmentOpsOut"
@@ -6333,6 +8476,9 @@
             "type": "integer",
             "title": "Review Revision"
           },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -6350,6 +8496,7 @@
           "feedback_structure_version",
           "reviewer_id",
           "review_revision",
+          "ai_use",
           "created_at"
         ],
         "title": "EvaluationOut"
@@ -6383,6 +8530,9 @@
             "maxItems": 6,
             "minItems": 1,
             "title": "Rubric Evaluations"
+          },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
           }
         },
         "additionalProperties": false,
@@ -6394,249 +8544,6 @@
           "rubric_evaluations"
         ],
         "title": "FinalizeReviewCommand"
-      },
-      "FormalAdmissionDecisionOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "enrollment_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Enrollment Id"
-          },
-          "journey_version_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Journey Version Id"
-          },
-          "outcome_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Outcome Id"
-          },
-          "total_score": {
-            "type": "integer",
-            "title": "Total Score"
-          },
-          "recommendation_tier": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ],
-            "title": "Recommendation Tier"
-          },
-          "scorecard": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Scorecard"
-          },
-          "source_evaluation_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Source Evaluation Ids"
-          },
-          "decision": {
-            "type": "string",
-            "enum": [
-              "ADMIT",
-              "DEFER",
-              "NOT_ADMIT"
-            ],
-            "title": "Decision"
-          },
-          "decision_reason": {
-            "type": "string",
-            "title": "Decision Reason"
-          },
-          "override_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Override Reason"
-          },
-          "decided_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Decided By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "idempotency_replay": {
-            "type": "boolean",
-            "title": "Idempotency Replay",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "enrollment_id",
-          "journey_version_id",
-          "outcome_id",
-          "total_score",
-          "recommendation_tier",
-          "scorecard",
-          "source_evaluation_ids",
-          "decision",
-          "decision_reason",
-          "override_reason",
-          "decided_by",
-          "created_at"
-        ],
-        "title": "FormalAdmissionDecisionOut"
-      },
-      "FormalAdmissionDecisionResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/FormalAdmissionDecisionOut"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "data",
-          "request_id"
-        ],
-        "title": "FormalAdmissionDecisionResponse"
-      },
-      "FormalAdmissionPreviewOut": {
-        "properties": {
-          "enrollment_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Enrollment Id"
-          },
-          "total_score": {
-            "type": "integer",
-            "title": "Total Score"
-          },
-          "recommendation_tier": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ],
-            "title": "Recommendation Tier"
-          },
-          "recommended_decision": {
-            "type": "string",
-            "enum": [
-              "ADMIT",
-              "DEFER",
-              "NOT_ADMIT"
-            ],
-            "title": "Recommended Decision"
-          },
-          "scorecard": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Scorecard"
-          },
-          "source_evaluation_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Source Evaluation Ids"
-          },
-          "advisory_only": {
-            "type": "boolean",
-            "const": true,
-            "title": "Advisory Only",
-            "default": true
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "enrollment_id",
-          "total_score",
-          "recommendation_tier",
-          "recommended_decision",
-          "scorecard",
-          "source_evaluation_ids"
-        ],
-        "title": "FormalAdmissionPreviewOut"
-      },
-      "FormalAdmissionPreviewResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/FormalAdmissionPreviewOut"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "data",
-          "request_id"
-        ],
-        "title": "FormalAdmissionPreviewResponse"
-      },
-      "FormalAdmissionScoreInput": {
-        "properties": {
-          "attendance_discipline": {
-            "type": "integer",
-            "maximum": 10.0,
-            "minimum": 0.0,
-            "title": "Attendance Discipline"
-          },
-          "muchener_understanding": {
-            "type": "integer",
-            "maximum": 10.0,
-            "minimum": 0.0,
-            "title": "Muchener Understanding"
-          },
-          "ai_data_fundamentals": {
-            "type": "integer",
-            "maximum": 10.0,
-            "minimum": 0.0,
-            "title": "Ai Data Fundamentals"
-          },
-          "project_organization_fit": {
-            "type": "integer",
-            "maximum": 10.0,
-            "minimum": 0.0,
-            "title": "Project Organization Fit"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "attendance_discipline",
-          "muchener_understanding",
-          "ai_data_fundamentals",
-          "project_organization_fit"
-        ],
-        "title": "FormalAdmissionScoreInput"
       },
       "FormalJourneyStageOut": {
         "properties": {
@@ -6850,6 +8757,167 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HandoffAcceptanceCommand": {
+        "properties": {
+          "next_training_stage_decision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Next Training Stage Decision Id"
+          },
+          "controlled_task_authorization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Controlled Task Authorization Id"
+          },
+          "expected_authorization_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Authorization Revision"
+          },
+          "expected_scope_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Scope Sha256"
+          },
+          "expected_task_version_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Task Version Sha256"
+          },
+          "expected_policy_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Policy Snapshot Sha256"
+          },
+          "expected_target_journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Expected Target Journey Version Id"
+          },
+          "expected_target_journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Expected Target Journey Stage Version Id"
+          },
+          "expected_target_task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Expected Target Task Version Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "next_training_stage_decision_id",
+          "controlled_task_authorization_id",
+          "expected_authorization_revision",
+          "expected_scope_sha256",
+          "expected_task_version_sha256",
+          "expected_policy_snapshot_sha256",
+          "expected_target_journey_version_id",
+          "expected_target_journey_stage_version_id",
+          "expected_target_task_version_id"
+        ],
+        "title": "HandoffAcceptanceCommand"
+      },
+      "HandoffAcceptanceOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "handoff_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Handoff Id"
+          },
+          "next_training_stage_decision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Next Training Stage Decision Id"
+          },
+          "controlled_task_authorization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Controlled Task Authorization Id"
+          },
+          "target_journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Version Id"
+          },
+          "target_journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Stage Version Id"
+          },
+          "target_task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Task Version Id"
+          },
+          "target_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Reviewer User Id"
+          },
+          "target_enrollment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Enrollment Id"
+          },
+          "target_assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Assignment Id"
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Accepted At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "handoff_id",
+          "next_training_stage_decision_id",
+          "controlled_task_authorization_id",
+          "target_journey_version_id",
+          "target_journey_stage_version_id",
+          "target_task_version_id",
+          "target_reviewer_user_id",
+          "target_enrollment_id",
+          "target_assignment_id",
+          "accepted_at"
+        ],
+        "title": "HandoffAcceptanceOut"
+      },
+      "HandoffAcceptanceResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HandoffAcceptanceOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "HandoffAcceptanceResponse"
+      },
       "HandoffAssignedReviewCommand": {
         "properties": {
           "expected_revision": {
@@ -6883,6 +8951,179 @@
           "reason"
         ],
         "title": "HandoffAssignedReviewCommand"
+      },
+      "HandoffControlledTaskAuthorizationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "ACTIVE",
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "target_journey_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Version Id"
+          },
+          "target_journey_stage_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Journey Stage Version Id"
+          },
+          "target_task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Task Version Id"
+          },
+          "task_version_sha256": {
+            "type": "string",
+            "title": "Task Version Sha256"
+          },
+          "scope_sha256": {
+            "type": "string",
+            "title": "Scope Sha256"
+          },
+          "policy_snapshot_sha256": {
+            "type": "string",
+            "title": "Policy Snapshot Sha256"
+          },
+          "primary_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Reviewer User Id"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Valid From"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "revision",
+          "target_journey_version_id",
+          "target_journey_stage_version_id",
+          "target_task_version_id",
+          "task_version_sha256",
+          "scope_sha256",
+          "policy_snapshot_sha256",
+          "primary_reviewer_user_id",
+          "valid_from",
+          "expires_at"
+        ],
+        "title": "HandoffControlledTaskAuthorizationOut"
+      },
+      "HandoffDetailOut": {
+        "properties": {
+          "handoff": {
+            "$ref": "#/components/schemas/HandoffOut"
+          },
+          "next_training_stage_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Training Stage Decision Id"
+          },
+          "next_training_stage_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "READY"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Training Stage Decision"
+          },
+          "controlled_task_authorization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffControlledTaskAuthorizationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffAcceptanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptance_status": {
+            "type": "string",
+            "enum": [
+              "DECISION_REQUIRED",
+              "AUTHORIZATION_REQUIRED",
+              "READY_TO_ACCEPT",
+              "ALREADY_ACCEPTED"
+            ],
+            "title": "Acceptance Status"
+          },
+          "production_execution_allowed": {
+            "type": "boolean",
+            "const": false,
+            "title": "Production Execution Allowed",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "handoff",
+          "next_training_stage_decision_id",
+          "next_training_stage_decision",
+          "controlled_task_authorization",
+          "acceptance",
+          "acceptance_status"
+        ],
+        "title": "HandoffDetailOut"
+      },
+      "HandoffDetailResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HandoffDetailOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "HandoffDetailResponse"
       },
       "HandoffOut": {
         "properties": {
@@ -7338,6 +9579,165 @@
         ],
         "title": "IdentityLinkResponse"
       },
+      "IncentiveLedgerEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "module_key": {
+            "type": "string",
+            "title": "Module Key"
+          },
+          "incentive_type": {
+            "type": "string",
+            "enum": [
+              "POINTS",
+              "XP",
+              "BADGE",
+              "RANK"
+            ],
+            "title": "Incentive Type"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source_outcome_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Outcome Id"
+          },
+          "rule_ref": {
+            "type": "string",
+            "title": "Rule Ref"
+          },
+          "rule_sha256": {
+            "type": "string",
+            "title": "Rule Sha256"
+          },
+          "correction_of_entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Of Entry Id"
+          },
+          "correction_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "module_key",
+          "incentive_type",
+          "amount",
+          "label",
+          "source_outcome_id",
+          "rule_ref",
+          "rule_sha256",
+          "correction_of_entry_id",
+          "correction_reason",
+          "created_at"
+        ],
+        "title": "IncentiveLedgerEntryOut"
+      },
+      "IncentiveLedgerOut": {
+        "properties": {
+          "points_total": {
+            "type": "integer",
+            "title": "Points Total"
+          },
+          "xp_total": {
+            "type": "integer",
+            "title": "Xp Total"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/IncentiveLedgerEntryOut"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "formal_effect": {
+            "type": "string",
+            "const": "NONE",
+            "title": "Formal Effect",
+            "default": "NONE"
+          },
+          "can_unlock_human_gate": {
+            "type": "boolean",
+            "const": false,
+            "title": "Can Unlock Human Gate",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "points_total",
+          "xp_total",
+          "entries"
+        ],
+        "title": "IncentiveLedgerOut"
+      },
+      "IncentiveLedgerResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IncentiveLedgerOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "IncentiveLedgerResponse"
+      },
       "InvitationControlOut": {
         "properties": {
           "state": {
@@ -7682,7 +10082,7 @@
           },
           "total_stages": {
             "type": "integer",
-            "const": 8,
+            "minimum": 0.0,
             "title": "Total Stages"
           },
           "current_stage_key": {
@@ -7746,6 +10146,9 @@
             "type": "array",
             "title": "Rubric Feedback"
           },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -7768,11 +10171,132 @@
           "decision",
           "overall_feedback",
           "rubric_feedback",
+          "ai_use",
           "created_at",
           "stage_key",
           "stage_title"
         ],
         "title": "JourneyResultEvaluationOut"
+      },
+      "LearnerEnrollmentListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LearnerEnrollmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LearnerEnrollmentListOut"
+      },
+      "LearnerEnrollmentListResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LearnerEnrollmentListOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "LearnerEnrollmentListResponse"
+      },
+      "LearnerEnrollmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_IDENTITY",
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "journey_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Version Id"
+          },
+          "journey_stable_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Stable Key"
+          },
+          "journey_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Title"
+          },
+          "journey_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Version"
+          },
+          "reviewer_display_name": {
+            "type": "string",
+            "title": "Reviewer Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "revision",
+          "journey_version_id",
+          "journey_stable_key",
+          "journey_title",
+          "journey_version",
+          "reviewer_display_name"
+        ],
+        "title": "LearnerEnrollmentOut"
       },
       "LearningMaterialCompletionOut": {
         "properties": {
@@ -7983,6 +10507,506 @@
           "required"
         ],
         "title": "LearningMaterialOut"
+      },
+      "NextTrainingStageReplacementDecisionCommand": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "DEFER",
+              "NOT_READY"
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Decision Reason"
+          },
+          "decision_evidence_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Decision Evidence Ref"
+          },
+          "decision_evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Decision Evidence Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "decision_reason",
+          "decision_evidence_ref",
+          "decision_evidence_sha256"
+        ],
+        "title": "NextTrainingStageReplacementDecisionCommand"
+      },
+      "NextTrainingStageReviewAssignmentCommand": {
+        "properties": {
+          "reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer User Id"
+          },
+          "assignment_reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Assignment Reason"
+          },
+          "assignment_evidence_ref": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Assignment Evidence Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reviewer_user_id",
+          "assignment_reason",
+          "assignment_evidence_ref"
+        ],
+        "title": "NextTrainingStageReviewAssignmentCommand"
+      },
+      "NextTrainingStageReviewAssignmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "review_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Request Id"
+          },
+          "source_decision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Decision Id"
+          },
+          "person_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Person Id"
+          },
+          "reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer User Id"
+          },
+          "assigned_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assigned By User Id"
+          },
+          "assignment_reason": {
+            "type": "string",
+            "title": "Assignment Reason"
+          },
+          "assignment_evidence_ref": {
+            "type": "string",
+            "title": "Assignment Evidence Ref"
+          },
+          "assigned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Assigned At"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "review_request_id",
+          "source_decision_id",
+          "person_id",
+          "reviewer_user_id",
+          "assigned_by_user_id",
+          "assignment_reason",
+          "assignment_evidence_ref",
+          "assigned_at"
+        ],
+        "title": "NextTrainingStageReviewAssignmentOut"
+      },
+      "NextTrainingStageReviewAssignmentResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NextTrainingStageReviewAssignmentOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NextTrainingStageReviewAssignmentResponse"
+      },
+      "NextTrainingStageReviewRequestCommand": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Reason"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evidence Refs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "NextTrainingStageReviewRequestCommand"
+      },
+      "NextTrainingStageReviewRequestListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NextTrainingStageReviewRequestOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "NextTrainingStageReviewRequestListOut"
+      },
+      "NextTrainingStageReviewRequestListResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NextTrainingStageReviewRequestListOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NextTrainingStageReviewRequestListResponse"
+      },
+      "NextTrainingStageReviewRequestOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "next_training_stage_decision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Next Training Stage Decision Id"
+          },
+          "source_decision": {
+            "type": "string",
+            "enum": [
+              "DEFER",
+              "NOT_READY"
+            ],
+            "title": "Source Decision"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "IN_REVIEW",
+              "UPHELD",
+              "OVERTURNED",
+              "RETURNED_FOR_REVIEW"
+            ],
+            "title": "Status",
+            "default": "RECEIVED"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "assigned_reviewer_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Reviewer User Id"
+          },
+          "assigned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned At"
+          },
+          "resolution_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Reason"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "replacement_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Decision Id"
+          },
+          "already_received": {
+            "type": "boolean",
+            "title": "Already Received",
+            "default": false
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "next_training_stage_decision_id",
+          "source_decision",
+          "reason",
+          "evidence_refs",
+          "requested_at"
+        ],
+        "title": "NextTrainingStageReviewRequestOut"
+      },
+      "NextTrainingStageReviewRequestResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NextTrainingStageReviewRequestOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NextTrainingStageReviewRequestResponse"
+      },
+      "NextTrainingStageReviewResolutionCommand": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPHELD",
+              "OVERTURNED",
+              "RETURNED_FOR_REVIEW"
+            ],
+            "title": "Status"
+          },
+          "resolution_reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Resolution Reason"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evidence Refs"
+          },
+          "replacement_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextTrainingStageReplacementDecisionCommand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "resolution_reason"
+        ],
+        "title": "NextTrainingStageReviewResolutionCommand"
+      },
+      "NextTrainingStageReviewResolutionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "review_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Request Id"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer User Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPHELD",
+              "OVERTURNED",
+              "RETURNED_FOR_REVIEW"
+            ],
+            "title": "Status"
+          },
+          "resolution_reason": {
+            "type": "string",
+            "title": "Resolution Reason"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Resolved At"
+          },
+          "replacement_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Decision Id"
+          },
+          "idempotency_replay": {
+            "type": "boolean",
+            "title": "Idempotency Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "review_request_id",
+          "assignment_id",
+          "reviewer_user_id",
+          "status",
+          "resolution_reason",
+          "evidence_refs",
+          "resolved_at"
+        ],
+        "title": "NextTrainingStageReviewResolutionOut"
+      },
+      "NextTrainingStageReviewResolutionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NextTrainingStageReviewResolutionOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "NextTrainingStageReviewResolutionResponse"
       },
       "NotificationDeliveryOut": {
         "properties": {
@@ -8483,6 +11507,208 @@
         ],
         "title": "OAuthStartResponse"
       },
+      "OwnerApproval": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "exploration_camp_owner",
+              "newcomer_village_owner",
+              "ai_academy_owner",
+              "delivery_guild_owner"
+            ],
+            "title": "Role"
+          },
+          "person_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Person Name"
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Signed At"
+          },
+          "decision": {
+            "type": "string",
+            "const": "APPROVED",
+            "title": "Decision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "person_name",
+          "signed_at",
+          "decision"
+        ],
+        "title": "OwnerApproval"
+      },
+      "PackageRubric": {
+        "properties": {
+          "rubric_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Rubric Id"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version"
+          },
+          "dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Dimensions"
+          },
+          "human_decision_required": {
+            "type": "boolean",
+            "const": true,
+            "title": "Human Decision Required"
+          },
+          "calibration_evidence_ref": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Calibration Evidence Ref"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rubric_id",
+          "version",
+          "dimensions",
+          "human_decision_required",
+          "calibration_evidence_ref",
+          "sha256"
+        ],
+        "title": "PackageRubric"
+      },
+      "PackageTaskVersion": {
+        "properties": {
+          "task_key": {
+            "type": "string",
+            "pattern": "^[A-Z0-9][A-Z0-9_-]{2,79}$",
+            "title": "Task Key"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version"
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Purpose"
+          },
+          "non_goals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Non Goals"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Inputs"
+          },
+          "deliverables": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Deliverables"
+          },
+          "rubric_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Rubric Id"
+          },
+          "reviewer_pool_ref": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Reviewer Pool Ref"
+          },
+          "help_path": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Help Path"
+          },
+          "execution_environment": {
+            "type": "string",
+            "enum": [
+              "SIMULATION",
+              "CONTROLLED_REAL_TASK"
+            ],
+            "title": "Execution Environment"
+          },
+          "controlled_task_authorization_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Controlled Task Authorization Ref"
+          },
+          "retention_policy": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Retention Policy"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_key",
+          "version",
+          "purpose",
+          "non_goals",
+          "inputs",
+          "deliverables",
+          "rubric_id",
+          "reviewer_pool_ref",
+          "help_path",
+          "execution_environment",
+          "retention_policy",
+          "sha256"
+        ],
+        "title": "PackageTaskVersion"
+      },
       "PresignAttachmentCommand": {
         "properties": {
           "assignment_id": {
@@ -8640,18 +11866,60 @@
         ],
         "title": "PresignedAttachmentResponse"
       },
-      "PreviewFormalAdmissionCommand": {
+      "PublishConstructionModulePackageCommand": {
         "properties": {
-          "scores": {
-            "$ref": "#/components/schemas/FormalAdmissionScoreInput"
+          "package": {
+            "$ref": "#/components/schemas/ConstructionModuleContentPackage"
+          },
+          "task_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Version Id"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner User Id"
+          },
+          "primary_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Reviewer User Id"
+          },
+          "backup_reviewer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Backup Reviewer User Id"
+          },
+          "reviewed_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewed By"
+          },
+          "expected_current_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Current Version"
+          },
+          "review_acknowledged": {
+            "type": "boolean",
+            "const": true,
+            "title": "Review Acknowledged"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "scores"
+          "package",
+          "task_version_id",
+          "owner_user_id",
+          "primary_reviewer_user_id",
+          "backup_reviewer_user_id",
+          "reviewed_by",
+          "expected_current_version",
+          "review_acknowledged"
         ],
-        "title": "PreviewFormalAdmissionCommand"
+        "title": "PublishConstructionModulePackageCommand"
       },
       "PublishContentDraftCommand": {
         "properties": {
@@ -9017,6 +12285,9 @@
             "type": "array",
             "title": "Rubric Feedback"
           },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -9031,6 +12302,7 @@
           "decision",
           "overall_feedback",
           "rubric_feedback",
+          "ai_use",
           "created_at"
         ],
         "title": "ResultEvaluationOut"
@@ -9062,24 +12334,48 @@
         ],
         "title": "ResultLearningCompletionOut"
       },
-      "ResultOperatorAdmissionOut": {
+      "ResultNextTrainingStageOut": {
         "properties": {
+          "decision_scope": {
+            "type": "string",
+            "const": "NEXT_TRAINING_STAGE",
+            "title": "Decision Scope",
+            "default": "NEXT_TRAINING_STAGE"
+          },
+          "display_name": {
+            "type": "string",
+            "const": "下一训练阶段决定",
+            "title": "Display Name",
+            "default": "下一训练阶段决定"
+          },
           "status": {
             "type": "string",
             "enum": [
-              "PENDING",
-              "DECIDED"
+              "PENDING_HUMAN_DECISION",
+              "RECORDED"
             ],
             "title": "Status"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
           },
           "decision": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "ADMIT",
+                  "READY",
                   "DEFER",
-                  "NOT_ADMIT"
+                  "NOT_READY"
                 ]
               },
               {
@@ -9099,20 +12395,19 @@
             ],
             "title": "Decision Reason"
           },
-          "total_score": {
+          "signed_by": {
             "anyOf": [
               {
-                "type": "integer",
-                "maximum": 100.0,
-                "minimum": 0.0
+                "type": "string",
+                "format": "uuid"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Total Score"
+            "title": "Signed By"
           },
-          "decided_at": {
+          "signed_at": {
             "anyOf": [
               {
                 "type": "string",
@@ -9122,18 +12417,48 @@
                 "type": "null"
               }
             ],
-            "title": "Decided At"
+            "title": "Signed At"
+          },
+          "decision_evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Evidence Ref"
+          },
+          "review_request_status": {
+            "type": "string",
+            "enum": [
+              "NOT_AVAILABLE_UNTIL_DECISION",
+              "NOT_APPLICABLE",
+              "AVAILABLE",
+              "RECEIVED"
+            ],
+            "title": "Review Request Status"
+          },
+          "can_request_review": {
+            "type": "boolean",
+            "title": "Can Request Review"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "status",
+          "decision_id",
           "decision",
           "decision_reason",
-          "decided_at"
+          "signed_by",
+          "signed_at",
+          "decision_evidence_ref",
+          "review_request_status",
+          "can_request_review"
         ],
-        "title": "ResultOperatorAdmissionOut"
+        "title": "ResultNextTrainingStageOut"
       },
       "ResultOut": {
         "properties": {
@@ -9161,11 +12486,8 @@
           "reviewer_conclusion": {
             "$ref": "#/components/schemas/ResultReviewerConclusionOut"
           },
-          "system_recommendation": {
-            "$ref": "#/components/schemas/ResultSystemRecommendationOut"
-          },
-          "operator_admission": {
-            "$ref": "#/components/schemas/ResultOperatorAdmissionOut"
+          "next_training_stage": {
+            "$ref": "#/components/schemas/ResultNextTrainingStageOut"
           },
           "evaluation": {
             "$ref": "#/components/schemas/ResultEvaluationOut"
@@ -9201,8 +12523,7 @@
           "summary",
           "learning_completion",
           "reviewer_conclusion",
-          "system_recommendation",
-          "operator_admission",
+          "next_training_stage",
           "evaluation",
           "journey_evaluations",
           "handoff",
@@ -9249,9 +12570,21 @@
             "format": "uuid",
             "title": "Reviewer Id"
           },
+          "reviewer_display_name": {
+            "type": "string",
+            "title": "Reviewer Display Name"
+          },
+          "submission_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Submission Version Id"
+          },
           "overall_feedback": {
             "type": "string",
             "title": "Overall Feedback"
+          },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
           },
           "concluded_at": {
             "type": "string",
@@ -9263,7 +12596,10 @@
         "type": "object",
         "required": [
           "reviewer_id",
+          "reviewer_display_name",
+          "submission_version_id",
           "overall_feedback",
+          "ai_use",
           "concluded_at"
         ],
         "title": "ResultReviewerConclusionOut"
@@ -9303,65 +12639,6 @@
           "feedback"
         ],
         "title": "ResultRubricFeedbackOut"
-      },
-      "ResultSystemRecommendationOut": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING_OPERATOR_INPUT",
-              "RECORDED"
-            ],
-            "title": "Status"
-          },
-          "advisory_only": {
-            "type": "boolean",
-            "const": true,
-            "title": "Advisory Only",
-            "default": true
-          },
-          "recommendation_tier": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "A",
-                  "B",
-                  "C",
-                  "D"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Recommendation Tier"
-          },
-          "recommended_decision": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ADMIT",
-                  "DEFER",
-                  "NOT_ADMIT"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Recommended Decision"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "status",
-          "recommendation_tier",
-          "recommended_decision"
-        ],
-        "title": "ResultSystemRecommendationOut"
       },
       "ReviewAttachmentOut": {
         "properties": {
@@ -9461,6 +12738,11 @@
             "type": "integer",
             "title": "Submission Version No"
           },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
           "assigned_at": {
             "type": "string",
             "format": "date-time",
@@ -9490,9 +12772,34 @@
             ],
             "title": "Material Status"
           },
+          "feedback_sla_business_days": {
+            "type": "integer",
+            "title": "Feedback Sla Business Days"
+          },
+          "revision_count": {
+            "type": "integer",
+            "title": "Revision Count"
+          },
+          "sensitivity": {
+            "type": "string",
+            "title": "Sensitivity"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          },
+          "conflict_status": {
+            "type": "string",
+            "const": "NOT_EVALUATED",
+            "title": "Conflict Status",
+            "default": "NOT_EVALUATED"
+          },
           "submission_body": {
             "type": "string",
             "title": "Submission Body"
+          },
+          "submission_ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
           },
           "task_purpose": {
             "type": "string",
@@ -9557,11 +12864,17 @@
           "task_title",
           "task_version",
           "submission_version_no",
+          "submitted_at",
           "assigned_at",
           "started_at",
           "priority_reason",
           "material_status",
+          "feedback_sla_business_days",
+          "revision_count",
+          "sensitivity",
+          "audience",
           "submission_body",
+          "submission_ai_use",
           "task_purpose",
           "completion_criteria",
           "required_deliverables",
@@ -9772,6 +13085,11 @@
             "type": "integer",
             "title": "Submission Version No"
           },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
           "assigned_at": {
             "type": "string",
             "format": "date-time",
@@ -9800,6 +13118,28 @@
               "INCOMPLETE"
             ],
             "title": "Material Status"
+          },
+          "feedback_sla_business_days": {
+            "type": "integer",
+            "title": "Feedback Sla Business Days"
+          },
+          "revision_count": {
+            "type": "integer",
+            "title": "Revision Count"
+          },
+          "sensitivity": {
+            "type": "string",
+            "title": "Sensitivity"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          },
+          "conflict_status": {
+            "type": "string",
+            "const": "NOT_EVALUATED",
+            "title": "Conflict Status",
+            "default": "NOT_EVALUATED"
           }
         },
         "additionalProperties": false,
@@ -9816,10 +13156,15 @@
           "task_title",
           "task_version",
           "submission_version_no",
+          "submitted_at",
           "assigned_at",
           "started_at",
           "priority_reason",
-          "material_status"
+          "material_status",
+          "feedback_sla_business_days",
+          "revision_count",
+          "sensitivity",
+          "audience"
         ],
         "title": "ReviewQueueItemOut"
       },
@@ -9858,6 +13203,191 @@
         ],
         "title": "ReviewQueueResponse"
       },
+      "ReviewerPolicy": {
+        "properties": {
+          "pool_ref": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Pool Ref"
+          },
+          "primary_reviewers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Primary Reviewers"
+          },
+          "backup_reviewers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Backup Reviewers"
+          },
+          "first_response_sla_minutes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "First Response Sla Minutes"
+          },
+          "completion_sla_minutes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Completion Sla Minutes"
+          },
+          "escalation_owner": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Escalation Owner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pool_ref",
+          "primary_reviewers",
+          "backup_reviewers",
+          "first_response_sla_minutes",
+          "completion_sla_minutes",
+          "escalation_owner"
+        ],
+        "title": "ReviewerPolicy"
+      },
+      "ReviewerWorkloadListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewerWorkloadOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ReviewerWorkloadListOut"
+      },
+      "ReviewerWorkloadListResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReviewerWorkloadListOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ReviewerWorkloadListResponse"
+      },
+      "ReviewerWorkloadOut": {
+        "properties": {
+          "binding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Binding Id"
+          },
+          "module_key": {
+            "type": "string",
+            "enum": [
+              "ai-academy",
+              "delivery-guild"
+            ],
+            "title": "Module Key"
+          },
+          "package_id": {
+            "type": "string",
+            "title": "Package Id"
+          },
+          "package_version": {
+            "type": "string",
+            "title": "Package Version"
+          },
+          "primary_reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Reviewer Id"
+          },
+          "primary_reviewer_display_name": {
+            "type": "string",
+            "title": "Primary Reviewer Display Name"
+          },
+          "backup_reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Backup Reviewer Id"
+          },
+          "backup_reviewer_display_name": {
+            "type": "string",
+            "title": "Backup Reviewer Display Name"
+          },
+          "first_response_sla_minutes": {
+            "type": "integer",
+            "title": "First Response Sla Minutes"
+          },
+          "completion_sla_minutes": {
+            "type": "integer",
+            "title": "Completion Sla Minutes"
+          },
+          "active_enrollment_count": {
+            "type": "integer",
+            "title": "Active Enrollment Count"
+          },
+          "open_review_count": {
+            "type": "integer",
+            "title": "Open Review Count"
+          },
+          "overdue_review_count": {
+            "type": "integer",
+            "title": "Overdue Review Count"
+          },
+          "capacity_limit": {
+            "type": "null",
+            "title": "Capacity Limit"
+          },
+          "capacity_status": {
+            "type": "string",
+            "const": "PENDING_OWNER_CONTENT",
+            "title": "Capacity Status"
+          },
+          "replacement_scope": {
+            "type": "string",
+            "const": "PRIMARY_OR_NAMED_BACKUP_ONLY",
+            "title": "Replacement Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "binding_id",
+          "module_key",
+          "package_id",
+          "package_version",
+          "primary_reviewer_id",
+          "primary_reviewer_display_name",
+          "backup_reviewer_id",
+          "backup_reviewer_display_name",
+          "first_response_sla_minutes",
+          "completion_sla_minutes",
+          "active_enrollment_count",
+          "open_review_count",
+          "overdue_review_count",
+          "capacity_status",
+          "replacement_scope"
+        ],
+        "title": "ReviewerWorkloadOut"
+      },
       "RevisionCommand": {
         "properties": {
           "expected_revision": {
@@ -9872,6 +13402,28 @@
           "expected_revision"
         ],
         "title": "RevisionCommand"
+      },
+      "RevokeControlledTaskAuthorizationCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "RevokeControlledTaskAuthorizationCommand"
       },
       "RevokeExternalIdentityCommand": {
         "properties": {
@@ -10639,6 +14191,9 @@
             "type": "array",
             "maxItems": 5,
             "title": "Attachment Ids"
+          },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
           }
         },
         "additionalProperties": false,
@@ -10847,6 +14402,9 @@
             "type": "string",
             "title": "Body"
           },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -10903,6 +14461,14 @@
               }
             ],
             "title": "Feedback"
+          },
+          "rubric_feedback": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rubric Feedback"
           }
         },
         "additionalProperties": false,
@@ -10911,12 +14477,14 @@
           "id",
           "version_no",
           "body",
+          "ai_use",
           "created_at",
           "attachments",
           "review_id",
           "review_status",
           "decision",
-          "feedback"
+          "feedback",
+          "rubric_feedback"
         ],
         "title": "SubmissionVersionOut"
       },

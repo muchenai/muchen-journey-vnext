@@ -1,8 +1,9 @@
 from functools import lru_cache
 from typing import Annotated
 from urllib.parse import urlsplit
+from uuid import UUID
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -45,6 +46,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://journey_next:journey_next_dev@localhost:5432/journey_next_dev"
     allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
     allow_fixture_identity: bool = False
+    release_marker: str = "DEVELOPMENT"
+    canary_learner_user_ids: Annotated[list[UUID], NoDecode] = Field(
+        default_factory=list
+    )
     session_secret: str = "journey-next-local-session-secret-change-me"
     invite_secret: str = "journey-next-local-invite-secret-change-me"
     import_signing_key: str = "journey-next-local-import-signing-key-change-me"
@@ -83,6 +88,15 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
+    @field_validator("canary_learner_user_ids", mode="before")
+    @classmethod
+    def split_canary_learner_user_ids(cls, value: object) -> object:
+        if value in (None, ""):
+            return []
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
     @field_validator("app_env")
     @classmethod
     def validate_environment(cls, value: str) -> str:
@@ -94,6 +108,26 @@ class Settings(BaseSettings):
     def fixture_identity_is_never_nonlocal(self) -> "Settings":
         if self.allow_fixture_identity and self.app_env not in {"local", "test"}:
             raise ValueError("ALLOW_FIXTURE_IDENTITY may only be enabled in local/test")
+        if self.release_marker not in {
+            "DEVELOPMENT",
+            "CONTROLLED_ALPHA",
+            "PRODUCTION_CANARY_UAT",
+        }:
+            raise ValueError("RELEASE_MARKER is unsupported")
+        canary_ids = set(self.canary_learner_user_ids)
+        if len(canary_ids) != len(self.canary_learner_user_ids):
+            raise ValueError("CANARY_LEARNER_USER_IDS must be unique")
+        if len(canary_ids) > 8:
+            raise ValueError("CANARY_LEARNER_USER_IDS may contain at most 8 learners")
+        if canary_ids and self.release_marker != "PRODUCTION_CANARY_UAT":
+            raise ValueError(
+                "CANARY_LEARNER_USER_IDS require RELEASE_MARKER=PRODUCTION_CANARY_UAT"
+            )
+        if self.release_marker == "PRODUCTION_CANARY_UAT":
+            if self.app_env != "production":
+                raise ValueError("PRODUCTION_CANARY_UAT requires APP_ENV=production")
+            if self.allow_fixture_identity:
+                raise ValueError("PRODUCTION_CANARY_UAT forbids fixture identity")
         if self.app_env in {"staging", "production"}:
             insecure_defaults = {
                 "journey-next-local-session-secret-change-me",

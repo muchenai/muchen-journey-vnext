@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 
+import { FactLabel } from "@/app/human-experience";
 import { identityPageRequest, ReviewDetail } from "@/lib/server/api";
 import { ReviewWorkbench } from "./review-workbench";
 
@@ -68,6 +69,9 @@ export default async function ReviewPage({
         <span>{review.priority_reason}</span>
         <span>分配于 {formatDate(review.assigned_at)}</span>
       </div>
+      <p className="status-meta">
+        固定 SubmissionVersion <code>{review.submission_version_id}</code> · Rubric V{review.rubric.version} · 冲突检查 {review.conflict_status}
+      </p>
       {query.started === "yes" ? (
         <p className="success-text" role="status">评审已开始，任务状态已同步为评审中。</p>
       ) : null}
@@ -119,8 +123,15 @@ export default async function ReviewPage({
       </section>
 
       <section className="review-section" aria-labelledby="submission-title">
+        <FactLabel kind="completion" />
         <h2 id="submission-title">固定提交正文</h2>
         <p className="status-meta">该正文属于 SubmissionVersion {review.submission_version_no}，评审不会修改它。</p>
+        <p className="status-meta">
+          <FactLabel kind="ai" />{" "}
+          AI 披露：{review.submission_ai_use.used
+            ? `已使用（${review.submission_ai_use.purpose}）；只作建议`
+            : "未使用"}
+        </p>
         <div className="submission">{submissionWithSafeLinks(review.submission_body)}</div>
       </section>
 
@@ -135,6 +146,7 @@ export default async function ReviewPage({
 
       {review.evaluation ? (
         <section className="review-section evaluation-history" aria-labelledby="evaluation-title">
+          <FactLabel kind="human" />
           <p className="eyebrow">只读结论历史</p>
           <h2 id="evaluation-title">{DECISION_LABELS[review.evaluation.overall_decision]}</h2>
           <p className="status-meta">
@@ -144,6 +156,11 @@ export default async function ReviewPage({
             <strong>总体反馈</strong>
             <p>{review.evaluation.overall_feedback}</p>
           </div>
+          <p className="status-meta">
+            Reviewer AI 披露：{review.evaluation.ai_use.used
+              ? `已使用（${review.evaluation.ai_use.purpose}）；不替代真人决定`
+              : "未使用"}
+          </p>
           <ol className="evaluation-list">
             {review.evaluation.rubric_evaluations.map((item) => (
               <li key={item.dimension_key}>
@@ -167,6 +184,12 @@ export default async function ReviewPage({
           finalizeIdempotencyKey={randomUUID()}
         />
       )}
+      <aside className="review-governance-note">
+        <h2>结论与申诉边界</h2>
+        <p>只有具名 Reviewer 提交完整 Rubric 与理由后，服务端才会追加不可变真人结论；AI 建议不能代签。</p>
+        <p>通用高影响申诉政策尚未获批准；本页不承诺申诉入口或 SLA。已批准的下一训练阶段独立复核在学员结果页单独处理。</p>
+        <p>若提交结果未知，请保留当前页面与 request ID，重新查询此 Review；不要重复点击或猜测 Evaluation 已写入。</p>
+      </aside>
     </article>
   );
 }

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "remediation_id": "exploration-camp-private-invite-orientation-v2",
+  "kind": "IMPLEMENTATION_READY_CONTRACT_ONLY",
+  "status": "RUNTIME_NOT_IMPLEMENTED",
+  "map": "exploration-camp",
+  "golden_path_id": "exploration-camp-first-meaningful-action",
+  "creates_second_golden_path": false,
+  "authoritative_contract_ref": "config/muchen_journey_product.json#/current_golden_path",
+  "frozen_baseline": {
+    "commit": "a9381f0944fb4c8c852c115e3bc708363ac67a37",
+    "candidate_manifest_ref": "outputs/muchen-journey-candidates/exploration-camp-first-meaningful-action-20260823-r1.json",
+    "mutation_allowed": false
+  },
+  "exact_path": {
+    "starts_at": "private-invitation-entry",
+    "ends_at": "first-required-learning-material-opened",
+    "routes": ["/", "/join", "/app"]
+  },
+  "problem": {
+    "severity": "P1",
+    "id": "DIRECT_INVITE_BYPASSES_FIVE_MAP_ORIENTATION",
+    "evidence_ref": "outputs/map-workstreams/exploration-camp/evaluator-report.md",
+    "statement": "A natural /join#token private invitation bypasses the only existing five-map orientation surface before the first required material."
+  },
+  "learner_visible_contract": {
+    "placement": "SERVER_RENDERED_ON_JOIN_BEFORE_THE_FIRST_FORM_PRIMARY_ACTION",
+    "orientation_facts": [
+      "Muchen Journey contains five maps",
+      "Exploration Camp is map 1 and the current starting map",
+      "Use the one current primary action, then open the first required Exploration Camp material"
+    ],
+    "interactive_elements_added": 0,
+    "primary_action_count_per_actionable_state": 1,
+    "future_map_navigation_added": false
+  },
+  "states": [
+    "FRAGMENT_PRESENT_UNEXCHANGED",
+    "NO_FRAGMENT_MANUAL_RECOVERY",
+    "JOIN_CONTEXT_READY",
+    "REENTRY_CONTEXT_READY",
+    "PENDING_SUBMISSION",
+    "INVALID_EXPIRED_REVOKED_OR_RATE_LIMITED"
+  ],
+  "security_and_domain_invariants": [
+    "fragment-token-format-unchanged",
+    "fragment-cleared-from-visible-url-after-hydration",
+    "token-absent-from-visible-copy-console-and-screenshots",
+    "single-use-exchange-unchanged",
+    "identity-and-role-resolution-unchanged",
+    "csrf-cookie-and-header-contract-unchanged",
+    "enrollment-assignment-and-reentry-semantics-unchanged",
+    "no-api-schema-database-or-business-fact-migration"
+  ],
+  "runtime_write_set_ref": "outputs/map-workstreams/exploration-camp/remediation-v2/runtime-write-set.json",
+  "machine_acceptance_ref": "outputs/map-workstreams/exploration-camp/remediation-v2/acceptance.md",
+  "human_acceptance_source": "config/muchen_journey_product.json#/current_golden_path/human_acceptance",
+  "candidate_state": {
+    "ready_for_human": false,
+    "human_gate_inferred": false,
+    "release_authorized": false,
+    "production_mutation_executed": false
+  },
+  "expected_preimplementation_evaluator_verdict": "BLOCKED_NO_RUNNABLE_TARGET"
+}

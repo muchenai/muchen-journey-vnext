@@ -1,0 +1,41 @@
+:root {
+  --mj-map-exploration-camp-canvas: #e6f1ef;
+  --mj-map-exploration-camp-canvas-ink: #173e5c;
+  --mj-map-exploration-camp-surface: #173e5c;
+  --mj-map-exploration-camp-surface-ink: #ffffff;
+  --mj-map-exploration-camp-accent: #efb43e;
+  --mj-map-exploration-camp-accent-ink: #173e5c;
+  --mj-map-exploration-camp-path: #147b78;
+
+  --mj-map-newcomer-village-canvas: #b9d9d1;
+  --mj-map-newcomer-village-canvas-ink: #173d35;
+  --mj-map-newcomer-village-surface: #315d49;
+  --mj-map-newcomer-village-surface-ink: #ffffff;
+  --mj-map-newcomer-village-accent: #f3b34b;
+  --mj-map-newcomer-village-accent-ink: #173d35;
+  --mj-map-newcomer-village-path: #91aa72;
+
+  --mj-map-ai-academy-canvas: #e7e9ff;
+  --mj-map-ai-academy-canvas-ink: #192b61;
+  --mj-map-ai-academy-surface: #192b61;
+  --mj-map-ai-academy-surface-ink: #ffffff;
+  --mj-map-ai-academy-accent: #f6d77b;
+  --mj-map-ai-academy-accent-ink: #192b61;
+  --mj-map-ai-academy-path: #4d52a6;
+
+  --mj-map-delivery-guild-canvas: #f5e6df;
+  --mj-map-delivery-guild-canvas-ink: #3e2930;
+  --mj-map-delivery-guild-surface: #3e2930;
+  --mj-map-delivery-guild-surface-ink: #ffffff;
+  --mj-map-delivery-guild-accent: #e0a054;
+  --mj-map-delivery-guild-accent-ink: #3e2930;
+  --mj-map-delivery-guild-path: #9c4d3c;
+
+  --mj-map-boss-dungeon-canvas: #e5e3e9;
+  --mj-map-boss-dungeon-canvas-ink: #252431;
+  --mj-map-boss-dungeon-surface: #252431;
+  --mj-map-boss-dungeon-surface-ink: #ffffff;
+  --mj-map-boss-dungeon-accent: #dc5a5f;
+  --mj-map-boss-dungeon-accent-ink: #100f18;
+  --mj-map-boss-dungeon-path: #5e3745;
+}

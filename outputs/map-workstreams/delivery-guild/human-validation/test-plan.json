@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "artifact_type": "HUMAN_VALIDATION_TEST_PLAN",
+  "status": "NOT_RUN",
+  "map": "delivery-guild",
+  "golden_path_id": "delivery-guild-first-bounded-evidence-draft",
+  "frozen_candidate_commit": "9b222163ca5137acd2f1d726a8686c6675eb5089",
+  "contract_ref": "outputs/map-workstreams/delivery-guild/contract.json#/active_golden_paths/0/human_acceptance",
+  "runtime_entry": "prototypes/delivery-guild/index.html",
+  "starts_at": "synthetic-readiness-and-ai-capability-snapshot",
+  "ends_at": "local-reviewable-evidence-or-retrospective-draft-formed",
+  "sample": {
+    "required_count": 3,
+    "participant_ids": [
+      "participant-01",
+      "participant-02",
+      "participant-03"
+    ],
+    "target_profile": [
+      "potential target learner for a bounded delivery collaboration experience",
+      "can independently read the Chinese prototype copy",
+      "has never used or reviewed this frozen candidate",
+      "was not involved in designing or building this candidate",
+      "agrees to use only synthetic sandbox content and no real business data"
+    ],
+    "exclude_if": [
+      "participant has seen the path or acceptance criteria before the session",
+      "participant helped create or review the candidate",
+      "participant cannot give voluntary informed consent",
+      "session would require real customer, project, person, or production data"
+    ]
+  },
+  "session": {
+    "facilitation": "UNPROMPTED_NO_EXPLANATION",
+    "fresh_local_state_required": true,
+    "real_customer_connection": false,
+    "real_project_connection": false,
+    "external_messages": false,
+    "production_mutation": false,
+    "timer_starts": "when the first screen is visible and the participant says they are starting",
+    "timer_ends": "when the local pending draft confirmation screen first becomes visible",
+    "maximum_first_draft_seconds": 180,
+    "rescue_interventions_allowed": 0
+  },
+  "human_acceptance": [
+    {
+      "id": "task-boundary-comprehension",
+      "threshold": "3/3 target learners",
+      "required_observations": [
+        "task_goal",
+        "one_non_goal",
+        "allowed_data",
+        "done_condition"
+      ],
+      "collection_point": "before the participant enters collaboration",
+      "prompt_rule": "Use only the neutral scripted comprehension prompt; do not name the required dimensions."
+    },
+    {
+      "id": "responsibility-comprehension",
+      "threshold": "3/3 target learners",
+      "required_observations": [
+        "learner_owns_factual_accuracy_and_uncertainty",
+        "ai_may_only_assist_structure_and_checks",
+        "mentor_performs_human_review"
+      ],
+      "collection_point": "after responsibilities are read and before drafting",
+      "prompt_rule": "Use only the neutral scripted comprehension prompt; do not name any role."
+    },
+    {
+      "id": "first-draft-within-3-minutes",
+      "threshold": "3/3 target learners within 3 minutes",
+      "required_observations": [
+        "draft_confirmation_visible_within_180_seconds",
+        "participant_states_draft_is_browser_local_and_pending",
+        "participant_states_draft_is_not_submitted_shared_evidence",
+        "participant_states_human_review_is_next"
+      ],
+      "collection_point": "at the first local pending draft confirmation",
+      "prompt_rule": "Ask only the scripted status question after stopping the timer."
+    },
+    {
+      "id": "clarity-and-willingness",
+      "threshold": "median >= 4/5 for both questions",
+      "required_observations": [
+        "task_boundary_clarity_1_to_5",
+        "willingness_to_continue_to_human_review_1_to_5"
+      ],
+      "collection_point": "after the status question",
+      "prompt_rule": "Read the two rating questions exactly as written."
+    },
+    {
+      "id": "zero-facilitator-rescue",
+      "threshold": "0 interventions",
+      "required_observations": [
+        "rescue_intervention_count"
+      ],
+      "collection_point": "throughout the measured path",
+      "prompt_rule": "Scripted measurement prompts are not rescue; any unscripted explanation, direction, terminology help, or next-action cue is rescue."
+    }
+  ],
+  "aggregate_decision": {
+    "initial_status": "NOT_RUN",
+    "pass_requires_all_human_acceptance": true,
+    "machine_evidence_may_substitute": false,
+    "map_may_release_itself": false,
+    "allowed_evaluator_verdicts_after_valid_sessions": [
+      "HUMAN_FAIL",
+      "HUMAN_PASS_CURRENT_GOLDEN_PATH"
+    ]
+  }
+}

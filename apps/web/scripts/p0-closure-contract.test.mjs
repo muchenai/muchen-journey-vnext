@@ -17,20 +17,21 @@ const contentPublicationPanel = await readFile(
   "utf8",
 );
 
-test("a fresh invite completes exchange and identity confirmation in one learner action", () => {
-  assert.match(actions, /export async function acceptInvite/);
-  assert.match(actions, /acceptInvite[\s\S]*?\/api\/v1\/join\/exchange/);
-  assert.match(actions, /acceptInvite[\s\S]*?\/api\/v1\/identity\/confirm/);
-  assert.match(inviteForm, /action=\{acceptInvite\}/);
-  assert.match(inviteForm, /走进第一站/);
+test("a fresh invite separates secure exchange from explicit identity confirmation", () => {
+  assert.match(actions, /export async function exchangeInvite/);
+  assert.match(actions, /exchangeInvite[\s\S]*?\/api\/v1\/join\/exchange/);
+  assert.match(actions, /export async function confirmIdentity/);
+  assert.match(actions, /confirmIdentity[\s\S]*?\/api\/v1\/identity\/confirm/);
+  assert.match(inviteForm, /action=\{exchangeInvite\}/);
+  assert.match(inviteForm, /验证专属邀请/);
   assert.doesNotMatch(inviteForm, /打开通行证/);
 });
 
 test("learner reentry is explicit and restores the existing journey", () => {
   assert.match(actions, /createLearnerReentry[\s\S]*?&flow=reentry/);
   assert.match(actions, /createLearnerInvite[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
-  assert.match(inviteForm, /恢复原有进度，不会创建新的学习记录/);
-  assert.match(inviteForm, /回到旅程/);
+  assert.match(actions, /flow: "JOIN" \| "REENTRY"/);
+  assert.match(actions, /JOIN_SUMMARY_COOKIE/);
 });
 
 test("https links embedded in frozen text materials remain clickable without unsafe html", () => {

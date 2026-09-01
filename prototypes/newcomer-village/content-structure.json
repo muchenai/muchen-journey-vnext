@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "artifact_type": "ISOLATED_RUNNABLE_GOLDEN_PATH",
+  "map": "newcomer-village",
+  "map_name": "新手村",
+  "map_order": 2,
+  "state": "ISOLATED_DRAFT_BUILD",
+  "contract_ref": "../../outputs/map-workstreams/newcomer-village/contract.json",
+  "formal_golden_path_promoted": false,
+  "depends_on_exploration_camp_human_pass": false,
+  "shared_fact_sources": "READ_ONLY",
+  "prototype_data": "SYNTHETIC_FIXTURE_ONLY",
+  "route": "/prototypes/newcomer-village/index.html",
+  "start": "isolated-arrival-with-authorized-context-snapshot",
+  "end": "local-evidence-draft-receipt-after-self-attested-real-action",
+  "states": [
+    "arrival",
+    "context-review",
+    "action-plan",
+    "action-check",
+    "evidence-capture",
+    "receipt"
+  ],
+  "experience_sequence": [
+    {
+      "key": "arrival_orientation",
+      "input": "visible isolation and Exploration Camp human-gate status",
+      "output": "learner chooses to inspect context"
+    },
+    {
+      "key": "context_review",
+      "input": "synthetic person-growth-baseline and role/organization field structure",
+      "output": "learner distinguishes source, status, and fact boundary"
+    },
+    {
+      "key": "first_real_action",
+      "input": "one of three bounded collaboration actions plus a time plan",
+      "output": "action card for work outside the prototype"
+    },
+    {
+      "key": "evidence_and_feedback",
+      "input": "self-attested real action, counterpart role, observation, repeatable behavior",
+      "output": "ephemeral local evidence draft"
+    },
+    {
+      "key": "map_handoff",
+      "input": "human-reviewed evidence draft after future authorized integration",
+      "output": "controller-owned role-and-collaboration-readiness write; not implemented here"
+    }
+  ],
+  "recovery": {
+    "storage": "sessionStorage",
+    "scope": "current browser tab only",
+    "truth_status": "DISPOSABLE_DRAFT_NOT_SHARED_FACT",
+    "restart": "explicitly clears the isolated draft"
+  },
+  "prohibited_assumptions": [
+    "Exploration Camp human validation has passed",
+    "a prototype click proves a real-world interaction",
+    "the local draft has been written to a shared Evidence Ledger",
+    "synthetic fixture values describe a real person or company",
+    "role readiness is an employment decision",
+    "the draft is integrated, promoted, released, or production ready"
+  ]
+}

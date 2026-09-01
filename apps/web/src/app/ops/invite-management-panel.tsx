@@ -201,7 +201,7 @@ function PublishFormalJourneyForm({
       <div>
         <strong>发布正式探索营 V2</strong>
         <p className="status-meta">
-          V2 包含完整一天学习输入、四个宝藏、三项真实评测及人工准入评分。V1 与现有 Enrollment 不迁移。
+          V2 包含四个宝藏与三项实操评测。下一训练阶段由另行授权的真人决定，不在此发布动作中产生；V1 与现有 Enrollment 不迁移。
         </p>
       </div>
       <input type="hidden" name="expected_current_version" value={expectedCurrentVersion} />

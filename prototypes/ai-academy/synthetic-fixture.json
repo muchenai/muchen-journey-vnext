@@ -1,0 +1,69 @@
+{
+  "fixture_type": "SYNTHETIC_LEARNING_FIXTURE",
+  "fixture_version": "ai-academy-first-practice-v1",
+  "formal_course": false,
+  "person": {
+    "display_name": "林晓（合成人物）",
+    "capability_goal": "把模糊的工作任务转成可核验、可复用的 AI 工作请求。"
+  },
+  "role": {
+    "display_name": "客户成功伙伴（合成岗位）",
+    "capability_requirement": "能向 AI 说明预期产出、必要背景、边界约束与验收方法，并对结果承担人工复核责任。"
+  },
+  "learning_input": {
+    "title": "第一份学习输入：四格工作请求",
+    "summary": "在让 AI 开始工作前，先补齐四类信息。它们减少猜测，但不会替你完成事实核对或业务判断。",
+    "parts": [
+      {
+        "key": "outcome",
+        "label": "01 · 产出",
+        "prompt": "要得到什么可交付结果？谁会使用它？"
+      },
+      {
+        "key": "context",
+        "label": "02 · 背景",
+        "prompt": "AI 必须知道哪些任务背景、对象与已有材料？"
+      },
+      {
+        "key": "constraints",
+        "label": "03 · 边界",
+        "prompt": "哪些内容不能猜、不能泄露，哪些决定必须由人作出？"
+      },
+      {
+        "key": "verification",
+        "label": "04 · 核验",
+        "prompt": "人将用什么标准检查完整性、准确性与可用性？"
+      }
+    ]
+  },
+  "practice": {
+    "title": "练习：为客户复盘准备一份 AI 工作请求",
+    "scenario": "合成场景：你要把一段内部会议笔记交给 AI，请它整理成下周客户复盘的准备稿。笔记可能包含不确定信息，最终稿必须由你复核后才能使用。",
+    "fields": [
+      {
+        "key": "outcome",
+        "label": "你要 AI 交付什么？",
+        "hint": "说明格式、使用者与用途。",
+        "minimum": 12
+      },
+      {
+        "key": "context",
+        "label": "AI 必须知道哪些背景？",
+        "hint": "说明已有材料、客户场景与任务上下文。",
+        "minimum": 16
+      },
+      {
+        "key": "constraints",
+        "label": "它必须遵守哪些边界？",
+        "hint": "处理不确定信息、敏感内容和人工决定。",
+        "minimum": 16
+      },
+      {
+        "key": "verification",
+        "label": "你会怎样核验结果？",
+        "hint": "写出至少一种具体的人工作业检查。",
+        "minimum": 12
+      }
+    ]
+  }
+}

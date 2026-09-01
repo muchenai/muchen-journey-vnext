@@ -1,0 +1,124 @@
+{
+  "schema_version": "module-content-package.v1",
+  "package_id": "delivery-guild-p0-2026-09-01",
+  "module_key": "delivery-guild",
+  "version": "1.0.0",
+  "owner": {
+    "role": "delivery_guild_owner",
+    "person_name": "段超群",
+    "signed_at": "2026-08-27T07:30:29+08:00",
+    "decision": "APPROVED"
+  },
+  "source_refs": [
+    "SRC-OWNER-03",
+    "SRC-GOV-01",
+    "SRC-WIKI-04"
+  ],
+  "effective_at": "2026-08-27T07:30:29+08:00",
+  "content_items": [
+    {
+      "content_id": "DLG-ORIENTATION-01",
+      "title": "交付线公会使命、边界与证据说明",
+      "version": "1.0.0",
+      "source_ref": "SRC-WIKI-04",
+      "owner": "段超群",
+      "estimated_minutes": 15,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "6ad81335658e3c12b6c66f1c85775e025018f980537d8ed8a343a059441782c9"
+    },
+    {
+      "content_id": "DLG-HANDOFF-GUIDE-01",
+      "title": "可追溯交付与交接包指南",
+      "version": "1.0.0",
+      "source_ref": "SRC-WIKI-04",
+      "owner": "段超群",
+      "estimated_minutes": 20,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "71451720e908681cb4b3acb92a6321f9c00be16bf6844ed52d1dd02261495e09"
+    }
+  ],
+  "task_versions": [
+    {
+      "task_key": "DLG-P1-TRACEABLE-HANDOFF",
+      "version": "1.0.0",
+      "purpose": "把一个模拟或脱敏任务整理成接收人无需口头补充即可核验、继续执行并发现风险的交接包。",
+      "non_goals": [
+        "直接操作生产系统",
+        "上传客户原始数据",
+        "只写心得或周报",
+        "用AI生成内容替代个人核验",
+        "产生项目准入或岗位等级结论"
+      ],
+      "inputs": [
+        "合成或获批脱敏的任务背景",
+        "交付物样例",
+        "质量要求和限制条件"
+      ],
+      "deliverables": [
+        "一页范围、目标和成功定义",
+        "输入输出与证据链接索引",
+        "质量检查清单和抽样结果",
+        "风险、未知项和停止线",
+        "下一责任人、下一行动和回退建议",
+        "AI使用披露",
+        "可访问的交接包链接"
+      ],
+      "rubric_id": "DLG-P1-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "055d9090cdc47a0979d9c321258f1f9209b264a0bd9cb12cf13441916e8885bc"
+    }
+  ],
+  "rubrics": [
+    {
+      "rubric_id": "DLG-P1-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "范围和成功定义清楚",
+        "证据链接可访问且可追溯",
+        "质量检查可复现",
+        "风险、未知项和停止线完整",
+        "接收人能独立完成下一行动"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#DLG-P1-R1",
+      "sha256": "c28efb22ecdb8a4bb7e398544778dc12b9f3addf3b224fe381f7973ca08c50b1"
+    }
+  ],
+  "reviewer_policy": {
+    "pool_ref": "REVIEW-POOL-2026-09-01-P0",
+    "primary_reviewers": [
+      "万雨欣"
+    ],
+    "backup_reviewers": [
+      "屠元琦"
+    ],
+    "first_response_sla_minutes": 1440,
+    "completion_sla_minutes": 2880,
+    "escalation_owner": "屠元琦"
+  },
+  "data_policy": {
+    "production_write_allowed": false,
+    "raw_customer_data_allowed": false,
+    "ai_high_impact_decision_allowed": false,
+    "visibility": [
+      "PERSON",
+      "ASSIGNED_REVIEWERS",
+      "AUTHORIZED_OPERATORS"
+    ],
+    "retention_policy": "180_DAYS"
+  },
+  "sha256": "682726a89084f1cbe5cfb3a84e3207ee353d594796a00e27ad815c0a69f890bc"
+}

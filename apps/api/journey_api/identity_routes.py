@@ -6,15 +6,19 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import (
+    Actor,
+    enforce_canary_invite_target,
+    get_actor,
+    require_role,
+)
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import canonical_hash, find_replay, store_result
 from journey_api.journey_service import (
-    create_formal_assignments,
-    journey_stages,
-    validate_published_structure,
+    create_journey_assignments,
+    invitable_journey_stages,
 )
 from journey_api.identity import (
     CSRF_COOKIE,
@@ -199,6 +203,7 @@ def create_invite(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.OPERATOR)
+    enforce_canary_invite_target(command.target_user_id)
     payload = command.model_dump(mode="json")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     replay = find_replay(
@@ -258,12 +263,15 @@ def create_invite(
             )
         )
         stages = (
-            journey_stages(session, journey_version.id, actor.organization_id)
+            invitable_journey_stages(
+                session,
+                journey_version_id=journey_version.id,
+                organization_id=actor.organization_id,
+                reviewer_id=command.reviewer_id,
+            )
             if journey_version is not None
             else []
         )
-        if journey_version is not None:
-            validate_published_structure(stages)
         resolved_task_version_id = stages[0].task_version_id if stages else None
     else:
         resolved_task_version_id = command.task_version_id
@@ -582,6 +590,7 @@ def create_learner_reentry(
     )
     if learner is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "Learner 身份已停用或角色已移除。")
+    enforce_canary_invite_target(learner.id)
     assignment = session.scalar(
         select(Assignment)
         .where(
@@ -764,6 +773,7 @@ def exchange_invite(
     if invite is None:
         deny_exchange(session, request, invite=None, message="邀请无效，请联系运营重新获取。")
     assert invite is not None
+    enforce_canary_invite_target(invite.target_user_id)
     now = utc_now()
     if invite.status != InviteStatus.ACTIVE:
         deny_exchange(session, request, invite=invite, message="邀请已失效，请联系运营重新获取。")
@@ -847,6 +857,7 @@ def exchange_invite(
     )
     context = JoinContext(
         id=uuid.uuid4(),
+        organization_id=invite.organization_id,
         invite_id=invite.id,
         user_id=user.id,
         enrollment_id=enrollment.id,
@@ -940,6 +951,7 @@ def confirm_identity(
         or user.status not in {UserStatus.PENDING_IDENTITY, UserStatus.ACTIVE}
     ):
         raise ApiError(410, "INVITE_EXPIRED_OR_REVOKED", "邀请已失效，请联系运营。")
+    enforce_canary_invite_target(user.id)
 
     if context.created_user:
         if command.display_name is None:
@@ -976,7 +988,7 @@ def confirm_identity(
         enrollment.status = EnrollmentStatus.ACTIVE
         enrollment.revision += 1
         if invite.journey_version_id is not None:
-            assignments = create_formal_assignments(session, enrollment=enrollment)
+            assignments = create_journey_assignments(session, enrollment=enrollment)
             assignment = assignments[0]
         else:
             task_version = session.scalar(

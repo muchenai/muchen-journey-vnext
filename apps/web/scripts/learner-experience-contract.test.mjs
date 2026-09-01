@@ -171,7 +171,7 @@ test("join and result pages keep operational explanations below the primary expe
   assert.match(stageTitle, /\(\?:能力\)\?评测\[一二三\]/);
   assert.match(resultPage, /treasureNodes\.map\(\(node, index\)/);
   assert.doesNotMatch(resultPage, /const treasureLabels =/);
-  assert.match(resultPage, /learnerPageRequest<CurrentAction>\("\/api\/v1\/me\/current-action"\)/);
+  assert.match(resultPage, /learnerPageRequest<CurrentAction>\(`\/api\/v1\/me\/current-action\$\{resultQuery\}`\)/);
   assert.match(resultPage, /aria-label="回看启程"/);
   assert.match(resultPage, /aria-label=\{`回看宝藏/);
   assert.match(resultPage, /aria-label=\{`回看能力评测/);
@@ -190,12 +190,12 @@ test("the map and result share the published Journey stage titles", () => {
   assert.match(resultPage, /stageDisplayTitle\(evaluation\.stage_title\)/);
 });
 
-test("the golden path starts as a journey instead of a generic session shortcut", () => {
+test("the golden path starts from the governed shared home and private orientation", () => {
   assert.match(homePage, /一天，八站。带走四份认知与三项真实能力证据/);
   assert.match(homePage, /Day 0 · 启程/);
-  assert.match(joinPage, /className="join-scene"/);
-  assert.match(joinPage, /第一站已经为你亮起/);
-  assert.match(joinPage, /走进第一站/);
+  assert.match(joinPage, /<PrivateInviteOrientation/);
+  assert.match(joinPage, /验证你的专属邀请/);
+  assert.match(joinPage, /进入探索营/);
   assert.match(api, /export async function hasLearnerSession/);
   assert.match(api, /\/api\/v1\/me\/current-action/);
   assert.doesNotMatch(layout, /hasLearnerSession|learnerPageRequest/);

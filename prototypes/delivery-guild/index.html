@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Muchen Journey 交付线工会第一条黄金路径隔离候选；仅使用合成数据，不连接真实客户、项目或共享事实源。">
+  <link rel="icon" href="data:,">
+  <title>交付线工会 · 第一份交付证据草稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5e6df;
+      --canvas-soft: #fcf7f2;
+      --ink: #342329;
+      --muted: #75666a;
+      --guild: #3e2930;
+      --guild-soft: #5a3a43;
+      --copper: #9c4d3c;
+      --gold: #e0a054;
+      --mint: #c7e0d2;
+      --success: #236448;
+      --danger: #a43f32;
+      --line: rgba(62, 41, 48, .16);
+      --shadow: 0 26px 70px rgba(62, 41, 48, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; scroll-behavior: smooth; background: var(--canvas-soft); }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 4% 4%, rgba(224, 160, 84, .22), transparent 24rem),
+        radial-gradient(circle at 96% 18%, rgba(156, 77, 60, .13), transparent 30rem),
+        var(--canvas-soft);
+      font: 16px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { min-height: 48px; }
+    h1, h2, h3, p { margin-top: 0; }
+    [hidden] { display: none !important; }
+
+    .isolation-banner {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 20px;
+      color: #fff9f5;
+      background: var(--guild);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-align: center;
+    }
+
+    .shell { width: min(1160px, calc(100% - 40px)); margin: 0 auto; padding: 26px 0 72px; }
+
+    .topbar {
+      display: flex;
+      min-height: 58px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand { font-size: 17px; font-weight: 900; letter-spacing: -.02em; }
+    .stage-label { color: var(--copper); font-size: 12px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 0 0 22px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .progress li { min-width: 0; }
+    .progress-bar { display: block; height: 5px; margin-bottom: 8px; background: #eadbd4; border-radius: 99px; }
+    .progress li.active .progress-bar, .progress li.done .progress-bar { background: var(--copper); }
+    .progress-copy { display: flex; align-items: baseline; gap: 6px; color: var(--muted); font-size: 11px; }
+    .progress li.active .progress-copy { color: var(--ink); font-weight: 800; }
+    .progress-index { font-variant-numeric: tabular-nums; font-weight: 900; }
+
+    .screen {
+      overflow: hidden;
+      min-height: 640px;
+      background: rgba(255, 253, 250, .93);
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      box-shadow: var(--shadow);
+    }
+
+    .screen-grid { display: grid; min-height: 640px; grid-template-columns: minmax(300px, .76fr) minmax(0, 1.24fr); }
+
+    .story-panel {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(30px, 4.4vw, 56px);
+      color: #fffaf6;
+      background:
+        linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px),
+        linear-gradient(145deg, var(--guild-soft), var(--guild));
+      background-size: 28px 28px, 28px 28px, auto;
+    }
+
+    .story-panel::after {
+      position: absolute;
+      right: -52px;
+      bottom: -48px;
+      width: 210px;
+      height: 210px;
+      border: 28px solid rgba(224, 160, 84, .19);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .eyebrow { margin-bottom: 18px; color: #f0c68f; font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .story-panel h1, .story-panel h2 { max-width: 11ch; margin-bottom: 22px; font-size: clamp(38px, 4vw, 58px); line-height: 1.04; letter-spacing: -.055em; }
+    .story-panel .lede { max-width: 29ch; color: #eadde0; font-size: 17px; }
+    .system-note { position: relative; z-index: 1; margin-top: 34px; padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, .16); color: #d7c4ca; font-size: 12px; }
+
+    .work-panel { display: flex; min-width: 0; flex-direction: column; padding: clamp(28px, 4vw, 54px); }
+    .work-panel > .primary { margin-top: auto; align-self: flex-start; }
+    .section-heading { margin-bottom: 25px; }
+    .section-heading h2 { margin-bottom: 8px; font-size: clamp(28px, 3vw, 40px); line-height: 1.12; letter-spacing: -.035em; }
+    .section-heading p { max-width: 62ch; margin-bottom: 0; color: var(--muted); }
+
+    .truth-key { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .truth-pill { padding: 6px 10px; color: var(--muted); background: #f4ece7; border-radius: 99px; font-size: 11px; font-weight: 800; }
+    .truth-pill.synthetic { color: #7b3a2d; background: #fae3d8; }
+    .truth-pill.system { color: #385e4b; background: #e1eee7; }
+    .truth-pill.person { color: #634e17; background: #fff0bf; }
+
+    .profile-grid, .boundary-grid, .role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .info-card { min-width: 0; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 18px; }
+    .info-card.accent { background: #fff8ee; border-color: rgba(224, 160, 84, .45); }
+    .info-card h3 { margin-bottom: 8px; font-size: 16px; }
+    .info-card p { margin-bottom: 0; color: var(--muted); font-size: 13px; }
+    .meter { overflow: hidden; height: 7px; margin: 15px 0 9px; background: #eadfda; border-radius: 99px; }
+    .meter span { display: block; width: var(--value); height: 100%; background: var(--copper); border-radius: inherit; }
+    .meter-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+
+    .task-title { padding: 18px 20px; margin-bottom: 14px; color: #fff; background: var(--copper); border-radius: 18px; }
+    .task-title strong { display: block; margin-bottom: 3px; font-size: 19px; }
+    .task-title span { color: #f9ddd6; font-size: 12px; }
+    .boundary-card { padding: 17px 18px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+    .boundary-card strong { display: block; margin-bottom: 5px; color: var(--copper); font-size: 12px; letter-spacing: .04em; }
+    .boundary-card span { font-size: 14px; }
+    .boundary-card.wide { grid-column: 1 / -1; }
+
+    .warning { display: flex; gap: 12px; margin-top: 15px; padding: 14px 16px; color: #704237; background: #fff0e8; border: 1px solid #efc9bb; border-radius: 14px; font-size: 12px; }
+    .warning::before { flex: 0 0 auto; content: "◈"; font-weight: 900; }
+
+    .role-card { padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 17px; }
+    .role-card .role-kicker { display: block; margin-bottom: 5px; color: var(--copper); font-size: 11px; font-weight: 900; letter-spacing: .08em; }
+    .role-card h3 { margin-bottom: 6px; font-size: 16px; }
+    .role-card p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+    .role-card.owner { color: #fff; background: var(--guild); }
+    .role-card.owner .role-kicker { color: #f0c68f; }
+    .role-card.owner p { color: #dfcfd3; }
+
+    .acknowledgement { display: flex; gap: 12px; align-items: flex-start; margin: 18px 0 24px; padding: 15px; background: #f8f1ed; border-radius: 14px; cursor: pointer; }
+    .acknowledgement input { width: 21px; height: 21px; margin: 2px 0 0; accent-color: var(--copper); }
+    .acknowledgement span { font-size: 13px; }
+
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 22px; padding: 5px; background: #f2e8e3; border-radius: 16px; }
+    .mode-switch button { color: var(--muted); background: transparent; border: 0; border-radius: 12px; cursor: pointer; font-weight: 800; }
+    .mode-switch button[aria-pressed="true"] { color: #fff; background: var(--guild); box-shadow: 0 8px 20px rgba(62, 41, 48, .16); }
+
+    .form-grid { display: grid; gap: 15px; }
+    .field { display: grid; gap: 7px; }
+    .field label { font-size: 13px; font-weight: 850; }
+    .field small { color: var(--muted); }
+    .field input, .field textarea {
+      width: 100%;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid #cdbdb7;
+      border-radius: 13px;
+      outline: none;
+    }
+    .field input { min-height: 48px; padding: 10px 13px; }
+    .field textarea { min-height: 98px; padding: 12px 13px; resize: vertical; }
+    .field input:focus, .field textarea:focus { border-color: var(--copper); box-shadow: 0 0 0 3px rgba(156, 77, 60, .14); }
+    .error { min-height: 22px; margin: 8px 0 0; color: var(--danger); font-size: 12px; font-weight: 750; }
+
+    .primary {
+      min-width: 220px;
+      padding: 13px 22px;
+      color: #fff;
+      background: var(--copper);
+      border: 0;
+      border-radius: 14px;
+      box-shadow: 0 12px 28px rgba(156, 77, 60, .23);
+      cursor: pointer;
+      font-weight: 900;
+    }
+    .primary:hover { background: #873f31; }
+    .primary:focus-visible, .secondary:focus-visible, .mode-switch button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    .primary:disabled { color: #8c7d81; background: #e3d9d6; box-shadow: none; cursor: not-allowed; }
+    .secondary { min-height: 44px; padding: 8px 12px; color: var(--copper); background: transparent; border: 0; cursor: pointer; font-weight: 800; }
+
+    .draft-card { padding: 23px; background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--success); border-radius: 18px; }
+    .draft-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 18px; }
+    .pending-badge { padding: 6px 9px; color: var(--success); background: #e1f0e8; border-radius: 99px; font-size: 11px; font-weight: 900; }
+    .draft-time { color: var(--muted); font-size: 11px; }
+    .draft-list { display: grid; gap: 12px; margin: 0; }
+    .draft-list div { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .draft-list div:last-child { padding-bottom: 0; border-bottom: 0; }
+    .draft-list dt { margin-bottom: 3px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .draft-list dd { margin: 0; overflow-wrap: anywhere; font-size: 14px; white-space: pre-wrap; }
+    .completion-note { margin: 18px 0 22px; padding: 15px 16px; color: #315846; background: #e8f3ed; border-radius: 14px; font-size: 12px; }
+    .end-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; }
+
+    .footer-note { margin: 18px 4px 0; color: var(--muted); font-size: 11px; text-align: center; }
+
+    @media (max-width: 860px) {
+      .screen-grid { grid-template-columns: 1fr; }
+      .story-panel { min-height: 330px; }
+      .story-panel h1, .story-panel h2 { max-width: 16ch; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 24px, 1160px); padding-top: 16px; }
+      .topbar { min-height: 66px; align-items: flex-start; flex-direction: column; justify-content: center; gap: 1px; }
+      .progress-copy span:last-child { overflow: hidden; max-width: 9ch; text-overflow: ellipsis; white-space: nowrap; }
+      .screen { min-height: 0; border-radius: 24px; }
+      .screen-grid { min-height: 0; }
+      .story-panel { min-height: 310px; padding: 28px 24px; }
+      .story-panel h1, .story-panel h2 { font-size: 40px; }
+      .work-panel { min-height: 510px; padding: 28px 22px; }
+      .profile-grid, .boundary-grid, .role-grid { grid-template-columns: 1fr; }
+      .boundary-card.wide { grid-column: auto; }
+      .primary { width: 100%; min-width: 0; }
+      .end-actions { align-items: stretch; flex-direction: column; }
+      .end-actions .secondary { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="isolation-banner">隔离候选 · 全部人物与任务均为合成沙盒数据 · 不连接真实客户、项目、外部消息或共享 Evidence Ledger</div>
+
+  <main class="shell">
+    <header class="topbar">
+      <span class="brand">Muchen Journey · 交付线工会</span>
+      <span class="stage-label" id="stage-label">01 / 04 · 准备度</span>
+    </header>
+
+    <ol class="progress" aria-label="黄金路径进度">
+      <li class="active" data-progress="1"><span class="progress-bar"></span><span class="progress-copy"><span class="progress-index">01</span><span>读档案</span></span></li>
+      <li data-progress="2"><span class="progress-bar"></span><span class="progress-copy"><span class="progress-index">02</span><span>看边界</span></span></li>
+      <li data-progress="3"><span class="progress-bar"></span><span class="progress-copy"><span class="progress-index">03</span><span>明责任</span></span></li>
+      <li data-progress="4"><span class="progress-bar"></span><span class="progress-copy"><span class="progress-index">04</span><span>留输入</span></span></li>
+    </ol>
+
+    <section class="screen" id="screen-1" aria-labelledby="title-1">
+      <div class="screen-grid">
+        <div class="story-panel">
+          <p class="eyebrow">MAP 04 / 05 · DELIVERY GUILD</p>
+          <h1 id="title-1">先看清你带来了什么。</h1>
+          <p class="lede">角色准备度与 AI 能力档案只帮助你选择合适的成长任务，不形成任何用人或绩效结论。</p>
+          <p class="system-note">系统状态：合成演示快照 · 只读 · 不对应任何真人</p>
+        </div>
+        <div class="work-panel">
+          <div class="section-heading">
+            <h2>你的沙盒准备快照</h2>
+            <p>先确认已有基础与需要练习的部分，再进入一项边界清晰的交付任务。</p>
+          </div>
+          <div class="truth-key" aria-label="信息类型">
+            <span class="truth-pill synthetic">合成事实</span>
+            <span class="truth-pill system">系统状态</span>
+          </div>
+          <div class="profile-grid">
+            <article class="info-card">
+              <h3>角色与协作准备度</h3>
+              <p>能复述目标并同步进度；需要练习在开始前声明非目标与升级条件。</p>
+              <div class="meter" aria-label="合成准备度 3 / 5"><span style="--value: 60%"></span></div>
+              <div class="meter-label"><span>合成档案</span><strong>3 / 5</strong></div>
+            </article>
+            <article class="info-card accent">
+              <h3>AI 能力档案</h3>
+              <p>能用 AI 组织结构与检查遗漏；事实核对、交付判断和最终责任仍由你承担。</p>
+              <div class="meter" aria-label="合成能力 4 / 5"><span style="--value: 80%"></span></div>
+              <div class="meter-label"><span>合成档案</span><strong>4 / 5</strong></div>
+            </article>
+          </div>
+          <p class="warning">这些数值是体验夹具，不是评价、排名或雇佣决定，也不会写回 Person、Capability 或 Progress。</p>
+          <button class="primary" type="button" data-next="2">查看沙盒任务</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-2" aria-labelledby="title-2" hidden>
+      <div class="screen-grid">
+        <div class="story-panel">
+          <p class="eyebrow">SANDBOX BRIEF · 任务边界</p>
+          <h2 id="title-2">先知道什么不做。</h2>
+          <p class="lede">边界先于行动。你只整理一份模拟交付检查清单，不触碰真实项目。</p>
+          <p class="system-note">任务状态：本地沙盒 · 无客户 · 无发送对象 · 无生产连接</p>
+        </div>
+        <div class="work-panel">
+          <div class="section-heading">
+            <h2>模拟交付检查清单</h2>
+            <p>阅读完整边界后，再决定进入协作。</p>
+          </div>
+          <div class="task-title"><strong>目标：找出模拟交付包缺少的 3 项检查</strong><span>任务编号 DG-SANDBOX-001 · 仅用于本地体验</span></div>
+          <div class="boundary-grid">
+            <div class="boundary-card"><strong>非目标</strong><span>不修改交付物，不联系客户，不替项目做放行决定。</span></div>
+            <div class="boundary-card"><strong>允许数据</strong><span>仅使用页面内虚构任务描述与本人输入；禁止粘贴真实业务信息。</span></div>
+            <div class="boundary-card"><strong>时间盒</strong><span>15 分钟；超时后记录未决项，不扩大范围。</span></div>
+            <div class="boundary-card"><strong>完成条件</strong><span>形成 3 项检查与 1 个需导师复核的问题草稿。</span></div>
+            <div class="boundary-card wide"><strong>升级条件</strong><span>发现数据来源不明、权限不清或事实无法核对时，停止并交由导师判断。</span></div>
+          </div>
+          <p class="warning">继续只会进入本地协作演练；不会创建真实任务、邀请协作者或发送消息。</p>
+          <button class="primary" type="button" data-next="3">确认边界，进入协作</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-3" aria-labelledby="title-3" hidden>
+      <div class="screen-grid">
+        <div class="story-panel">
+          <p class="eyebrow">COLLABORATION · 责任不是平均分</p>
+          <h2 id="title-3">协作清楚，证据才可信。</h2>
+          <p class="lede">AI 能帮你整理与提醒，但不能替你确认事实；导师复核也不会替代你的说明责任。</p>
+          <p class="system-note">治理边界：成长辅助，不自动形成绩效或人员结论</p>
+        </div>
+        <div class="work-panel">
+          <div class="section-heading">
+            <h2>四方协作责任</h2>
+            <p>在留下输入之前，先分清谁行动、谁协助、谁复核。</p>
+          </div>
+          <div class="role-grid">
+            <article class="role-card owner"><span class="role-kicker">YOU · 最终说明责任</span><h3>你 / 任务执行者</h3><p>核对输入事实，声明不确定性，记录实际行动与结果。</p></article>
+            <article class="role-card"><span class="role-kicker">COLLABORATOR</span><h3>模拟协作者</h3><p>补充上下文与异议；本原型不会邀请任何真人。</p></article>
+            <article class="role-card"><span class="role-kicker">MENTOR · 人工复核</span><h3>导师</h3><p>检查证据是否充分并给出发展反馈；当前尚未发生。</p></article>
+            <article class="role-card"><span class="role-kicker">AI · 辅助工具</span><h3>AI 助手</h3><p>建议结构、提示遗漏；不判断事实、不提交、不做人员决定。</p></article>
+          </div>
+          <label class="acknowledgement">
+            <input id="responsibility-ack" type="checkbox">
+            <span>我理解：我负责事实准确与不确定性说明；AI 只辅助；导师进行人工复核；本次不会向任何人发送内容。</span>
+          </label>
+          <button class="primary" id="responsibility-next" type="button" data-next="4" disabled>开始留下第一份输入</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-4" aria-labelledby="title-4" hidden>
+      <div class="screen-grid">
+        <div class="story-panel">
+          <p class="eyebrow">FIRST INPUT · 只留必要信息</p>
+          <h2 id="title-4">把行动变成可复核的输入。</h2>
+          <p class="lede">选择“项目证据”或“复盘输入”。两者都会成为浏览器本地待复核草稿，不进入共享台账。</p>
+          <p class="system-note">隐私提醒：请勿输入真实客户、项目、人员或商业数据</p>
+        </div>
+        <div class="work-panel">
+          <div class="section-heading">
+            <h2>形成第一份本地草稿</h2>
+            <p>最少填写三个字段；清楚区分你的输入与尚未发生的人工复核。</p>
+          </div>
+          <div class="mode-switch" aria-label="草稿类型">
+            <button type="button" data-mode="evidence" aria-pressed="true">项目证据</button>
+            <button type="button" data-mode="retro" aria-pressed="false">复盘输入</button>
+          </div>
+
+          <form id="draft-form" novalidate>
+            <div class="form-grid" id="evidence-fields">
+              <div class="field"><label for="evidence-action">我实际做了什么</label><textarea id="evidence-action" name="action" maxlength="280" placeholder="示例：核对了模拟交付包的范围、来源与放行条件。"></textarea></div>
+              <div class="field"><label for="evidence-result">形成了什么结果</label><textarea id="evidence-result" name="result" maxlength="280" placeholder="示例：列出 3 项缺失检查，并标注 1 个需导师确认的问题。"></textarea></div>
+              <div class="field"><label for="evidence-source">可核对来源</label><input id="evidence-source" name="source" maxlength="120" placeholder="示例：DG-SANDBOX-001 页面内任务描述"></div>
+            </div>
+            <div class="form-grid" id="retro-fields" hidden>
+              <div class="field"><label for="retro-observation">我观察到什么</label><textarea id="retro-observation" name="observation" maxlength="280" placeholder="示例：开始前先写非目标，能更早发现范围误解。"></textarea></div>
+              <div class="field"><label for="retro-impact">这带来什么影响</label><textarea id="retro-impact" name="impact" maxlength="280" placeholder="示例：减少了无关检查，也暴露了一个权限问题。"></textarea></div>
+              <div class="field"><label for="retro-next">下次我会怎样调整</label><input id="retro-next" name="next" maxlength="120" placeholder="示例：在同步进度时同时标注升级条件"></div>
+            </div>
+            <div class="field" style="margin-top:15px"><label for="uncertainty">仍需人工复核的不确定性</label><input id="uncertainty" name="uncertainty" maxlength="160" placeholder="示例：来源完整性是否足以支持放行（必填）"></div>
+            <p class="error" id="form-error" role="alert" aria-live="polite"></p>
+            <button class="primary" type="submit">保存为待复核草稿</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-5" aria-labelledby="title-5" hidden>
+      <div class="screen-grid">
+        <div class="story-panel">
+          <p class="eyebrow">DRAFT FORMED · 尚未提交</p>
+          <h2 id="title-5">第一份输入，已经可供复核。</h2>
+          <p class="lede">你完成的是本地待复核草稿。下一步应由真人导师判断它是否足以成为共享交付证据。</p>
+          <p class="system-note">系统状态：仅存于当前浏览器 · 未发送 · 未进入共享 Evidence Ledger</p>
+        </div>
+        <div class="work-panel">
+          <div class="section-heading">
+            <h2>草稿检查</h2>
+            <p>事实、你的输入、人工复核与系统状态保持分开。</p>
+          </div>
+          <article class="draft-card" aria-label="待复核草稿">
+            <div class="draft-status"><span class="pending-badge">浏览器本地 · 待人工复核</span><span class="draft-time" id="draft-time"></span></div>
+            <dl class="draft-list" id="draft-output"></dl>
+          </article>
+          <p class="completion-note">黄金路径已到达终点：草稿已形成，但没有真人验收、导师反馈、共享写入、地图晋级或发布。</p>
+          <div class="end-actions">
+            <button class="primary" id="review-draft" type="button">重新检查草稿</button>
+            <button class="secondary" id="reset-draft" type="button">清除本地草稿并重新开始</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer-note">交付线工会隔离候选 · delivery-guild-first-bounded-evidence-draft · 不代表真人通过、总控集成或正式发布</p>
+  </main>
+
+  <script>
+    (() => {
+      const storageKey = "muchen-journey.delivery-guild.v1";
+      const stageLabels = {
+        1: "01 / 04 · 准备度",
+        2: "02 / 04 · 任务边界",
+        3: "03 / 04 · 协作责任",
+        4: "04 / 04 · 第一份输入",
+        5: "终点 · 待复核草稿"
+      };
+      const fieldLabels = {
+        action: "实际行动",
+        result: "形成结果",
+        source: "可核对来源",
+        observation: "观察",
+        impact: "影响",
+        next: "下次调整",
+        uncertainty: "待人工复核的不确定性"
+      };
+      let mode = "evidence";
+
+      const screens = [...document.querySelectorAll(".screen")];
+      const progressItems = [...document.querySelectorAll("[data-progress]")];
+      const stageLabel = document.querySelector("#stage-label");
+      const ack = document.querySelector("#responsibility-ack");
+      const responsibilityNext = document.querySelector("#responsibility-next");
+      const form = document.querySelector("#draft-form");
+      const error = document.querySelector("#form-error");
+
+      function showScreen(step, focus = true) {
+        screens.forEach((screen) => { screen.hidden = screen.id !== `screen-${step}`; });
+        stageLabel.textContent = stageLabels[step];
+        const progressStep = Math.min(step, 4);
+        progressItems.forEach((item) => {
+          const index = Number(item.dataset.progress);
+          item.classList.toggle("active", index === progressStep);
+          item.classList.toggle("done", index < progressStep || step === 5);
+        });
+        if (focus) {
+          document.querySelector(`#screen-${step} h1, #screen-${step} h2`)?.focus?.({ preventScroll: true });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }
+
+      document.querySelectorAll("[data-next]").forEach((button) => {
+        button.addEventListener("click", () => showScreen(Number(button.dataset.next)));
+      });
+
+      ack.addEventListener("change", () => { responsibilityNext.disabled = !ack.checked; });
+
+      document.querySelectorAll("[data-mode]").forEach((button) => {
+        button.addEventListener("click", () => {
+          mode = button.dataset.mode;
+          document.querySelectorAll("[data-mode]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+          document.querySelector("#evidence-fields").hidden = mode !== "evidence";
+          document.querySelector("#retro-fields").hidden = mode !== "retro";
+          error.textContent = "";
+        });
+      });
+
+      function collectDraft() {
+        const names = mode === "evidence" ? ["action", "result", "source"] : ["observation", "impact", "next"];
+        const values = Object.fromEntries(names.map((name) => [name, form.elements[name].value.trim()]));
+        values.uncertainty = form.elements.uncertainty.value.trim();
+        return { mode, values, savedAt: new Date().toISOString(), state: "LOCAL_PENDING_HUMAN_REVIEW" };
+      }
+
+      function renderDraft(draft) {
+        const typeLabel = draft.mode === "evidence" ? "项目证据" : "复盘输入";
+        const rows = [["草稿类型", typeLabel], ...Object.entries(draft.values).map(([key, value]) => [fieldLabels[key], value])];
+        document.querySelector("#draft-output").replaceChildren(...rows.map(([label, value]) => {
+          const wrapper = document.createElement("div");
+          const term = document.createElement("dt");
+          const detail = document.createElement("dd");
+          term.textContent = label;
+          detail.textContent = value;
+          wrapper.append(term, detail);
+          return wrapper;
+        }));
+        document.querySelector("#draft-time").textContent = `保存于 ${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(draft.savedAt))}`;
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const draft = collectDraft();
+        const fieldNames = mode === "evidence" ? ["action", "result", "source", "uncertainty"] : ["observation", "impact", "next", "uncertainty"];
+        const firstMissing = fieldNames.find((name) => !draft.values[name]);
+        if (firstMissing) {
+          error.textContent = "请完成当前草稿的全部字段；每一项都是人工复核所需的最少信息。";
+          form.elements[firstMissing].focus();
+          return;
+        }
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(draft));
+        } catch {
+          error.textContent = "浏览器未允许本地保存。请调整本地存储设置后重试；内容尚未发送。";
+          return;
+        }
+        renderDraft(draft);
+        showScreen(5);
+      });
+
+      form.addEventListener("input", () => { error.textContent = ""; });
+
+      document.querySelector("#review-draft").addEventListener("click", () => showScreen(4));
+      document.querySelector("#reset-draft").addEventListener("click", () => {
+        localStorage.removeItem(storageKey);
+        form.reset();
+        mode = "evidence";
+        ack.checked = false;
+        responsibilityNext.disabled = true;
+        document.querySelector("#evidence-fields").hidden = false;
+        document.querySelector("#retro-fields").hidden = true;
+        document.querySelectorAll("[data-mode]").forEach((item) => item.setAttribute("aria-pressed", String(item.dataset.mode === "evidence")));
+        error.textContent = "";
+        showScreen(1);
+      });
+
+      try {
+        const savedDraft = JSON.parse(localStorage.getItem(storageKey));
+        if (savedDraft?.state === "LOCAL_PENDING_HUMAN_REVIEW" && savedDraft?.values && savedDraft?.savedAt) {
+          renderDraft(savedDraft);
+          showScreen(5, false);
+        }
+      } catch {
+        localStorage.removeItem(storageKey);
+      }
+    })();
+  </script>
+</body>
+</html>

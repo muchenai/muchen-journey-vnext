@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "contract_id": "MJ-HX-V1.0",
+  "phases": [
+    {
+      "phase": "HX-IMPL-001",
+      "order": 1,
+      "scope": "共享壳、五类事实标签、权威投影、唯一动作与锁定/空/错误态",
+      "depends_on": [
+        "MJ-HX-V1.0",
+        "existing CurrentAction API"
+      ],
+      "stop_if": [
+        "authority ambiguous",
+        "enabled CTA has no executable path"
+      ]
+    },
+    {
+      "phase": "HX-IMPL-002",
+      "order": 2,
+      "scope": "四模块入口和未批准扩展失败关闭",
+      "depends_on": [
+        "HX-IMPL-001",
+        "controlled release projection",
+        "module content package hashes"
+      ],
+      "stop_if": [
+        "content/reviewer/rubric/security binding missing"
+      ]
+    },
+    {
+      "phase": "HX-IMPL-003",
+      "order": 3,
+      "scope": "任务详情、行动、AI 自查、确认提交、等待、返工、重提、通过、申诉回链",
+      "depends_on": [
+        "HX-IMPL-001",
+        "shared Assignment/Submission/Review state machine"
+      ],
+      "stop_if": [
+        "review skipped",
+        "immutable version overwritten",
+        "unsigned decision"
+      ]
+    },
+    {
+      "phase": "HX-IMPL-004",
+      "order": 4,
+      "scope": "Reviewer/运营队列、主备、容量失败关闭、批准 SLA、通知/升级/证据回链",
+      "depends_on": [
+        "HX-IMPL-003",
+        "reviewer-workload API"
+      ],
+      "stop_if": [
+        "assignment unavailable",
+        "conflict unresolved",
+        "unapproved capacity shown"
+      ]
+    },
+    {
+      "phase": "HX-IMPL-005",
+      "order": 5,
+      "scope": "弱网/错误恢复、幂等、移动端、键盘、读屏、焦点、减少动态效果",
+      "depends_on": [
+        "HX-IMPL-001",
+        "HX-IMPL-004"
+      ],
+      "stop_if": [
+        "data loss",
+        "dead CTA",
+        "keyboard or screen-reader blocker"
+      ]
+    },
+    {
+      "phase": "HX-IMPL-006",
+      "order": 6,
+      "scope": "完整机器 Gate、traceability、候选证据与 NOT_RUN 真人 UAT 计划",
+      "depends_on": [
+        "HX-IMPL-001",
+        "HX-IMPL-002",
+        "HX-IMPL-003",
+        "HX-IMPL-004",
+        "HX-IMPL-005"
+      ],
+      "stop_if": [
+        "evidence missing",
+        "candidate drift",
+        "human evidence fabricated"
+      ]
+    }
+  ]
+}

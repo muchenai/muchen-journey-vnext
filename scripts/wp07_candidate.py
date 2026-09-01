@@ -23,7 +23,7 @@ FULL_SHA = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 MANIFEST_SCHEMA_VERSION = 2
 ALEMBIC_REVISION_MAX_LENGTH = 32
-GHCR_PREFIX = "ghcr.io/muchenai2024-creator/muchen-journey-vnext"
+GHCR_PREFIX = "ghcr.io/muchenai/muchen-journey-vnext"
 TRACE_IDS = (
     "ISO-MUST-001",
     "ISO-MUST-002",
@@ -129,32 +129,57 @@ def assignments(path: Path) -> dict[str, Any]:
 
 
 def migration() -> dict[str, Any]:
-    revisions: dict[str, str | None] = {}
+    revisions: dict[str, tuple[str, ...]] = {}
     for path in sorted((ROOT / "migrations" / "versions").glob("*.py")):
         values = assignments(path)
         revision, parent = values.get("revision"), values.get("down_revision")
-        if not isinstance(revision, str) or (parent is not None and not isinstance(parent, str)):
-            raise CandidateError(f"migration metadata must be literal and linear: {path.name}")
+        if not isinstance(revision, str):
+            raise CandidateError(f"migration revision must be literal: {path.name}")
+        if parent is None:
+            parents: tuple[str, ...] = ()
+        elif isinstance(parent, str):
+            parents = (parent,)
+        elif (
+            isinstance(parent, tuple)
+            and parent
+            and all(isinstance(item, str) for item in parent)
+        ):
+            parents = parent
+        else:
+            raise CandidateError(f"migration parents must be literal revision IDs: {path.name}")
         if not revision or len(revision) > ALEMBIC_REVISION_MAX_LENGTH:
             raise CandidateError(
                 f"migration revision must be 1-{ALEMBIC_REVISION_MAX_LENGTH} characters: {path.name}"
             )
         if revision in revisions:
             raise CandidateError(f"duplicate migration revision: {revision}")
-        revisions[revision] = parent
-    roots = [item for item, parent in revisions.items() if parent is None]
-    heads = [item for item in revisions if item not in {parent for parent in revisions.values()}]
+        revisions[revision] = parents
+    all_parents = {parent for parents in revisions.values() for parent in parents}
+    roots = [item for item, parents in revisions.items() if not parents]
+    heads = [item for item in revisions if item not in all_parents]
     if roots != ["0001_initial"] or len(heads) != 1:
-        raise CandidateError(f"migration chain must have root 0001_initial and one head: {roots}, {heads}")
+        raise CandidateError(
+            f"migration graph must have root 0001_initial and one head: {roots}, {heads}"
+        )
     seen: set[str] = set()
-    cursor: str | None = heads[0]
-    while cursor:
-        if cursor in seen or cursor not in revisions:
-            raise CandidateError(f"migration chain is cyclic or disconnected at {cursor}")
-        seen.add(cursor)
-        cursor = revisions[cursor]
+    visiting: set[str] = set()
+
+    def visit(revision_id: str) -> None:
+        if revision_id in visiting:
+            raise CandidateError(f"migration graph is cyclic at {revision_id}")
+        if revision_id in seen:
+            return
+        if revision_id not in revisions:
+            raise CandidateError(f"migration graph references missing revision {revision_id}")
+        visiting.add(revision_id)
+        for parent_id in revisions[revision_id]:
+            visit(parent_id)
+        visiting.remove(revision_id)
+        seen.add(revision_id)
+
+    visit(heads[0])
     if seen != set(revisions):
-        raise CandidateError("migration chain contains disconnected revisions")
+        raise CandidateError("migration graph contains disconnected revisions")
     return {"root": roots[0], "head": heads[0], "revision_count": len(revisions)}
 
 

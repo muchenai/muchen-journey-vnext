@@ -1,0 +1,35 @@
+{
+  "schema_version": "module-content-package-index.v1",
+  "state": "G1_CONTENT_BINDING_PASS",
+  "candidate_manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6",
+  "approval_evidence_sha256": "2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc",
+  "exploration_source_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+  "packages": [
+    {
+      "module_key": "exploration-camp",
+      "path": "config/module-content-packages/exploration-camp.module-content-package.v1.json",
+      "package_sha256": "0da335dc06e9e22a82dce863efb52eb7124d7845102323fbc05494625376e3f8",
+      "file_sha256": "0a8c03f55122d94fcc481ec95a5eface1800f3f6a709a0ad5ffd26e36638c113"
+    },
+    {
+      "module_key": "newcomer-village",
+      "path": "config/module-content-packages/newcomer-village.module-content-package.v1.json",
+      "package_sha256": "d81d6dd3ef179196db6f652867e05de89e9985bc8670f9601a21e9c5ed9b0802",
+      "file_sha256": "187c544a585d531d623f98a819d01f9a80626121363e6457312dbde2613a421d"
+    },
+    {
+      "module_key": "ai-academy",
+      "path": "config/module-content-packages/ai-academy.module-content-package.v1.json",
+      "package_sha256": "42c6359312f66158fabcc3508f042e62b387d43ed9a2d0739a0462b8722329cf",
+      "file_sha256": "3e13fde8c0d8418dfc52f78e044ca24a6c50f602d5ff964b08e8d0cf501ec36a"
+    },
+    {
+      "module_key": "delivery-guild",
+      "path": "config/module-content-packages/delivery-guild.module-content-package.v1.json",
+      "package_sha256": "682726a89084f1cbe5cfb3a84e3207ee353d594796a00e27ad815c0a69f890bc",
+      "file_sha256": "98454301377df6cc7da5924e04fa02e964bb86a4d2b197e276cd618df31a0c2c"
+    }
+  ],
+  "production_release_authorized": false,
+  "index_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd"
+}

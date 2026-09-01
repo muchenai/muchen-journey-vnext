@@ -52,8 +52,8 @@ test("route nodes expose their shared-coordinate anchor for geometry checks", ()
   assert.match(routeMap, /className="route-node-anchor"/);
   assert.match(routeMap, /data-route-index=\{index\}/);
   assert.match(routeMap, /transform=\{`translate\(\$\{x\} \$\{y\}\)`\}/);
-  assert.match(routeMap, /<circle className="route-node-hit-area" r=\{isCurrent \? 32 : 28\} \/>/);
-  assert.match(styles, /\.route-node-hit-area \{[^}]*fill: transparent[^}]*pointer-events: all/);
+  assert.doesNotMatch(routeMap, /route-node-link/);
+  assert.match(routeMap, /className="route-node-orb"/);
 });
 
 test("learner failure surfaces provide bounded recovery without raw API JSON", () => {
@@ -68,10 +68,10 @@ test("learner failure surfaces provide bounded recovery without raw API JSON", (
   }
 });
 
-test("desktop invitation headline stays on one deliberate line", () => {
-  assert.match(joinPage, /这张通行证，只属于你。/);
-  assert.match(styles, /\.join-entry > h1 \{[^}]*white-space: nowrap/);
-  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-entry > h1 \{[^}]*font-size: clamp\(24px, 7vw, 31px\)[^}]*white-space: nowrap/);
+test("private invitation headline remains deliberate across desktop and mobile", () => {
+  assert.match(joinPage, /你的探索营，已经在等你。/);
+  assert.match(styles, /\.join-intro > h1 \{/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.join-intro > h1 \{[^}]*font-size: clamp\(38px, 11\.5vw, 48px\)/);
 });
 
 test("mobile task titles balance deliberate lines instead of leaving an orphan glyph", () => {

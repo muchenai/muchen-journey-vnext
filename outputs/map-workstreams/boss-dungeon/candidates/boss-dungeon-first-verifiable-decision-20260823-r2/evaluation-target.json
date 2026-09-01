@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "candidate_id": "boss-dungeon-first-verifiable-decision-20260823-r2",
+  "map": "boss-dungeon",
+  "phase": "ISOLATED_DRAFT_BUILD",
+  "status": "READY_FOR_INDEPENDENT_EVALUATION",
+  "created_from_commit": "d781d0eb5eded3a4cf7c79b06f102b3b71137bfc",
+  "previous_candidate": {
+    "status": "ACTIVE_DRAFT",
+    "contract_ref": "outputs/map-workstreams/boss-dungeon/contract.json",
+    "contract_sha256": "efd9e472370c8c2a6d368eecc98fcfd987e6c36695b02853a4f879bf44187a97",
+    "fact_mutated": false
+  },
+  "candidate_delta": "Versioned acceptance metadata and fresh machine evidence only; runtime experience and shared facts are unchanged.",
+  "runtime": {
+    "entry": "prototypes/boss-dungeon/index.html",
+    "routes": [
+      "prototypes/boss-dungeon/index.html"
+    ],
+    "files": [
+      {
+        "path": "prototypes/boss-dungeon/index.html",
+        "sha256": "75c74630355574fca4b7d4e8577742e73e4a1ccc796d18a951b5488520120661"
+      },
+      {
+        "path": "prototypes/boss-dungeon/styles.css",
+        "sha256": "7a3702b0bb1034c254051951bb6f46a231aaad34856be36f53c227c7b1cb2bc4"
+      },
+      {
+        "path": "prototypes/boss-dungeon/app.js",
+        "sha256": "de2d72fc948b2f81913a6fec20ff583b78a96a1ddba61377c8fd376b26c794aa"
+      },
+      {
+        "path": "prototypes/boss-dungeon/contract.test.mjs",
+        "sha256": "d5ae32694b509f34ee87126c5d5d1e543f85e66919af1a4c72b4a5e0c6e968ba"
+      }
+    ],
+    "shared_fact_writes": false,
+    "production_mutation": false
+  },
+  "golden_path": {
+    "id": "boss-dungeon-first-verifiable-decision",
+    "active": true,
+    "starts_at": "synthetic-capability-briefing",
+    "ends_at": "local-decision-receipt-visible",
+    "ordered_states": [
+      "synthetic-capability-briefing",
+      "safe-scenario-confirmation",
+      "team-and-constraints-confirmation",
+      "first-verifiable-decision",
+      "local-decision-receipt-visible"
+    ]
+  },
+  "machine_acceptance": [
+    {
+      "id": "exact-natural-path",
+      "criterion": "首次状态从能力简报开始，学习者不跳转内部状态即可依次到达本地决策回执。"
+    },
+    {
+      "id": "synthetic-and-governance-labeling",
+      "criterion": "每个状态都可见合成模拟标记，并明确结果不构成真实雇佣或绩效结论。"
+    },
+    {
+      "id": "evidence-before-decision",
+      "criterion": "前四图合成证据和目标能力要求在任何决策输入之前出现。"
+    },
+    {
+      "id": "roles-and-constraints-before-decision",
+      "criterion": "未确认本人模拟角色、四个团队角色及时间、范围、隐私约束时，不能进入决策状态。"
+    },
+    {
+      "id": "verifiable-decision-input",
+      "criterion": "回执只能在学习者选择一个处置方案、引用至少一条能力证据和一项约束、并输入不少于 20 个字符的理由后生成。"
+    },
+    {
+      "id": "fact-advice-choice-separation",
+      "criterion": "回执分别标记合成事实、AI建议、人类选择和系统状态，不输出准备度评分或真实人才结论。"
+    },
+    {
+      "id": "three-viewport-continuity",
+      "criterion": "390、768、1280 CSS 像素宽度下无水平溢出、隐藏主操作或内容重叠。"
+    },
+    {
+      "id": "interaction-and-recovery",
+      "criterion": "键盘、触控尺寸、减少动态、校验错误、状态切换和页面重进均保留清晰的唯一下一操作，且无控制台错误。"
+    }
+  ],
+  "human_acceptance": [
+    {
+      "id": "orientation-and-safety",
+      "criterion": "首次体验者无需讲解，能说明这是合成大型项目演练、当前要做的事以及结果不能用于真实人才决定。",
+      "threshold": "3/3 目标学习者，进入后 20 秒内",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "evidence-to-decision-traceability",
+      "criterion": "体验者能指出自己的决定引用了哪条前置证据和哪项项目约束。",
+      "threshold": "3/3 目标学习者，不经提示",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "role-and-constraint-comprehension",
+      "criterion": "体验者能说出本人模拟角色、至少两个协作角色和全部三项硬约束。",
+      "threshold": "3/3 目标学习者，不经提示",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clarity-and-willingness",
+      "criterion": "体验者评价决策任务清晰度和继续完成副本的意愿。",
+      "threshold": "两项中位数均不低于 4/5，且 0 次引导救援",
+      "status": "NOT_RUN"
+    }
+  ],
+  "human_gate": {
+    "status": "UNTOUCHED",
+    "evidence": "NOT_RUN",
+    "machine_evidence_may_substitute": false,
+    "promotion_authorized": false,
+    "release_authorized": false
+  },
+  "evidence_targets": {
+    "contract_test": "evidence/contract-test-summary.json",
+    "browser": [
+      "evidence/390-entry.png",
+      "evidence/390-receipt.png",
+      "evidence/768-entry.png",
+      "evidence/768-receipt.png",
+      "evidence/1280-entry.png",
+      "evidence/1280-receipt.png"
+    ],
+    "evaluator_report": "evaluator-report.json",
+    "freeze_manifest": "candidate-freeze.json",
+    "final_versioned_contract": "contract.json"
+  },
+  "failure_rule": "Any evidence-backed P0 or P1 yields MACHINE_FAIL. READY_FOR_HUMAN is allowed only when all machine criteria pass and all human criteria remain NOT_RUN with the human gate UNTOUCHED."
+}

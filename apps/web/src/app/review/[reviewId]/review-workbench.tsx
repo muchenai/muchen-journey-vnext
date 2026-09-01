@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 
 import {
   finalizeReview,
@@ -21,9 +21,15 @@ type RubricDimension = {
 };
 
 function ActionError({ state }: { state: ReviewActionState }) {
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (state.error) errorRef.current?.focus();
+  }, [state.error]);
+
   if (!state.error) return null;
   return (
-    <div className="inline-error" role="alert">
+    <div ref={errorRef} className="inline-error" role="alert" tabIndex={-1}>
       <strong>操作没有完成</strong>
       <span>{state.error}</span>
       {state.requestId ? <code>request ID: {state.requestId}</code> : null}
@@ -170,6 +176,16 @@ export function ReviewWorkbench({
           maxLength={2000}
           required
         />
+        <details className="fixed-references">
+          <summary>Reviewer AI 使用披露</summary>
+          <label className="attachment-choice">
+            <input type="checkbox" name="reviewer_ai_used" />
+            <span>我使用了 AI 整理评审输入；AI 只提供建议，最终决定和理由由我本人作出。</span>
+          </label>
+          <label>AI 用途<input name="reviewer_ai_purpose" maxLength={200} /></label>
+          <label>模型版本<input name="reviewer_ai_model_version" maxLength={200} /></label>
+          <label>Prompt 版本<input name="reviewer_ai_prompt_version" maxLength={200} /></label>
+        </details>
         <fieldset>
           <legend>最终结论</legend>
           <div className="decision-grid">
@@ -193,7 +209,7 @@ export function ReviewWorkbench({
           type="submit"
           disabled={finalPending || materialStatus === "INCOMPLETE"}
         >
-          {finalPending ? "正在提交结论…" : "提交不可变最终结论"}
+          {finalPending ? "正在提交结论…" : "提交真人结论"}
         </button>
       </form>
     </section>

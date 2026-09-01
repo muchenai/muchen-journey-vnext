@@ -1,0 +1,116 @@
+{
+  "schema_version": "muchen-journey-release-gates.v1",
+  "release_id": "muchen-journey-2026-09-01-controlled-cohort",
+  "scope": {
+    "type": "CONTROLLED_COHORT_RELEASE",
+    "max_people": 25,
+    "uat_mode": "PRODUCTION_CANARY_UAT",
+    "canary_uat_people": 8,
+    "canary_deployment_is_release": false,
+    "modules": ["exploration-camp", "newcomer-village", "ai-academy", "delivery-guild"],
+    "deferred": ["certification-arena-full", "career-map-complex", "legacy-formal-migration", "complex-incentives", "automated-high-impact-decision", "boss-dungeon"]
+  },
+  "gates": [
+    {
+      "id": "G0_PRODUCT_CONTRACT",
+      "kind": "HUMAN_AND_DOCUMENT",
+      "required": ["construction_package_hash_valid", "source_priority_declared", "owner_decisions_bound", "p0_requirements_known"],
+      "owner_roles": ["PRODUCT_OWNER", "TECH_LEAD"],
+      "current_state": "CONTRACT_AMENDMENT_APPROVED",
+      "allows": "BUILD"
+    },
+    {
+      "id": "G1_CONTENT_BINDING",
+      "kind": "HUMAN",
+      "required": ["exploration_content_hash", "newcomer_task_pack_hash", "ai_academy_unit_hash", "delivery_guild_plugin_hash", "rubric_hashes", "reviewer_roster_and_sla", "product_owner_supplement_source", "exact_module_candidate_hashes", "three_person_four_module_hash_signatures"],
+      "owner_roles": ["EXPLORATION_OWNER", "NEWCOMER_OWNER", "AI_ACADEMY_OWNER", "DELIVERY_GUILD_OWNER", "REVIEWER_PANEL_OWNER"],
+      "candidate_manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6",
+      "approval_evidence_sha256": "2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc",
+      "exploration_source_version_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+      "formal_content_package_index_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
+      "current_state": "PASS",
+      "allows": "MODULE_OPENING"
+    },
+    {
+      "id": "G2_MACHINE_CONTRACT",
+      "kind": "MACHINE",
+      "required": ["all_p0_tests_pass", "all_p0_negative_tests_pass", "api_tests_pass", "web_tests_pass", "worker_tests_pass", "openapi_contract_pass", "production_build_pass", "dependency_and_secret_scan_pass", "current_image_os_cve_scan_pass"],
+      "owner_roles": ["TECH_LEAD", "QA_UAT_OPERATIONS_OWNER"],
+      "current_state": "NOT_RUN_ON_FINAL_CANDIDATE",
+      "allows": "CANDIDATE_FREEZE"
+    },
+    {
+      "id": "G3_CANDIDATE_FREEZE",
+      "kind": "MACHINE_AND_HUMAN",
+      "required": ["git_tree_clean", "full_git_sha", "immutable_candidate_tag", "single_migration_head", "manifest_complete", "web_api_worker_digests", "config_and_content_hashes", "deferred_features_absent"],
+      "owner_roles": ["TECH_LEAD", "RELEASE_OPS_OWNER"],
+      "current_state": "NOT_RUN",
+      "allows": "PRODUCTION_CANARY_READINESS_REVIEW"
+    },
+    {
+      "id": "G4_DATA_AND_RECOVERY",
+      "kind": "OPERATIONAL",
+      "required": ["legacy_migrate_record_count_zero", "fresh_encrypted_backup", "isolated_restore_pass", "application_rollback_pass", "formal_facts_preserved", "alerts_reach_human"],
+      "owner_roles": ["DATA_OWNER", "SECURITY_PRIVACY_OWNER", "RELEASE_OPS_OWNER"],
+      "current_state": "NOT_RUN",
+      "allows": "PRODUCTION_CANARY_DEPLOYMENT_DECISION"
+    },
+    {
+      "id": "G4A_PRODUCTION_CANARY_DEPLOYMENT",
+      "kind": "OPERATIONAL_AND_HUMAN",
+      "required": ["g0_through_g4_pass", "canary_authorization_evidence_schema_valid", "canary_deployment_go_bound_to_candidate", "exactly_eight_named_participants", "allowlist_hash_fixed", "server_side_allowlist_enforced", "fixture_identity_disabled", "release_marker_production_canary_uat", "controlled_uat_banner_visible", "freeze_invites_ready", "operator_and_reviewer_on_call", "external_production_writes_disabled", "legacy_migration_disabled", "high_impact_automation_disabled"],
+      "owner_roles": ["PRODUCT_OWNER", "SECURITY_PRIVACY_OWNER", "RELEASE_OPS_OWNER", "BUSINESS_DECIDER"],
+      "named_decider": "刘默文",
+      "current_state": "CANARY_DEPLOYMENT_NOT_AUTHORIZED",
+      "allows": "PRODUCTION_CANARY_UAT"
+    },
+    {
+      "id": "G5_REAL_HUMAN_UAT",
+      "kind": "HUMAN",
+      "required": ["production_canary_uat_mode", "exactly_eight_named_participants", "two_real_target_users_per_module", "all_common_scenarios_pass", "all_module_specific_scenarios_pass", "all_security_negative_scenarios_pass", "non_allowlisted_access_rejected", "same_candidate_sha", "same_deployed_artifacts", "zero_open_p0_p1"],
+      "owner_roles": ["QA_UAT_OPERATIONS_OWNER", "MODULE_OWNERS"],
+      "independent_observer_role": "INDEPENDENT_QA",
+      "current_state": "NOT_RUN",
+      "allows": "INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "G6_INDEPENDENT_REVIEW",
+      "kind": "HUMAN",
+      "required": ["independent_qa_candidate_signoff", "independent_release_review_signoff", "reviewers_not_builders_or_release_executors", "signatures_bind_candidate_sha"],
+      "owner_roles": ["INDEPENDENT_QA", "INDEPENDENT_RELEASE_REVIEWER"],
+      "named_person": "冯宇汀",
+      "role_acceptance_state": "ACCEPTED",
+      "candidate_signoff_state": "NOT_RUN",
+      "current_state": "ROLE_ACCEPTED_CANDIDATE_SIGNOFF_NOT_RUN",
+      "allows": "EXPLICIT_RELEASE_DECISION"
+    },
+    {
+      "id": "G7_EXPLICIT_RELEASE_DECISION",
+      "kind": "HUMAN",
+      "required": ["all_prior_gates_pass", "production_canary_uat_pass", "same_candidate_and_deployed_artifacts", "cohort_at_most_25", "freeze_invites_ready", "operator_and_reviewer_on_call", "day_one_monitoring_ready", "explicit_release_go_bound_to_candidate"],
+      "owner_roles": ["BUSINESS_DECIDER"],
+      "named_person": "刘默文",
+      "current_state": "RELEASE_NOT_AUTHORIZED",
+      "allows": "CONTROLLED_RELEASE"
+    },
+    {
+      "id": "G8_72H_CONTROLLED_ACCEPTANCE",
+      "kind": "OPERATIONAL_AND_HUMAN",
+      "required": ["no_scope_expansion", "no_security_incident", "real_module_activity_observed", "reviewer_sla_operational", "all_p0_p1_owned", "continuation_decision_signed"],
+      "owner_roles": ["PRODUCT_OWNER", "RELEASE_OPS_OWNER", "QA_UAT_OPERATIONS_OWNER"],
+      "current_state": "NOT_RUN",
+      "allows": "CONTINUE_OR_PAUSE_CONTROLLED_RELEASE"
+    }
+  ],
+  "global_fail_closed_rules": [
+    "any_candidate_hash_drift invalidates G5-G7 signatures",
+    "any authorization or data-scope change requires re-review",
+    "deadline cannot turn NOT_RUN or FAIL into PASS",
+    "machine test cannot fill a human gate",
+    "legacy completeness is not a release gate",
+    "no production canary deployment before G4A",
+    "G4A permits only allowlisted Journey UAT facts and never external production work",
+    "no cohort expansion beyond eight before G7",
+    "canary deployment or UAT pass never implies release go"
+  ]
+}

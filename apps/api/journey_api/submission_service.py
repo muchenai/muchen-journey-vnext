@@ -72,12 +72,18 @@ def submission_out(session: Session, submission: Submission) -> SubmissionOut:
                 id=version.id,
                 version_no=version.version_no,
                 body=version.body,
+                ai_use=version.ai_use,
                 created_at=version.created_at,
                 attachments=attachments_by_version.get(version.id, []),
                 review_id=review.id if review is not None else None,
                 review_status=review.status.value if review is not None else None,
                 decision=evaluation.decision.value if evaluation is not None else None,
                 feedback=evaluation.feedback if evaluation is not None else None,
+                rubric_feedback=(
+                    evaluation.structured_feedback or []
+                    if evaluation is not None
+                    else []
+                ),
             )
             for version, review, evaluation in rows
         ],

@@ -1,0 +1,162 @@
+{
+  "schema_version": "module-content-package.v1",
+  "package_id": "newcomer-village-p0-2026-09-01",
+  "module_key": "newcomer-village",
+  "version": "1.0.0",
+  "owner": {
+    "role": "newcomer_village_owner",
+    "person_name": "屠元琦",
+    "signed_at": "2026-08-27T07:30:29+08:00",
+    "decision": "APPROVED"
+  },
+  "source_refs": [
+    "SRC-OWNER-03",
+    "SRC-NV-01",
+    "SRC-NV-02"
+  ],
+  "effective_at": "2026-08-27T07:30:29+08:00",
+  "content_items": [
+    {
+      "content_id": "NV-TASK-23",
+      "title": "T+1 公司与行业初识卡",
+      "version": "1.0.0",
+      "source_ref": "SRC-NV-02",
+      "owner": "屠元琦",
+      "estimated_minutes": 45,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "1b3f915a124aa2ff0e3600b631142c4eddee7bc780552982cd57fd771d95ac30"
+    },
+    {
+      "content_id": "NV-TASK-24",
+      "title": "AI 数据交付关键词解释",
+      "version": "1.0.0",
+      "source_ref": "SRC-NV-02",
+      "owner": "屠元琦",
+      "estimated_minutes": 40,
+      "visibility": [
+        "LEARNER",
+        "REVIEWER",
+        "OPERATOR"
+      ],
+      "data_classification": "INTERNAL",
+      "sha256": "2229a2cbf8064387723f34dfd0d4cc721a05ec370dc4b251a53f7fca04cebd8e"
+    }
+  ],
+  "task_versions": [
+    {
+      "task_key": "NV-T1-COMPANY-INDUSTRY-CARD",
+      "version": "1.0.0",
+      "purpose": "帮助新成员建立对沐晨业务、AI数据行业和自身协作方式的可核验基础认知。",
+      "non_goals": [
+        "考察记忆背诵",
+        "形成录用或淘汰判断",
+        "使用客户原始数据"
+      ],
+      "inputs": [
+        "获批的公司介绍材料",
+        "获批的行业基础材料"
+      ],
+      "deliverables": [
+        "公司业务理解",
+        "行业关键词",
+        "三个仍不确定的问题",
+        "已咨询对象",
+        "下一步补充计划",
+        "可访问的提交链接"
+      ],
+      "rubric_id": "NV-T1-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "7ae2ca367a8e6e601aebacf3a7609a04df2e03abc3761b73e0ccbf1319168563"
+    },
+    {
+      "task_key": "NV-T2-AI-DELIVERY-GLOSSARY",
+      "version": "1.0.0",
+      "purpose": "把AI数据交付中的常用词汇转化为能在具体项目情境中使用的共同语言。",
+      "non_goals": [
+        "复制百科定义",
+        "堆砌过宽泛术语",
+        "未经确认解释客户专有规则"
+      ],
+      "inputs": [
+        "获批的AI数据交付术语材料",
+        "合成或脱敏项目场景"
+      ],
+      "deliverables": [
+        "关键词清单",
+        "自己的解释",
+        "适用场景",
+        "易错点",
+        "向Reviewer确认过的问题",
+        "可访问的提交链接"
+      ],
+      "rubric_id": "NV-T2-R1",
+      "reviewer_pool_ref": "REVIEW-POOL-2026-09-01-P0",
+      "help_path": "REVIEW-POOL-2026-09-01-P0 → 屠元琦",
+      "execution_environment": "SIMULATION",
+      "retention_policy": "180_DAYS",
+      "sha256": "bb0c41bd9a5af040d3584bfe88e75b4c5df916b9e6336bc6c31d89e1050a770b"
+    }
+  ],
+  "rubrics": [
+    {
+      "rubric_id": "NV-T1-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "业务理解准确",
+        "行业概念可解释",
+        "问题真实具体",
+        "来源与咨询对象可追溯",
+        "下一步行动可执行"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#NV-T1-R1",
+      "sha256": "88f547fd02d8750a7e3e9d8209cc4c7ce33112f28e5d107b9d8374a6d936a896"
+    },
+    {
+      "rubric_id": "NV-T2-R1",
+      "version": "1.0.0",
+      "dimensions": [
+        "术语解释准确",
+        "适用场景具体",
+        "易错点有效",
+        "确认问题可追溯",
+        "表达能被协作者复用"
+      ],
+      "human_decision_required": true,
+      "calibration_evidence_ref": "config/module-content-candidates.v1.json#NV-T2-R1",
+      "sha256": "647445f40058f6df7e771788407530dd7c4932eb47b843c183baa628fb30b332"
+    }
+  ],
+  "reviewer_policy": {
+    "pool_ref": "REVIEW-POOL-2026-09-01-P0",
+    "primary_reviewers": [
+      "万雨欣"
+    ],
+    "backup_reviewers": [
+      "屠元琦"
+    ],
+    "first_response_sla_minutes": 1440,
+    "completion_sla_minutes": 2880,
+    "escalation_owner": "屠元琦"
+  },
+  "data_policy": {
+    "production_write_allowed": false,
+    "raw_customer_data_allowed": false,
+    "ai_high_impact_decision_allowed": false,
+    "visibility": [
+      "PERSON",
+      "ASSIGNED_REVIEWERS",
+      "AUTHORIZED_OPERATORS"
+    ],
+    "retention_policy": "180_DAYS"
+  },
+  "sha256": "d81d6dd3ef179196db6f652867e05de89e9985bc8670f9601a21e9c5ed9b0802"
+}

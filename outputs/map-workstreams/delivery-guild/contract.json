@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "artifact_type": "MAP_GOLDEN_PATH_CONTRACT",
+  "product_id": "muchen-journey",
+  "map": "delivery-guild",
+  "map_name": "交付线工会",
+  "map_order": 4,
+  "mission": "在边界清晰的交付协作中理解责任，并形成第一份可供人工复核的项目证据或复盘输入草稿。",
+  "people_ai_output": "delivery-capability-evidence",
+  "operating_role": [
+    "map-workstream",
+    "golden-path-builder"
+  ],
+  "phase": "ISOLATED_DRAFT_BUILD",
+  "contract_status": "FROZEN_CANDIDATE",
+  "candidate_status": "READY_FOR_HUMAN",
+  "formal_product_integration": false,
+  "production_mutation_authorized": false,
+  "depends_on_exploration_camp_human_result": false,
+  "active_golden_paths": [
+    {
+      "id": "delivery-guild-first-bounded-evidence-draft",
+      "learner_outcome": "A learner reads a role-readiness and AI-capability snapshot, independently enters one bounded sandbox delivery task, can explain their collaboration responsibilities, and forms one reviewable project-evidence or retrospective-input draft without believing it was sent or added to the shared evidence ledger.",
+      "starts_at": "synthetic-readiness-and-ai-capability-snapshot",
+      "ends_at": "local-reviewable-evidence-or-retrospective-draft-formed",
+      "runtime_entry": "prototypes/delivery-guild/index.html",
+      "prototype_route": "/prototypes/delivery-guild/",
+      "steps": [
+        {
+          "id": "read-readiness",
+          "person_action": "Read the clearly labelled synthetic role-readiness and AI-capability snapshot.",
+          "required_understanding": "The snapshot is input for development, not an employment or performance decision."
+        },
+        {
+          "id": "enter-bounded-task",
+          "person_action": "Enter the single sandbox task after reviewing its goal, non-goals, permitted data, timebox, and done condition.",
+          "required_understanding": "No real customer, project, external recipient, or production system is connected."
+        },
+        {
+          "id": "understand-responsibilities",
+          "person_action": "Review the learner, collaborator, mentor, and AI responsibilities and acknowledge the learner-owned accountability boundary.",
+          "required_understanding": "AI may assist structure and checks; the learner owns factual accuracy and the mentor owns human review."
+        },
+        {
+          "id": "form-first-draft",
+          "person_action": "Choose project evidence or retrospective input, complete the minimum fields, and save one browser-local draft for review.",
+          "required_understanding": "The saved item is a prototype-local pending draft, not shared evidence and not a message."
+        }
+      ],
+      "single_primary_action_by_step": {
+        "read-readiness": "查看沙盒任务",
+        "enter-bounded-task": "确认边界，进入协作",
+        "understand-responsibilities": "开始留下第一份输入",
+        "form-first-draft": "保存为待复核草稿",
+        "draft-formed": "重新检查草稿"
+      },
+      "machine_acceptance": [
+        {
+          "id": "single-active-path-and-action",
+          "criterion": "The contract declares exactly one active golden path and every actionable step exposes exactly one enabled primary action."
+        },
+        {
+          "id": "bounded-synthetic-task",
+          "criterion": "The runtime visibly identifies all profile and task content as synthetic sandbox data, lists goal, non-goals, permitted data, timebox, and done condition, and exposes no network submission or external messaging path."
+        },
+        {
+          "id": "responsibility-comprehension-support",
+          "criterion": "Before drafting, the runtime distinguishes learner, collaborator, mentor, and AI responsibilities and requires acknowledgement of the learner accountability boundary."
+        },
+        {
+          "id": "reviewable-local-draft",
+          "criterion": "Either project-evidence or retrospective-input mode can form a non-empty, timestamped, reviewable local draft, visibly labelled pending and not written to the shared Evidence Ledger."
+        },
+        {
+          "id": "three-viewport-continuity",
+          "criterion": "The full path works without horizontal overflow, clipped content, or hidden primary actions at 390, 768, and 1280 CSS pixels."
+        },
+        {
+          "id": "interaction-and-recovery",
+          "criterion": "Keyboard, touch-sized controls, reduced motion, validation errors, refresh re-entry, and local reset preserve one clear next action without browser console errors."
+        }
+      ],
+      "human_acceptance": [
+        {
+          "id": "task-boundary-comprehension",
+          "criterion": "Without facilitator explanation, a target learner can state the task goal, one non-goal, what data is allowed, and the done condition before entering collaboration.",
+          "threshold": "3/3 target learners"
+        },
+        {
+          "id": "responsibility-comprehension",
+          "criterion": "Without facilitator explanation, a target learner can state what they own, what AI may assist with, and who performs human review.",
+          "threshold": "3/3 target learners"
+        },
+        {
+          "id": "first-draft-within-3-minutes",
+          "criterion": "A target learner independently forms either a project-evidence or retrospective-input draft and correctly identifies it as pending local evidence rather than submitted shared evidence.",
+          "threshold": "3/3 target learners within 3 minutes"
+        },
+        {
+          "id": "clarity-and-willingness",
+          "criterion": "Learners rate task-boundary clarity and willingness to continue to human review.",
+          "threshold": "median >= 4/5 for both questions"
+        },
+        {
+          "id": "zero-facilitator-rescue",
+          "criterion": "No facilitator explains the profile, task boundary, responsibility model, draft mode, or next action during the measured path.",
+          "threshold": "0 interventions"
+        }
+      ]
+    }
+  ],
+  "input_contract": {
+    "shared_sources_are_read_only": true,
+    "inputs": [
+      "role-and-collaboration-readiness",
+      "ai-capability-profile"
+    ],
+    "prototype_data": "synthetic-static-fixture",
+    "no_person_identity_required": true
+  },
+  "output_contract": {
+    "intended_shared_output": "delivery-capability-evidence",
+    "prototype_output": "browser-local-pending-draft",
+    "shared_evidence_write": false,
+    "human_review_required": true,
+    "controller_integration_required": true
+  },
+  "governance": {
+    "prohibited_automatic_decisions": [
+      "hire",
+      "promotion",
+      "termination",
+      "compensation",
+      "performance-rating"
+    ],
+    "prohibited_connections": [
+      "real-customer",
+      "real-project",
+      "external-message",
+      "production-api"
+    ],
+    "facts_must_be_distinguishable": [
+      "synthetic-fact",
+      "learner-input",
+      "human-review",
+      "system-state"
+    ]
+  },
+  "write_boundary": [
+    "docs/maps/delivery-guild/",
+    "prototypes/delivery-guild/",
+    "outputs/map-workstreams/delivery-guild/"
+  ],
+  "shared_surfaces_read_only": [
+    "/",
+    "global-navigation",
+    "person",
+    "capability",
+    "evidence-ledger",
+    "progress",
+    "identity",
+    "shared-domain-models",
+    "shared-api",
+    "shared-design-system",
+    "release-configuration"
+  ],
+  "promotion_rule": "Machine acceptance may move this isolated candidate to READY_FOR_HUMAN only. Human acceptance and controller integration remain separate and cannot be inferred.",
+  "freeze_rule": "Once READY_FOR_HUMAN, preserve the exact candidate until valid human evidence passes or fails it.",
+  "machine_evaluation": {
+    "verdict": "READY_FOR_HUMAN",
+    "evaluated_on": "2026-08-23",
+    "target": "local-read-only-synthetic-fixture",
+    "viewports_css_px": [
+      390,
+      768,
+      1280
+    ],
+    "p0_blockers": [],
+    "p1_blockers": [],
+    "report_ref": "outputs/map-workstreams/delivery-guild/evaluation-report.md"
+  },
+  "human_evaluation": {
+    "status": "NOT_RUN",
+    "criteria_inferred_from_machine_evidence": false
+  },
+  "source_refs": [
+    "config/muchen_journey_product.json",
+    "docs/41_PEOPLE_AI_PROGRAM_AND_PLATFORM_CONTRACT.md"
+  ]
+}

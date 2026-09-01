@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "contract_type": "ISOLATED_SHARED_VISUAL_CONTRACT",
+  "state": "DRAFT_ONLY",
+  "formal_golden_path_promoted": false,
+  "interaction_semantics": "NONE",
+  "minimum_contrast_ratio": 4.5,
+  "source_artifacts": [
+    "prototypes/newcomer-village/index.html",
+    "prototypes/five-map-worldboard/index.html"
+  ],
+  "maps": [
+    {
+      "order": 1,
+      "key": "exploration-camp",
+      "name": "探索营",
+      "evidence_state": "FORMAL_CANDIDATE_AWAITING_HUMAN",
+      "motif": "curved-route-and-warm-start",
+      "colors": {
+        "canvas": "#e6f1ef",
+        "canvas_ink": "#173e5c",
+        "surface": "#173e5c",
+        "surface_ink": "#ffffff",
+        "accent": "#efb43e",
+        "accent_ink": "#173e5c",
+        "path": "#147b78"
+      }
+    },
+    {
+      "order": 2,
+      "key": "newcomer-village",
+      "name": "新手村",
+      "evidence_state": "ISOLATED_VISUAL_DRAFT",
+      "motif": "village-gate-road-and-houses",
+      "colors": {
+        "canvas": "#b9d9d1",
+        "canvas_ink": "#173d35",
+        "surface": "#315d49",
+        "surface_ink": "#ffffff",
+        "accent": "#f3b34b",
+        "accent_ink": "#173d35",
+        "path": "#91aa72"
+      }
+    },
+    {
+      "order": 3,
+      "key": "ai-academy",
+      "name": "AI学院",
+      "evidence_state": "REVERSIBLE_VISUAL_HYPOTHESIS",
+      "motif": "tower-and-constellation",
+      "colors": {
+        "canvas": "#e7e9ff",
+        "canvas_ink": "#192b61",
+        "surface": "#192b61",
+        "surface_ink": "#ffffff",
+        "accent": "#f6d77b",
+        "accent_ink": "#192b61",
+        "path": "#4d52a6"
+      }
+    },
+    {
+      "order": 4,
+      "key": "delivery-guild",
+      "name": "交付线工会",
+      "evidence_state": "REVERSIBLE_VISUAL_HYPOTHESIS",
+      "motif": "bridge-and-delivery-crates",
+      "colors": {
+        "canvas": "#f5e6df",
+        "canvas_ink": "#3e2930",
+        "surface": "#3e2930",
+        "surface_ink": "#ffffff",
+        "accent": "#e0a054",
+        "accent_ink": "#3e2930",
+        "path": "#9c4d3c"
+      }
+    },
+    {
+      "order": 5,
+      "key": "boss-dungeon",
+      "name": "BOSS副本",
+      "evidence_state": "REVERSIBLE_VISUAL_HYPOTHESIS",
+      "motif": "portal-and-mountain-peaks",
+      "colors": {
+        "canvas": "#e5e3e9",
+        "canvas_ink": "#252431",
+        "surface": "#252431",
+        "surface_ink": "#ffffff",
+        "accent": "#dc5a5f",
+        "accent_ink": "#100f18",
+        "path": "#5e3745"
+      }
+    }
+  ],
+  "prohibited_claims": [
+    "visual tokens prove learner comprehension or motivation",
+    "a future map has a formal route, task, reward, or completion state",
+    "a visual hypothesis is approved content or release evidence"
+  ]
+}

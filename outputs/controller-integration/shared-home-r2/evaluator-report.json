@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "candidate_id": "shared-home-whole-journey-entry-r2",
+  "evaluated_on": "2026-08-23",
+  "evaluation_role": "CONTROLLER_INDEPENDENT_READ_ONLY",
+  "source_commit": "4df67ff",
+  "verdict": "READY_FOR_HUMAN",
+  "p0_p1_findings": [],
+  "integrity": {
+    "result": "PASS",
+    "checked_from_git_objects": true,
+    "frozen_files": "16/16",
+    "dirty_out_of_bound_css_used": false
+  },
+  "experience_findings": [
+    {
+      "id": "whole-product-identity",
+      "result": "PASS",
+      "evidence": "The first hierarchy is the company People AI promise and all five connected maps; Exploration Camp is presented as the current starting position, not the product identity."
+    },
+    {
+      "id": "visual-attraction-and-continuity",
+      "result": "PASS",
+      "evidence": "Independent visual review of visitor 390/1280 and unlocked 1280 evidence found clear hierarchy, one continuous worldboard, readable current/future states, and no clipping or competing entry."
+    },
+    {
+      "id": "truthful-state-action",
+      "result": "PASS",
+      "evidence": "Visitor, active, expired, and unlocked states each expose one state-appropriate primary action; the visitor action validates a complete invitation on the home page instead of opening an empty /join."
+    },
+    {
+      "id": "responsive-and-recovery",
+      "result": "PASS",
+      "evidence": "Frozen 390/768/1280 evidence and the source task's machine record cover first-viewport CTA, no horizontal overflow, keyboard/touch, reduced motion, expired recovery, and zero console errors."
+    }
+  ],
+  "compatibility_note": "Before a non-Exploration Journey becomes authoritative, remove the hard-coded Exploration Camp eyebrow in /app as described by the controller proposal.",
+  "human_gate": {
+    "status": "NOT_RUN",
+    "machine_evidence_substituted": false
+  },
+  "promotion_authorized": false,
+  "release_authorized": false,
+  "production_mutation_executed": false
+}

@@ -10,14 +10,22 @@ FULL_SHA = "a" * 40
 REMOTE_DIGEST = "sha256:" + "b" * 64
 
 
+def test_candidate_registry_prefix_uses_confirmed_namespace():
+    assert candidate.GHCR_PREFIX == "ghcr.io/muchenai/muchen-journey-vnext"
+    makefile = (candidate.ROOT / "Makefile").read_text(encoding="utf-8")
+    assert (
+        "WP07_GHCR_PREFIX ?= ghcr.io/muchenai/muchen-journey-vnext" in makefile
+    )
+
+
 @pytest.fixture
 def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "ROOT", tmp_path)
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0021_p0_identity_principal",
-        "revision_count": 21,
+        "head": "0028_canary_main_merge",
+        "revision_count": 30,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -87,15 +95,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0021_p0_identity_principal",
-        "revision_count": 21,
+        "head": "0028_canary_main_merge",
+        "revision_count": 30,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
-def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0021_p0_identity_principal"
+def test_manifest_inputs_form_one_connected_migration_graph():
+    assert migration()["head"] == "0028_canary_main_merge"
     assert config_schema() == 3
 
 

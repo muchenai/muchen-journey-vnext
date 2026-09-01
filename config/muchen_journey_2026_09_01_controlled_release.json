@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "contract_baseline_version": "1.0.3",
+  "release_id": "muchen-journey-2026-09-01-controlled-cohort",
+  "release_date": "2026-09-01",
+  "release_type": "CONTROLLED_COHORT_RELEASE",
+  "cohort_limit": 25,
+  "full_product_release": false,
+  "high_impact_automated_decision": false,
+  "scope_status": "FROZEN_BY_OWNER",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "uat_execution": {
+    "mode": "PRODUCTION_CANARY_UAT",
+    "canary_limit": 8,
+    "participant_count": 0,
+    "allowlist_sha256": null,
+    "release_marker": "PRODUCTION_CANARY_UAT",
+    "server_side_allowlist_required": true,
+    "non_allowlisted_access": "DENY",
+    "public_release": false,
+    "canary_deployment_authorized": false,
+    "canary_deployment_executed": false,
+    "canary_deployment_go_evidence_sha256": null,
+    "same_candidate_required": true,
+    "release_go_separate": true,
+    "contract_amendment": "docs/baselines/construction-v1.0/04_UAT与发布/03_PRODUCTION_CANARY_UAT合同变更_V1.0.1.md"
+  },
+  "modules": [
+    "exploration-camp",
+    "newcomer-village",
+    "ai-academy",
+    "delivery-guild"
+  ],
+  "shared_vertical_slice": [
+    "MODULE_ENTRY",
+    "TASK_ASSIGNMENT_OR_SELECTION",
+    "PRACTICE",
+    "EVIDENCE_SUBMISSION",
+    "HUMAN_REVIEW",
+    "REWORK_OR_PASS",
+    "RESULT_PACKAGE"
+  ],
+  "required_platform_capabilities": [
+    "PRIVATE_INVITATION_AND_LOGIN",
+    "UNIQUE_PERSON_IDENTITY_BINDING",
+    "UNIFIED_JOURNEY_HOME",
+    "FOUR_MODULE_ENTRY",
+    "SHARED_TASK_STATE_MACHINE",
+    "TASK_ASSIGNMENT_OR_SELECTION",
+    "EVIDENCE_SUBMISSION",
+    "REVIEWER_WORKBENCH",
+    "REWORK_OR_PASS",
+    "HUMAN_SIGNATURE",
+    "RESULT_PACKAGE",
+    "ROLE_PERMISSIONS",
+    "AUDIT_LOG",
+    "BACKUP_AND_RESTORE",
+    "RELEASE_ROLLBACK",
+    "CONTROLLED_COHORT_IMPORT_25",
+    "DAY_ONE_MONITORING"
+  ],
+  "deferred": [
+    "LEGACY_23_TABLE_COMPLETENESS_SUPPLEMENT",
+    "LEGACY_FORMAL_MIGRATION",
+    "FULL_CERTIFICATION_ARENA",
+    "FULL_CERTIFICATION_SYSTEM",
+    "CAREER_MAP_COMPLEX_COMPUTATION",
+    "POINTS_REDEMPTION_AND_COMPLEX_INCENTIVES",
+    "AUTOMATED_CROSS_MODULE_ADMISSION",
+    "AI_GENERATED_FORMAL_TALENT_OR_CAPABILITY_DECISIONS",
+    "NON_RELEASE_PRODUCT_LOGIC_INVENTION"
+  ],
+  "legacy_disposition": {
+    "legacy_data_usage": "REFERENCE_ONLY",
+    "legacy_formal_migration": "NOT_REQUIRED",
+    "legacy_completeness_gate": "SUPERSEDED_FOR_RELEASE",
+    "historical_completeness_gate": "FAIL",
+    "complete_legacy_snapshot": "NOT_ESTABLISHED",
+    "migrate_record_count": 0
+  },
+  "owner_roster": {
+    "product_owner": "刘默文",
+    "tech_lead": "刘默文",
+    "data_owner": "刘默文",
+    "security_privacy_owner": "刘默文",
+    "release_ops_owner": "刘默文",
+    "business_decider": "刘默文",
+    "exploration_camp_owner": "郑田源",
+    "newcomer_village_owner": "屠元琦",
+    "ai_academy_owner": "段超群",
+    "delivery_guild_owner": "段超群",
+    "qa_uat_operations_owner": "屠元琦",
+    "reviewer_panel_owner": "屠元琦",
+    "independent_qa": "冯宇汀",
+    "independent_release_reviewer": "冯宇汀"
+  },
+  "independent_role_acceptance": {
+    "status": "ACCEPTED",
+    "basis": "PRODUCT_OWNER_ATTESTATION",
+    "accepted_roles": [
+      "INDEPENDENT_QA",
+      "INDEPENDENT_RELEASE_REVIEWER"
+    ],
+    "candidate_qa_signoff": "NOT_RUN",
+    "candidate_release_review": "NOT_RUN"
+  },
+  "content_binding": {
+    "state": "G1_CONTENT_BINDING_PASS",
+    "product_owner_source_ref": "SRC-OWNER-03",
+    "active_owner_decision_pack_path": "docs/baselines/Muchen_Journey_Construction_V1_Owner_Decision_Pack_V1.1.md",
+    "superseded_owner_decision_pack_path": "docs/baselines/Muchen_Journey_Construction_V1_Owner_Decision_Pack_V1.0.md",
+    "candidate_manifest_path": "config/module-content-candidates.v1.json",
+    "candidate_manifest_sha256": "b517977338de3da689bc5e61b5bb81c57d0932f5759b3423b79e15ab8f98b3a6",
+    "signoff_manifest_path": "config/module-content-signoff-manifest.v1.json",
+    "module_candidate_sha256": {
+      "exploration-camp": "1d9feb1672c847279c0b85cdc5a13ea9a9890d45cad4b223dd59ef2f05bbeb1c",
+      "newcomer-village": "6dfedfa9e95e78b8ab06115b08f0b5e7379b988b87f59de5c166c37f45937f1b",
+      "ai-academy": "e58880f712ee6c1aa3e4e31e5a51e62e15ac1e8bd9a75ec3600ca8b03095a894",
+      "delivery-guild": "4ffe612ddec9b177596d7cc4b03d29f1231a00c42c63ad4f0f4759c72d793cba"
+    },
+    "machine_validation": "PASS",
+    "module_owner_signatures": "APPROVED_3_PEOPLE_4_MODULES_BY_PRODUCT_OWNER_ATTESTATION",
+    "approval_evidence_path": "config/module-content-approval-evidence.v1.json",
+    "approval_evidence_sha256": "2a1b46fd042f8ab96643266d973ab9c8b21c8a6c26199404a1862f6beb6000fc",
+    "exploration_sheet_version_binding_path": "config/exploration-sheet-version-binding.v1.json",
+    "exploration_sheet_version_binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+    "exploration_full_export_sha256": null,
+    "formal_content_package_index_path": "config/module-content-packages/module-content-package-index.v1.json",
+    "formal_content_package_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
+    "reviewer_pool": {
+      "primary": ["万雨欣"],
+      "backup": ["屠元琦"],
+      "weekly_capacity_people": 25,
+      "first_response_sla_minutes": 1440,
+      "completion_sla_minutes": 2880,
+      "revision_response_sla_minutes": 1440
+    }
+  },
+  "human_uat": {
+    "execution_mode": "PRODUCTION_CANARY_UAT",
+    "environment": "FINAL_PRODUCTION_INFRASTRUCTURE",
+    "required_total_real_target_people": 8,
+    "required_real_target_people_per_module": 2,
+    "modules_required": 4,
+    "status": "NOT_RUN",
+    "synthetic_or_ai_substitution_allowed": false,
+    "same_frozen_candidate_required": true,
+    "release_authorization_implied": false
+  },
+  "candidate_binding": {
+    "candidate_sha": null,
+    "configuration_sha256": null,
+    "migration_revision": null,
+    "web_artifact_sha256": null,
+    "api_artifact_sha256": null,
+    "content_package_sha256": "76086990bf28fdf567b7f21f4600e3a9828de116c41c4b0b3166ef233f22bfdd",
+    "state": "NOT_FROZEN"
+  },
+  "execution_control": {
+    "version": "2.0",
+    "status": "ACTIVE_EXECUTION_CONTROL",
+    "config_path": "config/muchen_journey_execution_control.v2.json",
+    "control_directory": "docs/baselines/execution-control-v2.0",
+    "product_semantic_baseline_unchanged": true,
+    "known_runtime_content_package_state": "FAIL_0_OF_4",
+    "production_effects_authorized": false
+  },
+  "next_gate": "G2_FORMAL_PACKAGE_RUNTIME_COMPATIBILITY"
+}

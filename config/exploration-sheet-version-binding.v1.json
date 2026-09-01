@@ -1,0 +1,27 @@
+{
+  "schema_version": "source-version-binding.v1",
+  "source_ref": "SRC-EXP-03",
+  "source_type": "FEISHU_SHEET_RENDERED_VERSION_METADATA",
+  "document_token": "LpnOsAMGth34BVtzRdXcq96Unwh",
+  "sheet_id": "2ogROw",
+  "source_url": "https://zx6w57w0j34.feishu.cn/sheets/LpnOsAMGth34BVtzRdXcq96Unwh?sheet=2ogROw",
+  "document_title": "Muchen_Journey_V3_正式内容输入与上线清单",
+  "visible_owner": "郑田源",
+  "visible_last_modified": "8月23日 14:00",
+  "normalized_last_modified": "2026-08-23T14:00:00+08:00",
+  "visible_sheet_title": "三项真实能力评测｜题面与 Reviewer 校准",
+  "visible_access_mode": "READ_ONLY",
+  "captured_at": "2026-08-27T07:30:29+08:00",
+  "capture_method": "SIGNED_IN_CHROME_RENDERED_UI_METADATA",
+  "canonical_binding": "feishu-sheet://LpnOsAMGth34BVtzRdXcq96Unwh/2ogROw|title=Muchen_Journey_V3_正式内容输入与上线清单|owner=郑田源|last_modified_local=2026-08-23T14:00:00+08:00|sheet_visible_title=三项真实能力评测｜题面与 Reviewer 校准|access=READ_ONLY",
+  "binding_sha256": "4ce0734ea7b3b21c768e706a28b836a06d164a9d194a822788a6e49f56bf3c6b",
+  "full_export_sha256": null,
+  "binding_kind": "VERSION_METADATA_BINDING_NOT_FULL_CONTENT_EXPORT",
+  "change_rule": "文档最近修改时间、sheet_id、标题或内容候选hash任一变化，都必须重新绑定并由探索营Owner重新批准。",
+  "limitations": [
+    "Chrome表格页不支持内容导出接口，本证据不是XLSX或CSV全文hash。",
+    "表格使用Canvas渲染，DOM只暴露版本元数据和当前Sheet标题，未把不可见单元格伪记为已读取。"
+  ],
+  "accepted_by_owner_attestation": true,
+  "production_mutation_executed": false
+}

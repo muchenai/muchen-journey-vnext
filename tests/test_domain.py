@@ -53,7 +53,7 @@ def test_waiting_action_distinguishes_queued_from_active_human_review():
     )
 
     assert queued.title == "等待主管开始评审"
-    assert queued.reason == "提交已经保存，主管将在两个工作日内反馈。"
+    assert queued.reason == "提交已经保存，等待已分配 Reviewer 按批准 SLA 处理。"
     assert active.title == "主管正在评审"
     assert active.reason == "主管已经开始处理这份固定版本。"
     assert queued.allowed_commands == active.allowed_commands == ()

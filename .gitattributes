@@ -1,0 +1,5 @@
+# Markdown uses two trailing spaces as an intentional hard line break.
+*.md whitespace=-trailing-space
+
+# Approved baseline packages are hash-bound and may retain intentional EOF spacing.
+docs/baselines/** whitespace=-trailing-space,-blank-at-eof

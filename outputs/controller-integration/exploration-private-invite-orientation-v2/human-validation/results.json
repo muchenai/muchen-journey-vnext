@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "candidate_id": "exploration-private-invite-orientation-v2-20260823",
+  "status": "NOT_RUN",
+  "participants": [],
+  "orientation_10_seconds": "NOT_RUN",
+  "first_action_60_seconds": "NOT_RUN",
+  "clarity_and_continuation": "NOT_RUN",
+  "zero_facilitator_rescue": "NOT_RUN",
+  "promotion_authorized": false,
+  "release_authorized": false,
+  "note": "Blank record only. Machine and model evaluation must not populate or replace target-learner evidence."
+}

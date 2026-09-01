@@ -9,6 +9,7 @@ from journey_api.fixtures import (
     ENROLLMENT_ID,
     LEARNER_ID,
     ORGANIZATION_ID,
+    OPERATOR_ID,
     REVIEWER_ID,
 )
 from journey_api.main import app
@@ -18,6 +19,9 @@ from journey_api.models import (
     AuditEntry,
     Enrollment,
     EnrollmentStatus,
+    JourneyDefinition,
+    JourneyDefinitionStatus,
+    JourneyVersion,
     Organization,
     OutboxEvent,
     TaskDefinition,
@@ -310,6 +314,83 @@ def test_assignment_stays_on_v1_when_v2_is_published_and_drives_current_action()
         assert assignment is not None
         assert assignment.task_version_id == uuid.UUID(str(version_one["id"]))
         assert assignment.task_version_id != uuid.UUID(str(version_two["id"]))
+
+
+def test_learner_lists_existing_module_enrollments_and_selects_one_without_new_facts():
+    definition_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+    enrollment_id = uuid.uuid4()
+    stable_key = f"AI-ACADEMY-TEST-{definition_id.hex[:8].upper()}"
+    with SessionLocal.begin() as session:
+        session.add(
+            JourneyDefinition(
+                id=definition_id,
+                organization_id=ORGANIZATION_ID,
+                stable_key=stable_key,
+                status=JourneyDefinitionStatus.PUBLISHED,
+                revision=1,
+                created_by=OPERATOR_ID,
+            )
+        )
+        session.flush()
+        session.add(
+            JourneyVersion(
+                id=version_id,
+                organization_id=ORGANIZATION_ID,
+                journey_definition_id=definition_id,
+                version=1,
+                title="AI 学院受控首发模块",
+                purpose="测试现有 Enrollment 的模块入口投影。",
+                change_summary="合成测试数据，不代表正式内容。",
+                content_review_note="机器测试 fixture；Owner 内容确认 NOT_RUN。",
+                published_by=OPERATOR_ID,
+                reviewed_by=REVIEWER_ID,
+            )
+        )
+        session.flush()
+        session.add(
+            Enrollment(
+                id=enrollment_id,
+                organization_id=ORGANIZATION_ID,
+                learner_id=LEARNER_ID,
+                reviewer_id=REVIEWER_ID,
+                journey_version_id=version_id,
+                status=EnrollmentStatus.COMPLETED,
+                revision=1,
+            )
+        )
+
+    listed = assert_ok(client.get("/api/v1/me/enrollments", headers=learner_headers))
+    projected = next(item for item in listed["items"] if item["id"] == str(enrollment_id))
+    assert projected == {
+        "id": str(enrollment_id),
+        "status": "COMPLETED",
+        "revision": 1,
+        "journey_version_id": str(version_id),
+        "journey_stable_key": stable_key,
+        "journey_title": "AI 学院受控首发模块",
+        "journey_version": 1,
+        "reviewer_display_name": "试点主管",
+    }
+
+    selected = assert_ok(
+        client.get(
+            f"/api/v1/me/current-action?enrollment_id={enrollment_id}",
+            headers=learner_headers,
+        )
+    )
+    assert selected["resource_id"] == str(enrollment_id)
+    assert selected["journey"]["stable_key"] == stable_key
+    assert selected["journey"]["completed_stages"] == 0
+    assert selected["journey"]["total_stages"] == 0
+    assert selected["journey"]["nodes"] == []
+
+    not_owned = client.get(
+        f"/api/v1/me/current-action?enrollment_id={uuid.uuid4()}",
+        headers=learner_headers,
+    )
+    assert not_owned.status_code == 404
+    assert not_owned.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_assignment_detail_does_not_leak_another_learners_task():

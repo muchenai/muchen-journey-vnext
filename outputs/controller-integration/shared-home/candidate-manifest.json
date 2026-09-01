@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "candidate_id": "shared-home-whole-journey-entry",
+  "state": "AWAITING_HUMAN",
+  "machine_verdict": "READY_FOR_HUMAN",
+  "human_gate": "NOT_RUN",
+  "release_authorized": false,
+  "production_mutation_executed": false,
+  "frozen_on": "2026-08-23",
+  "frozen_files": {
+    "apps/web/src/app/page.tsx": "91d1b334c45dc53a9f25e36d678ec1b18388b755f4d46370d56938214ee87bcf",
+    "apps/web/src/app/globals.css": "282b448f7158daebcc09f91dc458412d7144a5840085672eb76afef3b49d8c8b",
+    "apps/web/scripts/product-entry-contract.test.mjs": "b03e571db134804dd8d6811d3131347be84271f39cd90e2eb2488aa7e05abd4b",
+    "prototypes/five-map-worldboard/index.html": "c2fd1cc666a48c8b9b9c9411d2c251092fe4748d9d2f6e6649977b77a17f82e8",
+    "prototypes/five-map-worldboard/contract.test.mjs": "7596685fe4f2906fdf118151e1d3ddda119092223222df061e3a04b1f14dc9e0",
+    "prototypes/five-map-worldboard/five-map-visual-tokens.css": "bd643330604dd6f8a7fc633d7a3cc2ff1df7b859ab0d02f4462c6b33190b2144",
+    "outputs/controller-integration/shared-home/contract.json": "77610e19b767830400bbc6b8d7392db587eb398e6c10e92d2cad9dc7072020d1",
+    "outputs/controller-integration/shared-home/controller-proposal.md": "1094ab200672d541065d4046b4c4bdc639481554f9117764238ed1deb7199029",
+    "outputs/controller-integration/shared-home/browser-evidence.md": "ed96a3bfb68c12c255db0b7f2d485dfe226547abc8fb221e23bc2e6a70c2e28e",
+    "outputs/controller-integration/shared-home/machine-acceptance.json": "fe18d18db23c74da2d3521f1444e7c719395a48ffdb1a33f7db5fe0e80cacdbf",
+    "outputs/controller-integration/shared-home/browser-evidence/visitor-390.png": "04841ff6a1f579ece30151b1dd4ee1350081be5dd052d2ab0d68d998533c3971",
+    "outputs/controller-integration/shared-home/browser-evidence/visitor-768.png": "3da55e68717a9c5c0c74ba2fb7d1dfee2eef836a798f84d42a6ae8ef7c4c1b9b",
+    "outputs/controller-integration/shared-home/browser-evidence/visitor-1280.png": "3a4b14ccc11c778e28673ffb4e126c4be100e6d08f1d78f517f0ef79f4992aa9",
+    "outputs/controller-integration/shared-home/browser-evidence/active-1280.png": "3ea89590039f4752432976e2fa09f659f39cca0f70a944202d92ca67a956fa9c",
+    "outputs/controller-integration/shared-home/browser-evidence/expired-390.png": "1e321b0542c4d2446f731f3f1464a49c82baf5e264e28ce9d974691295023d0a",
+    "outputs/controller-integration/shared-home/browser-evidence/unlocked-1280.png": "b0f12049b24ad6ff596bcb13b9b72abd40bcd92d724abb50b5d72b270dfdeb46"
+  }
+}

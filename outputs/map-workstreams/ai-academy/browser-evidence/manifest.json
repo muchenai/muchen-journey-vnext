@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "target": "http://127.0.0.1:4173/ai-academy/",
+  "browser_config": "/Users/liumowen/Documents/Muchen Journey2.0/output/playwright/wp25/cli.config.json",
+  "browser": "existing-local-playwright-chromium",
+  "installed_new_browser": false,
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "full_path": "PASS",
+      "document_scroll_width": 390,
+      "visible_primary_actions_per_step": 1,
+      "primary_action_height_css_px": 54,
+      "final_evidence_rows": 4,
+      "screenshots": ["390-step-1.png", "390-step-4.png"]
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "full_path": "PASS",
+      "document_scroll_width": 768,
+      "visible_primary_actions_per_step": 1,
+      "primary_action_height_css_px": 54,
+      "final_evidence_rows": 4,
+      "screenshots": ["768-step-1.png", "768-step-4.png"]
+    },
+    {
+      "width": 1280,
+      "height": 900,
+      "full_path": "PASS",
+      "document_scroll_width": 1280,
+      "visible_primary_actions_per_step": 1,
+      "final_evidence_rows": 4,
+      "screenshots": ["1280-step-1.png", "1280-step-4.png"]
+    }
+  ],
+  "interaction_checks": {
+    "keyboard_enter_advances_from_learning_input": "PASS",
+    "empty_submit_blocks_evidence_and_identifies_four_fields": "PASS",
+    "valid_submit_echoes_four_original_inputs": "PASS",
+    "touch_target_minimum_44_css_px": "PASS",
+    "reduced_motion_emulated": true,
+    "reduced_motion_loader_duration": "0.00001s",
+    "invalid_fixture_shows_single_retry_action": "PASS",
+    "retry_after_fixture_recovery": "PASS",
+    "restart_clears_inputs": "PASS",
+    "reload_clears_inputs": "PASS",
+    "normal_path_console_errors": 0,
+    "schema_error_recovery_console_errors": 0
+  },
+  "content_and_data_checks": {
+    "synthetic_label_visible_on_every_step": "PASS",
+    "formal_course_claim_present": false,
+    "talent_or_employment_judgment_present": false,
+    "shared_fact_write_present": false,
+    "persistence_present": false
+  }
+}

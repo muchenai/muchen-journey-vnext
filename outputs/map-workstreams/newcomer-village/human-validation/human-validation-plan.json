@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "artifact_type": "HUMAN_VALIDATION_NOT_RUN_PACKAGE",
+  "map": "newcomer-village",
+  "target_contract_id": "newcomer-village-first-real-integration-action",
+  "frozen_candidate_commit": "14cc8b31936597f846c9b48bdaa36f7658155e61",
+  "candidate_status": "READY_FOR_HUMAN",
+  "candidate_frozen": true,
+  "route": "/prototypes/newcomer-village/index.html",
+  "starts_at": "isolated-arrival-with-authorized-context-snapshot",
+  "ends_at": "local-evidence-draft-receipt-after-self-attested-real-action",
+  "validation": {
+    "status": "NOT_RUN",
+    "started_at": null,
+    "completed_at": null,
+    "human_verdict": "NOT_RUN",
+    "human_result_inferred": false
+  },
+  "participant_profile": {
+    "description": "First-time target newcomer with an appropriate real-work counterpart and authorization to participate without exposing personal or confidential business data.",
+    "required_sample_size": 3,
+    "recruitment_status": "NOT_RUN",
+    "prohibited_identifiers": [
+      "real_name",
+      "email",
+      "phone",
+      "employee_id",
+      "account_id"
+    ]
+  },
+  "facilitator": {
+    "mode": "NO_EXPLANATION",
+    "allowed_opening_script_ref": "protocol.md#3-观察者唯一开场话术",
+    "facilitator_rescue_threshold": 0,
+    "may_explain_entry_route_terminology_or_next_action": false
+  },
+  "human_acceptance": [
+    {
+      "id": "orientation-and-source-boundary",
+      "protocol": "Without facilitator explanation, ask first-time target newcomers what information came from Exploration Camp, what came from role/organization context, and whether either source has been written by this prototype.",
+      "threshold": "3/3 correctly distinguish the two inputs and say the prototype does not write shared facts."
+    },
+    {
+      "id": "independent-action-selection",
+      "protocol": "Observe first-time target newcomers from arrival through a specific action card without hints.",
+      "threshold": "3/3 independently choose a relevant action, counterpart role, and time plan within 3 minutes; 0 facilitator rescues."
+    },
+    {
+      "id": "real-integration-action",
+      "protocol": "Within one working day, verify with the participant that the selected interaction actually occurred; do not treat prototype clicks as proof.",
+      "threshold": "3/3 complete one real interaction with an appropriate work counterpart."
+    },
+    {
+      "id": "reviewable-evidence",
+      "protocol": "A human reviewer checks the participant-authored draft for minimum fields, specificity, privacy, and whether it supports role readiness or a collaboration habit without becoming an employment decision.",
+      "threshold": "3/3 drafts are accepted without requesting private names or confidential details."
+    },
+    {
+      "id": "clarity-and-willingness",
+      "protocol": "After receipt, ask for 1-5 ratings on progress clarity and willingness to repeat the collaboration habit.",
+      "threshold": "Median >= 4/5 on both questions."
+    }
+  ],
+  "normalized_thresholds": {
+    "orientation_and_source_boundary": {
+      "required_pass_count": 3,
+      "sample_size": 3,
+      "requires_exploration_input_identified": true,
+      "requires_role_org_input_identified": true,
+      "requires_no_shared_write_identified": true
+    },
+    "independent_action_selection": {
+      "required_pass_count": 3,
+      "sample_size": 3,
+      "maximum_raw_elapsed_seconds": 180,
+      "maximum_total_facilitator_interventions": 0
+    },
+    "real_integration_action": {
+      "required_pass_count": 3,
+      "sample_size": 3,
+      "must_complete_within_one_working_day": true,
+      "prototype_click_is_proof": false
+    },
+    "reviewable_evidence": {
+      "required_pass_count": 3,
+      "sample_size": 3,
+      "human_reviewer_required": true,
+      "private_names_or_confidential_details_required": false
+    },
+    "clarity_and_willingness": {
+      "rating_scale_min": 1,
+      "rating_scale_max": 5,
+      "minimum_clarity_median": 4,
+      "minimum_willingness_median": 4
+    }
+  },
+  "evidence_policy": {
+    "filled_record_location": "APPROVED_PRIVATE_EVIDENCE_STORE_ONLY",
+    "filled_record_may_be_committed": false,
+    "repo_may_store_only_privacy_safe_references": true,
+    "evidence_refs_must_exclude_sensitive_content": true
+  },
+  "participant_slots": [
+    {
+      "slot_id": "NV-H01",
+      "status": "NOT_RUN",
+      "profile_fit_confirmed": null,
+      "non_sensitive_profile_ref": null,
+      "consent_ref": null,
+      "start_time_iso": null,
+      "action_card_time_iso": null,
+      "receipt_time_iso": null,
+      "raw_elapsed_seconds": null,
+      "facilitator_intervention_count": null,
+      "understanding_restatement_verbatim": null,
+      "understanding_coding": {
+        "exploration_input_identified": null,
+        "role_org_input_identified": null,
+        "no_shared_write_identified": null
+      },
+      "selected_action_id": null,
+      "planned_counterpart_role": null,
+      "planned_time": null,
+      "real_action": {
+        "confirmed": null,
+        "confirmed_within_one_working_day": null,
+        "privacy_safe_confirmation_ref": null
+      },
+      "evidence_review": {
+        "reviewer_role": null,
+        "accepted": null,
+        "minimum_fields_present": null,
+        "specific_enough": null,
+        "privacy_safe": null,
+        "supports_allowed_output": null,
+        "non_sensitive_review_ref": null
+      },
+      "clarity_rating_1_to_5": null,
+      "willingness_to_continue_rating_1_to_5": null,
+      "privacy_safe_evidence_refs": []
+    },
+    {
+      "slot_id": "NV-H02",
+      "status": "NOT_RUN",
+      "profile_fit_confirmed": null,
+      "non_sensitive_profile_ref": null,
+      "consent_ref": null,
+      "start_time_iso": null,
+      "action_card_time_iso": null,
+      "receipt_time_iso": null,
+      "raw_elapsed_seconds": null,
+      "facilitator_intervention_count": null,
+      "understanding_restatement_verbatim": null,
+      "understanding_coding": {
+        "exploration_input_identified": null,
+        "role_org_input_identified": null,
+        "no_shared_write_identified": null
+      },
+      "selected_action_id": null,
+      "planned_counterpart_role": null,
+      "planned_time": null,
+      "real_action": {
+        "confirmed": null,
+        "confirmed_within_one_working_day": null,
+        "privacy_safe_confirmation_ref": null
+      },
+      "evidence_review": {
+        "reviewer_role": null,
+        "accepted": null,
+        "minimum_fields_present": null,
+        "specific_enough": null,
+        "privacy_safe": null,
+        "supports_allowed_output": null,
+        "non_sensitive_review_ref": null
+      },
+      "clarity_rating_1_to_5": null,
+      "willingness_to_continue_rating_1_to_5": null,
+      "privacy_safe_evidence_refs": []
+    },
+    {
+      "slot_id": "NV-H03",
+      "status": "NOT_RUN",
+      "profile_fit_confirmed": null,
+      "non_sensitive_profile_ref": null,
+      "consent_ref": null,
+      "start_time_iso": null,
+      "action_card_time_iso": null,
+      "receipt_time_iso": null,
+      "raw_elapsed_seconds": null,
+      "facilitator_intervention_count": null,
+      "understanding_restatement_verbatim": null,
+      "understanding_coding": {
+        "exploration_input_identified": null,
+        "role_org_input_identified": null,
+        "no_shared_write_identified": null
+      },
+      "selected_action_id": null,
+      "planned_counterpart_role": null,
+      "planned_time": null,
+      "real_action": {
+        "confirmed": null,
+        "confirmed_within_one_working_day": null,
+        "privacy_safe_confirmation_ref": null
+      },
+      "evidence_review": {
+        "reviewer_role": null,
+        "accepted": null,
+        "minimum_fields_present": null,
+        "specific_enough": null,
+        "privacy_safe": null,
+        "supports_allowed_output": null,
+        "non_sensitive_review_ref": null
+      },
+      "clarity_rating_1_to_5": null,
+      "willingness_to_continue_rating_1_to_5": null,
+      "privacy_safe_evidence_refs": []
+    }
+  ]
+}
