@@ -96,4 +96,4 @@ make candidate-package   # 仅对 clean、已有 40 字符 HEAD 的候选生成 
 make candidate-registry-check  # 只校验三个 canonical GHCR SHA tag；不登录、不 push
 ```
 
-`candidate-package` 输出到被 Git 忽略的 `artifacts/wp07-candidate/`，本地默认不会 push。mainline workflow 只在 `push main` 且四项显式保护条件满足时，将同一批本地候选镜像推到 `ghcr.io/muchenai2024-creator/muchen-journey-vnext-{api,web,worker}:<full-sha>`；禁止 `latest`，不修改 GitHub 设置或部署环境。完整事实见 [WP-07 As-Built](docs/24_WP07_CANDIDATE_BASELINE_SUPPLY_CHAIN_EVIDENCE.md)。
+`candidate-package` 输出到被 Git 忽略的 `artifacts/wp07-candidate/`，本地默认不会 push。mainline workflow 只在 `push main` 且四项显式保护条件满足时，将同一批本地候选镜像推到 `ghcr.io/muchenai/muchen-journey-vnext-{api,web,worker}:<full-sha>`；禁止 `latest`，不修改 GitHub 设置或部署环境。完整事实见 [WP-07 As-Built](docs/24_WP07_CANDIDATE_BASELINE_SUPPLY_CHAIN_EVIDENCE.md)。

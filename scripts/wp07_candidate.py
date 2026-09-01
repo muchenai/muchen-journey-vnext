@@ -22,7 +22,7 @@ FULL_SHA = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 MANIFEST_SCHEMA_VERSION = 2
 ALEMBIC_REVISION_MAX_LENGTH = 32
-GHCR_PREFIX = "ghcr.io/muchenai2024-creator/muchen-journey-vnext"
+GHCR_PREFIX = "ghcr.io/muchenai/muchen-journey-vnext"
 TRACE_IDS = (
     "ISO-MUST-001",
     "ISO-MUST-002",

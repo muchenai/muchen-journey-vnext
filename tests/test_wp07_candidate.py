@@ -10,6 +10,14 @@ FULL_SHA = "a" * 40
 REMOTE_DIGEST = "sha256:" + "b" * 64
 
 
+def test_candidate_registry_prefix_uses_confirmed_namespace():
+    assert candidate.GHCR_PREFIX == "ghcr.io/muchenai/muchen-journey-vnext"
+    makefile = (candidate.ROOT / "Makefile").read_text(encoding="utf-8")
+    assert (
+        "WP07_GHCR_PREFIX ?= ghcr.io/muchenai/muchen-journey-vnext" in makefile
+    )
+
+
 @pytest.fixture
 def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "ROOT", tmp_path)
