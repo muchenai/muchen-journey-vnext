@@ -14,7 +14,7 @@ def release_manifest(tmp_path: Path) -> Path:
     for index, component in enumerate(archive.COMPONENTS, start=1):
         images[component] = {
             "registry_reference": (
-                "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+                "ghcr.io/muchenai/muchen-journey-vnext-"
                 f"{component}:{SHA}"
             ),
             "registry_digest": "sha256:" + str(index) * 64,
