@@ -1,0 +1,97 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "wp15-wartime-production.yml"
+PACKAGE_CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
+
+
+def workflow_text() -> str:
+    return WORKFLOW.read_text(encoding="utf-8")
+
+
+def greenfield_package_job() -> str:
+    text = workflow_text()
+    start = text.index("  greenfield_package:\n")
+    end = text.index("  greenfield_authorize:\n", start)
+    return text[start:end]
+
+
+def job(name: str, next_name: str) -> str:
+    text = workflow_text()
+    return text[text.index(f"  {name}:\n") : text.index(f"  {next_name}:\n")]
+
+
+def test_greenfield_package_is_exact_candidate_and_confirmation_bound() -> None:
+    job = greenfield_package_job()
+    assert f"inputs.candidate == '{PACKAGE_CANDIDATE}'" in job
+    assert "inputs.confirmation == 'PACKAGE_C72FEA5_GREENFIELD_CANARY'" in job
+    assert "ref: ${{ inputs.candidate }}" in job
+    assert "test \"$(git -C candidate rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
+
+
+def test_greenfield_package_has_no_production_environment_or_infrastructure_secrets() -> None:
+    job = greenfield_package_job()
+    assert "environment:" not in job
+    assert "VOLCENGINE_" not in job
+    assert "WP08_" not in job
+    assert "WP15_" not in job
+    assert "ssh " not in job
+    assert "terraform " not in job
+
+
+def test_greenfield_package_only_pushes_exact_commit_tags() -> None:
+    job = greenfield_package_job()
+    assert "make -C candidate candidate-registry-check" in job
+    assert job.count("docker push") == 1
+    assert 'candidate=\'${{ inputs.candidate }}\'' in job
+    assert 'muchen-journey-vnext-$service:$candidate' in job
+    assert ":latest" not in job
+
+
+def test_greenfield_package_rechecks_candidate_and_uploads_digest_evidence() -> None:
+    job = greenfield_package_job()
+    assert "python3 scripts/wp07_candidate.py preflight" in job
+    assert "make -C candidate ci-main" in job
+    assert "--platform linux/amd64" in job
+    assert "wp31_prepare_amd64_dockerfiles.py" in job
+    assert "amd64-build-definition-manifest.json" in job
+    assert "python3 scripts/wp07_candidate.py registry" in job
+    assert "python3 scripts/wp07_candidate.py verify" in job
+    assert "name: wp07-candidate-${{ inputs.candidate }}" in job
+    assert "non-self-referential evidence checksums" in job
+    assert "if grep -qE '[[:space:]]SHA256SUMS$' SHA256SUMS; then exit 2; fi" in job
+    assert "sha256sum -c SHA256SUMS" in job
+
+
+def test_legacy_wartime_candidate_guard_remains_distinct() -> None:
+    text = workflow_text()
+    legacy = text[text.index("  operate:\n") :]
+    assert "inputs.candidate == 'ff53052847a268d025bceb93c3eab37986d50219'" in legacy
+    assert PACKAGE_CANDIDATE not in legacy
+
+
+def test_no_environment_gate_has_no_environment_or_secret_context() -> None:
+    gate = job("greenfield_authorize", "greenfield_execution_authorize")
+    assert "environment:" not in gate
+    assert "${{ secrets." not in gate
+    assert "review-check" in gate
+    assert "wp31_ops_closure.py" in gate
+    assert 'test "$GITHUB_REF_TYPE" = tag' in gate
+    assert 'test "$reviewed" = "$GITHUB_SHA"' in gate
+    assert 'test "$reviewed_ref" = "$GITHUB_REF"' in gate
+
+
+def test_protected_owner_gate_precedes_infrastructure_secrets() -> None:
+    gate = job("greenfield_execution_authorize", "greenfield_canary")
+    protected = job("greenfield_canary", "operate")
+    assert "needs: greenfield_authorize" in gate
+    assert "environment: production-canary-uat" in gate
+    assert "WP31_EXECUTION_AUTHORIZATION_B64: ${{ secrets.WP31_EXECUTION_AUTHORIZATION_B64 }}" in gate
+    assert "VOLCENGINE_ACCESS_KEY" not in gate
+    assert "WP08_MIGRATION_DB_PASSWORD" not in gate
+    assert "authorization-check" in gate
+    assert "greenfield_authorize" in protected
+    assert "greenfield_execution_authorize" in protected
+    assert "needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha" in protected
+    assert "needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref" in protected

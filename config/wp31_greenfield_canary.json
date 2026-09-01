@@ -1,0 +1,32 @@
+{
+  "schema_version": 3,
+  "environment": "PRODUCTION_CANARY_UAT",
+  "application_candidate_sha": "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f",
+  "package_workflow_run_id": "33489482777",
+  "package_manifest_sha256": "c9c1ac639e7b4b1ed963b6b9e31b777456784b3aa560816123afdaf6bb20cc8b",
+  "migration_head": "0028_canary_main_merge",
+  "production_host": "journey.muchenai.com",
+  "source_database": "journey_next_cutover_20260810",
+  "isolated_canary_database": "journey_next_canary_20260901_c72fea5",
+  "scope": {
+    "max_allowlisted_learners": 8,
+    "fixture_identity": false,
+    "worker_started": false,
+    "legacy_migration_authorized": false,
+    "production_job_execution_authorized": false,
+    "release_go": false
+  },
+  "images": {
+    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:d7131d5e8af5cf0a7cef6e4aa4cd6a8a2e6eec0816424f7010efad86224da74c",
+    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:fcfd637bef0e6722d45494c7e4b0099270e41046c356eaa981d702935a0a6fc3",
+    "worker_evidence_only": "ghcr.io/muchenai/muchen-journey-vnext-worker@sha256:26e2a9f1826b506c3cd1f0171e694a0a209f721569f8b1102971217312dad340"
+  },
+  "rollback": {
+    "candidate_sha": "ff53052847a268d025bceb93c3eab37986d50219",
+    "database": "journey_next_cutover_20260810",
+    "edge_upstream": "production-web:3000",
+    "does_not_require_database_restore": true
+  },
+  "canary_edge_upstream": "greenfield-canary-web:3000",
+  "authorization_model": "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+}
