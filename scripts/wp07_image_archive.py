@@ -67,7 +67,7 @@ def release_images(release_manifest: Path) -> tuple[str, dict[str, Any]]:
         registry_digest = item.get("registry_digest")
         local_digest = item.get("local_image_digest")
         expected_reference = (
-            "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
+            "ghcr.io/muchenai/muchen-journey-vnext-"
             f"{component}:{commit}"
         )
         if registry_reference != expected_reference:
