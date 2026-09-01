@@ -6,7 +6,7 @@ root=/srv/journey-next-production/canary
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
 [[ -L "$root/current" ]] || fail "canary current release is missing"
 release=$(readlink -f "$root/current")
-[[ "$release" =~ ^$root/releases/1633ec4eabe381da3b56500c323005c0f363c0d9-[1-9][0-9]*$ ]] || fail "canary release path is invalid"
+[[ "$release" =~ ^$root/releases/c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f-[1-9][0-9]*$ ]] || fail "canary release path is invalid"
 cd "$release"
 for path in compose.canary.yaml edge.sh Caddyfile.rollback; do
   [[ -f "$path" && ! -L "$path" ]] || fail "rollback input is missing: $path"

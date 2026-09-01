@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "wp15-wartime-production.yml"
-PACKAGE_CANDIDATE = "1633ec4eabe381da3b56500c323005c0f363c0d9"
+PACKAGE_CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
 
 
 def workflow_text() -> str:
@@ -25,7 +25,7 @@ def job(name: str, next_name: str) -> str:
 def test_greenfield_package_is_exact_candidate_and_confirmation_bound() -> None:
     job = greenfield_package_job()
     assert f"inputs.candidate == '{PACKAGE_CANDIDATE}'" in job
-    assert "inputs.confirmation == 'PACKAGE_1633EC4_GREENFIELD_CANARY'" in job
+    assert "inputs.confirmation == 'PACKAGE_C72FEA5_GREENFIELD_CANARY'" in job
     assert "ref: ${{ inputs.candidate }}" in job
     assert "test \"$(git -C candidate rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
 

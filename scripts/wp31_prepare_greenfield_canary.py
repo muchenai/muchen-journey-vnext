@@ -14,13 +14,13 @@ from urllib.parse import quote
 from uuid import UUID
 
 
-CANDIDATE = "1633ec4eabe381da3b56500c323005c0f363c0d9"
+CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
 PRODUCTION_HOST = "journey.muchenai.com"
 SOURCE_DATABASE = "journey_next_cutover_20260810"
-CANARY_DATABASE = "journey_next_canary_20260828_1633ec4"
+CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api@sha256:df6df5ca835f33697c84c8d2566d317cc538658a0b21a292051f2eb12fd12332",
-    "WEB_IMAGE": "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web@sha256:56fc8f6f9d37960c9a39a1e209c44df19221536bc1208dca9fa60f1df9e040d6",
+    "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:d7131d5e8af5cf0a7cef6e4aa4cd6a8a2e6eec0816424f7010efad86224da74c",
+    "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:fcfd637bef0e6722d45494c7e4b0099270e41046c356eaa981d702935a0a6fc3",
 }
 DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
 
@@ -127,6 +127,7 @@ def prepare(output: Path, host: str, port: int) -> None:
             "APP_ENV": "production",
             "APP_RELEASE": CANDIDATE,
             "CONFIG_SCHEMA_VERSION": "3",
+            "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
             "API_INTERNAL_URL": "http://greenfield-canary-api:8000",
             "ALLOW_FIXTURE_IDENTITY": "false",
         },

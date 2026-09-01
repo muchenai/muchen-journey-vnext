@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive reviewed amd64 Dockerfiles without changing the frozen app tree."""
+"""Verify reviewed architecture-aware Dockerfiles for the frozen amd64 build."""
 
 from __future__ import annotations
 
@@ -11,20 +11,11 @@ import subprocess
 from pathlib import Path
 
 
-CANDIDATE = "1633ec4eabe381da3b56500c323005c0f363c0d9"
+CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
 FILES = {
-    "api": ("apps/api/Dockerfile", "81e2747a7bfb8f43a6cff73e876932aedfe6f8e521edd6700d22929f8da172bb"),
-    "worker": ("apps/worker/Dockerfile", "3ca9e68781e13400d8a8e2a53c4fe61eada70ae3085faf0dcf8494495e41ae96"),
-    "web": ("apps/web/Dockerfile", "e017758fd5f77d91cfdbead45a817566d1dde4cd1d2e73ebabf2194eadebe5e6"),
-}
-REPLACEMENTS = {
-    "sha256:35b892813c23664a3592e4fc8c12a03538a22c579057655361c7043305272a9a":
-        "sha256:161223a16f042b8e469e9441291e071464fd91d4f4bbe6f496ee8d0abd4e0701",
-    "sha256:d6ec970cc10e01539e41626f720c4e0ac69016eaa2079a10ef776ffd3243db5b":
-        "sha256:aca521e5ae4a321322a9d47ed64a1775f5ab1ffd215d1e9fc0433c58f7bfd037",
-    "sha256:0d12f4f145ec045dd19e8465bd3cb07b08197f96a3776641511dc2bec53cc0b7":
-        "sha256:e18c561e6a8fb744b42fe000f4a8cdfcc38e7956e62a6ab44b0a0580db948450",
-    "/main/aarch64/": "/main/x86_64/",
+    "api": ("apps/api/Dockerfile", "275b3a0fb72a5739583e4300595032b99efd37119351874a3baa1ed75d2e246f"),
+    "worker": ("apps/worker/Dockerfile", "73c527d7c7dd901483a7bf17519ffe094cad4a6cf648caf00d3c7e55de702eb9"),
+    "web": ("apps/web/Dockerfile", "6b14531b8573f06ba240e82353297104519e8a3a579264fbe6a6f6d270519a60"),
 }
 
 
@@ -38,14 +29,15 @@ def sha256_bytes(value: bytes) -> str:
 
 def transform(source: bytes) -> bytes:
     text = source.decode("utf-8")
-    for old, new in REPLACEMENTS.items():
-        expected = 3 if old == "/main/aarch64/" else 1
-        if text.count(old) != expected:
-            raise Amd64DockerfileError(f"frozen Dockerfile replacement count drifted: {old}")
-        text = text.replace(old, new)
-    if "aarch64" in text:
-        raise Amd64DockerfileError("derived Dockerfile still contains aarch64")
-    return text.encode("utf-8")
+    required = (
+        "ARG TARGETARCH",
+        "amd64) alpine_arch=x86_64;",
+        "arm64) alpine_arch=aarch64;",
+        'Unsupported TARGETARCH: ${TARGETARCH}',
+    )
+    if any(text.count(marker) != 1 for marker in required):
+        raise Amd64DockerfileError("frozen Dockerfile architecture contract drifted")
+    return source
 
 
 def git(root: Path, *arguments: str) -> str:

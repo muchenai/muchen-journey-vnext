@@ -321,6 +321,7 @@ def test_backup_and_deploy_proofs_bind_real_files_and_exact_release() -> None:
     assert 'digest("canary-source.dump.enc") == value["encrypted_backup_sha256"]' in deploy
     assert 'cmp -s "$before" "$current_before"' in deploy
     assert 'rm -f -- "$root/current"' in deploy
+    assert "grep -qx 'RELEASE_MARKER=PRODUCTION_CANARY_UAT' secrets/web.env" in deploy
     assert '"release":sys.argv[2]' in edge
 
 
@@ -355,7 +356,7 @@ def test_ops_manifest_fails_closed_on_working_tree_drift(
 
 
 def test_exact_canary_database_is_the_only_new_rds_target() -> None:
-    expected = "journey_next_canary_20260828_1633ec4"
+    expected = "journey_next_canary_20260901_c72fea5"
     assert wp15_rds_database.GREENFIELD_CANARY_DATABASE_NAME == expected
     assert wp15_rds_schema_owner.GREENFIELD_CANARY_DATABASE_NAME == expected
     assert expected in wp15_rds_database.ALLOWED_DATABASES
@@ -389,7 +390,9 @@ def test_prepare_accepts_zero_allowlist_and_never_writes_worker_env(
     assert proof["raw_identifiers_in_proof"] is False
     assert not (output / "secrets/worker.env").exists()
     api = (output / "secrets/api.env").read_text()
+    web = (output / "secrets/web.env").read_text()
     assert "RELEASE_MARKER=PRODUCTION_CANARY_UAT\n" in api
+    assert "RELEASE_MARKER=PRODUCTION_CANARY_UAT\n" in web
     assert "ALLOW_FIXTURE_IDENTITY=false\n" in api
     assert "NOTIFICATION_RECIPIENTS_ENABLED=false\n" in api
 

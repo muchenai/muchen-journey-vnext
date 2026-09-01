@@ -11,23 +11,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("service", ["api", "worker", "web"])
-def test_transform_is_only_reviewed_architecture_and_checksum_change(service: str) -> None:
+def test_transform_preserves_reviewed_architecture_aware_dockerfile(service: str) -> None:
     relative, expected_hash = build.FILES[service]
     source = (ROOT / relative).read_bytes()
     assert build.sha256_bytes(source) == expected_hash
     derived = build.transform(source)
-    assert b"aarch64" not in derived
-    assert derived.count(b"/main/x86_64/") == 3
-    for old, new in build.REPLACEMENTS.items():
-        assert old.encode() not in derived
-        assert new.encode() in derived
+    assert derived == source
+    assert b"ARG TARGETARCH" in derived
+    assert b"amd64) alpine_arch=x86_64;" in derived
+    assert b"arm64) alpine_arch=aarch64;" in derived
 
 
 def test_transform_fails_closed_on_source_drift() -> None:
     source = (ROOT / "apps/api/Dockerfile").read_bytes().replace(
-        b"/main/aarch64/", b"/main/other/", 1
+        b"amd64) alpine_arch=x86_64;", b"amd64) alpine_arch=other;", 1
     )
-    with pytest.raises(build.Amd64DockerfileError, match="replacement count drifted"):
+    with pytest.raises(build.Amd64DockerfileError, match="architecture contract drifted"):
         build.transform(source)
 
 
