@@ -20,7 +20,7 @@ const AUTH_ERRORS: Record<string, string> = {
   IDENTITY_PROVIDER_DISABLED: "身份服务尚未完成环境配置。",
   IDENTITY_PROVIDER_UNAVAILABLE: "身份服务暂时不可用，请稍后再试。",
   SESSION_EXPIRED: "当前会话已失效。业务事实未受影响，请使用对应工作入口重新进入。",
-  LEARNER_SESSION_EXPIRED: "会话已失效，但你的成长进度和证据仍然保留。",
+  LEARNER_SESSION_EXPIRED: "会话已失效，但你的成长进度和证据仍然保留；已提交的任务与评审事实仍然保留。",
 };
 
 const CONTROLLED_MODULE_KEYS = new Set<string>(controlledRelease.modules);
@@ -117,7 +117,7 @@ function InvitationAction({ expired = false }: { expired?: boolean }) {
       <p>
         {expired
           ? "向运营获取一次性重新进入链接；验证后回到原进度，不会创建重复记录。"
-          : "粘贴你收到的完整链接。系统先验证通行证，再确认身份。"}
+          : "从专属邀请开始：粘贴你收到的完整链接。系统先验证通行证，再确认身份。"}
       </p>
     </form>
   );
@@ -142,6 +142,7 @@ function StateAction({ state }: { state: HomeState }) {
       className="button primary home-primary-action"
       href="/app"
       prefetch={false}
+      aria-label={state === "unlocked" ? "进入下一张地图" : "继续旅程"}
     >
       {state === "unlocked" ? "进入下一张地图" : "继续当前旅程"}
       <span aria-hidden="true">→</span>
@@ -185,9 +186,12 @@ export default async function Home({
   return (
     <section className="shared-home" data-home-state={context.state}>
       <header className="home-world-intro">
+        <p className="journey-whisper">It&apos;s a long game.</p>
         <p className="home-world-kicker">Muchen Journey · People AI 成长系统</p>
-        <h1>四个模块，共用一条真实任务闭环</h1>
+        <h1>这里，没有标准答案。</h1>
         <p>
+          <strong>四个模块，共用一条真实任务闭环。</strong>
+          一天，八站。带走四份认知与三项真实能力证据；从 Day 0 · 启程开始，
           从认识方向，到融入岗位、建立 AI 能力、积累交付证据；本次只开放受控首发范围，
           每个正式结果都需要真实实操、证据与真人签署。
         </p>
@@ -213,7 +217,11 @@ export default async function Home({
                   ? "current"
                   : "future";
               return (
-                <li className={`is-${mapState}`} key={map.key}>
+                <li
+                  className={`is-${mapState}`}
+                  data-hint={`${map.name} · ${map.mission}`}
+                  key={map.key}
+                >
                   <span className="home-map-number" aria-hidden="true">
                     {String(map.order).padStart(2, "0")}
                   </span>

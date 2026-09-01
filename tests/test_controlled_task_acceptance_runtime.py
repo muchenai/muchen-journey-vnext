@@ -15,6 +15,7 @@ from journey_api.controlled_task_runtime import (
 )
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
+from journey_api.fixtures import ORGANIZATION_ID
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
 from journey_api.main import app
 from journey_api.models import (
@@ -349,6 +350,7 @@ def build_synthetic_ready_handoff_and_authorization() -> dict[str, object]:
                 submission_id=submission.id,
                 submission_version_id=version.id,
                 reviewer_id=reviewer.id,
+                executor_id=reviewer.id,
                 review_revision=1,
                 decision=Decision.PASS,
                 rubric_scores={},
@@ -561,13 +563,19 @@ def build_synthetic_operator_target() -> dict[str, object]:
         operator = session.scalar(
             select(User)
             .join(RoleAssignment, RoleAssignment.user_id == User.id)
-            .where(RoleAssignment.role == Role.OPERATOR)
+            .where(
+                RoleAssignment.role == Role.OPERATOR,
+                User.organization_id == ORGANIZATION_ID,
+            )
             .order_by(User.id)
         )
         reviewer = session.scalar(
             select(User)
             .join(RoleAssignment, RoleAssignment.user_id == User.id)
-            .where(RoleAssignment.role == Role.REVIEWER)
+            .where(
+                RoleAssignment.role == Role.REVIEWER,
+                User.organization_id == ORGANIZATION_ID,
+            )
             .order_by(User.id)
         )
         assert operator is not None and reviewer is not None

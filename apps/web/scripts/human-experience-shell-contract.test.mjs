@@ -39,7 +39,10 @@ test("locked, empty and error surfaces keep one safe recovery action", () => {
 test("waiting work exposes the submitted version as the single current action", () => {
   assert.match(learnerHome, /WAIT_FOR_REVIEW/);
   assert.match(learnerHome, /查看已提交版本/);
-  assert.match(learnerHome, /href: opensTask \|\| waitsForReview \? taskHref/);
+  assert.match(
+    learnerHome,
+    /href: showSubmissionTransition \? null : opensTask \|\| waitsForReview \? taskHref/,
+  );
 });
 
 test("the current task card projects immutable task, assignment, SLA and review facts", () => {

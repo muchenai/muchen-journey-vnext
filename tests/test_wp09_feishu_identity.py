@@ -3,6 +3,7 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from fastapi import Response
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -14,7 +15,15 @@ from journey_api.feishu_oauth import (
     get_feishu_oauth_client,
 )
 from journey_api.fixtures import OPERATOR_ID, ORGANIZATION_ID
-from journey_api.identity import OAUTH_COOKIE, SESSION_COOKIE, credential_hash, utc_now
+from journey_api import identity
+from journey_api.identity import (
+    OAUTH_COOKIE,
+    SESSION_COOKIE,
+    clear_oauth_cookie,
+    credential_hash,
+    set_oauth_cookie,
+    utc_now,
+)
 from journey_api.main import app
 from journey_api.models import (
     AuditEntry,
@@ -88,6 +97,36 @@ def assert_ok(response):
     return response.json()["data"]
 
 
+@pytest.mark.parametrize(
+    ("secure", "expected_same_site"),
+    [(False, "SameSite=lax"), (True, "SameSite=none")],
+)
+def test_oauth_cookie_supports_cross_site_provider_return(
+    monkeypatch: pytest.MonkeyPatch,
+    secure: bool,
+    expected_same_site: str,
+) -> None:
+    monkeypatch.setattr(identity, "cookie_secure", lambda: secure)
+    response = Response()
+
+    set_oauth_cookie(response, "browser-token", max_age=600)
+
+    cookie = response.headers["set-cookie"]
+    assert "journey_next_oauth=browser-token" in cookie
+    assert "HttpOnly" in cookie
+    assert "Path=/auth/feishu" in cookie
+    assert expected_same_site in cookie
+    assert ("Secure" in cookie) is secure
+
+    cleared = Response()
+    clear_oauth_cookie(cleared)
+    cleared_cookie = cleared.headers["set-cookie"]
+    assert "journey_next_oauth=" in cleared_cookie
+    assert "Path=/auth/feishu" in cleared_cookie
+    assert expected_same_site in cleared_cookie
+    assert ("Secure" in cleared_cookie) is secure
+
+
 def create_link(role: Role, target_user_id: uuid.UUID) -> dict[str, object]:
     response = client_for(f"operator-link-{uuid.uuid4()}").post(
         "/api/v1/ops/identity-links",
@@ -125,6 +164,156 @@ def create_role_user(role: Role) -> uuid.UUID:
             )
         )
     return user_id
+
+
+def test_linked_content_editor_can_receive_separately_audited_reviewer_role(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    with SessionLocal.begin() as session:
+        session.add(
+            ExternalIdentity(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=editor_id,
+                provider="FEISHU",
+                subject=uuid.uuid4().hex + uuid.uuid4().hex,
+                verified_at=utc_now(),
+                revision=1,
+            )
+        )
+    operator = client_for("operator-grant-reviewer-role")
+    key = f"grant-reviewer-{uuid.uuid4()}"
+    payload = {
+        "expected_absent": True,
+        "reason": "郑田源在保留内容编辑职责的同时兼任本次真人评审",
+    }
+    granted = assert_ok(
+        operator.post(
+            f"/api/v1/ops/users/{editor_id}/reviewer-role",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    replay = assert_ok(
+        operator.post(
+            f"/api/v1/ops/users/{editor_id}/reviewer-role",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    assert granted["status"] == "ACTIVE"
+    assert replay["resource_id"] == granted["resource_id"]
+    assert replay["idempotency_replay"] is True
+    with SessionLocal() as session:
+        roles = set(
+            session.scalars(
+                select(RoleAssignment.role).where(RoleAssignment.user_id == editor_id)
+            ).all()
+        )
+        assert roles == {Role.CONTENT_EDITOR, Role.REVIEWER}
+        audit = session.scalar(
+            select(AuditEntry).where(
+                AuditEntry.action == "reviewer_role.granted",
+                AuditEntry.resource_id == uuid.UUID(granted["resource_id"]),
+            )
+        )
+        assert audit is not None
+        assert audit.details["role"] == "REVIEWER"
+
+
+def test_reviewer_role_grant_rejects_unlinked_content_editor(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    response = client_for("operator-grant-unlinked-reviewer").post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"grant-unlinked-{uuid.uuid4()}",
+        },
+        json={
+            "expected_absent": True,
+            "reason": "未绑定身份的内容编辑不能直接获得评审权限",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "IDENTITY_NOT_LINKED"
+
+
+def test_existing_content_editor_session_uses_live_roles_without_rebinding_identity(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    editor_id = create_role_user(Role.CONTENT_EDITOR)
+    link = create_link(Role.CONTENT_EDITOR, editor_id)
+    raw_subject = f"ou_multi_role_{uuid.uuid4().hex}"
+    oauth_provider.subjects["multi-role-content-code"] = raw_subject
+    editor = client_for("wp09-multi-role-content-editor")
+    state = begin_oauth(editor, "/content", str(link["link_token"]))
+    assert_ok(callback(editor, "multi-role-content-code", state))
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    assert editor.get("/api/v1/reviews").status_code == 403
+
+    operator = client_for("wp09-multi-role-operator")
+    granted = operator.post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"grant-live-session-{uuid.uuid4()}",
+        },
+        json={
+            "expected_absent": True,
+            "reason": "验证同一真实身份的角色授权无需重新绑定或重新登录",
+        },
+    )
+    assert assert_ok(granted)["status"] == "ACTIVE"
+
+    session_view = assert_ok(editor.get("/api/v1/session"))
+    assert session_view["roles"] == ["CONTENT_EDITOR", "REVIEWER"]
+    assert session_view["allowed_workspaces"] == ["content", "review"]
+    assert session_view["capabilities"] == [
+        "content:manage",
+        "review:decide",
+        "review:read",
+    ]
+    assert session_view["safe_entry"] == "/content"
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    assert editor.get("/api/v1/reviews").status_code == 200
+
+    revoked = operator.post(
+        f"/api/v1/ops/users/{editor_id}/reviewer-role/revoke",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"revoke-live-session-{uuid.uuid4()}",
+        },
+        json={
+            "expected_present": True,
+            "reason": "验证撤销评审能力不会影响内容编辑身份和现有会话",
+        },
+    )
+    assert assert_ok(revoked)["status"] == "REVOKED"
+    assert editor.get("/api/v1/reviews").status_code == 403
+    assert editor.get("/api/v1/content/task-definitions").status_code == 200
+    after = assert_ok(editor.get("/api/v1/session"))
+    assert after["roles"] == ["CONTENT_EDITOR"]
+    assert after["allowed_workspaces"] == ["content"]
+
+    with SessionLocal() as session:
+        identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == editor_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        active_session = session.scalar(
+            select(IdentitySession).where(
+                IdentitySession.user_id == editor_id,
+                IdentitySession.revoked_at.is_(None),
+            )
+        )
+        assert identity is not None
+        assert active_session is not None
+        assert active_session.role == Role.CONTENT_EDITOR
 
 
 def begin_oauth(client: TestClient, return_to: str, link_token: str | None = None) -> str:
@@ -309,6 +498,30 @@ def test_external_identity_revocation_immediately_invalidates_session(
         },
     )
     assert assert_ok(revoked)["status"] == "REVOKED"
+    assert reviewer.get("/api/v1/session").status_code == 401
+
+
+def test_external_identity_revision_change_invalidates_older_session(
+    oauth_provider: FakeFeishuOAuthClient,
+):
+    reviewer_id = create_role_user(Role.REVIEWER)
+    link = create_link(Role.REVIEWER, reviewer_id)
+    oauth_provider.subjects["identity-revision-code"] = f"ou_{uuid.uuid4().hex}"
+    reviewer = client_for("wp09-identity-revision-reviewer")
+    state = begin_oauth(reviewer, "/review", str(link["link_token"]))
+    assert_ok(callback(reviewer, "identity-revision-code", state))
+    assert reviewer.get("/api/v1/session").status_code == 200
+
+    with SessionLocal.begin() as session:
+        identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == reviewer_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        assert identity is not None
+        identity.revision += 1
+
     assert reviewer.get("/api/v1/session").status_code == 401
 
 
@@ -538,6 +751,7 @@ def test_revoked_identity_transfer_fails_closed_on_sessions_and_stale_link(
                 organization_id=ORGANIZATION_ID,
                 user_id=reviewer_id,
                 external_identity_id=identity_id,
+                external_identity_revision=1,
                 role=Role.REVIEWER,
                 token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
                 csrf_token_hash=uuid.uuid4().hex + uuid.uuid4().hex,

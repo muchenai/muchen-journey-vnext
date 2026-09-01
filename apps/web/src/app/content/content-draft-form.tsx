@@ -89,6 +89,14 @@ export function ContentDraftForm({ action, definitions, draft }: DraftFormProps)
         <label>步骤（每行一条）<textarea name="instructions" required defaultValue={content.instructions.join("\n")} /></label>
         <label>完成标准（每行一条）<textarea name="completion_criteria" required defaultValue={content.completion_criteria.join("\n")} /></label>
         <label>交付物（每行一条）<textarea name="required_deliverables" required defaultValue={content.required_deliverables.join("\n")} /></label>
+        <label>
+          提交后开放的参考答案（每行一条，可留空）
+          <textarea
+            name="reference_materials"
+            placeholder="参考答案：https://…"
+            defaultValue={content.reference_materials.join("\n")}
+          />
+        </label>
       </fieldset>
 
       <fieldset>

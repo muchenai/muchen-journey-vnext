@@ -41,7 +41,11 @@ jobs:
         run: make candidate-registry-push
         env:
           WP07_REGISTRY_PUSH: "1"
+      - name: Package verified candidate images for restricted staging networks
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: make candidate-image-archives
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ always() && hashFiles('artifacts/wp07-candidate/release-manifest.json') != '' }}
         with:
           name: wp07-candidate-${{ github.sha }}
           path: |
@@ -50,5 +54,9 @@ jobs:
             artifacts/wp07-candidate/web.spdx.json
             artifacts/wp07-candidate/worker.spdx.json
             artifacts/wp07-candidate/task-versions.json
+            artifacts/wp07-candidate/image-archives.json
+            artifacts/wp07-candidate/images/api.tar
+            artifacts/wp07-candidate/images/web.tar
+            artifacts/wp07-candidate/images/worker.tar
           if-no-files-found: error
           retention-days: 14

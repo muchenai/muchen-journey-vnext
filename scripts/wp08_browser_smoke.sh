@@ -61,7 +61,7 @@ page_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encod
 protected_path=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["protected_path"])' "$spec_path")
 pwcli open "${BROWSER_BASE_URL%/}${page_path}" --config "$runtime_config"
 pwcli snapshot >snapshot-initial.txt
-pwcli --raw eval "() => fetch('${protected_path}', {redirect: 'manual'}).then(response => response.status)" >protected-status.txt
+pwcli --raw run-code "async (page) => (await page.context().request.get('${BROWSER_BASE_URL%/}${protected_path}', {maxRedirects: 0})).status()" >protected-status.txt
 grep -Eq '(^|[^0-9])401([^0-9]|$)' protected-status.txt
 
 pwcli tab-new "${BROWSER_BASE_URL%/}/content"
@@ -87,6 +87,32 @@ if result != expected:
     raise SystemExit(f"anonymous Content Editor recovery mismatch: {result}")
 PY
 pwcli screenshot --filename "wp08-content-login.png" --full-page
+pwcli tab-close
+pwcli tab-select 0
+
+pwcli tab-new "${BROWSER_BASE_URL%/}/review"
+pwcli snapshot >snapshot-review-login.txt
+pwcli --raw eval "() => JSON.stringify({pathname: window.location.pathname, title: document.querySelector('h1')?.textContent?.trim(), action: Array.from(document.querySelectorAll('a')).find((link) => link.textContent?.trim() === '使用飞书进入')?.getAttribute('href') ?? null})" >review-entry.json
+python3 - "review-entry.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw = path.read_text(encoding="utf-8").strip()
+try:
+    result = json.loads(json.loads(raw) if raw.startswith('"') else raw)
+except json.JSONDecodeError as error:
+    raise SystemExit(f"invalid Reviewer browser result: {raw!r}: {error}")
+expected = {
+    "pathname": "/review/login",
+    "title": "进入主管评审",
+    "action": "/auth/feishu?return_to=%2Freview",
+}
+if result != expected:
+    raise SystemExit(f"anonymous Reviewer recovery mismatch: {result}")
+PY
+pwcli screenshot --filename "wp08-review-login.png" --full-page
 pwcli tab-close
 pwcli tab-select 0
 
@@ -132,4 +158,5 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror)' console-errors.txt;
     exit 2
 fi
 
-printf '%s\n' "WP08_BROWSER_SMOKE=PASS anonymous_content_reentry=same-origin-login"
+printf '%s\n' \
+    "WP08_BROWSER_SMOKE=PASS anonymous_content_reentry=same-origin-login anonymous_reviewer_reentry=same-origin-login"

@@ -81,7 +81,7 @@ export default async function JoinPage({
                   <input id="display-name" name="display_name" minLength={1} maxLength={120} required />
                 </>
               ) : (
-                <p className="status-meta">原有进度会被安全恢复，不会创建重复记录。</p>
+                <p className="status-meta">从上次离开的地方继续，回到旅程；原有进度会被安全恢复，不会创建重复记录。</p>
               )}
               <label className="consent-row">
                 <input type="checkbox" name="accepted_purpose" value="yes" required />

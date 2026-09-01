@@ -1,9 +1,18 @@
 # 09｜测试、UAT 与质量策略
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.2  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：QA/UAT Owner + Tech Lead  
+
+## 0. 第一性原理修订
+
+测试从“模块覆盖”改为“证据分层 + 真人任务”。自动化可以证明规则和浏览器行为，不能代替目标角色理解和体验。P0 必须增加两条黄金路径：
+
+- `AT-P0-AUTH-GOLDEN`：已绑定 Content Editor 的同一飞书 User 获得 Reviewer 后，无需重复绑定即可登录并进入 `/content` 与 `/review`；撤销单角色只移除对应能力；
+- `AT-P0-JOURNEY-GOLDEN`：真实 Learner 从邀请完成 Day 0、四宝藏、三评测、一次修订、最终通过与结果，关键要求默认可见、材料全部可打开。
+
+每次 auth 变更必须在真实 Chromium 运行 OAuth/cookie/redirect E2E；mock provider 测试不能关闭此门禁。每次 Learner 页面变更必须验证首次进入、进行中、等待、修订、完成、会话过期和链接失败七类状态及 390/768/1280 三视口。
 质量原则：测试要证明一个小系统真实成立，不再为多代兼容系统建立不断膨胀的门禁矩阵。  
 变更说明：根据 WP-01 实测，增加既有开发库升级路径、早期浏览器检查和单工作包门禁顺序。
 

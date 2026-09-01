@@ -9,24 +9,79 @@ fail() {
   exit 1
 }
 
+pull_with_bounded_retry() {
+  local label=$1
+  shift
+  local attempt status category log_file
+  log_file=$(mktemp /tmp/wp08-image-pull.XXXXXX)
+
+  for attempt in 1 2 3; do
+    : >"$log_file"
+    if timeout --signal=TERM --kill-after=30s 8m "$@" >"$log_file" 2>&1; then
+      rm -f "$log_file"
+      printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 result=PASS\n' \
+        "$label" "$attempt"
+      return 0
+    else
+      status=$?
+    fi
+    category=NON_RETRYABLE
+    if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+      category=COMMAND_TIMEOUT
+    elif grep -Eiq \
+      'TLS handshake timeout|i/o timeout|connection reset by peer|unexpected EOF|temporary failure|502 Bad Gateway|503 Service Unavailable|429 Too Many Requests' \
+      "$log_file"; then
+      category=TRANSIENT_NETWORK
+    fi
+
+    if [[ "$category" == "NON_RETRYABLE" || "$attempt" -eq 3 ]]; then
+      rm -f "$log_file"
+      printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 category=%s result=FAIL\n' \
+        "$label" "$attempt" "$category" >&2
+      return "$status"
+    fi
+
+    rm -f "$log_file"
+    printf 'WP08_IMAGE_PULL label=%s attempt=%s max_attempts=3 category=%s result=RETRY next_in_seconds=%s\n' \
+      "$label" "$attempt" "$category" "$((attempt * 5))"
+    sleep "$((attempt * 5))"
+    log_file=$(mktemp /tmp/wp08-image-pull.XXXXXX)
+  done
+}
+
 [[ "${EUID}" -eq 0 ]] || fail "deploy.sh must run as root"
-[[ "${CANDIDATE_COMMIT:-}" == "ff53052847a268d025bceb93c3eab37986d50219" ]] || fail "unexpected candidate"
+[[ "${CANDIDATE_COMMIT:-}" == "0a8b96d38c2cfeb4f1a500d1d752f1dec03e18dc" ]] || fail "unexpected candidate"
 [[ "${STAGING_HOST:-}" == "staging-vnext.muchenai.com" ]] || fail "unexpected staging host"
 [[ "${PRODUCTION_HOST:-}" == "journey.muchenai.com" ]] || fail "unexpected production host"
 [[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]] || fail "unexpected deploy mode"
-[[ "${BASELINE_CANDIDATE:-}" == "02863d0b670ee9b00b9def3e75bc6699827f555a" ]] || fail "unexpected Web-only baseline"
+[[ "${BASELINE_CANDIDATE:-}" == "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4" ]] || fail "unexpected Web-only baseline"
 
 for name in API_IMAGE WEB_IMAGE WORKER_IMAGE; do
   value=${!name:-}
   [[ "$value" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-*"@sha256:"* ]] || fail "$name is not an immutable vNext GHCR digest"
 done
-[[ "${WEB_IMAGE#*@}" == "sha256:a3335542f74d09f4bc394119cee81ba7b866edc6ef041f3f4444949d271e2aee" ]] || fail "Web digest differs from candidate manifest"
+[[ "${WEB_IMAGE#*@}" == "sha256:10aa9a30e9fbf8d76224f9971a1a4406ea1e0947dcb664fa8442378ec9f840e3" ]] || fail "Web digest differs from candidate manifest"
 if [[ "$DEPLOY_MODE" == "full" ]]; then
-  [[ "${API_IMAGE#*@}" == "sha256:2a053bad89bea8c06daba6e929af49a4804cc06a2321e49e93858f1f4fda6a6c" ]] || fail "API digest differs from candidate manifest"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:2ef3cd1b05c545810929a3136ac8259042f6b6c586ccb8c59af90c579bfd9f38" ]] || fail "Worker digest differs from candidate manifest"
+  [[ "${API_IMAGE#*@}" == "sha256:5fd865e50d6b2d3373985356d4f3b24768d398cd642abf1d9de87643677a6992" ]] || fail "API digest differs from candidate manifest"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:6d68cfda177ebce0aa9b26441ff56ac6d944da4ee0ae39c30a2b090a4415b050" ]] || fail "Worker digest differs from candidate manifest"
 else
-  [[ "${API_IMAGE#*@}" == "sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0" ]] || fail "API digest differs from the Web-only baseline"
-  [[ "${WORKER_IMAGE#*@}" == "sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22" ]] || fail "Worker digest differs from the Web-only baseline"
+  [[ "${API_IMAGE#*@}" == "sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d" ]] || fail "API digest differs from the Web-only baseline"
+  [[ "${WORKER_IMAGE#*@}" == "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da" ]] || fail "Worker digest differs from the Web-only baseline"
+fi
+
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  [[ "${IMAGE_TRANSPORT:-}" == "verified-archive" ]] || fail "full deploy must use verified image archives"
+  [[ "${API_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-api:$CANDIDATE_COMMIT" ]] || fail "API runtime reference differs from candidate"
+  [[ "${WEB_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-web:$CANDIDATE_COMMIT" ]] || fail "Web runtime reference differs from candidate"
+  [[ "${WORKER_RUNTIME_IMAGE:-}" == "ghcr.io/muchenai2024-creator/muchen-journey-vnext-worker:$CANDIDATE_COMMIT" ]] || fail "Worker runtime reference differs from candidate"
+  [[ "${API_LOCAL_IMAGE_DIGEST:-}" == "sha256:705824640538583177957f9b95ea2ebf3327481a7017de0b8ce2f47592d06783" ]] || fail "API local image digest differs from candidate manifest"
+  [[ "${WEB_LOCAL_IMAGE_DIGEST:-}" == "sha256:75d576aa70a60e6ead397ed04a74734bf7ec0b2e08ce049b69f4fbd98632ad22" ]] || fail "Web local image digest differs from candidate manifest"
+  [[ "${WORKER_LOCAL_IMAGE_DIGEST:-}" == "sha256:195296e36cf648979a634f77d6d46172f355d5b14815938c967c4aefe1e493f7" ]] || fail "Worker local image digest differs from candidate manifest"
+else
+  [[ "${IMAGE_TRANSPORT:-}" == "registry" ]] || fail "partial deploy must use registry transport"
+  [[ "${API_RUNTIME_IMAGE:-}" == "$API_IMAGE" ]] || fail "API runtime and registry references differ"
+  [[ "${WEB_RUNTIME_IMAGE:-}" == "$WEB_IMAGE" ]] || fail "Web runtime and registry references differ"
+  [[ "${WORKER_RUNTIME_IMAGE:-}" == "$WORKER_IMAGE" ]] || fail "Worker runtime and registry references differ"
 fi
 
 command -v docker >/dev/null || fail "docker is missing"
@@ -34,6 +89,11 @@ docker compose version >/dev/null || fail "docker compose plugin is missing"
 for path in compose.yaml compose.migrate.yaml Caddyfile grant_runtime.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "$path must be a regular file"
 done
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  for path in release-manifest.json image-archives.json wp07_image_archive.py images/api.tar images/web.tar images/worker.tar; do
+    [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "verified archive file $path is missing"
+  done
+fi
 for path in api.env migration.env worker.env web.env edge.env; do
   [[ -f "$SECRETS/$path" && ! -L "$SECRETS/$path" ]] || fail "secret file $path is missing"
   [[ "$(stat -c '%a' "$SECRETS/$path")" == "600" ]] || fail "secret file $path must be mode 0600"
@@ -71,6 +131,26 @@ unset api_recipient_key worker_recipient_key
 grep -qx 'PRODUCTION_HOST=journey.muchenai.com' "$SECRETS/edge.env" || fail "production edge host differs"
 
 docker compose -f compose.yaml -f compose.migrate.yaml config --quiet
+
+load_verified_archive() {
+  local component=$1 runtime_reference=$2 expected_id=$3 actual_id revision
+  docker load --input "images/$component.tar" >/dev/null
+  actual_id=$(docker image inspect --format '{{.Id}}' "$runtime_reference")
+  revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$runtime_reference")
+  [[ "$actual_id" == "$expected_id" ]] || fail "$component loaded image digest differs"
+  [[ "$revision" == "$CANDIDATE_COMMIT" ]] || fail "$component loaded image revision differs"
+  printf 'WP08_IMAGE_ARCHIVE_LOAD component=%s result=PASS\n' "$component"
+}
+
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  python3 ./wp07_image_archive.py verify-files \
+    --release-manifest ./release-manifest.json \
+    --archive-manifest ./image-archives.json \
+    --archive-root ./images
+  load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"
+  load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"
+  load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"
+fi
 
 verify_web_only_runtime() {
   local release_dir=$1
@@ -111,12 +191,26 @@ worker = json.loads(worker_raw)
 assert api == {
     "release": baseline,
     "config_schema_version": 3,
-    "migration_revision": "0014_wp12_data_lifecycle",
+    "migration_revision": "0021_p0_identity_principal",
     "status": "READY",
 }
 assert worker["release"] == baseline
 assert worker["heartbeat_release"] == baseline
 assert worker["stale"] is False
+PY
+}
+
+validate_component_marker_shape() {
+  local path=$1
+  python3 - "$path" <<'PY'
+import json
+import re
+import sys
+
+components = json.loads(open(sys.argv[1], encoding="utf-8").read())
+full_sha = re.compile(r"^[0-9a-f]{40}$")
+assert set(components) == {"web", "api", "worker"}
+assert all(isinstance(value, str) and full_sha.fullmatch(value) for value in components.values())
 PY
 }
 
@@ -196,11 +290,13 @@ if [[ "$DEPLOY_MODE" == "web-only" ]]; then
   [[ -L "$ROOT/current" ]] || fail "Web-only deploy requires an existing current release"
   previous=$(readlink -f "$ROOT/current")
   [[ -d "$previous" && -f "$previous/compose.yaml" ]] || fail "current release is invalid"
-  [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "deployed runtime baseline marker is missing"
-  [[ "$(cat "$ROOT/DEPLOYED_CANDIDATE")" == "$BASELINE_CANDIDATE" ]] || fail "deployed runtime baseline differs from the Web-only contract"
+  [[ -f "$ROOT/DEPLOYED_CANDIDATE" ]] || fail "latest deployed candidate marker is missing"
+  [[ -f "$ROOT/DEPLOYED_COMPONENTS.json" ]] || fail "deployed component marker is missing"
+  validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json" || \
+    fail "deployed component marker shape is invalid"
   previous_candidate_marker=$(cat "$ROOT/DEPLOYED_CANDIDATE")
   verify_web_only_runtime "$previous" || fail "runtime baseline is not healthy and compatible"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"
+  pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"
 
   rollback_web() {
     local code=${1:-$?}
@@ -255,8 +351,8 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   [[ "$backend_previous" == "$worker_previous" ]] || fail "API and Worker do not share one rollback release"
   [[ "$backend_previous" == "$ROOT"/releases/* && -f "$backend_previous/compose.yaml" && -f "$backend_previous/.deployment.env" ]] || fail "backend rollback release is outside the staging root"
   verify_runtime_repair_prestate "$previous" || fail "runtime repair prestate is not reviewed"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"
-  timeout --signal=TERM --kill-after=30s 8m docker pull "$WORKER_IMAGE"
+  pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"
+  pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"
 
   rollback_runtime() {
     local code=${1:-$?}
@@ -293,7 +389,6 @@ if [[ "$DEPLOY_MODE" == "runtime-repair" ]]; then
   exit 0
 fi
 
-docker compose pull
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api \
   python -c "from pathlib import Path; Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
 
@@ -317,7 +412,6 @@ trap rollback ERR
 
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api alembic upgrade head
 docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api python /tmp/grant_runtime.py
-docker compose -f compose.yaml -f compose.migrate.yaml run --rm --no-deps api python -m journey_api.seed
 docker compose up -d --remove-orphans --wait
 
 api_health=$(docker compose exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3).read().decode())")

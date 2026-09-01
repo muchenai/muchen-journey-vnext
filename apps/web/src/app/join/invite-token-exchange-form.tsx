@@ -7,10 +7,10 @@ import { exchangeInvite } from "@/app/actions";
 import { JoinSubmitButton } from "./join-submit-button";
 
 let capturedToken = "";
-
 function readFragmentToken(): string {
   if (typeof window !== "undefined") {
-    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const fragmentToken = fragment.get("token") ?? "";
     if (fragmentToken) capturedToken = fragmentToken;
   }
   return capturedToken;
@@ -71,7 +71,7 @@ export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientat
       aria-describedby={orientationDescriptionId}
     >
       <input type="hidden" name="token" value={token} />
-        <p className="join-ready-copy"><strong>邀请已读取</strong><span>验证后还会由你本人确认身份。</span></p>
+      <p className="join-ready-copy"><strong>邀请已读取</strong><span>验证后还会由你本人确认身份。</span></p>
       <JoinSubmitButton idleLabel="验证专属邀请" pendingLabel="正在验证…" />
     </form>
   );

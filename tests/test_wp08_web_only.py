@@ -26,13 +26,11 @@ def accepted_runtime(contract: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypatch):
+def test_checked_in_contract_is_static_web_only_and_baseline_compatible(
+    monkeypatch, tmp_path: Path
+):
     contract = copy.deepcopy(web_only.load_contract())
-    assert contract["status"] == "RETIRED"
-    assert (
-        contract["superseded_by_candidate"]
-        == "ff53052847a268d025bceb93c3eab37986d50219"
-    )
+    assert contract["status"] == "ACTIVE"
     candidate_openapi = b'{"openapi":"historical-candidate"}\n'
     baseline = contract["runtime_baseline"]
     assert isinstance(baseline, dict)
@@ -44,7 +42,11 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
         if args[:2] == ("merge-base", "--is-ancestor"):
             return ""
         if args[:2] == ("diff", "--name-only") and "--" not in args:
-            return "apps/web/src/app/ops/page.tsx\nMakefile\n"
+            return (
+                "apps/web/src/app/app/page.tsx\n"
+                "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md\n"
+                "scripts/wp08_web_runtime_check.py\n"
+            )
         if args[:2] == ("diff", "--name-only") and "--" in args:
             return ""
         if args[:1] == ("show",):
@@ -52,6 +54,9 @@ def test_checked_in_contract_is_static_web_only_and_baseline_compatible(monkeypa
         raise AssertionError(args)
 
     monkeypatch.setattr(web_only, "_git", fake_git)
+    wp08_contract = tmp_path / "wp08_staging.json"
+    wp08_contract.write_text(json.dumps({"candidate_commit": contract["candidate_commit"]}))
+    monkeypatch.setattr(web_only, "WP08_CONTRACT", wp08_contract)
     web_only.check_repository(contract)
 
 
@@ -87,12 +92,40 @@ def test_contract_rejects_widened_allowed_paths(tmp_path: Path):
         web_only.load_contract(contract)
 
 
-def test_contract_cannot_be_reactivated(tmp_path: Path):
+def test_runtime_compatibility_matches_the_deployed_component_boundary():
+    contract = web_only.load_contract()
+    compatibility = contract["baseline_compatibility_paths"]
+    assert isinstance(compatibility, list)
+    assert "apps/api/" not in compatibility
+    assert set(compatibility) == {
+        "apps/worker/",
+        "contracts/openapi.json",
+        "migrations/",
+    }
+
+
+def test_contract_accepts_runtime_browser_check_as_reviewed_web_evidence():
+    contract = web_only.load_contract()
+    allowed = contract["candidate_commit_allowed_paths"]
+    assert isinstance(allowed, list)
+    assert web_only._path_allowed("scripts/wp08_web_runtime_check.py", allowed)
+    assert web_only._path_allowed("scripts/p0_journey_v3_browser_fixture.py", allowed)
+
+
+def test_contract_accepts_retired_tombstone(tmp_path: Path):
     payload = json.loads(web_only.CONTRACT.read_text())
-    payload["status"] = "ACTIVE"
+    payload["status"] = "RETIRED"
     contract = tmp_path / "wp08_web_only.json"
     contract.write_text(json.dumps(payload))
-    with pytest.raises(web_only.WebOnlyError, match="remain retired"):
+    assert web_only.load_contract(contract)["status"] == "RETIRED"
+
+
+def test_contract_rejects_unknown_status(tmp_path: Path):
+    payload = json.loads(web_only.CONTRACT.read_text())
+    payload["status"] = "PAUSED"
+    contract = tmp_path / "wp08_web_only.json"
+    contract.write_text(json.dumps(payload))
+    with pytest.raises(web_only.WebOnlyError, match="ACTIVE or RETIRED"):
         web_only.load_contract(contract)
 
 
@@ -110,7 +143,7 @@ def repair_prestate(contract: dict[str, object]) -> dict[str, object]:
         "api_release": contract["candidate_commit"],
         "worker_release": contract["candidate_commit"],
         "worker_heartbeat_release": contract["candidate_commit"],
-        "migration_revision": "0014_wp12_data_lifecycle",
+        "migration_revision": "0021_p0_identity_principal",
         "config_schema_version": 3,
         "api_status": "READY",
         "worker_stale": False,

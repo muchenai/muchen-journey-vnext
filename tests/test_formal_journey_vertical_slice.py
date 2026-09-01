@@ -330,6 +330,23 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         "ASM-002-MODEL-JUDGEMENT",
         "ASM-003-DATA-CONSTRUCTION",
     ]
+    # Completed route nodes remain readable for reflection even though every
+    # mutation still requires an ACTIVE enrollment through the lock helper.
+    completed_day_zero = ok(
+        learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
+    )
+    assert completed_day_zero["status"] == "COMPLETED"
+    assert completed_day_zero["allowed_commands"] == []
+    completed_mutation = learner.post(
+        f"/api/v1/me/assignments/{day_zero['id']}/start",
+        headers={
+            "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_revision": completed_day_zero["revision"]},
+    )
+    assert completed_mutation.status_code == 404
+    assert completed_mutation.json()["error"]["code"] == "NOT_FOUND"
     with SessionLocal() as session:
         enrollment = session.scalar(
             select(Enrollment).where(

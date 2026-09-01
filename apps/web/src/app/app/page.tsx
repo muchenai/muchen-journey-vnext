@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutSession } from "@/app/actions";
 import { ExperienceState, FactLegend } from "@/app/human-experience";
+import { LiveStatusSignal } from "@/app/live-status-signal";
 import {
   Assignment,
   CurrentAction,
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function LearnerHome({
   searchParams,
 }: {
-  searchParams: Promise<{ enrollment_id?: string }>;
+  searchParams: Promise<{ enrollment_id?: string; transition?: string }>;
 }) {
   const query = await searchParams;
   const enrollmentQuery = query.enrollment_id
@@ -36,17 +37,67 @@ export default async function LearnerHome({
   const assignment = opensTask || waitsForReview
     ? await learnerPageRequest<Assignment>(`/api/v1/me/assignments/${action.resource_id}`)
     : null;
-  const currentNode = action.journey?.nodes.find((node) => node.status === "CURRENT");
+  const currentJourneyNode = action.journey?.nodes.find((node) => node.status === "CURRENT");
+  const currentNode = currentJourneyNode;
   const opensFirstMaterial = opensTask && currentNode?.position === 0;
+  const beginsDayZero = opensTask && currentJourneyNode?.stage_kind === "DAY_0";
   const taskHref = `/app/tasks/${action.resource_id}${
     opensFirstMaterial ? "#first-learning-input" : ""
   }`;
   const resultHref = query.enrollment_id
     ? `/app/result?enrollment_id=${encodeURIComponent(query.enrollment_id)}`
     : "/app/result";
+  const showSubmissionTransition = query.transition === "submitted";
+  const primaryActionLabel = opensResult
+    ? "打开旅程收获"
+    : action.action_type === "REVISE_SUBMISSION"
+      ? "查看反馈并修订"
+      : opensFirstMaterial
+        ? "打开第一份必读材料"
+        : "打开当前任务";
 
   return (
     <section className={action.journey ? "learner-journey-page" : "content-narrow"}>
+      {showSubmissionTransition ? (
+        <section className="journey-transition" role="status" aria-labelledby="journey-transition-title">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p className="eyebrow">这一站已保存</p>
+            <h1 id="journey-transition-title">
+              {opensResult
+                ? "八个路标都已点亮"
+                : opensTask
+                  ? "下一站已解锁"
+                  : "已经交给 Reviewer"}
+            </h1>
+            <p>
+              {opensResult
+                ? "打开旅程收获，看看你带走了什么。"
+                : opensTask
+                  ? "路线已经更新，继续从当前路标出发。"
+                  : "你的提交与版本已经保留，等待真人反馈。"}
+            </p>
+          </div>
+          {opensTask || opensResult ? (
+            <Link
+              className="button transition-action"
+              href={opensResult ? resultHref : taskHref}
+            >
+              {opensResult ? "查看旅程收获" : "进入下一站"}
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+      <LiveStatusSignal
+        statusKey={`${action.action_type}:${action.resource_id ?? "none"}:${action.title}`}
+        active={waitsForReview}
+        title="提交成功，已交给主管评审"
+        detail="无需手动刷新；页面会自动检查评分状态。"
+        changedMessage="评分完成，旅程已经更新。"
+        initialMessage={action.action_type === "REVISE_SUBMISSION"
+          ? "评分完成，Reviewer 已返回修订建议。"
+          : null}
+      />
       {action.journey ? (
         <>
           <JourneyMap
@@ -55,17 +106,18 @@ export default async function LearnerHome({
               position: currentNode?.position ?? 0,
               title: currentNode?.title ?? action.title,
               reason: action.reason,
-              href: opensTask || waitsForReview ? taskHref : opensResult ? resultHref : null,
-              actionLabel: opensResult ? "打开旅程结果" : null,
+              href: showSubmissionTransition ? null : opensTask || waitsForReview ? taskHref : opensResult ? resultHref : null,
+              actionLabel: !showSubmissionTransition && opensResult ? primaryActionLabel : null,
             }}
           />
-          {assignment ? (
+          {assignment && !showSubmissionTransition ? (
             <section className="current-task-card" aria-labelledby="current-task-card-title">
               <header>
                 <div>
                   <p className="eyebrow">当前应做的一项 · TaskVersion v{assignment.task_version}</p>
                   <h2 id="current-task-card-title">{assignment.task_title}</h2>
                   <p>{assignment.task_purpose}</p>
+                  {beginsDayZero ? <p>先带着一个真实问题出发，后面的每份材料都会给你一条线索。</p> : null}
                 </div>
                 <strong>{assignment.status}</strong>
               </header>
@@ -78,12 +130,12 @@ export default async function LearnerHome({
                 <div><dt>当前状态来源</dt><dd>Assignment revision {assignment.revision}</dd></div>
               </dl>
               <Link className="button primary" href={taskHref}>
-                {waitsForReview ? "查看已提交版本" : opensFirstMaterial ? "打开第一份必读材料" : "打开当前任务"}
+                {waitsForReview ? "查看已提交版本" : primaryActionLabel}
               </Link>
             </section>
           ) : null}
         </>
-      ) : opensTask || waitsForReview || opensResult ? (
+      ) : query.transition === "submitted" && (opensTask || opensResult) ? null : opensTask || waitsForReview || opensResult ? (
         <article className="status-card">
           <p className="eyebrow">{action.stage}</p>
           <h2>{action.title}</h2>
@@ -115,9 +167,11 @@ export default async function LearnerHome({
         enrollments={enrollmentsResponse.items}
       />
       {!action.journey ? null : (
-        <p className="journey-support">
-          {action.responsible_party} · {action.feedback_expectation}
-        </p>
+        <details className="journey-support">
+          <summary>为什么是这一步</summary>
+          <p>{action.reason}</p>
+          <p>{action.responsible_party} · {action.feedback_expectation}</p>
+        </details>
       )}
       <FactLegend />
       {hasSession ? (

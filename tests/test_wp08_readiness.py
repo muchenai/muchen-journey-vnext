@@ -46,6 +46,7 @@ def test_browser_spec_is_pinned_and_complete():
     assert spec["protected_path"] == "/ops"
     assert "anonymous_protected_status" in spec["checks"]
     assert "anonymous_content_reentry" in spec["checks"]
+    assert "anonymous_reviewer_reentry" in spec["checks"]
 
 
 def test_browser_preflight_rejects_insecure_staging_url(tmp_path, monkeypatch):

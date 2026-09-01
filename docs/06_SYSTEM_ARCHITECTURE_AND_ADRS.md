@@ -1,10 +1,16 @@
 # 06｜系统架构与 ADR
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.1  
-日期：2026-07-20  
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Tech Lead  
 批准方案：独立仓库内的模块化单体；前端、API、worker 分进程部署；独立 PostgreSQL 与对象存储。`DEC-005` 已批准。
+
+## 0. 第一性原理修订
+
+架构的首要优化目标改为“减少真实用户完成闭环所需的认知和运行故障点”，而不是增加合同、provider 或部署能力。P0 保持现有模块化单体和冻结基础设施；除修复真实 blocker 外不新增组件。
+
+新增 `ADR-009｜Identity-centric multi-role authorization`：OAuth adapter 只解析外部身份，Identity 模块建立内部 User；Session principal 不包含唯一角色；Authorization service 按 User、organization、RoleAssignment 和 resource scope 计算 capabilities。Web 只消费 capabilities 和安全入口，不建立按角色复制的登录/回调路径。状态：`APPROVED / IMPLEMENTED_LOCAL_BY_P0-1`；staging 与真实飞书 OAuth 证据仍独立待验。
 
 ## 1. 架构目标
 

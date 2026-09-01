@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { FactLabel } from "@/app/human-experience";
 import { identityPageRequest, ReviewItem } from "@/lib/server/api";
+import { LiveStatusSignal } from "@/app/live-status-signal";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ export default async function ReviewQueuePage({
     "REVIEWER",
   );
   const checkedAt = new Date();
+  const queueStatusKey = queue.items
+    .map((item) => `${item.id}:${item.status}:${item.submission_version_no}`)
+    .join("|");
   return (
     <section className="content-narrow review-queue-page">
       <p className="eyebrow">主管工作台</p>
@@ -34,6 +38,13 @@ export default async function ReviewQueuePage({
         <p>主备与升级：当前 Reviewer 队列接口未提供批准的替补映射；需要交接时请保留 Review ID 并联系运营核对绑定。</p>
         <p>利益冲突：当前仅能证明任务已分配给本人，自动回避检查为 NOT_EVALUATED，不宣称“无冲突”。</p>
       </div>
+      <LiveStatusSignal
+        statusKey={queueStatusKey}
+        active
+        title={queue.items.length > 0 ? `有 ${queue.items.length} 项等待处理` : "当前没有新提交"}
+        detail="无需手动刷新；页面会自动检查新人提交。"
+        changedMessage="有新的提交或评审状态变化，队列已更新。"
+      />
       {query.finalized ? (
         <p className="success-text" role="status">
           {query.finalized === "approved" ? "通过结论已定稿，任务已完成。" : "修订结论已定稿，新人已进入修订状态。"}

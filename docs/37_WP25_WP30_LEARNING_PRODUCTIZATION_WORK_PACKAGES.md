@@ -1,10 +1,12 @@
 # 37｜WP-25～WP-30 探索营 P0 真人体验与受控上线工作包
 
-状态：`APPROVED_FOR_BUILD / WP26_WP30_MACHINE_IMPLEMENTED / HUMAN_GATES_NOT_RUN`
+状态：`SUPERSEDED_EXECUTION_ORDER / HISTORICAL_EVIDENCE_RETAINED`
 
 版本：V0.3
 
 日期：2026-08-05
+
+> **2026-08-13 治理说明：** 本文的根因、机器实现和真人门禁事实继续有效，但未完成施工顺序已由 42/43 替代。不得再从 WP 编号推导优先级；当前先关闭多角色身份、Learner 一站式体验和完整真人 Journey V3。
 
 前置：DEC-024/025、WP-24 Formal Exploration Camp V2、`UAT-WP24-001..003`
 

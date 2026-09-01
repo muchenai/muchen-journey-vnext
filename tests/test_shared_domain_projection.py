@@ -517,6 +517,7 @@ def runtime_facts(
         submission_id=submission.id,
         submission_version_id=version.id,
         reviewer_id=reviewer_id,
+        executor_id=reviewer_id,
         review_revision=2,
         decision=decision,
         rubric_scores={"evidence": "MEETS"},

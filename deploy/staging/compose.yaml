@@ -20,7 +20,7 @@ x-app-security: &app-security
 services:
   api:
     <<: [*common, *app-security]
-    image: ${API_IMAGE:?API_IMAGE must be an immutable GHCR digest reference}
+    image: ${API_RUNTIME_IMAGE:?API_RUNTIME_IMAGE must be a verified candidate image reference}
     env_file:
       - secrets/api.env
     volumes:
@@ -36,7 +36,7 @@ services:
 
   worker:
     <<: [*common, *app-security]
-    image: ${WORKER_IMAGE:?WORKER_IMAGE must be an immutable GHCR digest reference}
+    image: ${WORKER_RUNTIME_IMAGE:?WORKER_RUNTIME_IMAGE must be a verified candidate image reference}
     env_file:
       - secrets/worker.env
     volumes:
@@ -53,7 +53,7 @@ services:
 
   web:
     <<: [*common, *app-security]
-    image: ${WEB_IMAGE:?WEB_IMAGE must be an immutable GHCR digest reference}
+    image: ${WEB_RUNTIME_IMAGE:?WEB_RUNTIME_IMAGE must be a verified candidate image reference}
     env_file:
       - secrets/web.env
     depends_on:

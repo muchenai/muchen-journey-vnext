@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 import {
   acceptControlledTaskHandoff,
   requestNextTrainingStageReview,
 } from "@/app/actions";
 import { FactLabel } from "@/app/human-experience";
 import {
+  CurrentAction,
   HandoffDetail,
   IncentiveLedger,
   learnerPageRequest,
@@ -11,6 +14,8 @@ import {
   Result,
   Timeline,
 } from "@/lib/server/api";
+
+import { stageDisplayTitle } from "../stage-title";
 
 export const dynamic = "force-dynamic";
 
@@ -74,13 +79,14 @@ export default async function ResultPage({
   const resultQuery = query.enrollment_id
     ? `?enrollment_id=${encodeURIComponent(query.enrollment_id)}`
     : "";
-  const [result, timeline, reviewRequests, incentives] = await Promise.all([
+  const [result, timeline, reviewRequests, incentives, currentAction] = await Promise.all([
     learnerPageRequest<Result>(`/api/v1/me/result${resultQuery}`),
     learnerPageRequest<Timeline>(`/api/v1/me/timeline?limit=100${enrollmentQuery}`),
     learnerPageRequest<NextTrainingStageReviewRequestList>(
       "/api/v1/me/next-training-stage-review-requests",
     ),
     learnerPageRequest<IncentiveLedger>("/api/v1/me/incentives"),
+    learnerPageRequest<CurrentAction>(`/api/v1/me/current-action${resultQuery}`),
   ]);
   const handoff = await learnerPageRequest<HandoffDetail>(
     `/api/v1/me/handoffs/${result.handoff.id}`,
@@ -91,18 +97,111 @@ export default async function ResultPage({
       ? "尚无飞书服务回执；结果仍以本页为准。"
       : "本地测试记录不代表外部送达。";
   const latestReviewRequest = reviewRequests.items[0] ?? null;
+  const journeyNodes = currentAction.journey?.nodes ?? [];
+  const dayZero = journeyNodes.find((node) => node.stage_kind === "DAY_0");
+  const treasureNodes = journeyNodes.filter((node) => node.stage_kind === "TREASURE");
+  const assessmentNodes = new Map(
+    journeyNodes
+      .filter((node) => node.stage_kind === "ASSESSMENT")
+      .map((node) => [node.stable_key, node]),
+  );
   return (
     <article className="result-page">
       <header className="panel result-hero">
-        <div className="completion-orbit" aria-hidden="true"><i /><i /><i /></div>
-        <p className="journey-whisper">The journey continues.</p>
-        <p className="result-kicker"><span aria-hidden="true">✓</span> 已完成</p>
-        <h1>探索营结果包已准备好</h1>
-        <p className="lede">{result.summary}</p>
-        <p className="status-meta">
-          结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
-        </p>
+        <div className="result-sky" aria-hidden="true">
+          <span className="result-horizon" />
+          <div className="completion-orbit">
+            {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+          </div>
+        </div>
+        <div className="result-hero-copy">
+          <p className="journey-whisper">The journey continues.</p>
+          {dayZero ? (
+            <Link
+              className="result-kicker result-kicker-link"
+              href={`/app/tasks/${dayZero.assignment_id}`}
+              aria-label="回看启程"
+            >
+              <span aria-hidden="true">✓</span> 8 / 8 路标已点亮
+            </Link>
+          ) : (
+            <p className="result-kicker"><span aria-hidden="true">✓</span> 8 / 8 路标已点亮</p>
+          )}
+          <h1>你走完了这段探索。</h1>
+          <p className="result-hero-statement">也留下了只属于你的判断。</p>
+          <p className="lede">{result.summary}</p>
+          <p className="status-meta">
+            结果生成于 <time dateTime={result.created_at}>{formatDate.format(new Date(result.created_at))}</time>
+          </p>
+        </div>
       </header>
+
+      <section className="panel result-section result-collection" aria-labelledby="collection-title">
+        <div className="result-section-heading">
+          <div>
+            <p className="section-label">探索通行证已盖章</p>
+            <h2 id="collection-title">你带走的，不只是答案</h2>
+          </div>
+          <span className="result-pass-stamp" aria-label="四枚宝藏与三项能力证据已确认">Journey 8 / 8</span>
+        </div>
+        <div className="treasure-collection" aria-label="已完成四个宝藏主题">
+          {treasureNodes.map((node, index) => {
+            const title = stageDisplayTitle(node.title);
+            return (
+              <Link
+                className="result-revisit-link"
+                href={`/app/tasks/${node.assignment_id}`}
+                aria-label={`回看宝藏 ${index + 1}：${title}`}
+                key={node.assignment_id}
+              >
+                <article>
+                  <span aria-hidden="true">✦</span>
+                  <small>宝藏 {index + 1}</small>
+                  <strong>{title}</strong>
+                </article>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="ability-collection" aria-label="已通过三项能力评测">
+          {result.journey_evaluations.map((evaluation, index) => {
+            const node = assessmentNodes.get(evaluation.stage_key);
+            const title = stageDisplayTitle(evaluation.stage_title);
+            const card = (
+              <article>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>Reviewer 已确认</small>
+                  <strong>{title}</strong>
+                </div>
+              </article>
+            );
+            return node ? (
+              <Link
+                className="result-revisit-link"
+                href={`/app/tasks/${node.assignment_id}`}
+                aria-label={`回看能力评测 ${index + 1}：${title}`}
+                key={evaluation.id}
+              >
+                {card}
+              </Link>
+            ) : (
+              <div key={evaluation.id}>{card}</div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="panel result-section result-next-step-summary" aria-labelledby="next-step-summary-title">
+        <p className="section-label">下一步</p>
+        <h2 id="next-step-summary-title">{result.handoff.next_step_title}</h2>
+        <p>{result.handoff.instructions}</p>
+      </section>
+
+      <details className="panel result-section result-details">
+        <summary>查看评审与准入详情</summary>
+        <p>正式结果、真人 Reviewer 结论和下一训练阶段决定分别记录；下方各区展示权威事实与人工复核入口。</p>
+      </details>
 
       <section className="panel result-section" aria-labelledby="decision-layers-title">
         <p className="section-label">01 · 结论分层</p>
@@ -158,7 +257,7 @@ export default async function ResultPage({
             {result.journey_evaluations.map((evaluation, index) => (
               <article key={evaluation.id}>
                 <span>0{index + 1}</span>
-                <h3>{evaluation.stage_title.replace(/^能力评测[一二三]：/, "")}</h3>
+                <h3>{stageDisplayTitle(evaluation.stage_title)}</h3>
                 <p>{evaluation.overall_feedback}</p>
                 <details>
                   <summary>展开评审证据</summary>
@@ -379,38 +478,41 @@ export default async function ResultPage({
         ) : null}
       </section>
 
-      <section className="panel result-section" aria-labelledby="notification-title">
-        <p className="section-label">05 · 通知状态</p>
-        <h2 id="notification-title">核心结果不依赖通知</h2>
-        <div className={`notification-state notification-${result.notification.status.toLowerCase()}`}>
-          <strong>{result.notification.status}</strong>
-          <p>{result.notification.display_status}</p>
-        </div>
-        <p className="notification-disclaimer">
-          {notificationEvidence}
-          {result.notification.attempt_count > 0 ? ` 已记录 ${result.notification.attempt_count} 次投递尝试。` : ""}
-        </p>
-      </section>
+      <details className="panel result-section result-proof">
+        <summary>查看通知与过程记录</summary>
+        <section aria-labelledby="notification-title">
+          <p className="section-label">05 · 通知状态</p>
+          <h2 id="notification-title">核心结果不依赖通知</h2>
+          <div className={`notification-state notification-${result.notification.status.toLowerCase()}`}>
+            <strong>{result.notification.status}</strong>
+            <p>{result.notification.display_status}</p>
+          </div>
+          <p className="notification-disclaimer">
+            {notificationEvidence}
+            {result.notification.attempt_count > 0 ? ` 已记录 ${result.notification.attempt_count} 次投递尝试。` : ""}
+          </p>
+        </section>
 
-      <section className="panel result-section" aria-labelledby="timeline-title">
-        <p className="section-label">06 · 不可变时间线</p>
-        <h2 id="timeline-title">从提交到交接</h2>
-        <ol className="result-timeline">
-          {timeline.items.map((item) => {
-            const detail = timelineDetail(item.event_type, item.details);
-            return (
-              <li key={item.item_id}>
-                <span className="timeline-dot" aria-hidden="true" />
-                <div>
-                  <time dateTime={item.occurred_at}>{formatDate.format(new Date(item.occurred_at))}</time>
-                  <h3>{item.title}</h3>
-                  {detail ? <p>{detail}</p> : null}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+        <section aria-labelledby="timeline-title">
+          <p className="section-label">06 · 不可变时间线</p>
+          <h2 id="timeline-title">从提交到交接</h2>
+          <ol className="result-timeline">
+            {timeline.items.map((item) => {
+              const detail = timelineDetail(item.event_type, item.details);
+              return (
+                <li key={item.item_id}>
+                  <span className="timeline-dot" aria-hidden="true" />
+                  <div>
+                    <time dateTime={item.occurred_at}>{formatDate.format(new Date(item.occurred_at))}</time>
+                    <h3>{item.title}</h3>
+                    {detail ? <p>{detail}</p> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      </details>
     </article>
   );
 }

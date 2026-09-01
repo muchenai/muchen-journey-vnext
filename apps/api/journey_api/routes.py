@@ -20,7 +20,9 @@ from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import (
     completed_materials,
     ensure_required_materials_completed,
+    learner_learning_materials,
     material_by_key,
+    reviewable_material_links,
 )
 from journey_api.journey_service import (
     formal_admission_scorecard,
@@ -177,6 +179,7 @@ def task_definition_out(
                 version=version.version,
                 title=version.title,
                 published_at=version.published_at,
+                material_links=reviewable_material_links(version.learning_materials),
             )
             for version in versions
         ],
@@ -441,6 +444,20 @@ def publish_task_version(
     )
     if reviewer is None:
         raise ApiError(422, "VALIDATION_FAILED", "内容复核人必须是同组织的有效 Reviewer。")
+    expected_material_links = reviewable_material_links(
+        [material.model_dump(mode="json") for material in command.learning_materials]
+    )
+    expected_material_urls = [item["url"] for item in expected_material_links]
+    if command.verified_material_urls != expected_material_urls:
+        raise ApiError(
+            422,
+            "MATERIAL_LINK_VERIFICATION_REQUIRED",
+            "必须逐项打开并确认当前任务版本中的全部材料链接。",
+            details={
+                "expected_count": len(expected_material_urls),
+                "verified_count": len(command.verified_material_urls),
+            },
+        )
     next_version = (
         session.scalar(
             select(func.max(TaskVersion.version)).where(
@@ -510,6 +527,7 @@ def publish_task_version(
             "sensitivity": command.sensitivity,
             "audience": command.audience,
             "reference_material_count": len(command.reference_materials),
+            "verified_material_link_count": len(expected_material_urls),
             "content_source_count": len(command.content_source_notes),
             "change_summary": command.change_summary.strip(),
             "reviewer_calibration_note": command.reviewer_calibration_note.strip(),
@@ -1119,7 +1137,9 @@ def assignment_detail(
             Assignment.id == assignment_id,
             Assignment.organization_id == actor.organization_id,
             Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
+            Enrollment.status.in_(
+                (EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+            ),
             TaskVersion.organization_id == actor.organization_id,
             TaskDefinition.organization_id == actor.organization_id,
         )
@@ -1170,8 +1190,7 @@ def assignment_detail(
                     else None
                 ),
             )
-            for material in task.learning_materials
-            if isinstance(material, dict) and material.get("key")
+            for material in learner_learning_materials(task.learning_materials)
         ],
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,

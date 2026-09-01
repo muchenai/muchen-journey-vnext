@@ -157,6 +157,17 @@ class AssignEnrollmentReviewerCommand(RevisionCommand):
         return value.strip()
 
 
+class HandoffAssignedReviewCommand(RevisionCommand):
+    review_revision: int = Field(ge=1)
+    reviewer_id: UUID
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_handoff_reason(cls, value: str) -> str:
+        return value.strip()
+
+
 class CancelEnrollmentCommand(RevisionCommand):
     reason: str = Field(min_length=10, max_length=500)
 
@@ -368,6 +379,16 @@ class TaskContentInput(StrictModel):
 class PublishTaskVersionCommand(TaskContentInput):
     expected_revision: int = Field(ge=1)
     reviewed_by: UUID
+    verified_material_urls: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("verified_material_urls")
+    @classmethod
+    def validate_verified_material_urls(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("Verified material URLs must be unique")
+        if any(not value.startswith("https://") or len(value) > 2_000 for value in values):
+            raise ValueError("Verified material URLs must use HTTPS")
+        return values
 
 
 class CreateContentDraftCommand(StrictModel):
@@ -381,6 +402,26 @@ class CreateContentEditorCommand(StrictModel):
     @field_validator("display_name")
     @classmethod
     def normalize_content_editor_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class GrantReviewerRoleCommand(StrictModel):
+    expected_absent: Literal[True]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_grant_reason(cls, value: str) -> str:
+        return value.strip()
+
+
+class RevokeReviewerRoleCommand(StrictModel):
+    expected_present: Literal[True]
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_revoke_reason(cls, value: str) -> str:
         return value.strip()
 
 
@@ -401,6 +442,16 @@ class PublishContentDraftCommand(RevisionCommand):
     expected_definition_revision: int = Field(ge=1)
     reviewed_by: UUID
     review_acknowledged: Literal[True]
+    verified_material_urls: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("verified_material_urls")
+    @classmethod
+    def validate_verified_material_urls(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("Verified material URLs must be unique")
+        if any(not value.startswith("https://") or len(value) > 2_000 for value in values):
+            raise ValueError("Verified material URLs must use HTTPS")
+        return values
 
 
 class LearningMaterialOut(StrictModel):
@@ -552,6 +603,8 @@ class IdentityAccessOut(StrictModel):
             "create_identity_link",
             "revoke_identity_link",
             "revoke_external_identity",
+            "grant_reviewer_role",
+            "revoke_reviewer_role",
         ]
     ]
 
@@ -626,6 +679,8 @@ class SessionOut(StrictModel):
     organization_id: UUID
     display_name: str
     roles: list[str]
+    capabilities: list[str]
+    allowed_workspaces: list[str]
     scope: dict[str, str]
     safe_entry: str
     expires_at: datetime | None
@@ -831,11 +886,17 @@ class ContentDraftListResponse(StrictModel):
     request_id: str
 
 
+class PublishedMaterialLinkOut(StrictModel):
+    title: str
+    url: str
+
+
 class TaskVersionSummaryOut(StrictModel):
     id: UUID
     version: int
     title: str
     published_at: datetime
+    material_links: list[PublishedMaterialLinkOut] = Field(default_factory=list)
 
 
 class TaskDefinitionOut(StrictModel):
@@ -983,6 +1044,7 @@ class EnrollmentOpsOut(StrictModel):
     journey_version_id: UUID | None
     assignment_statuses: list[str]
     open_review_status: str | None
+    open_review_revision: int | None
     allowed_commands: list[str]
 
 

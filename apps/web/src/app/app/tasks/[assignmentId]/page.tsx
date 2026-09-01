@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Link from "next/link";
+import type { CSSProperties } from "react";
 
 import {
   completeLearningMaterial,
@@ -13,28 +13,147 @@ import { SubmissionComposer } from "./submission-composer";
 
 export const dynamic = "force-dynamic";
 
-const formatDate = new Intl.DateTimeFormat("zh-CN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Shanghai",
-});
+const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
+const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
+const POST_SUBMISSION_REFERENCE = /答案|参考解答|评分参考|answer/iu;
+
+function textWithSafeLinks(value: string | null) {
+  if (!value) return null;
+  return value.split(HTTPS_URL).map((part, index) => {
+    if (!part.startsWith("https://")) return part;
+    const trailing = part.match(TRAILING_URL_PUNCTUATION)?.[0] ?? "";
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <span key={`${href}-${index}`}>
+        <a href={href} target="_blank" rel="noreferrer" aria-label="打开学习材料">
+          {new URL(href).hostname}
+        </a>
+        {trailing}
+      </span>
+    );
+  });
+}
+
+function ContractLine({ value }: { value: string }) {
+  return <span className="contract-line">{textWithSafeLinks(value)}</span>;
+}
+
+const MATERIAL_FOCUS_BY_STAGE: Record<string, string> = {
+  "DAY-0": "看完后，你只需要能说出：今天会经历什么，第一步从哪里开始？",
+  "TRE-001-COMPANY-VALUES": "客户真正购买的，是更多人力，还是可验收的确定性交付？找到一句证据。",
+  "TRE-002-AI-DATA-BASICS": "找出一个“表达很流畅，但结论未必可靠”的例子。",
+  "TRE-003-PROJECT-AWARENESS": "找出新人进入真实项目后需要承担的一项具体责任。",
+  "TRE-004-DELIVERY-FIT": "找出一个应该停下来提问，而不是自行猜测的边界。",
+  "ASM-001-RULE-BREAKDOWN": "找出做判断时最容易漏掉的一条规则。",
+  "ASM-002-MODEL-JUDGEMENT": "找出一个必须用具体证据才能判断的回答信号。",
+  "ASM-003-DATA-CONSTRUCTION": "找出一份可交付数据必须保持一致的结构与校验点。",
+};
+
+function materialFocus(
+  stageKey: string | undefined,
+  learnerOutcome: string,
+  materialTitle?: string,
+  materialIndex?: number,
+) {
+  if (stageKey === "DAY-0") {
+    if (/一封信/u.test(materialTitle ?? "")) {
+      return "从信里找一句：公司希望你怎样面对一件需要长期投入的事？";
+    }
+    return materialIndex === 0
+      ? "只看路线：今天先认识什么，之后会用哪三次挑战证明自己？"
+      : "只找一个答案：这份材料与你今天的哪一站有关？";
+  }
+  if (stageKey === "ASM-002-MODEL-JUDGEMENT") {
+    if (/视频/u.test(materialTitle ?? "")) {
+      return "找出一个看起来合理、但仍必须核对证据才能下结论的回答信号。";
+    }
+    if (/理由|书写/u.test(materialTitle ?? "")) {
+      return "记下一种写法：先给出可以或不可以，再用一条具体证据说明理由。";
+    }
+  }
+  return MATERIAL_FOCUS_BY_STAGE[stageKey ?? ""]
+    ?? `读完后，试着用自己的话回答：${learnerOutcome}`;
+}
+
+function materialLinks(value: string | null): string[] {
+  if (!value) return [];
+  const links = Array.from(value.matchAll(HTTPS_URL), ([match]) =>
+    match.replace(TRAILING_URL_PUNCTUATION, ""),
+  );
+  return Array.from(new Set(links));
+}
+
+function isFeishuMaterial(href: string) {
+  return new URL(href).hostname.endsWith(".feishu.cn");
+}
+
+function explorationMinutes(estimatedMinutes: number, isDayZero: boolean) {
+  return Math.min(estimatedMinutes, isDayZero ? 8 : 12);
+}
+
+function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string; label?: string }) {
+  const requiresFeishu = isFeishuMaterial(href);
+  return (
+    <div className="material-open-action">
+      <a
+        className="button secondary compact material-open-link"
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={label}
+      >
+        <span>{requiresFeishu ? "用企业飞书打开" : label}</span>
+        <small>
+          {requiresFeishu ? "首次打开需登录" : new URL(href).hostname}
+        </small>
+        <i aria-hidden="true">↗</i>
+      </a>
+      {requiresFeishu ? (
+        <details className="material-access-help">
+          <summary>打不开？</summary>
+          <p>
+            使用重庆沐晨科技飞书账号；仍提示无权限时，请勿标记完成，联系内容负责人。
+          </p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function LearningMaterialBody({ value }: { value: string | null }) {
+  const links = materialLinks(value);
+  if (links.length === 0) {
+    return <div className="material-body">{textWithSafeLinks(value)}</div>;
+  }
+  return (
+    <>
+      <div className="material-link-actions">
+        {links.map((href) => (
+          <MaterialOpenLink href={href} key={href} />
+        ))}
+      </div>
+      <details className="material-notes">
+        <summary>查看材料说明</summary>
+        <div className="material-body">{textWithSafeLinks(value)}</div>
+      </details>
+    </>
+  );
+}
 
 export default async function TaskPage({
   params,
   searchParams,
 }: {
   params: Promise<{ assignmentId: string }>;
-  searchParams: Promise<{
-    draft?: string;
-    attachment?: string;
-    material?: string;
-    revision?: string;
-  }>;
+  searchParams: Promise<{ draft?: string; attachment?: string; material?: string; revision?: string }>;
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
   const assignment = await learnerPageRequest<Assignment>(
     `/api/v1/me/assignments/${encodeURIComponent(assignmentId)}`,
+  );
+  const rubricTitles = new Map(
+    assignment.rubric.dimensions.map((dimension) => [dimension.dimension_key, dimension.title]),
   );
   const canStart = assignment.allowed_commands.includes("start");
   const submitCommand = assignment.allowed_commands.find((command) =>
@@ -48,12 +167,58 @@ export default async function TaskPage({
     ? assignment.learning_experience
     : null;
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
+  const completedRequiredMaterials = requiredMaterials.filter(
+    (material) => material.completed_at !== null,
+  ).length;
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
-  const nextMaterialKey = assignment.learning_materials.find(
+  const pendingRequiredMaterials = requiredMaterials.filter((material) => material.completed_at === null);
+  const activeMaterialIndex = assignment.learning_materials.findIndex(
     (material) => material.completed_at === null,
-  )?.key;
-  const isWaiting = ["SUBMITTED", "IN_REVIEW"].includes(assignment.status);
-  const isRevision = assignment.status === "NEEDS_REVISION";
+  );
+  const nextMaterialKey = assignment.learning_materials[activeMaterialIndex]?.key ?? null;
+  const isAssessment = assignment.journey_stage?.stage_kind === "ASSESSMENT";
+  const isTreasure = assignment.journey_stage?.stage_kind === "TREASURE";
+  const isDayZero = assignment.journey_stage?.stage_kind === "DAY_0";
+  const isFirstTreasure = assignment.journey_stage?.stable_key === "TRE-001-COMPANY-VALUES";
+  const stageMarker = isDayZero ? "DAY 0 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
+  const learningStepTitle = "学习材料";
+  const actionStepTitle = isAssessment ? "能力评测" : isDayZero ? "启程" : "宝藏小任务";
+  const completionStepTitle = isAssessment ? "主管评审" : "阶段完成";
+  const practiceNoun = actionStepTitle;
+  const taskBriefHeading = isDayZero
+    ? "完成一张三句出发卡"
+    : isAssessment
+      ? "完成这次能力评测"
+      : "完成这一站的宝藏小任务";
+  const completedTaskBriefHeading = isDayZero
+    ? "三句出发卡"
+    : isAssessment
+      ? "能力评测题面"
+      : "宝藏小任务";
+  const taskTimeLabel = isDayZero
+    ? "先找 1 条线索"
+    : `${assignment.estimated_duration_minutes} min`;
+  const taskTimeAriaLabel = isDayZero
+    ? "当前动作：先找一条线索"
+    : `预计 ${assignment.estimated_duration_minutes} 分钟`;
+  const taskContractText = [
+    ...assignment.instructions,
+    ...assignment.required_deliverables,
+    ...assignment.completion_criteria,
+  ].join(" ");
+  const expectsExternalDocument = isAssessment
+    || /飞书|文档副本|文档链接|提交文档/u.test(taskContractText);
+  const instructionLinks = assignment.instructions.flatMap(materialLinks);
+  const taskActionUrl = instructionLinks.find(isFeishuMaterial) ?? instructionLinks[0] ?? null;
+  const postSubmissionReferences = assignment.reference_materials.filter((item) =>
+    POST_SUBMISSION_REFERENCE.test(item),
+  );
+  const supportingReferences = assignment.reference_materials.filter((item) =>
+    !POST_SUBMISSION_REFERENCE.test(item),
+  );
+  const stageComplete = assignment.status === "COMPLETED";
+  const awaitingReview = ["SUBMITTED", "IN_REVIEW"].includes(assignment.status);
+  const needsRevision = assignment.status === "NEEDS_REVISION";
   const revisionVersion = assignment.submission?.versions.findLast(
     (version) => version.decision === "REVISION_REQUIRED",
   );
@@ -61,9 +226,31 @@ export default async function TaskPage({
     revisionVersion && revisionVersion.rubric_feedback.length > 0,
   );
   const editingRevision = query.revision === "edit" && revisionReady;
+  const latestReviewPassed = stageComplete && latestVersion?.decision === "PASS";
+  const latestPassFeedback = latestReviewPassed ? latestVersion.feedback : null;
+  const actionComplete = assignment.submission !== null && !needsRevision;
+  const currentFocus = !materialsReady
+    ? isDayZero
+      ? "先选一个问题，再从第 1 份材料里找 1 条线索"
+      : isFirstTreasure
+        ? "先做一个 10 秒判断，再打开第 1 条核心线索"
+        : `打开第 ${Math.max(1, activeMaterialIndex + 1)} 份材料，带着一个问题去看`
+    : canStart
+      ? `看清挑战，开始${practiceNoun}`
+      : needsRevision
+        ? "根据 Reviewer 反馈完成修订"
+        : submitCommand
+          ? isAssessment ? "完成作答并交给 Reviewer" : "留下这一站的学习证据"
+          : awaitingReview
+            ? assignment.status === "IN_REVIEW" ? "Reviewer 正在评审" : "等待 Reviewer 开始评审"
+            : stageComplete ? "这一站已经完成" : "等待下一步开放";
 
   return (
-    <article className="learner-task-page">
+    <article
+      className="learner-task-page"
+      data-stage-kind={assignment.journey_stage?.stage_kind ?? "TASK"}
+      data-stage-key={assignment.journey_stage?.stable_key ?? assignment.stable_task_key}
+    >
       <header className="task-hero-card">
         <div className="task-identity">
           <span aria-hidden="true">
@@ -71,33 +258,27 @@ export default async function TaskPage({
           </span>
           <p>
             {assignment.journey_stage?.title ?? assignment.stable_task_key}
-            {assignment.journey_stage ? <small>第 {assignment.journey_stage.position + 1} 站</small> : null}
+            <small>V{assignment.task_version}</small>
           </p>
         </div>
-        <h1>{assignment.task_title}</h1>
+        <p className="task-hero-label">{stageMarker}</p>
+        <h1>{assignment.journey_stage?.title ?? assignment.task_title}</h1>
+        {assignment.journey_stage?.title !== assignment.task_title ? (
+          <p className="task-specific-title">当前任务 · {assignment.task_title}</p>
+        ) : null}
         <p>{assignment.journey_stage?.short_description ?? assignment.task_purpose}</p>
-        <div className="task-time" aria-label={`预计 ${assignment.estimated_duration_minutes} 分钟`}>
-          <i aria-hidden="true" /> {assignment.estimated_duration_minutes} min
+        <div className="task-time" aria-label={taskTimeAriaLabel}>
+          <i aria-hidden="true" /> {taskTimeLabel}
         </div>
       </header>
 
-      <section className="task-authority-summary" aria-labelledby="task-authority-title">
-        <header>
-          <FactLabel kind="system" />
-          <div>
-            <p className="section-label">权威任务说明</p>
-            <h2 id="task-authority-title">开始前，先确认目标与责任边界</h2>
-          </div>
-        </header>
+      <section className="task-governance" aria-labelledby="task-governance-title">
+        <FactLabel kind="system" />
+        <h2 id="task-governance-title">固定任务与安全边界</h2>
         <dl>
-          <div><dt>为什么做</dt><dd>{assignment.task_purpose}</dd></div>
-          <div><dt>任务版本</dt><dd>{assignment.stable_task_key} v{assignment.task_version} · Rubric v{assignment.rubric.version}</dd></div>
-          <div><dt>当前状态</dt><dd>{assignment.status}</dd></div>
-          <div><dt>正式性质</dt><dd>{assignment.journey_stage?.completion_policy === "LEARNER_EVIDENCE" ? "低风险学习证据" : "正式任务 · 必须真人审核"}</dd></div>
-          <div><dt>Reviewer</dt><dd>{assignment.reviewer_display_name} · {assignment.reviewer_role}</dd></div>
-          <div><dt>预计投入</dt><dd>{assignment.estimated_duration_minutes} 分钟</dd></div>
-          <div><dt>分配时间</dt><dd>{formatDate.format(new Date(assignment.assigned_at))}</dd></div>
-          <div><dt>截止与反馈</dt><dd>未配置任务截止时间；TaskVersion 记录反馈 SLA 为 {assignment.feedback_sla_business_days} 个工作日</dd></div>
+          <div><dt>任务版本</dt><dd>TaskVersion v{assignment.task_version}</dd></div>
+          <div><dt>Rubric 版本</dt><dd>v{assignment.rubric.version}</dd></div>
+          <div><dt>Reviewer</dt><dd>{assignment.reviewer_display_name}</dd></div>
           <div><dt>可见与敏感级别</dt><dd>{assignment.audience} · {assignment.sensitivity}</dd></div>
           <div><dt>积分规则</dt><dd>积分规则：未配置；积分不会改变正式状态或人才结论</dd></div>
         </dl>
@@ -106,67 +287,309 @@ export default async function TaskPage({
           <ul className="checklist">
             <li>阅读、点击、自证、AI 建议或积分都不能产生正式通过。</li>
             <li>Journey 内不执行外部生产作业，不上传未获批准的敏感或原始客户数据。</li>
-            <li>若任务专属非目标、截止时间或安全字段缺失，页面不会自行补写；请向 {assignment.reviewer_display_name} 或运营确认。</li>
+            <li>正式任务尚未批准撤回；页面不提供绕过审核的动作。</li>
           </ul>
         </details>
       </section>
 
+      <section className="mission-now" aria-labelledby="mission-now-title">
+        <div>
+          <p className="section-label">现在只做这一步</p>
+          <h2 id="mission-now-title">{currentFocus}</h2>
+        </div>
+        {needsRevision ? (
+          <a className="button primary compact" href="#task-workspace">
+            查看反馈并修改 <span aria-hidden="true">↓</span>
+          </a>
+        ) : !materialsReady && !isFirstTreasure ? (
+          <a
+            className="button primary compact"
+            href={isDayZero ? "#day-zero-choice" : "#learning-materials-title"}
+          >
+            {isDayZero ? "选一个出发问题" : "打开当前线索"} <span aria-hidden="true">↓</span>
+          </a>
+        ) : null}
+        <div className="mission-progress" aria-label={`已完成 ${completedRequiredMaterials} / ${requiredMaterials.length} 份学习材料`}>
+          <span style={{ "--mission-progress": `${requiredMaterials.length === 0 ? 100 : completedRequiredMaterials / requiredMaterials.length * 100}%` } as CSSProperties} />
+          <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
+        </div>
+      </section>
+
+      {stageComplete ? (
+        <section className="feedback-callout completion-feedback stage-completion-hero" aria-labelledby="completion-feedback-title">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p className="section-label">{latestReviewPassed ? "已通过" : "已完成"}</p>
+            <h3 id="completion-feedback-title">
+              {latestReviewPassed
+                ? "你的判断已经被确认"
+                : isDayZero
+                  ? "你的出发卡已经保存"
+                  : isTreasure
+                    ? "这枚宝藏已经收入旅程"
+                    : "这一站已经完成"}
+            </h3>
+            <p>
+              {latestPassFeedback
+                ?? (isDayZero
+                  ? "第一站已经点亮；你的问题和下一步会继续留在这段旅程里。"
+                  : isTreasure
+                    ? "你的学习证据已经保存，可以回到地图继续下一站。"
+                    : "这一站的证据已经保存，可以继续下一站。")}
+            </p>
+            <a className="button primary compact" href="/app">
+              回到旅程地图 <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </section>
+      ) : null}
+
+      {needsRevision && !revisionReady ? (
+        <ExperienceState
+          kind="error"
+          title="返工依据不完整，暂不能正式修订"
+          summary="系统没有取得固定旧版本及逐项 Rubric 反馈；为避免覆盖证据或猜测修改范围，当前保持失败关闭。"
+          knownFacts={[
+            "旧提交与旧结论保持只读",
+            "页面不会自行补写 Reviewer 理由、Rubric 反馈或返工截止时间",
+            "需要运营纠正评审引用后，修订入口才会恢复",
+          ]}
+          action={{ href: "/app", label: "返回当前任务" }}
+        />
+      ) : null}
+
+      {needsRevision && revisionVersion && revisionReady ? (
+        <section className="feedback-callout revision-state" aria-labelledby="formal-revision-feedback-title">
+          <FactLabel kind="human" />
+          <p className="section-label">NEEDS_REVISION</p>
+          <h2 id="formal-revision-feedback-title">{assignment.reviewer_display_name} 要求修订</h2>
+          <p>{revisionVersion.feedback}</p>
+          <ul className="revision-rubric-feedback">
+            {revisionVersion.rubric_feedback.map((item) => (
+              <li key={item.dimension_key}>
+                <strong>{rubricTitles.get(item.dimension_key) ?? item.dimension_key}</strong>
+                <span>{item.rating}</span>
+                <p>{item.feedback ?? "该维度没有补充文字反馈。"}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="status-meta">
+            引用旧提交 Version {revisionVersion.version_no}；旧提交与旧结论保持只读。未配置返工截止时间，页面不会自行生成日期。
+          </p>
+          {!editingRevision ? (
+            <a className="button primary" href="?revision=edit#task-workspace">开始修订</a>
+          ) : null}
+        </section>
+      ) : null}
+
+      {isDayZero && !materialsReady ? (
+        <section className="day-zero-briefing" aria-labelledby="day-zero-briefing-title">
+          <div className="day-zero-briefing-heading">
+            <div>
+              <p className="section-label">10 秒看懂今天</p>
+              <h2 id="day-zero-briefing-title">一天结束时，你会带走什么？</h2>
+              <p>不是背完一套资料，而是完成一条“认识 → 判断 → 行动”的路线。</p>
+            </div>
+          </div>
+          <fieldset id="day-zero-choice" className="day-zero-outcome-choice">
+            <legend>先选一个你最想弄清的</legend>
+            <label htmlFor="day-zero-choice-company">
+              <input id="day-zero-choice-company" name="day-zero-outcome" type="radio" />
+              <span aria-hidden="true">01</span>
+              <strong>这家公司为什么做 AI 数据？</strong>
+              <small>四个宝藏会给你线索</small>
+            </label>
+            <label htmlFor="day-zero-choice-work">
+              <input id="day-zero-choice-work" name="day-zero-outcome" type="radio" />
+              <span aria-hidden="true">02</span>
+              <strong>真实项目里，我要负责什么？</strong>
+              <small>从项目、交付与边界里找答案</small>
+            </label>
+            <label htmlFor="day-zero-choice-proof">
+              <input id="day-zero-choice-proof" name="day-zero-outcome" type="radio" />
+              <span aria-hidden="true">03</span>
+              <strong>我会怎样证明自己的判断力？</strong>
+              <small>最后用三次真实挑战验证</small>
+            </label>
+          </fieldset>
+          <div className="day-zero-rhythm" aria-label="每一站的体验节奏">
+            <span><b>1</b> 带一个问题</span>
+            <i aria-hidden="true">→</i>
+            <span><b>2</b> 找一条线索</span>
+            <i aria-hidden="true">→</i>
+            <span><b>3</b> 做一个动作</span>
+          </div>
+          <a className="button primary compact" href="#learning-materials-title">
+            从第 1 条线索出发 <span aria-hidden="true">↓</span>
+          </a>
+        </section>
+      ) : null}
+
+      {isFirstTreasure && !materialsReady ? (
+        <section className="treasure-opening-choice" aria-labelledby="treasure-opening-choice-title">
+          <div>
+            <p className="section-label">10 秒先猜</p>
+            <h2 id="treasure-opening-choice-title">客户真正买的是什么？</h2>
+            <p>不用先读完资料。选一个，再去线索里验证。</p>
+          </div>
+          <fieldset>
+            <legend className="sr-only">选择你当前的判断</legend>
+            <label htmlFor="treasure-choice-labor">
+              <input id="treasure-choice-labor" name="treasure-opening-choice" type="radio" />
+              <span aria-hidden="true">A</span>
+              <strong>更多低价人力</strong>
+            </label>
+            <label htmlFor="treasure-choice-delivery">
+              <input id="treasure-choice-delivery" name="treasure-opening-choice" type="radio" />
+              <span aria-hidden="true">B</span>
+              <strong>可验收的确定性交付</strong>
+            </label>
+          </fieldset>
+          <p className="treasure-choice-feedback treasure-choice-feedback-labor" role="status">
+            这是行业最容易走回的旧路。打开线索，看看公司为什么选择另一条路。
+          </p>
+          <p className="treasure-choice-feedback treasure-choice-feedback-delivery" role="status">
+            带着这个判断打开线索：你需要找到一句能支持它的证据。
+          </p>
+          <a className="button primary compact" href="#learning-materials-title">
+            去线索里验证 <span aria-hidden="true">↓</span>
+          </a>
+        </section>
+      ) : null}
+
+      {!isDayZero ? <nav className="task-flow" aria-label="这一站的完成路径">
+        <ol>
+          <li data-state={materialsReady ? "complete" : "current"}>
+            <span>{materialsReady ? "✓" : "01"}</span>
+            <strong>{learningStepTitle}</strong>
+            <small>{requiredMaterials.length} 份必读</small>
+          </li>
+          <li data-state={actionComplete ? "complete" : materialsReady ? "current" : "locked"}>
+            <span>{actionComplete ? "✓" : "02"}</span>
+            <strong>{actionStepTitle}</strong>
+            <small>{assignment.required_deliverables[0] ?? "留下这一站的学习证据"}</small>
+          </li>
+          <li data-state={stageComplete ? "complete" : awaitingReview ? "current" : "locked"}>
+            <span>{stageComplete ? "✓" : "03"}</span>
+            <strong>{completionStepTitle}</strong>
+            <small>{isAssessment ? "提交后等待真人评审" : "提交后路线自动更新"}</small>
+          </li>
+        </ol>
+      </nav> : null}
+
       {assignment.learning_materials.length > 0 ? (
-        <section id="first-learning-input" className="learning-materials" aria-labelledby="learning-materials-title">
+        <section className="learning-materials" aria-labelledby="learning-materials-title">
           <div className="learning-materials-heading">
             <div>
-              <p className="section-label">先完成输入</p>
-              <h2 id="learning-materials-title">学习材料</h2>
+              <p className="section-label">{isTreasure ? "宝藏线索" : isAssessment ? "评测输入" : "出发准备"}</p>
+              <h2 id="learning-materials-title">
+                {isDayZero
+                  ? "先打开材料，再留下你的问题"
+                  : isFirstTreasure
+                    ? "先找证据，不用记住全文"
+                    : "每份材料，只找一个答案"}
+              </h2>
             </div>
             <strong>
-              {requiredMaterials.filter((material) => material.completed_at).length}
+              {completedRequiredMaterials}
               /{requiredMaterials.length}
             </strong>
           </div>
           {query.material === "completed" ? (
-            <p className="success-text" role="status">完成事实已保存，可在重新登录后恢复。</p>
+            <p className="success-text" role="status">
+              {materialsReady ? `材料已完成，现在完成${practiceNoun}。` : "已完成，下一份材料就在下方。"}
+            </p>
           ) : null}
           <ol className="learning-material-list">
             {assignment.learning_materials.map((material, index) => {
               const isComplete = material.completed_at !== null;
-              const isCurrentMaterial = material.key === nextMaterialKey;
+              const isActive = index === activeMaterialIndex && material.key === nextMaterialKey;
+              const isLocked = !isComplete && !isActive;
+              const itemClass = isComplete ? "is-complete" : isActive ? "is-active" : "is-locked";
+              const stageFocus = materialFocus(
+                assignment.journey_stage?.stable_key,
+                assignment.learner_outcome,
+                material.title,
+                index,
+              );
+              const heading = (
+                <>
+                  <span>
+                    {material.source_label} · {material.required ? "核心线索" : "可选补给"}
+                  </span>
+                  <strong>{material.title}</strong>
+                  <small>
+                    本轮建议 {explorationMinutes(material.estimated_duration_minutes, isDayZero)} min
+                    {material.estimated_duration_minutes > explorationMinutes(material.estimated_duration_minutes, isDayZero)
+                      ? ` · 原材料约 ${material.estimated_duration_minutes} min`
+                      : ""}
+                    {" · 只找 1 条线索"}
+                  </small>
+                </>
+              );
+
               return (
-                <li
-                  className={isComplete ? "is-complete" : isCurrentMaterial ? "is-current" : "is-locked"}
-                  key={material.key}
-                >
+                <li className={itemClass} key={material.key}>
                   <div className="learning-material-order" aria-hidden="true">
                     {isComplete ? "✓" : String(index + 1).padStart(2, "0")}
                   </div>
-                  <article>
-                    <p>
-                      {material.source_label} · {material.estimated_duration_minutes} min
-                      {material.required ? " · 必读" : " · 选读"}
-                    </p>
-                    <h3>{material.title}</h3>
-                    {isCurrentMaterial ? (
-                      material.kind === "TEXT" ? <div>{material.body}</div> : (
-                        <a href={material.url ?? "#"} target="_blank" rel="noreferrer">
-                          打开 {new URL(material.url ?? "https://invalid.example").hostname}
-                        </a>
-                      )
-                    ) : null}
-                    {isComplete ? (
-                      <span className="material-complete-label">已完成</span>
-                    ) : isCurrentMaterial ? (
-                      <form action={completeLearningMaterial}>
-                        <input type="hidden" name="assignment_id" value={assignment.id} />
-                        <input type="hidden" name="task_version" value={assignment.task_version} />
-                        <input type="hidden" name="material_key" value={material.key} />
-                        <input type="hidden" name="idempotency_key" value={randomUUID()} />
-                        <button className="button primary compact" type="submit">
-                          完成本材料
-                        </button>
-                      </form>
-                    ) : (
-                      <span className="material-locked-label">完成上一份后开放</span>
-                    )}
-                  </article>
+                  {isLocked ? (
+                    <div className="learning-material-locked">
+                      {heading}
+                      <small>完成上一份后开放（完成上一项后解锁）</small>
+                    </div>
+                  ) : (
+                    <details className="learning-material-card" open={isActive}>
+                      <summary>{heading}</summary>
+                      <div className="learning-material-content">
+                        <div className="material-focus-prompt">
+                          <span aria-hidden="true">?</span>
+                          <div>
+                            <small>不用通读，先带着这一个问题</small>
+                            <strong>{stageFocus}</strong>
+                          </div>
+                        </div>
+                        <div className="material-exploration-contract" aria-label="这一轮的探索方式">
+                          <span><b>1</b> 带着问题</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>2</b> 找到一条线索</span>
+                          <i aria-hidden="true">→</i>
+                          <span><b>3</b> 立即返回</span>
+                        </div>
+                        {material.kind === "TEXT" ? (
+                          <LearningMaterialBody value={material.body} />
+                        ) : (
+                          <MaterialOpenLink
+                            href={material.url ?? "https://invalid.example"}
+                            label="打开材料，找 1 条线索"
+                          />
+                        )}
+                        {isComplete ? (
+                          <span className="material-complete-label">已完成</span>
+                        ) : (
+                          <form action={completeLearningMaterial}>
+                            <input type="hidden" name="assignment_id" value={assignment.id} />
+                            <input type="hidden" name="task_version" value={assignment.task_version} />
+                            <input type="hidden" name="material_key" value={material.key} />
+                            <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                            <input
+                              type="hidden"
+                              name="final_required_material"
+                              value={material.required && pendingRequiredMaterials.length === 1 ? "true" : "false"}
+                            />
+                            <button
+                              className={`button ${material.required ? "primary" : "secondary"} compact`}
+                              type="submit"
+                            >
+                              {material.required && pendingRequiredMaterials.length === 1
+                                ? `我找到 1 条线索，开始${practiceNoun}`
+                                : "我找到 1 条线索，继续"}
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </details>
+                  )}
                 </li>
               );
             })}
@@ -174,8 +597,19 @@ export default async function TaskPage({
         </section>
       ) : null}
 
+      {isTreasure && materialsReady && !stageComplete ? (
+        <section className="treasure-unlocked" aria-labelledby="treasure-unlocked-title">
+          <span className="treasure-seal" aria-hidden="true">✦</span>
+          <div>
+            <p className="section-label">线索已收集</p>
+            <h2 id="treasure-unlocked-title">宝藏还差你的判断</h2>
+            <p>把刚刚看到的内容变成自己的证据，完成后这枚路标才会真正点亮。</p>
+          </div>
+        </section>
+      ) : null}
+
       {experience && assignment.learning_materials.length === 0 ? (
-        <section id="first-learning-input" className="learning-experience" aria-labelledby="learning-experience-title">
+        <section className="learning-experience" aria-labelledby="learning-experience-title">
           <div className="learning-schedule">
             <span>{experience.schedule.start}</span>
             <i aria-hidden="true" />
@@ -206,103 +640,141 @@ export default async function TaskPage({
             <p className="learning-break">完成后 · {experience.schedule.break_after}</p>
           ) : null}
         </section>
-      ) : materialsReady ? (
-        <section className="task-moves" aria-labelledby="task-moves-title">
-          <p className="section-label">这一站</p>
-          <h2 id="task-moves-title">沿着动作前进</h2>
-          <ol>
-            {assignment.instructions.map((item) => <li key={item}>{item}</li>)}
-          </ol>
+      ) : null}
+
+      {!materialsReady ? (
+        <section className="task-next-unlock" aria-labelledby="task-next-unlock-title">
+          <span aria-hidden="true">→</span>
+          <div>
+            <p className="section-label">完成材料后解锁</p>
+            <h2 id="task-next-unlock-title">{taskBriefHeading}</h2>
+            <p>
+              {isAssessment
+                ? "完成飞书作答，再交给 Reviewer。"
+                : "用刚找到的线索，完成一个短小任务。"}
+            </p>
+            <details className="task-success-criteria">
+              <summary>怎样算完成？</summary>
+              <p>{assignment.learner_outcome}</p>
+              <ul className="checklist">
+                {assignment.completion_criteria.map((item) => (
+                  <li key={item}><ContractLine value={item} /></li>
+                ))}
+              </ul>
+            </details>
+            {postSubmissionReferences.length > 0 ? (
+              <small>参考答案将在提交后开放。</small>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
-      <details className="task-contract">
-        <summary>完成边界</summary>
-        <p>{assignment.learner_outcome}</p>
-        <div className="task-contract-columns">
-          <div>
-            <h3>完成标准</h3>
+      {materialsReady ? <section className="task-brief" aria-labelledby="task-brief-title">
+        <p className="section-label">
+          {stageComplete ? "回看这一站" : isAssessment ? "能力挑战" : "轮到你行动"}
+        </p>
+        <h2 id="task-brief-title">
+          {stageComplete ? completedTaskBriefHeading : taskBriefHeading}
+        </h2>
+        <p className="task-outcome">
+          {stageComplete
+            ? "任务、标准与历史版本都保留在这里，随时可以回来查看。"
+            : isDayZero
+            ? "不用复述材料。写清你想弄懂什么、从哪里找答案、下一站先做什么。"
+            : "把刚才找到的线索，变成你自己的判断。"}
+        </p>
+
+        {isDayZero ? (
+          <div className="day-zero-departure-card" aria-labelledby="task-deliverables-title">
+            <div>
+              <p className="section-label">三段就够</p>
+              <h3 id="task-deliverables-title">你的出发卡</h3>
+            </div>
+            <ol>
+              <li><span>01</span><strong>我最想弄清什么？</strong><small>从上面的三个问题里选一个</small></li>
+              <li><span>02</span><strong>我会去哪里找答案？</strong><small>写下一份材料或一个真实场景</small></li>
+              <li><span>03</span><strong>下一站先做什么？</strong><small>给自己一个可以立即开始的动作</small></li>
+            </ol>
+          </div>
+        ) : isFirstTreasure && materialsReady ? (
+          <div className="treasure-response-cues" aria-labelledby="task-deliverables-title">
+            <div>
+              <p className="section-label">3–5 句话就够</p>
+              <h3 id="task-deliverables-title">把答案放进这三格</h3>
+            </div>
+            <ol>
+              <li><span>01</span><strong>公司在解决什么问题？</strong><small>用你自己的话写一句</small></li>
+              <li><span>02</span><strong>你选择或质疑哪项命题？</strong><small>带上刚才找到的证据</small></li>
+              <li><span>03</span><strong>未来一周你会做什么？</strong><small>写一个别人看得见的动作</small></li>
+            </ol>
+          </div>
+        ) : (
+          <div className="task-brief-deliverables" aria-labelledby="task-deliverables-title">
+            <h3 id="task-deliverables-title">这一站只交付</h3>
             <ul className="checklist">
-              {assignment.completion_criteria.map((item) => <li key={item}>{item}</li>)}
+              {assignment.required_deliverables.map((item) => (
+                <li key={item}><ContractLine value={item} /></li>
+              ))}
             </ul>
           </div>
-          <div>
-            <h3>交付内容</h3>
-            <ul className="checklist">
-              {assignment.required_deliverables.map((item) => <li key={item}>{item}</li>)}
-            </ul>
+        )}
+
+        {isFirstTreasure || isDayZero ? (
+          <details className="treasure-method-details">
+            <summary>{isDayZero ? "需要帮助？查看完整要求" : "需要提示？查看完成方法"}</summary>
+            <ol className="checklist">
+              {assignment.instructions.map((item) => (
+                <li key={item}><ContractLine value={item} /></li>
+              ))}
+            </ol>
+          </details>
+        ) : (
+          <div className="task-supporting-rules task-contract-columns">
+            <div>
+              <h3><span aria-hidden="true">→</span> 怎么完成</h3>
+              <ol className="checklist">
+                {assignment.instructions.map((item) => (
+                  <li key={item}><ContractLine value={item} /></li>
+                ))}
+              </ol>
+            </div>
+            {supportingReferences.length > 0 ? (
+              <div>
+                <h3>参考资料</h3>
+                <ul className="checklist">
+                  {supportingReferences.map((item) => (
+                    <li key={item}>{textWithSafeLinks(item)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
-        </div>
-        {assignment.reference_materials.length > 0 ? (
+        )}
+        <details className="task-success-criteria">
+          <summary>怎样算完成？</summary>
+          <p>{assignment.learner_outcome}</p>
           <ul className="checklist">
-            {assignment.reference_materials.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        ) : null}
-      </details>
-
-      {isWaiting && latestVersion ? (
-        <section className="review-waiting-state" aria-labelledby="review-waiting-title">
-          <FactLabel kind="system" />
-          <p className="section-label">{assignment.status}</p>
-          <h2 id="review-waiting-title">
-            {assignment.status === "IN_REVIEW" ? "Reviewer 正在处理固定版本" : "提交已接收，等待 Reviewer 开始"}
-          </h2>
-          <dl>
-            <div><dt>SubmissionVersion</dt><dd>Version {latestVersion.version_no} · {latestVersion.id}</dd></div>
-            <div><dt>提交时间</dt><dd>{formatDate.format(new Date(latestVersion.created_at))}</dd></div>
-            <div><dt>Reviewer / 队列</dt><dd>{assignment.reviewer_display_name} · {assignment.status}</dd></div>
-            <div><dt>首次反馈 SLA</dt><dd>TaskVersion 配置为 {assignment.feedback_sla_business_days} 个工作日；运营 SLA 以批准运行配置为准</dd></div>
-            <div><dt>通知</dt><dd>任务接口未提供外部通知回执；请以本页权威状态为准</dd></div>
-            <div><dt>撤回</dt><dd>正式任务尚未批准撤回；页面不提供绕过审核的动作</dd></div>
-          </dl>
-          <Link className="button primary" href="#submission-history">查看已提交版本</Link>
-        </section>
-      ) : null}
-
-      {isRevision && !revisionReady ? (
-        <ExperienceState
-          kind="error"
-          title="返工依据不完整，暂不能正式修订"
-          summary="系统没有取得固定旧版本及逐项 Rubric 反馈；为避免覆盖证据或猜测修改范围，当前保持失败关闭。"
-          knownFacts={[
-            "原提交与已有结论仍保持只读",
-            "页面不会自行补写 Reviewer 理由、Rubric 反馈或返工截止时间",
-            "需要运营纠正评审引用后，修订入口才会恢复",
-          ]}
-          action={{ href: "/app", label: "返回当前任务" }}
-        />
-      ) : null}
-
-      {isRevision && revisionVersion && revisionReady ? (
-        <section className="feedback-callout revision-state" aria-labelledby="revision-feedback-title">
-          <FactLabel kind="human" />
-          <p className="section-label">NEEDS_REVISION</p>
-          <h2 id="revision-feedback-title">{assignment.reviewer_display_name} 要求修订</h2>
-          <p>{revisionVersion.feedback}</p>
-          <ul className="revision-rubric-feedback">
-            {revisionVersion.rubric_feedback.map((item) => (
-              <li key={item.dimension_key}>
-                <strong>{item.dimension_key} · {item.rating}</strong>
-                <span>{item.feedback}</span>
-              </li>
+            {assignment.completion_criteria.map((item) => (
+              <li key={item}><ContractLine value={item} /></li>
             ))}
           </ul>
-          <p className="status-meta">
-            引用旧提交 Version {revisionVersion.version_no}；旧提交与旧结论保持只读。未配置返工截止时间，页面不会自行生成日期。
-          </p>
-          <p className="status-meta">
-            只修改 Reviewer 指出的缺项；其余已提交证据可保留。若签署或证据引用不完整，请先联系运营纠正。
-          </p>
-          {!editingRevision ? (
-            <Link className="button primary" href={`?revision=edit#task-workspace`}>开始修订</Link>
-          ) : null}
-        </section>
-      ) : null}
+        </details>
+      </section> : null}
 
-      <section className="task-workspace" aria-labelledby="task-workspace-title">
-      <p className="section-label">完成本阶段</p>
+      {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
+      <p className="section-label">
+        {stageComplete ? "路标已点亮" : needsRevision ? "Reviewer 已回应" : "你的行动"}
+      </p>
       <h2 id="task-workspace-title">
-        {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "提交你的作答" : "留下学习证据"}
+        {stageComplete
+          ? isDayZero
+            ? "启程记录已保存"
+            : isTreasure
+              ? "这枚宝藏已经找到"
+              : "这一站，已经完成"
+          : needsRevision
+            ? "带着反馈，再走一步"
+          : isDayZero ? "写下你的三句出发卡" : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
       </h2>
 
       {query.draft === "saved" ? (
@@ -315,21 +787,31 @@ export default async function TaskPage({
         <p className="success-text" role="status">未绑定附件已删除。</p>
       ) : null}
 
-      {!materialsReady ? (
-        <p className="task-locked-message" role="status">
-          完成全部必读材料后，小任务会在这里解锁。
-        </p>
+      {needsRevision && assignment.latest_revision_feedback ? (
+        <section className="feedback-callout revision-feedback" aria-labelledby="revision-feedback-title">
+          <span aria-hidden="true">↳</span>
+          <div>
+            <p className="section-label">这不是重新开始</p>
+            <h3 id="revision-feedback-title">Reviewer 希望你调整这里</h3>
+            <p>{assignment.latest_revision_feedback}</p>
+            <ol className="revision-path" aria-label="完成修订的三个步骤">
+              <li><b>1</b><span>打开上次答案</span></li>
+              <li><b>2</b><span>只改反馈指出的部分</span></li>
+              <li><b>3</b><span>提交新版本</span></li>
+            </ol>
+          </div>
+        </section>
       ) : null}
 
-      {canStart && materialsReady ? (
+      {canStart ? (
         <form action={startAssignment}>
           <input type="hidden" name="assignment_id" value={assignment.id} />
           <input type="hidden" name="revision" value={assignment.revision} />
-          <button className="button primary" type="submit">开始这一站</button>
+          <button className="button primary" type="submit">开始{practiceNoun}</button>
         </form>
       ) : null}
 
-      {submitCommand && materialsReady && (!isRevision || editingRevision) ? (
+      {submitCommand && (!needsRevision || editingRevision) ? (
         <>
           {assignment.allowed_attachment_types.length > 0 ? (
             <section className="attachment-workspace" aria-labelledby="attachment-title">
@@ -359,9 +841,7 @@ export default async function TaskPage({
                 <p className="status-meta">暂无 READY 附件；纯文本提交仍可继续。</p>
               )}
             </section>
-          ) : (
-            <p className="status-meta">当前固定任务版本不接收附件，可直接提交结构化文本。</p>
-          )}
+          ) : null}
           <SubmissionComposer
             assignmentId={assignment.id}
             assignmentRevision={assignment.revision}
@@ -372,7 +852,9 @@ export default async function TaskPage({
             submissionIdempotencyKey={randomUUID()}
             initialDraftRevision={assignment.draft?.revision ?? null}
             initialDraftUpdatedAt={assignment.draft?.updated_at ?? null}
-            responseSections={experience?.response_sections ?? []}
+            responseSections={isDayZero
+              ? ["我最想弄清的一件事", "我会从哪里找答案", "下一站我先做什么"]
+              : experience?.response_sections ?? []}
             requiresReview={
               assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"
             }
@@ -381,18 +863,28 @@ export default async function TaskPage({
             rubricVersion={assignment.rubric.version}
             reviewerName={assignment.reviewer_display_name}
             visibility={`${assignment.audience} · ${assignment.sensitivity}`}
+            expectsExternalDocument={expectsExternalDocument}
+            taskActionUrl={taskActionUrl}
           />
         </>
       ) : null}
 
-      {assignment.allowed_commands.length === 0 && !isWaiting ? (
+      {awaitingReview ? (
+        <p className="notice" role="status">
+          {assignment.status === "IN_REVIEW"
+            ? "Reviewer 已开始评审。结果完成后，旅程会自动更新。"
+            : "提交成功，正在等待 Reviewer 开始评审。你可以先离开，结果完成后旅程会自动更新。"}
+        </p>
+      ) : stageComplete && !latestReviewPassed ? (
+        <p className="notice" role="status">这一站已经完成。返回旅程，继续前往下一站。</p>
+      ) : assignment.allowed_commands.length === 0 ? (
         <p className="notice">这一站暂时没有可执行动作。</p>
       ) : null}
-      </section>
+      </section> : null}
 
       {assignment.submission ? (
-        <section id="submission-history" className="submission-history" aria-labelledby="submission-history-title">
-          <h2 id="submission-history-title">提交历史</h2>
+        <details className="submission-history" aria-label="查看已提交版本">
+          <summary>查看提交历史</summary>
           <p className="status-meta">
             当前为 Version {assignment.submission.current_version_no}；历史版本和评审引用永久只读。
           </p>
@@ -416,10 +908,31 @@ export default async function TaskPage({
               ) : null}
             </article>
           ))}
-        </section>
+        </details>
       ) : null}
 
-      {assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
+      {materialsReady && postSubmissionReferences.length > 0 ? (
+        assignment.submission ? (
+          <details className="post-submission-answers">
+            <summary>查看提交后的参考答案</summary>
+            <ul className="checklist">
+              {postSubmissionReferences.map((item) => (
+                <li key={item}>{textWithSafeLinks(item)}</li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <section className="answer-locked" aria-label="参考答案尚未开放">
+            <span aria-hidden="true">◇</span>
+            <div>
+              <strong>参考答案将在提交后开放</strong>
+              <small>先留下你自己的判断；系统确认提交成功后才能查看。</small>
+            </div>
+          </section>
+        )
+      ) : null}
+
+      {materialsReady && assignment.rubric.dimensions.length > 0 ? <details className="task-contract">
         <summary>评审会看什么</summary>
         <ul className="checklist">
           {assignment.rubric.dimensions.map((dimension) => (

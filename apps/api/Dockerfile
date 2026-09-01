@@ -44,7 +44,8 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 COPY contracts ./contracts
 COPY config ./config
-RUN chmod 0555 contracts && chmod 0444 contracts/openapi.json
+COPY deploy/staging/deploy.sh ./deploy/staging/deploy.sh
+RUN chmod 0555 contracts && chmod 0444 contracts/openapi.json deploy/staging/deploy.sh
 COPY tests ./tests
 COPY scripts ./scripts
 

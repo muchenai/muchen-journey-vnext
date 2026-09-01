@@ -33,4 +33,8 @@ test("reentry confirmation does not collect a new display name or claim new busi
   assert.match(join, /原有进度会被安全恢复/);
   assert.match(join, /不会创建重复记录/);
   assert.match(join, /继续当前一站/);
+  assert.match(join, /\{!isReentry \? \([\s\S]*name="display_name"/);
+  assert.match(join, /从上次离开的地方继续/);
+  assert.doesNotMatch(join, /Enrollment|Assignment/);
+  assert.match(join, /回到旅程/);
 });

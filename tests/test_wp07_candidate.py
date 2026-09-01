@@ -24,8 +24,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0027_next_stage_review",
-        "revision_count": 27,
+        "head": "0028_canary_main_merge",
+        "revision_count": 30,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -95,16 +95,46 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0027_next_stage_review",
-        "revision_count": 27,
+        "head": "0028_canary_main_merge",
+        "revision_count": 30,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
-def test_manifest_inputs_are_literal_and_linear():
-    assert migration()["head"] == "0027_next_stage_review"
+def test_manifest_inputs_form_one_connected_migration_graph():
+    assert migration()["head"] == "0028_canary_main_merge"
     assert config_schema() == 3
+
+
+def test_staging_candidate_binding_accepts_matching_terraform_default(tmp_path):
+    candidate_sha = "c" * 40
+    config = tmp_path / "config" / "wp08_staging.json"
+    variables = tmp_path / "infra" / "staging" / "variables.tf"
+    config.parent.mkdir(parents=True)
+    variables.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"candidate_commit": candidate_sha}), encoding="utf-8")
+    variables.write_text(
+        f'variable "candidate_commit" {{\n  default = "{candidate_sha}"\n}}\n',
+        encoding="utf-8",
+    )
+
+    assert candidate.validate_staging_candidate_binding(tmp_path) == candidate_sha
+
+
+def test_staging_candidate_binding_rejects_terraform_drift(tmp_path):
+    config = tmp_path / "config" / "wp08_staging.json"
+    variables = tmp_path / "infra" / "staging" / "variables.tf"
+    config.parent.mkdir(parents=True)
+    variables.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"candidate_commit": "c" * 40}), encoding="utf-8")
+    variables.write_text(
+        f'variable "candidate_commit" {{\n  default = "{"d" * 40}"\n}}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CandidateError, match="Terraform staging candidate differs"):
+        candidate.validate_staging_candidate_binding(tmp_path)
 
 
 def test_formal_catalog_is_bound_into_candidate_content_evidence():
@@ -305,4 +335,37 @@ def test_remote_manifest_digest_rejects_immutable_mismatch(monkeypatch):
     monkeypatch.setattr(candidate, "run_bytes", lambda arguments: next(responses))
 
     with pytest.raises(CandidateError, match="digest verification failed"):
-        candidate.remote_manifest_digest("ghcr.io/example/image:tag")
+        candidate.remote_manifest_digest("ghcr.io/example/image:tag", attempts=1)
+
+
+def test_remote_manifest_digest_retries_transient_registry_failure(monkeypatch):
+    raw = b'{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}'
+    expected = "sha256:" + candidate.hashlib.sha256(raw).hexdigest()
+    responses = iter(
+        [
+            CandidateError("temporary registry response"),
+            raw,
+            raw,
+        ]
+    )
+    sleeps = []
+
+    def inspect(_arguments):
+        result = next(responses)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(candidate, "run_bytes", inspect)
+
+    assert candidate.remote_manifest_digest(
+        "ghcr.io/example/image:tag",
+        delay_seconds=2,
+        sleeper=sleeps.append,
+    ) == expected
+    assert sleeps == [2]
+
+
+def test_remote_manifest_digest_rejects_unbounded_retries():
+    with pytest.raises(CandidateError, match="attempts must be between 1 and 3"):
+        candidate.remote_manifest_digest("ghcr.io/example/image:tag", attempts=4)

@@ -1,29 +1,33 @@
 {
-  "schema_version": 2,
-  "status": "RETIRED",
-  "superseded_by_candidate": "ff53052847a268d025bceb93c3eab37986d50219",
+  "schema_version": 3,
+  "status": "ACTIVE",
   "target_environment": "staging",
   "region_id": "cn-beijing",
-  "candidate_commit": "222096db506e95db887a8705b22ca4a439d0545d",
-  "candidate_parent": "2fb60d57f9a492fe8e6b48988cba15a758503823",
-  "candidate_artifact_run_id": 30550010916,
-  "web_image_digest": "sha256:a940420f58eb6ef085926c442996f40b66b6870136272c565bfb9b1c2656d1c2",
+  "candidate_commit": "0a8b96d38c2cfeb4f1a500d1d752f1dec03e18dc",
+  "candidate_parent": "6932c6b46a06ddcfbc74ca4bc3232aeb8f189461",
+  "candidate_artifact_run_id": 32612355086,
+  "web_image_digest": "sha256:10aa9a30e9fbf8d76224f9971a1a4406ea1e0947dcb664fa8442378ec9f840e3",
   "runtime_baseline": {
-    "candidate_commit": "02863d0b670ee9b00b9def3e75bc6699827f555a",
-    "api_image_digest": "sha256:4f88255f71e047db6e93640ae5549353146d7e73a6d110b040d61f2133e6e1a0",
-    "worker_image_digest": "sha256:62a9e2191667967764799f4cf328508ea9576955bff71b9049c39f1136c6db22",
-    "migration_revision": "0014_wp12_data_lifecycle",
+    "candidate_commit": "9e8a8063ebd8fadb2ca3761e867c12b270dcbfb4",
+    "api_image_digest": "sha256:ceb2d7827d68f0d7132d862196657e0f656ed64239a487e470286ee4ffc4d86d",
+    "worker_image_digest": "sha256:15ab046a369b62a0605ce90b760559bb1d45290f951bd7741ca8ec251e4652da",
+    "migration_revision": "0021_p0_identity_principal",
     "config_schema_version": 3,
-    "openapi_sha256": "90ea29045bba1e165d85ddaa695e2357015aff5f0346e9689376443b4965b55f"
+    "openapi_sha256": "d116ce052e41f1fd8757a3e9d585a035eb8fbc998b0d27fbd80d3fd9c2ac3389"
   },
   "candidate_commit_allowed_paths": [
-    "Makefile",
     "apps/web/",
+    "docs/00_DOCUMENT_MAP_AND_GOVERNANCE.md",
+    "docs/10_DELIVERY_PLAN_AND_ENGINEERING_RULES.md",
     "docs/13_REQUIREMENTS_TRACEABILITY_MATRIX.md",
-    "docs/31_WP13_WP15_EXECUTION_GATE_KIT.md"
+    "docs/43_P0_P1_P2_EXECUTION_MASTER_PLAN.md",
+    "docs/44_P0_1_IDENTITY_CAPABILITY_BUILD_EVIDENCE.md",
+    "docs/45_P0_2_LEARNER_ONE_PAGE_BUILD_CONTRACT.md",
+    "scripts/p0_journey_v3_browser.sh",
+    "scripts/p0_journey_v3_browser_fixture.py",
+    "scripts/wp08_web_runtime_check.py"
   ],
   "baseline_compatibility_paths": [
-    "apps/api/",
     "apps/worker/",
     "contracts/openapi.json",
     "migrations/"

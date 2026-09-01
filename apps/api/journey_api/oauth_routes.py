@@ -44,6 +44,7 @@ from journey_api.schemas import (
     CommandOut,
     CommandResponse,
     CreateIdentityLinkCommand,
+    GrantReviewerRoleCommand,
     IdentityAccessListOut,
     IdentityAccessListResponse,
     IdentityAccessOut,
@@ -57,6 +58,7 @@ from journey_api.schemas import (
     OAuthStartResponse,
     RevokeExternalIdentityCommand,
     RevokeIdentityLinkCommand,
+    RevokeReviewerRoleCommand,
     RevokedIdentityTransferCandidateOut,
     TransferRevokedExternalIdentityCommand,
 )
@@ -171,6 +173,12 @@ def list_identity_access(
             links_by_user_role[key] = link
 
     now = utc_now()
+    reviewer_user_ids = {
+        user.id for user, role in role_rows if role == Role.REVIEWER
+    }
+    content_editor_user_ids = {
+        user.id for user, role in role_rows if role == Role.CONTENT_EDITOR
+    }
     items: list[IdentityAccessOut] = []
     for user, role in role_rows:
         identity = identities_by_user.get(user.id)
@@ -186,6 +194,14 @@ def list_identity_access(
             allowed_commands = (
                 [] if user.id == actor.id else ["revoke_external_identity"]
             )
+            if role == Role.CONTENT_EDITOR and user.id not in reviewer_user_ids:
+                allowed_commands.append("grant_reviewer_role")
+            if (
+                role == Role.REVIEWER
+                and user.id in content_editor_user_ids
+                and user.id != actor.id
+            ):
+                allowed_commands.append("revoke_reviewer_role")
         elif active_link:
             identity_status = "REVOKED" if identity is not None else "UNLINKED"
             allowed_commands = ["revoke_identity_link"]
@@ -288,6 +304,175 @@ def list_identity_access(
             revoked_transfer_candidates=revoked_transfer_candidates,
         ),
     )
+
+
+@router.post("/ops/users/{user_id}/reviewer-role", response_model=CommandResponse)
+def grant_reviewer_role(
+    user_id: uuid.UUID,
+    command: GrantReviewerRoleCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Grant an existing, verified Content Editor a separately audited Reviewer role."""
+    require_role(actor, Role.OPERATOR)
+    payload = {"user_id": str(user_id), **command.model_dump(mode="json")}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.grant",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    user = session.scalar(
+        select(User)
+        .join(RoleAssignment, RoleAssignment.user_id == User.id)
+        .where(
+            User.id == user_id,
+            User.organization_id == actor.organization_id,
+            User.status == UserStatus.ACTIVE,
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.role == Role.CONTENT_EDITOR,
+        )
+        .with_for_update()
+    )
+    if user is None:
+        raise ApiError(422, "VALIDATION_FAILED", "目标必须是同组织的有效 Content Editor。")
+    identity = session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id == user.id,
+            ExternalIdentity.provider == PROVIDER,
+            ExternalIdentity.revoked_at.is_(None),
+        )
+    )
+    if identity is None:
+        raise ApiError(409, "IDENTITY_NOT_LINKED", "目标 Content Editor 尚未绑定有效飞书身份。")
+    existing = session.scalar(
+        select(RoleAssignment).where(
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.user_id == user.id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+    )
+    if existing is not None:
+        raise ApiError(409, "ROLE_ALREADY_ASSIGNED", "目标已经具备 Reviewer 角色。")
+    assignment = RoleAssignment(
+        id=uuid.uuid4(),
+        organization_id=actor.organization_id,
+        user_id=user.id,
+        role=Role.REVIEWER,
+    )
+    session.add(assignment)
+    result = {
+        "resource_id": str(assignment.id),
+        "status": "ACTIVE",
+        "revision": 1,
+        "idempotency_replay": False,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.grant",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action="reviewer_role.granted",
+        resource_type="role_assignment",
+        resource_id=assignment.id,
+        result="SUCCESS",
+        details={"role": Role.REVIEWER.value, "status": "ACTIVE", "reason": command.reason},
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
+
+
+@router.post(
+    "/ops/users/{user_id}/reviewer-role/revoke",
+    response_model=CommandResponse,
+)
+def revoke_reviewer_role(
+    user_id: uuid.UUID,
+    command: RevokeReviewerRoleCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Remove only Reviewer capability while preserving identity and other roles."""
+    require_role(actor, Role.OPERATOR)
+    if user_id == actor.id:
+        raise ApiError(409, "SELF_ROLE_REVOCATION_FORBIDDEN", "不能在当前会话撤销自己的权限。")
+    payload = {"user_id": str(user_id), **command.model_dump(mode="json")}
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.revoke",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    assignment = session.scalar(
+        select(RoleAssignment)
+        .where(
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.user_id == user_id,
+            RoleAssignment.role == Role.REVIEWER,
+        )
+        .with_for_update()
+    )
+    if assignment is None:
+        raise ApiError(409, "ROLE_NOT_ASSIGNED", "目标当前不具备 Reviewer 角色。")
+    content_editor_role = session.scalar(
+        select(RoleAssignment.id).where(
+            RoleAssignment.organization_id == actor.organization_id,
+            RoleAssignment.user_id == user_id,
+            RoleAssignment.role == Role.CONTENT_EDITOR,
+        )
+    )
+    if content_editor_role is None:
+        raise ApiError(422, "VALIDATION_FAILED", "该命令仅用于撤销兼任 Content Editor 的 Reviewer 角色。")
+    assignment_id = assignment.id
+    session.delete(assignment)
+    result = {
+        "resource_id": str(assignment_id),
+        "status": "REVOKED",
+        "revision": 1,
+        "idempotency_replay": False,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="reviewer_role.revoke",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_audit(
+        session,
+        request_id=request.state.request_id,
+        organization_id=actor.organization_id,
+        actor_id=actor.id,
+        action="reviewer_role.revoked",
+        resource_type="role_assignment",
+        resource_id=assignment_id,
+        result="SUCCESS",
+        details={"role": Role.REVIEWER.value, "status": "REVOKED"},
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
 
 
 @router.post("/ops/identity-links", response_model=IdentityLinkResponse)
@@ -961,17 +1146,24 @@ def complete_feishu_oauth(
     assert identity is not None
     user = session.scalar(
         select(User)
-        .join(RoleAssignment, RoleAssignment.user_id == User.id)
         .where(
             User.id == identity.user_id,
             User.organization_id == identity.organization_id,
             User.status == UserStatus.ACTIVE,
-            RoleAssignment.organization_id == identity.organization_id,
-            RoleAssignment.role == role,
         )
         .with_for_update()
     )
     if user is None:
+        raise ApiError(403, "FORBIDDEN", "当前身份不可用。")
+    active_roles = frozenset(
+        session.scalars(
+            select(RoleAssignment.role).where(
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.organization_id == user.organization_id,
+            )
+        ).all()
+    )
+    if role not in active_roles:
         raise ApiError(403, "FORBIDDEN", "当前身份没有该入口的有效权限。")
 
     issued_at = utc_now()
@@ -995,7 +1187,6 @@ def complete_feishu_oauth(
         select(IdentitySession)
         .where(
             IdentitySession.user_id == user.id,
-            IdentitySession.role == role,
             IdentitySession.revoked_at.is_(None),
         )
         .with_for_update()
@@ -1010,6 +1201,7 @@ def complete_feishu_oauth(
         organization_id=user.organization_id,
         user_id=user.id,
         external_identity_id=identity.id,
+        external_identity_revision=identity.revision,
         role=role,
         token_hash=credential_hash(settings.session_secret, "session", session_token),
         csrf_token_hash=credential_hash(settings.session_secret, "csrf", csrf_token),
@@ -1025,7 +1217,11 @@ def complete_feishu_oauth(
         resource_type="identity_session",
         resource_id=identity_session.id,
         result="SUCCESS",
-        details={"provider": PROVIDER, "role": role.value},
+        details={
+            "provider": PROVIDER,
+            "entry_role": role.value,
+            "active_roles": sorted(active_role.value for active_role in active_roles),
+        },
     )
     session.commit()
     set_session_cookies(

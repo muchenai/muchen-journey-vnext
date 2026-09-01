@@ -1,9 +1,84 @@
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
+import scripts.wp08_prepare_deploy as prepare
 import scripts.wp08_staging as staging
+
+
+def test_archive_runtime_image_builder_is_candidate_bound():
+    source = (staging.ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
+
+    assert 'f"{component.lower()}:{CANDIDATE}"' in source
+
+
+def pull_helper_source() -> str:
+    script = staging.DEPLOY_SCRIPT.read_text()
+    start = script.index("pull_with_bounded_retry() {")
+    end = script.index('\n\n[[ "${EUID}"', start)
+    return script[start:end]
+
+
+def test_image_pull_retries_only_transient_failures_and_redacts_raw_error(tmp_path: Path):
+    attempt_file = tmp_path / "attempts"
+    fake_pull = tmp_path / "fake-pull"
+    fake_pull.write_text(
+        "#!/usr/bin/env bash\n"
+        "count=0\n"
+        '[[ ! -f "$ATTEMPT_FILE" ]] || count=$(cat "$ATTEMPT_FILE")\n'
+        "count=$((count + 1))\n"
+        'printf \'%s\' "$count" > "$ATTEMPT_FILE"\n'
+        'if [[ "$count" -lt 3 ]]; then\n'
+        "  printf 'TLS handshake timeout https://signed.example.invalid/?secret=must-not-leak\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+    )
+    fake_pull.chmod(0o755)
+    command = f"""
+set -euo pipefail
+{pull_helper_source()}
+pull_with_bounded_retry api {fake_pull!s}
+"""
+    env = os.environ.copy()
+    env["ATTEMPT_FILE"] = str(attempt_file)
+    result = subprocess.run(
+        ["bash", "-c", command], capture_output=True, text=True, check=False, env=env
+    )
+    assert result.returncode == 0
+    assert attempt_file.read_text() == "3"
+    assert result.stdout.count("result=RETRY") == 2
+    assert "attempt=3 max_attempts=3 result=PASS" in result.stdout
+    assert "signed.example.invalid" not in result.stdout + result.stderr
+
+
+def test_image_pull_does_not_retry_non_transient_failure_or_leak_log(tmp_path: Path):
+    attempt_file = tmp_path / "attempts"
+    fake_pull = tmp_path / "fake-pull"
+    fake_pull.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf \'1\' > "$ATTEMPT_FILE"\n'
+        "printf 'manifest unknown https://signed.example.invalid/?secret=must-not-leak\\n' >&2\n"
+        "exit 7\n"
+    )
+    fake_pull.chmod(0o755)
+    command = f"""
+set -euo pipefail
+{pull_helper_source()}
+pull_with_bounded_retry api {fake_pull!s}
+"""
+    env = os.environ.copy()
+    env["ATTEMPT_FILE"] = str(attempt_file)
+    result = subprocess.run(
+        ["bash", "-c", command], capture_output=True, text=True, check=False, env=env
+    )
+    assert result.returncode == 7
+    assert attempt_file.read_text() == "1"
+    assert "category=NON_RETRYABLE result=FAIL" in result.stderr
+    assert "result=RETRY" not in result.stdout + result.stderr
+    assert "signed.example.invalid" not in result.stdout + result.stderr
 
 
 def contract(tmp_path: Path, *, estimate=None) -> Path:
@@ -107,6 +182,32 @@ def test_contract_requires_three_valid_candidate_digests(tmp_path: Path):
     path.write_text(json.dumps(payload))
     with pytest.raises(staging.StagingError, match="invalid digest"):
         staging.load_contract(path)
+
+
+def test_active_candidate_binding_matches_deploy_preflight():
+    data = staging.load_contract()
+    script = staging.DEPLOY_SCRIPT.read_text()
+    candidate = str(data["candidate_commit"])
+    digests = data["candidate_image_digests"]
+
+    assert f'[[ "${{CANDIDATE_COMMIT:-}}" == "{candidate}" ]]' in script
+    assert isinstance(digests, dict)
+    for component in ("api", "web", "worker"):
+        key = f"{component.upper()}_IMAGE"
+        local_key = f"{component.upper()}_LOCAL_IMAGE_DIGEST"
+        assert prepare.IMAGES[key].endswith(f"@{digests[component]}")
+        assert str(digests[component]) in script
+        assert prepare.LOCAL_IMAGE_DIGESTS[local_key] in script
+
+
+def test_active_candidate_local_digests_match_verified_archive():
+    expected = {
+        "API_LOCAL_IMAGE_DIGEST": "sha256:705824640538583177957f9b95ea2ebf3327481a7017de0b8ce2f47592d06783",
+        "WEB_LOCAL_IMAGE_DIGEST": "sha256:75d576aa70a60e6ead397ed04a74734bf7ec0b2e08ce049b69f4fbd98632ad22",
+        "WORKER_LOCAL_IMAGE_DIGEST": "sha256:195296e36cf648979a634f77d6d46172f355d5b14815938c967c4aefe1e493f7",
+    }
+
+    assert prepare.LOCAL_IMAGE_DIGESTS == expected
 
 
 def test_apply_requires_quote_and_rejects_over_budget(tmp_path: Path):
@@ -220,9 +321,19 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     valid = (
         "\n".join(
             (
+                "pull_with_bounded_retry()",
+                "for attempt in 1 2 3",
+                "timeout --signal=TERM --kill-after=30s 8m",
+                "TRANSIENT_NETWORK",
+                "COMMAND_TIMEOUT",
+                "NON_RETRYABLE",
+                "WP08_IMAGE_PULL",
                 'SECRETS="$PWD/secrets"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet",
-                "docker compose pull",
+                "python3 ./wp07_image_archive.py verify-files",
+                'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"',
+                'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"',
+                'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"',
                 "docker compose -f compose.yaml -f compose.migrate.yaml "
                 "run --rm --no-deps api python -c \"from pathlib import Path; "
                 "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -233,8 +344,9 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
                 "verify_web_only_runtime",
                 "verify_runtime_repair_prestate",
-                'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
-                'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+                'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
                 "alembic upgrade 0014_wp12_data_lifecycle",
                 "docker compose up -d --no-deps --wait --wait-timeout 180 web",
                 "WP08_WEB_ONLY_ROLLBACK=START",
@@ -242,11 +354,17 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
                 "WP08_RUNTIME_REPAIR=PASS",
                 "DEPLOYED_CANDIDATE.tmp",
                 "DEPLOYED_COMPONENTS.json",
+                "validate_component_marker_shape",
+                "full_sha.fullmatch(value)",
                 "WP08_WEB_ONLY_DEPLOY=PASS",
+                'if [[ "$DEPLOY_MODE" == "web-only" ]]',
+                'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+                'verify_web_only_runtime "$previous"',
+                'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
                 'if [[ "$DEPLOY_MODE" == "runtime-repair" ]]',
                 "verify_runtime_repair_prestate",
-                'docker pull "$API_IMAGE"',
-                'docker pull "$WORKER_IMAGE"',
+                'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+                'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
                 "alembic upgrade 0014_wp12_data_lifecycle",
                 "python /tmp/grant_runtime.py",
                 "docker compose up -d --no-deps --wait --wait-timeout 180 api",
@@ -259,6 +377,42 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
     )
     script.write_text(valid)
     staging.validate_deploy_script(script)
+
+    script.write_text(valid.replace("full_sha.fullmatch(value)", "value == candidate"))
+    with pytest.raises(staging.StagingError, match="Web-only deployment contract is incomplete"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(valid + '\ncomponents["api"] == baseline\n')
+    with pytest.raises(staging.StagingError, match="live runtime instead of trusting stale markers"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"\n'
+            'verify_web_only_runtime "$previous"',
+            'verify_web_only_runtime "$previous"\n'
+            'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+        )
+    )
+    with pytest.raises(staging.StagingError, match="marker shape and live runtime"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(valid + "\npython -m journey_api.seed\n")
+    with pytest.raises(staging.StagingError, match="must not seed fixture business facts"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(valid.replace("for attempt in 1 2 3", "for attempt in 1 2 3 4"))
+    with pytest.raises(staging.StagingError, match="three-attempt bounded retry"):
+        staging.validate_deploy_script(script)
+
+    script.write_text(
+        valid.replace(
+            'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+            'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
+        )
+    )
+    with pytest.raises(staging.StagingError, match="bounded retry"):
+        staging.validate_deploy_script(script)
 
     script.write_text('SECRETS="$ROOT/secrets"\n')
     with pytest.raises(staging.StagingError, match="release-local"):
@@ -276,7 +430,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
 
     script.write_text(
         valid.replace(
-            "docker compose pull\n"
+            "python3 ./wp07_image_archive.py verify-files\n"
+            'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"\n"
@@ -284,7 +441,10 @@ def test_deploy_requires_release_local_secrets_and_safe_preflight(tmp_path: Path
             "run --rm --no-deps api alembic upgrade head",
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api alembic upgrade head\n"
-            "docker compose pull\n"
+            "python3 ./wp07_image_archive.py verify-files\n"
+            'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"\n'
+            'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"\n'
             "docker compose -f compose.yaml -f compose.migrate.yaml "
             "run --rm --no-deps api python -c \"from pathlib import Path; "
             "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()\"",
@@ -355,7 +515,10 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/health/ready\n"
         "  edge:\n"
@@ -378,7 +541,10 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
 
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/ops\n"
         "  edge:\n"
@@ -388,7 +554,11 @@ def test_staging_edge_uses_verified_project_ghcr_digest(tmp_path: Path, monkeypa
         staging.validate_staging_compose(compose)
 
     compose.write_text(
-        "services:\n  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
+        "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
+        "  web:\n    image: ${WEB_RUNTIME_IMAGE:?required}\n"
+        "  edge:\n    image: caddy:2.10.2-alpine@sha256:" + "a" * 64 + "\n"
     )
     with pytest.raises(staging.StagingError, match="project GHCR digest"):
         staging.validate_staging_compose(compose)
@@ -414,7 +584,10 @@ def test_staging_web_requires_dynamic_per_request_csp_nonce(tmp_path: Path, monk
     compose = tmp_path / "compose.yaml"
     compose.write_text(
         "services:\n"
+        "  api:\n    image: ${API_RUNTIME_IMAGE:?required}\n"
+        "  worker:\n    image: ${WORKER_RUNTIME_IMAGE:?required}\n"
         "  web:\n"
+        "    image: ${WEB_RUNTIME_IMAGE:?required}\n"
         "    healthcheck:\n"
         "      test: http://localhost:3000/health/ready\n"
         "  edge:\n"
@@ -439,27 +612,38 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
     workflow = tmp_path / "staging.yml"
     source = "\n".join(
         (
-            "- audit",
-            "          - deploy",
-            "          - inspect-runtime",
+                "- audit",
+                "          - deploy-web",
+                "          - inspect-runtime",
             "          - diagnose-publication",
             "          - repair-edge-route",
             "          - cleanup-failed-release",
-            "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
+                "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
+                "inputs.confirmation == 'DEPLOY_WEB_0A8B96D_ON_9E8A806_STAGING'",
             "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
             "DEPLOY_WEB_222096D_ON_02863D0_STAGING",
             "REPAIR_RUNTIME_02863D0_FOR_WEB_222096D_STAGING",
-            '["/ops", "/review"]',
+            'pathname === "/ops" || pathname.startsWith("/ops/")',
+            "isReviewRoute && !isReviewLogin && !hasSession",
             "isContentRoute && !isContentLogin && !hasSession",
-            "INSPECT_RUNTIME_3B7D757_STAGING",
+            "INSPECT_RUNTIME_EB7C40B_STAGING",
             "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
             "REPAIR_EDGE_ROUTE_EF0A512_STAGING",
             "id: terraform_init",
+            "max_attempts=3",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=START",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=PASS",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=RETRY next_in_seconds=%s",
+            "WP08_TERRAFORM_INIT attempt=%s/%s result=FAIL retries_exhausted=true",
+            "WP08_TERRAFORM_VALIDATE result=PASS",
             'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
             'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
             'git show "$candidate:deploy/staging/compose.yaml"',
             'git show "$candidate:apps/web/src/proxy.ts"',
-            'git show "$candidate:apps/web/src/proxy.ts" | grep -Fq \'["/ops", "/review"]\'',
+            'git show "$candidate:apps/web/src/proxy.ts" | grep -Fq \'pathname === "/ops" || pathname.startsWith("/ops/")\'',
+            'git show "$candidate:apps/web/src/proxy.ts" | grep -Fq \'isReviewRoute && !isReviewLogin && !hasSession\'',
+            'git show "$candidate:apps/web/src/app/review/login/page.tsx"',
+            "进入主管评审",
             'git show "$candidate:apps/web/src/proxy.ts" | grep -Fq \'isContentRoute && !isContentLogin && !hasSession\'',
             'git show "$candidate:apps/web/src/app/content/login/page.tsx"',
             "使用飞书进入",
@@ -481,6 +665,15 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             'git show "$candidate:apps/worker/journey_worker/main.py"',
             "active_recipient_exists",
             'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+            "scripts/wp07_image_archive.py verify-files",
+            "artifacts/wp07-candidate/image-archives.json",
+            "artifacts/wp07-candidate/images/api.tar",
+            "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed",
+            "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed",
+            "timeout --signal=TERM --kill-after=30s 20m ssh",
+            "WP08_BUNDLE_TRANSFER=FAIL cleanup=exact-release",
+            "timeout --signal=TERM --kill-after=30s 2m ssh",
+            'rm -rf -- \'$release\'',
             'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
             'git show "$candidate:scripts/wp08_prepare_deploy.py" | grep -Fq \'"DB_POOL_SIZE": "20"\'',
             'git show "$candidate:scripts/wp08_prepare_deploy.py" | grep -Fq \'"DB_MAX_OVERFLOW": "5"\'',
@@ -564,6 +757,9 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
             "next_in_seconds=5",
             "--connect-timeout 2",
             "--max-time 3",
+            "-o ServerAliveInterval=15",
+            "-o ServerAliveCountMax=4",
+            "-o TCPKeepAlive=yes",
             "      - name: Close SSH ingress",
             "if: always() && (inputs.phase == 'deploy' || inputs.phase == 'deploy-web' || inputs.phase == 'repair-runtime' || inputs.phase == 'inspect-runtime' || inputs.phase == 'diagnose-publication' || inputs.phase == 'repair-edge-route' || inputs.phase == 'cleanup-failed-release') && steps.frozen_infrastructure.outputs.security_group_id != ''",
             "python3 -m scripts.wp08_security_group close",
@@ -581,6 +777,26 @@ def test_workflow_requires_guard_before_each_saved_plan_apply(tmp_path: Path, mo
         staging.validate_workflow(workflow)
 
     workflow.write_text(source.replace("WP08_SURFACE_ATTEMPT", "missing-surface-attempt-contract"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("max_attempts=3", "max_attempts=4"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("retries_exhausted=true", "retries_exhausted=false"))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("-o ServerAliveInterval=15", ""))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("-o ServerAliveCountMax=4", ""))
+    with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
+        staging.validate_workflow(workflow)
+
+    workflow.write_text(source.replace("-o TCPKeepAlive=yes", ""))
     with pytest.raises(staging.StagingError, match="missing bootstrap marker"):
         staging.validate_workflow(workflow)
 

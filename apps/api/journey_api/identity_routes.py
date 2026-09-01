@@ -115,9 +115,17 @@ def ensure_revision(actual: int, expected: int) -> None:
         )
 
 
-def visible_invite_status(invite: Invite) -> str:
+def visible_invite_status(
+    invite: Invite, pending_invite_ids: set[uuid.UUID] | None = None
+) -> str:
     if invite.status == InviteStatus.ACTIVE and invite.expires_at <= utc_now():
         return InviteStatus.EXPIRED.value
+    if (
+        invite.status == InviteStatus.ACTIVE
+        and pending_invite_ids is not None
+        and invite.id in pending_invite_ids
+    ):
+        return "EXCHANGED_PENDING_CONFIRMATION"
     return invite.status.value
 
 
@@ -359,6 +367,15 @@ def list_invites(
         .order_by(Invite.created_at.desc())
         .limit(100)
     ).all()
+    invite_ids = [invite.id for invite in invites]
+    pending_invite_ids = set(
+        session.scalars(
+            select(JoinContext.invite_id).where(
+                JoinContext.invite_id.in_(invite_ids),
+                JoinContext.status == JoinContextStatus.PENDING,
+            )
+        ).all()
+    ) if invite_ids else set()
     return envelope(
         request,
         InviteListOut(
@@ -367,7 +384,7 @@ def list_invites(
                     id=invite.id,
                     purpose=invite.purpose,
                     role="LEARNER",
-                    status=visible_invite_status(invite),
+                    status=visible_invite_status(invite, pending_invite_ids),
                     expires_at=invite.expires_at,
                     revision=invite.revision,
                     journey_version_id=invite.journey_version_id,
@@ -1034,7 +1051,7 @@ def confirm_identity(
 
     session_token = random_token()
     session_csrf_token = random_token()
-    expires_at = now + timedelta(hours=settings.session_ttl_hours)
+    expires_at = now + timedelta(hours=settings.learner_session_ttl_hours)
     identity_session = IdentitySession(
         id=uuid.uuid4(),
         organization_id=invite.organization_id,
@@ -1069,7 +1086,7 @@ def confirm_identity(
         response,
         session_token,
         session_csrf_token,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=settings.learner_session_ttl_hours * 3600,
     )
     return envelope(
         request,
@@ -1091,22 +1108,45 @@ def current_session(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
-    roles = session.scalars(
-        select(RoleAssignment.role).where(
-            RoleAssignment.user_id == actor.id,
-            RoleAssignment.organization_id == actor.organization_id,
-        )
-    ).all()
+    roles = actor.roles
     expires_at = None
     if actor.session_id is not None:
         identity_session = session.get(IdentitySession, actor.session_id)
         expires_at = identity_session.expires_at if identity_session else None
-    safe_entry = {
+    entry_by_role = {
         Role.LEARNER: "/app",
         Role.REVIEWER: "/review",
         Role.OPERATOR: "/ops/invites",
         Role.CONTENT_EDITOR: "/content",
-    }[actor.role]
+    }
+    workspace_by_role = {
+        Role.LEARNER: "learner",
+        Role.REVIEWER: "review",
+        Role.OPERATOR: "ops",
+        Role.CONTENT_EDITOR: "content",
+    }
+    capability_by_role = {
+        Role.LEARNER: ("journey:learn",),
+        Role.REVIEWER: ("review:read", "review:decide"),
+        Role.OPERATOR: ("ops:manage",),
+        Role.CONTENT_EDITOR: ("content:manage",),
+    }
+    preferred_role = actor.entry_role if actor.entry_role in roles else None
+    if preferred_role is None:
+        preferred_role = next(
+            (
+                role
+                for role in (
+                    Role.LEARNER,
+                    Role.REVIEWER,
+                    Role.CONTENT_EDITOR,
+                    Role.OPERATOR,
+                )
+                if role in roles
+            ),
+            None,
+        )
+    safe_entry = entry_by_role[preferred_role] if preferred_role else "/"
     return envelope(
         request,
         SessionOut(
@@ -1114,6 +1154,14 @@ def current_session(
             organization_id=actor.organization_id,
             display_name=actor.display_name,
             roles=sorted(role.value for role in roles),
+            capabilities=sorted(
+                {
+                    capability
+                    for role in roles
+                    for capability in capability_by_role[role]
+                }
+            ),
+            allowed_workspaces=sorted(workspace_by_role[role] for role in roles),
             scope={"organization_id": str(actor.organization_id)},
             safe_entry=safe_entry,
             expires_at=expires_at,

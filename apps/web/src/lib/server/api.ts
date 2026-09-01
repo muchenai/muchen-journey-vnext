@@ -84,7 +84,14 @@ export type LearningExperience = {
 
 export type Assignment = {
   id: string;
-  status: string;
+  status:
+    | "AVAILABLE"
+    | "IN_PROGRESS"
+    | "SUBMITTED"
+    | "IN_REVIEW"
+    | "NEEDS_REVISION"
+    | "COMPLETED"
+    | "CANCELLED";
   revision: number;
   assigned_at: string;
   reviewer_display_name: string;
@@ -473,7 +480,13 @@ export type OpsTaskDefinition = {
   status: string;
   revision: number;
   content_owner_id: string;
-  versions: Array<{ id: string; version: number; title: string; published_at: string }>;
+  versions: Array<{
+    id: string;
+    version: number;
+    title: string;
+    published_at: string;
+    material_links: Array<{ title: string; url: string }>;
+  }>;
 };
 
 export type LearningMaterialInput = {
@@ -548,6 +561,7 @@ export type OpsEnrollment = {
   journey_version_id: string | null;
   assignment_statuses: string[];
   open_review_status: string | null;
+  open_review_revision: number | null;
   allowed_commands: string[];
 };
 
@@ -565,7 +579,11 @@ export type OpsIdentityAccess = {
   link_revision: number | null;
   link_expires_at: string | null;
   allowed_commands: Array<
-    "create_identity_link" | "revoke_identity_link" | "revoke_external_identity"
+    "create_identity_link"
+    | "revoke_identity_link"
+    | "revoke_external_identity"
+    | "grant_reviewer_role"
+    | "revoke_reviewer_role"
   >;
 };
 
@@ -583,7 +601,7 @@ export type OpsInvite = {
   id: string;
   purpose: string;
   role: "LEARNER";
-  status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "REVOKED";
+  status: "ACTIVE" | "EXCHANGED_PENDING_CONFIRMATION" | "CONSUMED" | "EXPIRED" | "REVOKED";
   expires_at: string;
   revision: number;
   journey_version_id: string | null;
@@ -772,12 +790,18 @@ export async function identityPageRequest<T>(
   try {
     return await apiRequest<T>(path, role);
   } catch (error) {
+    if (
+      role === "REVIEWER"
+      && error instanceof ApiRequestError
+      && error.status === 403
+    ) {
+      redirect("/review/login?auth_error=FORBIDDEN");
+    }
     if (error instanceof ApiRequestError && error.status === 401) {
-      const returnTo = role === "REVIEWER"
-        ? "/review"
-        : role === "CONTENT_EDITOR"
-          ? "/content"
-          : "/ops";
+      if (role === "REVIEWER") {
+        redirect("/review/login?auth_error=SESSION_EXPIRED");
+      }
+      const returnTo = role === "CONTENT_EDITOR" ? "/content" : "/ops";
       const query = new URLSearchParams({
         auth_error: "SESSION_EXPIRED",
         return_to: returnTo,
@@ -864,4 +888,18 @@ export async function resolveLearnerSessionState(): Promise<LearnerSessionState>
 
 export async function hasValidLearnerSession(): Promise<boolean> {
   return (await resolveLearnerSessionState()).status === "VALID";
+}
+
+export async function hasLearnerSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  if (!cookieStore.get(SESSION_COOKIE)?.value) return false;
+  try {
+    await apiRequest<CurrentAction>("/api/v1/me/current-action", "LEARNER");
+    return true;
+  } catch (error) {
+    if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+      return false;
+    }
+    throw error;
+  }
 }

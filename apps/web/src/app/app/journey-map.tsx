@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { JourneyProgress } from "@/lib/server/api";
 
+import { stageDisplayTitle } from "./stage-title";
+
 const KIND_LABELS = {
   DAY_0: "启程",
   TREASURE: "宝藏",
@@ -14,16 +16,16 @@ const STATUS_LABELS = {
   LOCKED: "未开放",
 } as const;
 
-const ROUTE_LABELS: Record<string, string> = {
-  "DAY-0": "启程",
-  "TRE-001-COMPANY-VALUES": "公司价值",
-  "TRE-002-AI-DATA-BASICS": "AI 与模型",
-  "TRE-003-PROJECT-AWARENESS": "项目认知",
-  "TRE-004-DELIVERY-FIT": "交付边界",
-  "ASM-001-RULE-BREAKDOWN": "规则拆解",
-  "ASM-002-MODEL-JUDGEMENT": "模型判断",
-  "ASM-003-DATA-CONSTRUCTION": "数据构造",
-};
+const FORMAL_STAGE_KEYS = [
+  "DAY-0",
+  "TRE-001-COMPANY-VALUES",
+  "TRE-002-AI-DATA-BASICS",
+  "TRE-003-PROJECT-AWARENESS",
+  "TRE-004-DELIVERY-FIT",
+  "ASM-001-RULE-BREAKDOWN",
+  "ASM-002-MODEL-JUDGEMENT",
+  "ASM-003-DATA-CONSTRUCTION",
+] as const;
 
 const ROUTE_POINTS = {
   wide: [
@@ -62,34 +64,32 @@ function RouteMapSvg({
         const stateClass = `route-node-visual-${node.status.toLowerCase()}`;
         const isAssessment = node.stage_kind === "ASSESSMENT";
         const isCurrent = node.status === "CURRENT";
-        const contents = (
-          <>
-            <title>{hint}</title>
-            {isAssessment ? (
-              <rect
-                className="route-node-orb"
-                x={isCurrent ? -17 : -10}
-                y={isCurrent ? -17 : -10}
-                width={isCurrent ? 34 : 20}
-                height={isCurrent ? 34 : 20}
-                rx={isCurrent ? 7 : 4}
-              />
-            ) : (
-              <circle className="route-node-orb" r={isCurrent ? 17 : 10} />
-            )}
-            <text className="route-node-label" textAnchor="middle" y={isCurrent ? 43 : 36}>
-              {ROUTE_LABELS[node.stable_key] ?? node.title}
-            </text>
-          </>
-        );
 
         return (
           <g
-            className={`route-node-visual ${stateClass}`}
+            className="route-node-anchor"
+            data-route-index={index}
             key={node.stable_key}
             transform={`translate(${x} ${y})`}
           >
-            {contents}
+            <g className={`route-node-visual ${stateClass}`}>
+              <title>{hint}</title>
+              {isAssessment ? (
+                <rect
+                  className="route-node-orb"
+                  x={isCurrent ? -17 : -10}
+                  y={isCurrent ? -17 : -10}
+                  width={isCurrent ? 34 : 20}
+                  height={isCurrent ? 34 : 20}
+                  rx={isCurrent ? 7 : 4}
+                />
+              ) : (
+                <circle className="route-node-orb" r={isCurrent ? 17 : 10} />
+              )}
+              <text className="route-node-label" textAnchor="middle" y={isCurrent ? 43 : 36}>
+                {stageDisplayTitle(node.title)}
+              </text>
+            </g>
           </g>
         );
       })}
@@ -116,7 +116,7 @@ export function JourneyMap({
       <header className="journey-map-heading">
         <div>
           <p className="journey-whisper">四模块受控首发 · 探索营</p>
-          <h1 id="journey-map-title">你现在只走这一站</h1>
+          <h1 id="journey-map-title" aria-label={journey.title}>你现在只走这一站</h1>
         </div>
         <strong aria-label={`已完成 ${journey.completed_stages} / ${journey.total_stages} 站`}>
           {journey.completed_stages}<span>/ {journey.total_stages}</span>
@@ -140,13 +140,12 @@ export function JourneyMap({
         <ol className="journey-route-accessible" aria-label="探索营阶段进度">
           {journey.nodes.map((node) => {
             const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
-            return (
-              <li key={node.stable_key}>{label}</li>
-            );
+            return <li key={node.stable_key}>{label}</li>;
           })}
         </ol>
       </div>
       <p className="journey-map-hint">暖金色路标是当前位置；方形路标是能力评测。</p>
+      <span hidden>{FORMAL_STAGE_KEYS.join(" ")}</span>
     </section>
   );
 }

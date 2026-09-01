@@ -38,6 +38,7 @@ from journey_api.models import (
     OutboxEvent,
     OutboxStatus,
     Review,
+    ReviewDelegation,
     ReviewStatus,
     Role,
     Submission,
@@ -121,7 +122,10 @@ def scoped_review_lineage(actor: Actor):
         User.organization_id == actor.organization_id,
         TaskDefinition.organization_id == actor.organization_id,
         TaskVersion.organization_id == actor.organization_id,
-        Enrollment.reviewer_id == Review.reviewer_id,
+        or_(
+            Enrollment.reviewer_id == Review.reviewer_id,
+            Enrollment.reviewer_id == ReviewDelegation.reviewer_id,
+        ),
         TaskVersion.task_definition_id == Assignment.task_definition_id,
         or_(
             Assignment.journey_stage_version_id.is_(None),
@@ -163,10 +167,11 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
             ),
         )
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
+        .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.id == review_id,
             Review.organization_id == actor.organization_id,
-            Review.reviewer_id == actor.id,
+            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
             *scoped_review_lineage(actor),
         )
     )
@@ -379,9 +384,10 @@ def review_queue(
                 JourneyStageVersion.organization_id == Assignment.organization_id,
             ),
         )
+        .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.organization_id == actor.organization_id,
-            Review.reviewer_id == actor.id,
+            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
             Enrollment.status == EnrollmentStatus.ACTIVE,
             *scoped_review_lineage(actor),
@@ -469,7 +475,7 @@ def start_review(
             actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
             actor_id=actor.id,
             learner_id=context.learner.id,
-            assigned_reviewer_id=context.review.reviewer_id,
+            assigned_reviewer_id=actor.id,
             fixed_submission_version=True,
         )
     except FormalAssignmentTransitionError as exc:
@@ -612,7 +618,7 @@ def finalize_review(
             actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
             actor_id=actor.id,
             learner_id=context.learner.id,
-            assigned_reviewer_id=context.review.reviewer_id,
+            assigned_reviewer_id=actor.id,
             fixed_submission_version=True,
             rubric_complete=True,
             reason=command.overall_feedback,
@@ -629,6 +635,7 @@ def finalize_review(
         submission_id=context.review.submission_id,
         submission_version_id=context.review.submission_version_id,
         reviewer_id=context.review.reviewer_id,
+        executor_id=actor.id,
         review_revision=command.expected_revision,
         decision=decision,
         rubric_scores={

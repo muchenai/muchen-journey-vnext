@@ -3,6 +3,7 @@ import {
   cancelEnrollment,
   configureNotificationEndpoint,
   createContentEditor,
+  handoffAssignedReview,
   redriveNotificationDelivery,
   revokeNotificationEndpoint,
 } from "@/app/actions";
@@ -90,7 +91,6 @@ export default async function OpsPage({
       "OPERATOR",
     ),
   ]);
-  const isStaging = runtime.environment === "staging";
   const overdueReviewCount = reviewerWorkload.items.reduce(
     (total, item) => total + item.overdue_review_count,
     0,
@@ -98,6 +98,12 @@ export default async function OpsPage({
   const highestExceptionHref = notificationDeliveries.items.length > 0
     ? "#notification-operations"
     : "#reviewer-operations";
+  const environmentNotice = {
+    production: "当前为 production；仅已发布的固定旅程和受控邀请对真实用户生效，staging 继续用于后续验证。",
+    staging: "当前为 Alpha staging；用于真人验证与后续修复，不代表 production 当前运行状态。",
+    test: "当前为测试环境；这里的身份、邀请和业务事实不代表真实运营数据。",
+    local: "当前为本地环境；这里的身份、邀请和业务事实不代表真实运营数据。",
+  }[runtime.environment] ?? "当前环境标识异常，请停止写入并联系工程支持。";
 
   return (
     <section className="ops-page">
@@ -107,9 +113,7 @@ export default async function OpsPage({
         这里没有通用状态编辑器。所有写入都绑定组织、对象、角色、expected revision、幂等键与理由。
       </p>
       <p className="notice">
-        {isStaging
-          ? "当前为 Alpha staging；真人身份/UAT、真实通知、物理 ACL 证据、异机恢复与发布签署未闭环前，production 仍必须 NO_GO。"
-          : "当前为本地/测试环境；真人 UAT、真实通知与发布签署不在此环境中成立，发布判定必须 NO_GO。"}
+        {environmentNotice}
       </p>
       {query.updated ? <p className="success-text" role="status">受控命令已写入并记录审计。</p> : null}
 
@@ -157,6 +161,7 @@ export default async function OpsPage({
           identityAccess={identityAccess.items}
           tasks={tasks.items}
           journeys={formalJourneys.items}
+          observedAt={new Date().toISOString()}
         />
       </section>
 
@@ -191,7 +196,22 @@ export default async function OpsPage({
           {tasks.items.map((task) => (
             <li key={task.id}>
               <div><strong>{task.stable_key}</strong><span>{task.status} · definition revision {task.revision}</span></div>
-              <span>{task.versions.map((version) => `V${version.version} ${version.title}`).join(" · ") || "尚未发布"}</span>
+              {task.versions.length > 0 ? task.versions.map((version) => (
+                <details key={version.id} className="published-material-audit">
+                  <summary>V{version.version} {version.title} · {version.material_links.length} 个材料链接</summary>
+                  {version.material_links.length > 0 ? (
+                    <ul>
+                      {version.material_links.map((link) => (
+                        <li key={link.url}>
+                          <a href={link.url} target="_blank" rel="noreferrer">
+                            {link.title} · {new URL(link.url).hostname}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="status-meta">该版本没有外部材料链接。</p>}
+                </details>
+              )) : <span>尚未发布</span>}
             </li>
           ))}
         </ul>
@@ -235,7 +255,9 @@ export default async function OpsPage({
                 <span className="badge">主管：{enrollment.reviewer_display_name}</span>
               </div>
               {enrollment.open_review_status ? (
-                <p className="inline-error">已有 {enrollment.open_review_status} Review；Reviewer 重分配与 Enrollment 取消均被状态机阻断。</p>
+                <p className="inline-error">
+                  已有 {enrollment.open_review_status} Review；仅尚未开始的 ASSIGNED 评审允许受控移交，其他状态继续阻断。
+                </p>
               ) : null}
               {enrollment.status === "COMPLETED" ? (
                 <p>下一训练阶段决定尚未启用；当前运营页不提供该高影响决定入口。</p>
@@ -259,6 +281,29 @@ export default async function OpsPage({
                     <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
                   </label>
                   <button className="button secondary compact" type="submit">受控分配 Reviewer</button>
+                </form>
+              ) : null}
+              {enrollment.allowed_commands.includes("handoff_assigned_review") && enrollment.open_review_revision ? (
+                <form action={handoffAssignedReview} className="ops-command-form">
+                  <input type="hidden" name="enrollment_id" value={enrollment.id} />
+                  <input type="hidden" name="revision" value={enrollment.revision} />
+                  <input type="hidden" name="review_revision" value={enrollment.open_review_revision} />
+                  <label>
+                    移交给已绑定 Reviewer
+                    <select name="reviewer_id" required defaultValue="">
+                      <option value="" disabled>选择 Reviewer</option>
+                      {identityAccess.items
+                        .filter((item) => item.role === "REVIEWER"
+                          && item.identity_status === "LINKED"
+                          && item.user_id !== enrollment.reviewer_id)
+                        .map((item) => <option key={item.user_id} value={item.user_id}>{item.display_name}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    移交理由
+                    <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                  </label>
+                  <button className="button secondary compact" type="submit">移交未开始评审</button>
                 </form>
               ) : null}
               {enrollment.allowed_commands.includes("cancel_enrollment") ? (

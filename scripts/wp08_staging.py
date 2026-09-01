@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config" / "wp08_staging.json"
+WEB_ONLY_CONTRACT = ROOT / "config" / "wp08_web_only.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "staging.yml"
 EDGE_MIRROR_WORKFLOW = ROOT / ".github" / "workflows" / "wp08-edge-mirror.yml"
 WP09_BOOTSTRAP_WORKFLOW = ROOT / ".github" / "workflows" / "wp09-operator-bootstrap.yml"
@@ -193,7 +194,12 @@ def validate_runtime_inventory_script(path: Path = RUNTIME_INVENTORY_SCRIPT) -> 
         "SELECT version_num FROM alembic_version",
         "SELECT release,last_seen_at FROM worker_heartbeats",
         "WP08_RUNTIME_INVENTORY=",
-        "deployed candidate differs from authorized candidate",
+        '"deployed_components"',
+        '"deployed_candidate"',
+        '"component_marker_matches"',
+        '"component_markers_match_runtime"',
+        '"marker_relationships"',
+        '"marker_relationships_consistent"',
     )
     if any(marker not in source for marker in required):
         raise StagingError("runtime inventory script is incomplete")
@@ -353,6 +359,9 @@ def validate_edge_mirror_workflow(path: Path = EDGE_MIRROR_WORKFLOW) -> None:
 
 def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
     compose = path.read_text()
+    for component in ("API", "WEB", "WORKER"):
+        if f"image: ${{{component}_RUNTIME_IMAGE:" not in compose:
+            raise StagingError("staging application images must use verified runtime references")
     if f"image: {EDGE_IMAGE}" not in compose:
         raise StagingError("staging edge must use the verified project GHCR digest")
     if "image: caddy:" in compose or "docker.io/library/caddy" in compose:
@@ -387,6 +396,8 @@ def validate_staging_compose(path: Path = STAGING_COMPOSE) -> None:
 
 def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     script = path.read_text()
+    if "journey_api.seed" in script:
+        raise StagingError("staging deploy must not seed fixture business facts")
     if 'SECRETS="$PWD/secrets"' not in script:
         raise StagingError("staging deploy must read release-local secrets")
     if 'SECRETS="$ROOT/secrets"' in script:
@@ -394,7 +405,12 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     compose_check = (
         "docker compose -f compose.yaml -f compose.migrate.yaml config --quiet"
     )
-    image_pull = "docker compose pull"
+    archive_loads = (
+        "python3 ./wp07_image_archive.py verify-files",
+        'load_verified_archive api "$API_RUNTIME_IMAGE" "$API_LOCAL_IMAGE_DIGEST"',
+        'load_verified_archive web "$WEB_RUNTIME_IMAGE" "$WEB_LOCAL_IMAGE_DIGEST"',
+        'load_verified_archive worker "$WORKER_RUNTIME_IMAGE" "$WORKER_LOCAL_IMAGE_DIGEST"',
+    )
     container_ca_check = (
         "Path('/run/secrets/volcengine-rds-ca.pem').read_bytes()"
     )
@@ -404,19 +420,45 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     )
     if any(
         command not in script
-        for command in (compose_check, image_pull, container_ca_check, migration)
+        for command in (compose_check, *archive_loads, container_ca_check, migration)
     ):
         raise StagingError("staging deploy preflight commands are incomplete")
     if not (
         script.index(compose_check)
-        < script.index(image_pull)
+        < script.index(archive_loads[0])
+        < script.index(archive_loads[1])
+        < script.index(archive_loads[2])
+        < script.index(archive_loads[3])
         < script.index(container_ca_check)
         < script.index(migration)
     ):
         raise StagingError(
-            "staging deploy must validate Compose, pull all images, and verify "
+            "staging deploy must validate Compose, load all verified images, and verify "
             "container CA readability before database migration"
         )
+    bounded_pull_contract = (
+        "pull_with_bounded_retry()",
+        "for attempt in 1 2 3",
+        "timeout --signal=TERM --kill-after=30s 8m",
+        "TRANSIENT_NETWORK",
+        "COMMAND_TIMEOUT",
+        "NON_RETRYABLE",
+        "WP08_IMAGE_PULL",
+        "pull_with_bounded_retry web-only docker pull",
+        "pull_with_bounded_retry runtime-api docker pull",
+        "pull_with_bounded_retry runtime-worker docker pull",
+    )
+    if any(marker not in script for marker in bounded_pull_contract):
+        raise StagingError(
+            "staging image pulls must use the observable three-attempt bounded retry contract"
+        )
+    loop_match = re.search(r"for attempt in ([^;\n]+)", script)
+    if loop_match is None or loop_match.group(1).split() != ["1", "2", "3"]:
+        raise StagingError(
+            "staging image pulls must use the observable three-attempt bounded retry contract"
+        )
+    if "timeout --signal=TERM --kill-after=30s 8m docker pull" in script:
+        raise StagingError("staging image pulls must not bypass the bounded retry helper")
     first_release_cleanup = (
         "WP08_ROLLBACK=STOP_FAILED_FIRST_RELEASE",
         "docker compose down --remove-orphans",
@@ -427,8 +469,8 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         '[[ "${DEPLOY_MODE:-}" == "full" || "${DEPLOY_MODE:-}" == "web-only" || "${DEPLOY_MODE:-}" == "runtime-repair" ]]',
         "verify_web_only_runtime",
         "verify_runtime_repair_prestate",
-        'timeout --signal=TERM --kill-after=30s 8m docker pull "$WEB_IMAGE"',
-        'timeout --signal=TERM --kill-after=30s 8m docker pull "$API_IMAGE"',
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
+        'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
         'alembic upgrade 0014_wp12_data_lifecycle',
         "docker compose up -d --no-deps --wait --wait-timeout 180 web",
         "WP08_WEB_ONLY_ROLLBACK=START",
@@ -436,10 +478,38 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
         "WP08_RUNTIME_REPAIR=PASS",
         "DEPLOYED_CANDIDATE.tmp",
         "DEPLOYED_COMPONENTS.json",
+        "validate_component_marker_shape",
+        "full_sha.fullmatch(value)",
         "WP08_WEB_ONLY_DEPLOY=PASS",
     )
     if any(marker not in script for marker in web_only_markers):
         raise StagingError("bounded Web-only deployment contract is incomplete")
+    stale_marker_assertions = (
+        'components["api"] == baseline',
+        'components["worker"] == baseline',
+    )
+    if any(marker in script for marker in stale_marker_assertions):
+        raise StagingError(
+            "Web-only deployment must verify the live runtime instead of trusting stale markers"
+        )
+    web_only_start = script.find('if [[ "$DEPLOY_MODE" == "web-only" ]]')
+    marker_shape_check = script.find(
+        'validate_component_marker_shape "$ROOT/DEPLOYED_COMPONENTS.json"',
+        web_only_start,
+    )
+    live_runtime_check = script.find(
+        'verify_web_only_runtime "$previous"', web_only_start
+    )
+    web_image_pull = script.find(
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"', web_only_start
+    )
+    if not (
+        web_only_start >= 0
+        and web_only_start < marker_shape_check < live_runtime_check < web_image_pull
+    ):
+        raise StagingError(
+            "Web-only deployment must validate marker shape and live runtime before pulling Web"
+        )
     repair_start = script.find('if [[ "$DEPLOY_MODE" == "runtime-repair" ]]')
     repair_end = script.find("\nfi", repair_start)
     if repair_start < 0 or repair_end < 0:
@@ -447,8 +517,8 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     repair = script[repair_start:repair_end]
     repair_required = (
         "verify_runtime_repair_prestate",
-        'docker pull "$API_IMAGE"',
-        'docker pull "$WORKER_IMAGE"',
+        'pull_with_bounded_retry runtime-api docker pull "$API_IMAGE"',
+        'pull_with_bounded_retry runtime-worker docker pull "$WORKER_IMAGE"',
         "alembic upgrade 0014_wp12_data_lifecycle",
         "python /tmp/grant_runtime.py",
         "--wait-timeout 180 api",
@@ -459,7 +529,7 @@ def validate_deploy_script(path: Path = DEPLOY_SCRIPT) -> None:
     if any(marker not in repair for marker in repair_required):
         raise StagingError("runtime repair branch is incomplete")
     repair_forbidden = (
-        'docker pull "$WEB_IMAGE"',
+        'pull_with_bounded_retry web-only docker pull "$WEB_IMAGE"',
         "--wait-timeout 180 web",
         "journey_api.seed",
         "terraform ",
@@ -576,11 +646,36 @@ def validate_candidate(data: dict[str, object]) -> None:
 
     commit = str(data["candidate_commit"])
     run_id = str(data["candidate_artifact_run_id"])
-    confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
     prepare = (ROOT / "scripts" / "wp08_prepare_deploy.py").read_text()
     deploy = DEPLOY_SCRIPT.read_text()
     workflow = WORKFLOW.read_text()
     variables = (ROOT / "infra" / "staging" / "variables.tf").read_text()
+    web_only = json.loads(WEB_ONLY_CONTRACT.read_text())
+    if (
+        web_only.get("status") == "ACTIVE"
+        and web_only.get("candidate_commit") == commit
+    ):
+        if web_only.get("candidate_artifact_run_id") != data["candidate_artifact_run_id"]:
+            raise StagingError("active Web-only artifact differs from WP-08")
+        if web_only.get("web_image_digest") != expected_digests["web"]:
+            raise StagingError("active Web-only digest differs from WP-08")
+        baseline = str(web_only["runtime_baseline"]["candidate_commit"])
+        confirmation = (
+            f"DEPLOY_WEB_{commit[:7].upper()}_ON_"
+            f"{baseline[:7].upper()}_STAGING"
+        )
+        baseline_markers = (
+            baseline,
+            str(web_only["runtime_baseline"]["api_image_digest"]),
+            str(web_only["runtime_baseline"]["worker_image_digest"]),
+        )
+        for marker in baseline_markers:
+            if marker not in prepare or marker not in deploy:
+                raise StagingError(
+                    "active Web-only runtime baseline differs from deploy bundle"
+                )
+    else:
+        confirmation = f"DEPLOY_{commit[:7].upper()}_TO_VOLCENGINE_STAGING"
     required_markers = (
         (prepare, commit, "deploy bundle candidate"),
         (deploy, commit, "deploy preflight candidate"),
@@ -593,13 +688,22 @@ def validate_candidate(data: dict[str, object]) -> None:
     for source, marker, label in required_markers:
         if marker not in source:
             raise StagingError(f"{label} differs from the machine contract")
+    runtime_image_builder = 'f"{component.lower()}:{CANDIDATE}"'
+    if runtime_image_builder not in prepare:
+        raise StagingError("archive runtime image builder differs from the machine contract")
     for component in ("api", "web", "worker"):
         digest = str(expected_digests[component])
+        local_digest = str(images[component]["local_image_digest"])
         immutable = (
             "ghcr.io/muchenai2024-creator/muchen-journey-vnext-"
             f"{component}@{digest}"
         )
-        if immutable not in prepare or digest not in deploy:
+        if (
+            immutable not in prepare
+            or digest not in deploy
+            or local_digest not in prepare
+            or local_digest not in deploy
+        ):
             raise StagingError(f"{component} deploy binding differs from the machine contract")
 
 
@@ -648,23 +752,43 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     workflow = path.read_text()
     jobs_start = workflow.find("jobs:\n")
     guard_end = workflow.find("    runs-on:", jobs_start)
+    web_only = json.loads(WEB_ONLY_CONTRACT.read_text())
+    active_web_only = web_only.get("status") == "ACTIVE"
     if jobs_start >= 0 and guard_end >= 0:
         job_guard = workflow[jobs_start:guard_end]
-        retired_dispatches = (
+        retired_dispatches = [
             "inputs.phase == 'provision'",
-            "inputs.phase == 'deploy-web'",
             "inputs.phase == 'repair-runtime'",
-        )
+        ]
+        if not active_web_only:
+            retired_dispatches.append("inputs.phase == 'deploy-web'")
         if any(marker in job_guard for marker in retired_dispatches):
             raise StagingError(
                 "controlled Alpha candidate must not dispatch retired mutation phases"
             )
+    phase_sequence = (
+        "- audit\n          - deploy-web\n          - inspect-runtime"
+        if active_web_only
+        else "- audit\n          - deploy\n          - inspect-runtime"
+    )
+    deployment_confirmation = (
+        "inputs.confirmation == 'DEPLOY_WEB_0A8B96D_ON_9E8A806_STAGING'"
+        if active_web_only
+        else "inputs.confirmation == 'DEPLOY_EB7C40B_TO_VOLCENGINE_STAGING'"
+    )
     required = (
-        "- audit\n          - deploy\n          - inspect-runtime",
+        phase_sequence,
+        deployment_confirmation,
         "          - cleanup-failed-release",
         "inputs.confirmation == 'AUDIT_WP08_RDS_NETWORK'",
         "inputs.confirmation == 'CLEANUP_FAILED_RELEASE_EF0A512_30808632624'",
         "id: terraform_init",
+        "max_attempts=3",
+        "WP08_TERRAFORM_INIT attempt=%s/%s result=START",
+        "WP08_TERRAFORM_INIT attempt=%s/%s result=PASS",
+        "WP08_TERRAFORM_INIT attempt=%s/%s result=RETRY next_in_seconds=%s",
+        "WP08_TERRAFORM_INIT attempt=%s/%s result=FAIL retries_exhausted=true",
+        "WP08_TERRAFORM_VALIDATE result=PASS",
         "if: inputs.phase == 'audit'",
         "python3 -m scripts.wp08_rds_network_audit",
         "terraform -chdir=infra/staging state pull",
@@ -700,6 +824,9 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'next_in_seconds=5',
         '--connect-timeout 2',
         '--max-time 3',
+        '-o ServerAliveInterval=15',
+        '-o ServerAliveCountMax=4',
+        '-o TCPKeepAlive=yes',
         "expired_reviewer=explicit-relogin",
         'if [[ "${{ inputs.phase }}" == "deploy" ]]; then',
         'git cat-file -e "$candidate:apps/web/src/app/health/ready/route.ts"',
@@ -709,6 +836,15 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:scripts/wp08_web_runtime_check.py"',
         'git show "$candidate:apps/worker/journey_worker/main.py"',
         'git show "$candidate:scripts/wp08_prepare_deploy.py"',
+        "scripts/wp07_image_archive.py verify-files",
+        "artifacts/wp07-candidate/image-archives.json",
+        "artifacts/wp07-candidate/images/api.tar",
+        "WP08_BUNDLE_TRANSFER=START transport=ssh-compressed",
+        "WP08_BUNDLE_TRANSFER=PASS transport=ssh-compressed",
+        "timeout --signal=TERM --kill-after=30s 20m ssh",
+        "WP08_BUNDLE_TRANSFER=FAIL cleanup=exact-release",
+        "timeout --signal=TERM --kill-after=30s 2m ssh",
+        'rm -rf -- \'$release\'',
         '"DB_POOL_SIZE": "20"',
         '"DB_MAX_OVERFLOW": "5"',
         '"DB_POOL_SIZE": "2"',
@@ -720,7 +856,10 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         '"runtime.snapshot"',
         "active_recipient_exists",
         'NOTIFICATION_RESULT_URL": f"https://{STAGING_HOST}/app/result"',
-        '["/ops", "/review"]',
+        'pathname === "/ops" || pathname.startsWith("/ops/")',
+        "isReviewRoute && !isReviewLogin && !hasSession",
+        'git show "$candidate:apps/web/src/app/review/login/page.tsx"',
+        "进入主管评审",
         "isContentRoute && !isContentLogin && !hasSession",
         'git show "$candidate:apps/web/src/app/content/login/page.tsx"',
         'git show "$candidate:apps/web/src/app/ops/invite-management-panel.tsx"',
@@ -728,7 +867,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         'git show "$candidate:.github/workflows/staging.yml"',
         "anonymous_content=login-page",
         "oauth_redirect=root-relative-content",
-        "INSPECT_RUNTIME_3B7D757_STAGING",
+        "INSPECT_RUNTIME_EB7C40B_STAGING",
         "scripts/wp08_runtime_inventory.py",
         "DIAGNOSE_FORMAL_JOURNEY_EF0A512_STAGING",
         "scripts/wp19_publication_diagnostic.py",
@@ -769,7 +908,7 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
         raise StagingError("staging workflow failed-release cleanup step count must be exactly 1")
     if (
         workflow.count("git cat-file -e") != 5
-        or workflow.count('git show "$candidate:') != 19
+        or workflow.count('git show "$candidate:') != 21
     ):
         raise StagingError(
             "deploy must verify the Web, bounded database pool, WP-11, and WP-12B contracts "
@@ -890,10 +1029,12 @@ def validate_workflow(path: Path = WORKFLOW) -> None:
     ):
         if forbidden in cleanup_step:
             raise StagingError("failed-release cleanup exceeds its reviewed boundary")
+    deployment_mode = "web-only" if active_web_only else "bounded-full-deploy"
+    retired_modes = "provision,runtime-repair" if active_web_only else "provision,web-only,runtime-repair"
     print(
         "WP08_STAGING_WORKFLOW=PASS"
-        " dispatch=audit,frozen-alpha-deploy,runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
-        " retired=provision,bounded-web-only,runtime-repair"
+        f" dispatch=audit,{deployment_mode},runtime-inventory,publication-diagnostic,edge-route-repair,exact-failed-release-cleanup"
+        f" retired={retired_modes}"
     )
 
 

@@ -20,6 +20,7 @@ import {
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
+const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
 
 function requiredUuid(data: FormData, key: string): string {
   const value = data.get(key);
@@ -62,6 +63,20 @@ function textLines(data: FormData, key: string, maxItems: number): string[] {
   const lines = value.split("\n").map((item) => item.trim()).filter(Boolean);
   if (lines.length < 1 || lines.length > maxItems || new Set(lines).size !== lines.length) {
     throw new Error(`${key} 必须是 1–${maxItems} 行不重复内容。`);
+  }
+  return lines;
+}
+
+function optionalTextLines(data: FormData, key: string, maxItems: number): string[] {
+  const raw = data.get(key);
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  const lines = raw.split("\n").map((item) => item.trim()).filter(Boolean);
+  if (
+    lines.length > maxItems
+    || new Set(lines).size !== lines.length
+    || lines.some((item) => item.length > 500)
+  ) {
+    throw new Error(`${key} 必须是不超过 ${maxItems} 行且每行不超过 500 字的不重复内容。`);
   }
   return lines;
 }
@@ -122,7 +137,7 @@ function taskContentFromForm(data: FormData): TaskContentInput {
     reviewer_calibration_note: requiredText(data, "reviewer_calibration_note", 10, 1_000),
     allowed_attachment_types: [],
     max_attachment_size_bytes: 0,
-    reference_materials: [],
+    reference_materials: optionalTextLines(data, "reference_materials", 20),
     learning_materials: learningMaterials,
     estimated_duration_minutes: boundedInteger(data, "estimated_duration_minutes", 1, 480),
     rubric: {
@@ -162,6 +177,42 @@ function attachmentIds(data: FormData): string[] {
     throw new Error("附件选择无效。请刷新页面后重试。");
   }
   return values as string[];
+}
+
+function submissionBody(data: FormData, requireComplete: boolean): SubmissionActionState | string {
+  const rawBody = data.get("body");
+  const rawEvidenceUrl = data.get("evidence_url");
+  const evidenceUrlRequired = data.get("evidence_url_required") === "true";
+  const body = typeof rawBody === "string" ? rawBody.trim() : "";
+  const evidenceUrl = typeof rawEvidenceUrl === "string" ? rawEvidenceUrl.trim() : "";
+
+  if (evidenceUrl) {
+    try {
+      const parsed = new URL(evidenceUrl);
+      const isFeishuHost = parsed.hostname === "feishu.cn"
+        || parsed.hostname.endsWith(".feishu.cn")
+        || parsed.hostname === "larksuite.com"
+        || parsed.hostname.endsWith(".larksuite.com");
+      if (parsed.protocol !== "https:" || !isFeishuHost) {
+        return { error: "请粘贴 HTTPS 飞书文档链接；草稿仍保留在当前页面。" };
+      }
+    } catch {
+      return { error: "飞书文档链接无效；请从浏览器地址栏复制完整链接。" };
+    }
+  } else if (requireComplete && evidenceUrlRequired) {
+    return { error: "请先粘贴飞书文档链接，再提交给 Reviewer。" };
+  }
+
+  const composed = evidenceUrl
+    ? `${FEISHU_EVIDENCE_PREFIX}${evidenceUrl}${body ? `\n\n补充说明：\n${body}` : ""}`
+    : body;
+  if (composed.length > 8_000) {
+    return { error: "提交内容不能超过 8000 个字符；草稿仍保留在当前页面。" };
+  }
+  if (requireComplete && composed.length < 40) {
+    return { error: "提交内容需为 40–8000 个字符。草稿仍保留在当前页面。" };
+  }
+  return composed;
 }
 
 export type SubmissionActionState = {
@@ -272,6 +323,106 @@ export async function exchangeInvite(data: FormData) {
     { ...options, httpOnly: true },
   );
   redirect("/join");
+}
+
+export async function acceptInvite(data: FormData) {
+  const token = data.get("token");
+  const displayName = data.get("display_name");
+  const acceptedPurpose = data.get("accepted_purpose") === "yes";
+  if (typeof token !== "string" || token.length < 32 || token.length > 256) {
+    redirect("/join?code=INVITE_EXPIRED_OR_REVOKED");
+  }
+  if (
+    displayName !== null
+    && (typeof displayName !== "string" || !displayName.trim() || displayName.length > 120)
+  ) {
+    redirect("/join?code=VALIDATION_FAILED");
+  }
+  if (!acceptedPurpose) redirect("/join?code=PURPOSE_NOT_ACCEPTED");
+
+  let exchange: {
+    data: {
+      flow: "JOIN" | "REENTRY";
+      purpose: string;
+      expires_at: string;
+      csrf_token: string;
+    };
+    setCookies: string[];
+  };
+  try {
+    exchange = await anonymousApiRequest("/api/v1/join/exchange", {
+      method: "POST",
+      body: JSON.stringify({ token, return_to: "/app" }),
+    });
+  } catch (error) {
+    safeJoinError(error);
+  }
+
+  const joinToken = cookieValue(exchange.setCookies, JOIN_COOKIE);
+  if (!joinToken) throw new Error("API 未返回安全加入上下文。");
+  const cookieStore = await cookies();
+  const joinMaxAge = Math.max(
+    1,
+    Math.floor((new Date(exchange.data.expires_at).getTime() - Date.now()) / 1000),
+  );
+  const joinOptions = {
+    path: "/",
+    sameSite: "lax" as const,
+    secure: cookieSecure(),
+    maxAge: joinMaxAge,
+  };
+  cookieStore.set(JOIN_COOKIE, joinToken, { ...joinOptions, httpOnly: true });
+  cookieStore.set(CSRF_COOKIE, exchange.data.csrf_token, { ...joinOptions, httpOnly: false });
+  cookieStore.set(
+    JOIN_SUMMARY_COOKIE,
+    Buffer.from(JSON.stringify(exchange.data)).toString("base64url"),
+    { ...joinOptions, httpOnly: true },
+  );
+
+  let confirmation: {
+    data: { expires_at: string; csrf_token: string };
+    setCookies: string[];
+  };
+  try {
+    confirmation = await anonymousApiRequest("/api/v1/identity/confirm", {
+      method: "POST",
+      headers: {
+        Cookie: `${JOIN_COOKIE}=${joinToken}; ${CSRF_COOKIE}=${exchange.data.csrf_token}`,
+        "X-CSRF-Token": exchange.data.csrf_token,
+      },
+      body: JSON.stringify({
+        display_name: exchange.data.flow === "JOIN" && typeof displayName === "string"
+          ? displayName.trim()
+          : null,
+        accepted_purpose: true,
+        return_to: "/app",
+      }),
+    });
+  } catch (error) {
+    safeJoinError(error);
+  }
+
+  const sessionToken = cookieValue(confirmation.setCookies, SESSION_COOKIE);
+  if (!sessionToken) throw new Error("API 未返回安全 vNext 会话。");
+  const sessionMaxAge = Math.max(
+    1,
+    Math.floor((new Date(confirmation.data.expires_at).getTime() - Date.now()) / 1000),
+  );
+  const sessionOptions = {
+    path: "/",
+    sameSite: "lax" as const,
+    secure: cookieSecure(),
+    maxAge: sessionMaxAge,
+  };
+  cookieStore.set(SESSION_COOKIE, sessionToken, { ...sessionOptions, httpOnly: true });
+  cookieStore.set(CSRF_COOKIE, confirmation.data.csrf_token, {
+    ...sessionOptions,
+    httpOnly: false,
+  });
+  cookieStore.delete(JOIN_COOKIE);
+  cookieStore.delete(JOIN_SUMMARY_COOKIE);
+  revalidatePath("/app");
+  redirect("/app");
 }
 
 export async function confirmIdentity(data: FormData) {
@@ -401,7 +552,7 @@ export async function startAssignment(data: FormData) {
     body: JSON.stringify({ expected_revision: expectedRevision }),
   });
   revalidatePath("/app");
-  redirect(`/app/tasks/${assignmentId}`);
+  redirect(`/app/tasks/${assignmentId}#task-workspace`);
 }
 
 export async function completeLearningMaterial(data: FormData) {
@@ -426,7 +577,10 @@ export async function completeLearningMaterial(data: FormData) {
   );
   revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  redirect(`/app/tasks/${assignmentId}?material=completed`);
+  const anchor = data.get("final_required_material") === "true"
+    ? "task-brief-title"
+    : "learning-materials-title";
+  redirect(`/app/tasks/${assignmentId}?material=completed#${anchor}`);
 }
 
 export async function submitAssignment(
@@ -436,17 +590,15 @@ export async function submitAssignment(
   const assignmentId = requiredUuid(data, "assignment_id");
   const expectedRevision = requiredRevision(data);
   const idempotencyKey = requiredIdempotencyKey(data, "submission_idempotency_key");
-  const body = data.get("body");
-  if (typeof body !== "string" || body.trim().length < 40 || body.length > 8_000) {
-    return { error: "提交内容需为 40–8000 个字符。草稿仍保留在当前页面。" };
-  }
+  const body = submissionBody(data, true);
+  if (typeof body !== "string") return body;
   try {
     await apiRequest(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         expected_revision: expectedRevision,
-        body: body.trim(),
+        body,
         attachment_ids: attachmentIds(data),
         ai_use: aiUseDisclosure(data, "learner_ai"),
       }),
@@ -455,7 +607,7 @@ export async function submitAssignment(
     return submissionError(error);
   }
   revalidatePath("/app");
-  redirect("/app");
+  redirect("/app?transition=submitted");
 }
 
 export async function saveSubmissionDraft(
@@ -465,10 +617,8 @@ export async function saveSubmissionDraft(
   const assignmentId = requiredUuid(data, "assignment_id");
   const expectedRevision = requiredRevision(data);
   const idempotencyKey = requiredIdempotencyKey(data, "draft_idempotency_key");
-  const body = data.get("body");
-  if (typeof body !== "string" || body.length > 8_000) {
-    return { error: "草稿内容不能超过 8000 个字符。" };
-  }
+  const body = submissionBody(data, false);
+  if (typeof body !== "string") return body;
   try {
     const saved = await apiRequest<SubmissionDraft>(
       `/api/v1/me/assignments/${assignmentId}/draft`,
@@ -736,6 +886,27 @@ export async function assignEnrollmentReviewer(data: FormData) {
   redirect("/ops?updated=reviewer");
 }
 
+export async function handoffAssignedReview(data: FormData) {
+  const enrollmentId = requiredUuid(data, "enrollment_id");
+  const reviewerId = requiredUuid(data, "reviewer_id");
+  const reviewRevision = Number(data.get("review_revision"));
+  if (!Number.isSafeInteger(reviewRevision) || reviewRevision < 1) {
+    throw new Error("待评审版本信息无效。请刷新页面后重试。");
+  }
+  await apiRequest(`/api/v1/ops/enrollments/${enrollmentId}/assigned-review/handoff`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_revision: requiredRevision(data),
+      review_revision: reviewRevision,
+      reviewer_id: reviewerId,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=assigned-review-handoff#admission-decisions");
+}
+
 export async function cancelEnrollment(data: FormData) {
   const enrollmentId = requiredUuid(data, "enrollment_id");
   const expectedRevision = requiredRevision(data);
@@ -756,6 +927,7 @@ export type InviteActionState = {
   requestId?: string;
   joinPath?: string;
   expiresAt?: string;
+  loginRequired?: boolean;
 };
 
 export async function createLearnerInvite(
@@ -804,6 +976,13 @@ export async function createLearnerInvite(
       expiresAt: result.expires_at,
     };
   } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      return {
+        error: "Operator 会话已失效，请重新使用飞书进入后再创建邀请。",
+        requestId: error.requestId,
+        loginRequired: true,
+      };
+    }
     return submissionError(error);
   }
 }
@@ -905,7 +1084,7 @@ export async function createLearnerReentry(
     );
     revalidatePath("/ops");
     return {
-      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}`,
+      joinPath: `/join#token=${encodeURIComponent(result.invite_token)}&flow=reentry`,
       expiresAt: result.expires_at,
     };
   } catch (error) {
@@ -1030,6 +1209,12 @@ export async function publishContentDraft(data: FormData) {
   if (data.get("review_acknowledged") !== "on") {
     throw new Error("发布前必须确认复核已完成。近似确认不能替代真实复核。");
   }
+  const verifiedMaterialUrls = data.getAll("verified_material_url").map((value) => {
+    if (typeof value !== "string" || !value.startsWith("https://") || value.length > 2_000) {
+      throw new Error("材料链接确认值无效，请刷新页面重新逐项打开。");
+    }
+    return value;
+  });
   await apiRequest(`/api/v1/ops/content-drafts/${draftId}/publish`, "OPERATOR", {
     method: "POST",
     headers: commandHeaders(),
@@ -1038,6 +1223,7 @@ export async function publishContentDraft(data: FormData) {
       expected_definition_revision: definitionRevision,
       reviewed_by: reviewerId,
       review_acknowledged: true,
+      verified_material_urls: verifiedMaterialUrls,
     }),
   });
   revalidatePath("/ops");
@@ -1053,6 +1239,34 @@ export async function createContentEditor(data: FormData) {
   });
   revalidatePath("/ops");
   redirect("/ops?updated=content-editor-created#identity-access");
+}
+
+export async function grantReviewerRole(data: FormData) {
+  const userId = requiredUuid(data, "user_id");
+  await apiRequest(`/api/v1/ops/users/${userId}/reviewer-role`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_absent: true,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=reviewer-role-granted#identity-access");
+}
+
+export async function revokeReviewerRole(data: FormData) {
+  const userId = requiredUuid(data, "user_id");
+  await apiRequest(`/api/v1/ops/users/${userId}/reviewer-role/revoke`, "OPERATOR", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      expected_present: true,
+      reason: requiredReason(data),
+    }),
+  });
+  revalidatePath("/ops");
+  redirect("/ops?updated=reviewer-role-revoked#identity-access");
 }
 
 export async function assembleFormalJourneyV3(data: FormData) {

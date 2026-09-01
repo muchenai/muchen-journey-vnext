@@ -4,9 +4,11 @@ import { useActionState, useState } from "react";
 
 import {
   createIdentityLink,
+  grantReviewerRole,
   IdentityLinkActionState,
   revokeExternalIdentity,
   revokeIdentityLink,
+  revokeReviewerRole,
   transferRevokedExternalIdentity,
 } from "@/app/actions";
 import {
@@ -21,6 +23,7 @@ function formatTime(value: string | null): string {
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Shanghai",
   }).format(new Date(value));
 }
 
@@ -146,6 +149,34 @@ function IdentityAccessItem({
       {item.allowed_commands.includes("create_identity_link") ? <CreateLinkForm item={item} /> : null}
 
       <RevokedIdentityTransferForms item={item} candidates={revokedCandidates} />
+
+      {item.allowed_commands.includes("grant_reviewer_role") ? (
+        <form action={grantReviewerRole} className="ops-command-form">
+          <input type="hidden" name="user_id" value={item.user_id} />
+          <label>
+            兼任理由
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <button className="button secondary compact" type="submit">
+            授予兼任 Reviewer
+          </button>
+          <p className="status-meta">保留 Content Editor；飞书身份不变。提交后写入独立角色审计。</p>
+        </form>
+      ) : null}
+
+      {item.allowed_commands.includes("revoke_reviewer_role") ? (
+        <form action={revokeReviewerRole} className="ops-command-form">
+          <input type="hidden" name="user_id" value={item.user_id} />
+          <label>
+            撤销兼任理由
+            <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+          </label>
+          <button className="button secondary compact" type="submit">
+            撤销兼任 Reviewer
+          </button>
+          <p className="status-meta">仅移除 Reviewer；保留 Content Editor、飞书身份和现有内容事实。</p>
+        </form>
+      ) : null}
 
       {item.allowed_commands.includes("revoke_identity_link") && item.link_id && item.link_revision ? (
         <form action={revokeIdentityLink} className="ops-command-form">

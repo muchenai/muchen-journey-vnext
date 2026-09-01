@@ -428,6 +428,7 @@ class IdentitySession(Base):
     external_identity_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("external_identities.id"), nullable=True, index=True
     )
+    external_identity_revision: Mapped[int | None] = mapped_column(nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     csrf_token_hash: Mapped[str] = mapped_column(String(64))
@@ -1253,6 +1254,29 @@ class Review(Base):
     finalized_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class ReviewDelegation(Base):
+    __tablename__ = "review_delegations"
+    __table_args__ = (
+        UniqueConstraint("review_id", name="uq_review_delegations_review"),
+        CheckConstraint("revision >= 1", name="ck_review_delegations_positive_revision"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    review_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviews.id"), index=True)
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    delegated_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(String(500))
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Evaluation(Base):
     __tablename__ = "evaluations"
     __table_args__ = (
@@ -1276,7 +1300,7 @@ class Evaluation(Base):
             name="fk_evaluations_review_fixed_scope",
         ),
         CheckConstraint(
-            "created_by = reviewer_id", name="ck_evaluations_reviewer_is_actor"
+            "created_by = executor_id", name="ck_evaluations_executor_is_actor"
         ),
         CheckConstraint(
             "review_revision >= 1", name="ck_evaluations_positive_review_revision"
@@ -1304,6 +1328,7 @@ class Evaluation(Base):
     submission_id: Mapped[uuid.UUID]
     submission_version_id: Mapped[uuid.UUID]
     reviewer_id: Mapped[uuid.UUID]
+    executor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     review_revision: Mapped[int]
     decision: Mapped[Decision] = mapped_column(Enum(Decision, native_enum=False))
     rubric_scores: Mapped[dict[str, str]] = mapped_column(JSON)

@@ -47,8 +47,9 @@ def actor(role: Role, user_id: UUID | None = None) -> auth.Actor:
     return auth.Actor(
         id=user_id or uuid4(),
         organization_id=ORGANIZATION_ID,
-        role=role,
+        roles=frozenset({role}),
         display_name="Canary test actor",
+        entry_role=role,
     )
 
 
@@ -153,21 +154,26 @@ def test_authenticated_learner_session_cannot_bypass_canary_scope(
     settings = production_settings(canary_learner_user_ids=[allowed_id])
     monkeypatch.setattr(auth, "get_settings", lambda: settings)
 
-    identity_session = SimpleNamespace(id=uuid4())
+    identity_session = SimpleNamespace(id=uuid4(), role=Role.LEARNER)
     user = SimpleNamespace(
         id=denied_id,
         organization_id=ORGANIZATION_ID,
         display_name="Denied learner",
     )
-    assignment = SimpleNamespace(role=Role.LEARNER)
-
     class Result:
         def first(self):
-            return identity_session, user, assignment
+            return identity_session, user
+
+    class ScalarResult:
+        def all(self):
+            return [Role.LEARNER]
 
     class Session:
         def execute(self, _query):
             return Result()
+
+        def scalars(self, _query):
+            return ScalarResult()
 
     request = Request(
         {

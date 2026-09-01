@@ -1,8 +1,8 @@
 # 12｜决策、风险与开放问题台账
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.9
-日期：2026-08-04
+状态：`APPROVED_FOR_BUILD / PRIOR_DECISIONS_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Product Owner（业务）+ Tech Lead（技术）  
 规则：`BLOCKS_G0` 未关闭即 No-Go；不得用“先按默认做，后面再调”开始编码。
 
@@ -47,6 +47,10 @@
 | DEC-024 | 正式探索营产品真相恢复 | 当前 TSK-001 是验证 vNext 闭环的 Alpha 切片，不代表正式探索营全部产品。正式目标固定为 Day 0、四个认知宝藏、三个能力评测和完整结果；旧前端所谓“第五个宝藏”是能力准入容器，不是独立宝藏。后续只在 vNext Identity/Enrollment/Task/Submission/Review/Outcome 基座上增加版本化 Journey 编排，不复用旧代码、路由、状态、数据库或运行时 | `APPROVED` | WP-18 产品合同生效；当前 Alpha 历史不变；WP-19 实现前需 schema/API/迁移评审 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
 | DEC-025 | 正式探索营 V2 内容、评分与准入 | 以完整正式方案而非最小技术切片为内容事实源：10:00–19:00 先完成 Day 0 与四个学习宝藏，再完成规则拆解、模型回答判断和通用数据构建三项真实题面；边界识别与提报是横向能力，不是第三项独立评测。固定 100 分只形成 A/B/C/D 建议，最终下一阶段准入必须由授权 Operator 基于证据人工决定；覆盖建议必须记录理由，系统不得自动淘汰或录用。V1 与既有事实不可变，V2 以新版本发布 | `APPROVED` | 授权 WP-24 本地实现和 PR；不授权业务发布、邀请、部署或现有 Enrollment 迁移 | Liu Mowen（Product + Content + Design + Tech + Data + QA Owner） |
 | DEC-026 | 探索营 P0 真人体验优先与受控上线 | 不再按视觉/数据/后台/页面的技术层顺序建设；先冻结真实材料和完整可点击体验，每个工作包均以真人可感知结果退出，只在单宝藏闭环通过后扩展四宝藏和三评测。路线节点共享坐标、Learner 页面执行文字预算；最小权限 Content Editor 导入结构化文本/HTTPS 链接，经 Operator 发布不可变 Journey V3；WP-10 附件保持关闭。P0 上线仅指 `journey.muchenai.com` 单组织私密 cohort，不等同完整 production GO | `APPROVED` | 2026-08-04 只开放 WP-25 内容/原型/真人验证；产品代码、外部写入、WP-26 及以后仍未授权 | Liu Mowen（Product + Content + Design + Security + Tech + QA Owner） |
+| DEC-027 | 产品进度与完成单位重置 | 产品进度只按目标用户在真实浏览器完成可观察闭环计算；模块、测试、PR、候选和部署分别记为实现证据，不得合并声明“产品完成” | `APPROVED` | 批准 42 后立即约束全部 P0 工作 | Liu Mowen（Product + QA Owner） |
+| DEC-028 | 身份中心化多角色授权 | 飞书只识别内部 User；RoleAssignment 决定多项能力；Session 绑定 user/organization/identity version 而非唯一 role；角色变化后不重新绑定身份即可刷新授权；路由按 capability + scope 服务端校验 | `APPROVED` | P0-1；批准后替代按角色复制 OAuth/会话的实现假设 | Liu Mowen（Product + Security + Tech Owner） |
+| DEC-029 | P0/P1/P2 优先级重置 | P0 只关闭真实进入、学习、提交、评审、修订、结果、运营和恢复；P1 解决可持续运营；P2 的多组织、通知、附件和独立灾备必须由真实需求触发。37/41 未完成施工顺序由 43 替代 | `APPROVED` | 43 批准；P0 blocker 清零前禁止 P2 实现 | Liu Mowen（Product + Tech + Design + QA + Ops Owner） |
+| DEC-030 | 两次同类问题停止规则 | 同类身份、会话、路由或理解问题第二次出现即停止局部补丁，先完成模型级根因、简化方案和黄金路径回归；第三次之前不得继续部署试错 | `APPROVED` | 全部 P0 PR 与部署 | Liu Mowen（Tech + QA Owner） |
 
 > Owner 说明：仓库使用操作系统账号对应的项目发起人标识 `Liu Mowen` 作为初始责任人。真实试点参与者采用受控名册，不把姓名或外部身份标识提交到 Git。真人 UAT、Reviewer 独立性和生产双人批准必须在 G4 以独立证据确认，当前均为 `NOT_RUN`。
 
@@ -154,6 +158,9 @@ run `30525165474` 在北京现有 ECS 内完整执行 20 组织、500 Learner、
 | RSK-028 | 内容导入绕过附件与外部内容安全 | 中/高 | 上传 PDF/视频、服务端抓取任意 URL、复制未授权材料或记录外部身份 | WP-10 保持关闭；仅清洗文本和 HTTPS 链接；不抓取/嵌入；来源与版权复核 | Content/Security/Tech/Privacy |
 | RSK-029 | 工作包再次按技术层完成而不是用户结果完成 | 高/高 | 数据/组件/后台分别 PASS，但没有真人完成当包价值；问题集中到最后 UAT | DEC-026；WP-25 内容/原型先行；WP-26 单宝藏纵向切片；每包真人门禁；代码不得领先真人证据一个包以上 | Product/Tech/Design/QA |
 | RSK-030 | 无止境内测推迟真实上线 | 高/中 | 每轮加入新偏好和增强项、重复全量回归、没有最后 UAT 和上线判定 | WP-29 是最后完整上线前 UAT；只让 P0 blocker 阻断；修复后重验受影响路径；增强项进入真实使用 backlog | Product/QA/Release |
+| RSK-031 | 单角色会话让多角色授权事实无法生效 | 高/高 | RoleAssignment 已成功但同一人仍在 `/content`、`/review` 间反复 OAuth/403 | DEC-028；Session 只绑定 User/组织；capability 服务端授权；真实 OAuth 黄金路径 | Product/Security/Tech/QA |
+| RSK-032 | Public Git 泄露真实试点人员信息 | 中/高 | 文档、截图、日志出现姓名、飞书 subject 或身份映射 | 只用私密名册代号；PII/secret 扫描；受控证据库保存映射 | Privacy/Security/Ops |
+| RSK-033 | 3+1 受控样本被误写成完整 UAT | 中/高 | P0 可用后关闭 DEC-007、扩大名单或声明 `RELEASE_GO` | 43 明确样本边界；5+2 独立 Reviewer UAT 继续为完整 release gate | Product/QA/Release |
 
 ## 5. 原开放问题的关闭结论
 

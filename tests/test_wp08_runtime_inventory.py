@@ -15,6 +15,20 @@ IMAGE_ID = "a" * 64
 IMAGE_DIGEST = "b" * 64
 
 
+def install_component_markers(monkeypatch, tmp_path: Path, *, web: str = CANDIDATE):
+    runtime_marker = tmp_path / "DEPLOYED_CANDIDATE"
+    web_marker = tmp_path / "DEPLOYED_WEB_CANDIDATE"
+    components_marker = tmp_path / "DEPLOYED_COMPONENTS.json"
+    runtime_marker.write_text(API)
+    web_marker.write_text(web)
+    components_marker.write_text(
+        json.dumps({"web": web, "api": API, "worker": API})
+    )
+    monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", runtime_marker)
+    monkeypatch.setattr(inventory, "DEPLOYED_WEB_CANDIDATE", web_marker)
+    monkeypatch.setattr(inventory, "DEPLOYED_COMPONENTS", components_marker)
+
+
 def safe_container_metadata(service: str) -> dict[str, object]:
     return {
         "compose_config_files": ["compose.yaml"],
@@ -37,9 +51,7 @@ def safe_container_metadata(service: str) -> dict[str, object]:
 def test_inventory_outputs_only_safe_revision_and_health_fields(
     monkeypatch, tmp_path: Path
 ):
-    marker = tmp_path / "DEPLOYED_CANDIDATE"
-    marker.write_text(CANDIDATE)
-    monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", marker)
+    install_component_markers(monkeypatch, tmp_path)
     monkeypatch.setattr(
         inventory,
         "_inspect_running_container",
@@ -93,13 +105,21 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
             service: 1 for service in inventory.CONTAINERS
         },
         "compose_singleton_services": True,
+        "component_marker_matches": {"api": True, "web": True, "worker": False},
+        "component_markers_match_runtime": False,
         "caddy_upstreams": {
             "production": "production-web:3000",
             "staging": "journey-next-staging-web-1:3000",
         },
-        "deployed_candidate": CANDIDATE,
+        "deployed_components": {"web": CANDIDATE, "api": API, "worker": API},
+        "deployed_candidate": API,
         "heartbeat_release": API,
         "migration_revision": "0013_wp11_notify_observability",
+        "marker_relationships": {
+            "authorized_web": True,
+            "latest_deploy_web": False,
+        },
+        "marker_relationships_consistent": False,
         "web_release": CANDIDATE,
         "worker_release": WORKER,
         "worker_stale": True,
@@ -112,9 +132,7 @@ def test_inventory_outputs_only_safe_revision_and_health_fields(
 def test_inventory_rejects_missing_or_malformed_revision_evidence(
     monkeypatch, tmp_path: Path
 ):
-    marker = tmp_path / "DEPLOYED_CANDIDATE"
-    marker.write_text(CANDIDATE)
-    monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", marker)
+    install_component_markers(monkeypatch, tmp_path)
     monkeypatch.setattr(
         inventory,
         "_inspect_running_container",
@@ -155,12 +173,29 @@ def test_inventory_rejects_missing_or_malformed_revision_evidence(
 
 
 def test_inventory_requires_authorized_deployed_candidate(monkeypatch, tmp_path: Path):
-    marker = tmp_path / "DEPLOYED_CANDIDATE"
-    marker.write_text("5" * 40)
-    monkeypatch.setattr(inventory, "DEPLOYED_CANDIDATE", marker)
+    install_component_markers(monkeypatch, tmp_path, web="5" * 40)
 
-    with pytest.raises(inventory.InventoryError, match="authorized candidate"):
-        inventory.collect(CANDIDATE)
+    _, _, relationships = inventory._component_markers(CANDIDATE)
+    assert relationships == {
+        "authorized_web": False,
+        "latest_deploy_web": False,
+    }
+    assert all(relationships.values()) is False
+
+
+def test_component_markers_allow_independent_component_releases(monkeypatch, tmp_path: Path):
+    install_component_markers(monkeypatch, tmp_path)
+    inventory.DEPLOYED_COMPONENTS.write_text(
+        json.dumps({"web": CANDIDATE, "api": API, "worker": WORKER})
+    )
+
+    components, _, relationships = inventory._component_markers(CANDIDATE)
+    assert components == {"web": CANDIDATE, "api": API, "worker": WORKER}
+    assert relationships == {
+        "authorized_web": True,
+        "latest_deploy_web": False,
+    }
+    assert all(relationships.values()) is False
 
 
 def test_container_metadata_is_whitelisted_and_redacts_runtime_secrets(monkeypatch):

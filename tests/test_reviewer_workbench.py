@@ -1,5 +1,6 @@
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select, update
@@ -7,6 +8,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import DBAPIError
 
 from journey_api.auth import Actor
+from journey_api.config import get_settings
 from journey_api.db import SessionLocal
 from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_VERSION_V2_ID
 from journey_api.main import app
@@ -20,12 +22,15 @@ from journey_api.models import (
     Decision,
     Enrollment,
     EnrollmentStatus,
+    ExternalIdentity,
     Evaluation,
     Invite,
     InviteStatus,
+    IdentitySession,
     Organization,
     OutboxEvent,
     Review,
+    ReviewDelegation,
     ReviewStatus,
     Role,
     RoleAssignment,
@@ -38,6 +43,7 @@ from journey_api.models import (
     User,
     UserStatus,
 )
+from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash, utc_now
 from journey_api.review_routes import locked_scoped_context_query
 
 
@@ -54,7 +60,13 @@ RUBRIC_KEYS = (
 
 def test_reviewer_transition_locks_context_in_one_scoped_postgres_query():
     statement = locked_scoped_context_query(
-        Actor(REVIEWER_ID, ORGANIZATION_ID, Role.REVIEWER, "Fixture Reviewer"),
+        Actor(
+            REVIEWER_ID,
+            ORGANIZATION_ID,
+            frozenset({Role.REVIEWER}),
+            "Fixture Reviewer",
+            entry_role=Role.REVIEWER,
+        ),
         uuid.uuid4(),
     )
     sql = str(statement.compile(dialect=postgresql.dialect()))
@@ -292,6 +304,204 @@ def test_incomplete_or_non_advisory_ai_provenance_fails_closed():
         json=payload,
     )
     assert response.status_code == 422
+
+
+def create_linked_reviewer(display_name: str) -> uuid.UUID:
+    reviewer_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        session.add(
+            User(
+                id=reviewer_id,
+                organization_id=ORGANIZATION_ID,
+                display_name=display_name,
+                status=UserStatus.ACTIVE,
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                RoleAssignment(
+                    id=uuid.uuid4(),
+                    organization_id=ORGANIZATION_ID,
+                    user_id=reviewer_id,
+                    role=Role.REVIEWER,
+                ),
+                ExternalIdentity(
+                    id=uuid.uuid4(),
+                    organization_id=ORGANIZATION_ID,
+                    user_id=reviewer_id,
+                    provider="FEISHU",
+                    subject=uuid.uuid4().hex + uuid.uuid4().hex,
+                    verified_at=utc_now(),
+                    revision=1,
+                ),
+            ]
+        )
+    return reviewer_id
+
+
+def client_for_linked_reviewer(reviewer_id: uuid.UUID) -> tuple[TestClient, str]:
+    settings = get_settings()
+    session_token = uuid.uuid4().hex + uuid.uuid4().hex
+    csrf_token = uuid.uuid4().hex + uuid.uuid4().hex
+    with SessionLocal.begin() as session:
+        external_identity = session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.user_id == reviewer_id,
+                ExternalIdentity.revoked_at.is_(None),
+            )
+        )
+        assert external_identity is not None
+        session.add(
+            IdentitySession(
+                id=uuid.uuid4(),
+                organization_id=ORGANIZATION_ID,
+                user_id=reviewer_id,
+                external_identity_id=external_identity.id,
+                external_identity_revision=external_identity.revision,
+                role=Role.REVIEWER,
+                token_hash=credential_hash(settings.session_secret, "session", session_token),
+                csrf_token_hash=credential_hash(settings.session_secret, "csrf", csrf_token),
+                expires_at=utc_now() + timedelta(minutes=30),
+            )
+        )
+    reviewer = client_for(f"linked-reviewer-{reviewer_id}")
+    reviewer.cookies.set(SESSION_COOKIE, session_token)
+    reviewer.cookies.set(CSRF_COOKIE, csrf_token)
+    return reviewer, csrf_token
+
+
+def test_operator_can_handoff_only_unstarted_assigned_review_with_audit_history():
+    flow = create_submission("assigned-handoff")
+    new_reviewer_id = create_linked_reviewer("郑田源")
+    with SessionLocal() as session:
+        review = session.get(Review, flow["review_id"])
+        assignment = session.get(Assignment, uuid.UUID(flow["assignment_id"]))
+        assert review is not None and assignment is not None
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        assert enrollment is not None
+        enrollment_id = enrollment.id
+        enrollment_revision = enrollment.revision
+        previous_reviewer_id = review.reviewer_id
+    key = f"assigned-handoff-{uuid.uuid4()}"
+    payload = {
+        "expected_revision": enrollment_revision,
+        "review_revision": 1,
+        "reviewer_id": str(new_reviewer_id),
+        "reason": "原试点主管实名归属不明，移交给已确认的郑田源",
+    }
+    operator = client_for("operator-assigned-handoff")
+    handed_off = assert_ok(
+        operator.post(
+            f"/api/v1/ops/enrollments/{enrollment_id}/assigned-review/handoff",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    replay = assert_ok(
+        operator.post(
+            f"/api/v1/ops/enrollments/{enrollment_id}/assigned-review/handoff",
+            headers={**OPERATOR_HEADERS, "Idempotency-Key": key},
+            json=payload,
+        )
+    )
+    assert replay["resource_id"] == handed_off["resource_id"]
+    assert replay["reviewer_id"] == handed_off["reviewer_id"]
+    assert replay["idempotency_replay"] is True
+    with SessionLocal() as session:
+        review = session.get(Review, flow["review_id"])
+        enrollment = session.get(Enrollment, enrollment_id)
+        assert review is not None and enrollment is not None
+        assert review.status == ReviewStatus.ASSIGNED
+        assert review.reviewer_id == previous_reviewer_id
+        assert review.revision == 1
+        assert enrollment.reviewer_id == new_reviewer_id
+        assert enrollment.revision == enrollment_revision + 1
+        delegation = session.scalar(
+            select(ReviewDelegation).where(ReviewDelegation.review_id == review.id)
+        )
+        assert delegation is not None
+        assert delegation.reviewer_id == new_reviewer_id
+        audit = session.scalar(
+            select(AuditEntry).where(
+                AuditEntry.action == "review.assigned_handoff",
+                AuditEntry.resource_id == enrollment_id,
+            )
+        )
+        assert audit is not None
+        assert audit.details["previous_reviewer_id"] == str(previous_reviewer_id)
+        assert audit.details["reviewer_id"] == str(new_reviewer_id)
+
+    delegated_reviewer, csrf_token = client_for_linked_reviewer(new_reviewer_id)
+    queue = assert_ok(delegated_reviewer.get("/api/v1/reviews"))
+    assert str(flow["review_id"]) in {item["id"] for item in queue["items"]}
+    started = assert_ok(
+        delegated_reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/start",
+            headers={
+                "Idempotency-Key": f"delegated-start-{uuid.uuid4()}",
+                "X-CSRF-Token": csrf_token,
+            },
+            json={"expected_revision": 1},
+        )
+    )
+    finalized = assert_ok(
+        delegated_reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/finalize",
+            headers={
+                "Idempotency-Key": f"delegated-finalize-{uuid.uuid4()}",
+                "X-CSRF-Token": csrf_token,
+            },
+            json=finalize_payload(started["review_revision"], decision="APPROVE"),
+        )
+    )
+    assert finalized["review_status"] == "FINALIZED"
+    with SessionLocal() as session:
+        evaluation = session.scalar(
+            select(Evaluation).where(Evaluation.review_id == flow["review_id"])
+        )
+        assert evaluation is not None
+        assert evaluation.reviewer_id == previous_reviewer_id
+        assert evaluation.executor_id == new_reviewer_id
+        assert evaluation.created_by == new_reviewer_id
+
+
+def test_operator_cannot_handoff_review_after_reviewer_started_it():
+    flow = create_submission("started-handoff-blocked")
+    reviewer = client_for("reviewer-start-before-handoff")
+    assert_ok(
+        reviewer.post(
+            f"/api/v1/reviews/{flow['review_id']}/start",
+            headers={
+                **REVIEWER_HEADERS,
+                "Idempotency-Key": f"start-before-handoff-{uuid.uuid4()}",
+            },
+            json={"expected_revision": 1},
+        )
+    )
+    new_reviewer_id = create_linked_reviewer("不可接管的 Reviewer")
+    with SessionLocal() as session:
+        assignment = session.get(Assignment, uuid.UUID(flow["assignment_id"]))
+        assert assignment is not None
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        assert enrollment is not None
+        enrollment_id = enrollment.id
+        enrollment_revision = enrollment.revision
+    response = client_for("operator-started-handoff-blocked").post(
+        f"/api/v1/ops/enrollments/{enrollment_id}/assigned-review/handoff",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": f"blocked-handoff-{uuid.uuid4()}",
+        },
+        json={
+            "expected_revision": enrollment_revision,
+            "review_revision": 2,
+            "reviewer_id": str(new_reviewer_id),
+            "reason": "评审已经开始后必须阻断任何人员移交操作",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "INVALID_STATE_TRANSITION"
 
 
 def finalize_payload(

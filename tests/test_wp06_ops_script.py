@@ -159,8 +159,8 @@ def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
     assert report["business_facts_preserved"] is True
 
 
-def test_current_ops_contract_tracks_0026_and_all_formal_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0027_next_stage_review"
+def test_current_ops_contract_tracks_0028_merge_head_and_all_formal_fact_tables():
+    assert ops.EXPECTED_MIGRATION_HEAD == "0028_canary_main_merge"
     assert ops.SAFE_ROLLBACK_REVISION == "0025_formal_result_gate"
     assert {
         "submission_versions",
@@ -183,7 +183,7 @@ def test_current_ops_contract_tracks_0026_and_all_formal_fact_tables():
 
 def test_schema_rollback_only_accepts_the_current_identity_scope_head():
     facts = {
-        "migration_revision": "0027_next_stage_review",
+        "migration_revision": "0028_canary_main_merge",
         "counts": {"outcomes": 1},
     }
     ops.require_safe_schema_rollback(facts)
@@ -199,7 +199,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0027_next_stage_review",
+        "migration_revision": "0028_canary_main_merge",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []

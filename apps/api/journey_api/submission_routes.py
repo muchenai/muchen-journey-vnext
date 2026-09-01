@@ -509,8 +509,8 @@ def download_attachment(
     )
     if attachment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
-    allowed = actor.role == Role.LEARNER and attachment.owner_id == actor.id
-    if actor.role == Role.REVIEWER:
+    allowed = actor.has_role(Role.LEARNER) and attachment.owner_id == actor.id
+    if actor.has_role(Role.REVIEWER):
         allowed = session.scalar(
             select(Review.id)
             .join(

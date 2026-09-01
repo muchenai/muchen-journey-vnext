@@ -1,10 +1,16 @@
 # 05｜领域模型、状态机与数据合同
 
-状态：`APPROVED_FOR_BUILD`  
-版本：V0.2
-日期：2026-08-03
+状态：`APPROVED_FOR_BUILD / PRIOR_BASELINE_RETAINED`
+版本：V1.0
+日期：2026-08-13
 文档 Owner：Tech Lead + Data Owner  
 原则：新模型从业务事实推导，不从旧表、旧 JSON、旧 API 或旧枚举翻译而来。
+
+## 0. 第一性原理修订：身份、角色与会话
+
+`ExternalIdentity` 只识别 `User`；`RoleAssignment` 是能力事实且一名 User 可有多个有效角色；`Session` 只证明 `user_id + organization_id + identity_version`，不得把一个 role 作为会话身份。请求授权实时或通过带版本的短期 capability 投影读取有效 RoleAssignment。角色变更使 capability 投影失效，但不复制 ExternalIdentity、不建立平行 User、不覆盖历史撤销记录。
+
+当前单角色会话属于待迁移实现，不得被本合同追认。迁移必须向前兼容现有有效会话，提供有界失效与回归，不通过直接 SQL 改角色作为产品路径。
 
 ## 1. 领域边界
 
@@ -29,7 +35,8 @@ P0 不拆成微服务；模块通过明确接口和数据库约束隔离。未�
 | `Organization` | id, name, status | P0 即使单组织也显式隔离 |
 | `User` | id, organization_id, status | 内部 UUID；不使用飞书 open_id 作为主键 |
 | `ExternalIdentity` | provider, subject, user_id, verified_at | provider + subject 全局/组织内唯一 |
-| `RoleAssignment` | user_id, role, scope, valid_from/to | 权限有范围和有效期 |
+| `RoleAssignment` | user_id, role, scope, status, valid_from/to, revision | 同一 User 可有多个有效角色；权限有范围、有效期和可审计修订 |
+| `Session` | user_id, organization_id, identity_version, expires_at, revoked_at | 证明当前是谁，不固化唯一角色；身份停用/撤销可使其失效 |
 | `Invite` | id, token_hash, purpose, expires_at, status | 存哈希不存明文 token；消费/撤销原子 |
 | `Enrollment` | id, organization_id, learner_id, cohort_id, reviewer_id, journey_version_id, status, revision | learner + active program 唯一；固定引用进入时 JourneyVersion |
 | `JourneyDefinition` | id, stable_key | 正式旅程稳定身份，不含可变阶段内容 |

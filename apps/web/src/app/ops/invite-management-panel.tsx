@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 
 import {
   createLearnerInvite,
@@ -25,15 +26,24 @@ function formatTime(value: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Shanghai",
   }).format(new Date(value));
 }
 
 const STATUS_LABELS: Record<OpsInvite["status"], string> = {
   ACTIVE: "待使用",
+  EXCHANGED_PENDING_CONFIRMATION: "已兑换，待确认身份",
   CONSUMED: "已使用",
   EXPIRED: "已过期",
   REVOKED: "已撤销",
 };
+
+function visibleInviteStatus(invite: OpsInvite, observedAtMs: number): OpsInvite["status"] {
+  if (invite.status === "ACTIVE" && new Date(invite.expires_at).getTime() <= observedAtMs) {
+    return "EXPIRED";
+  }
+  return invite.status;
+}
 
 function formatJourneyOptionLabel(journey: OpsFormalJourney): string {
   const title = journey.title.trim();
@@ -160,10 +170,15 @@ function CreateInviteForm({
         {pending ? "正在生成…" : "生成 24 小时邀请链接"}
       </button>
       {state.error ? (
-        <p className="inline-error" role="alert">
-          {state.error}
+        <div className="inline-error" role="alert">
+          <p>{state.error}</p>
           {state.requestId ? <code>request ID: {state.requestId}</code> : null}
-        </p>
+          {state.loginRequired ? (
+            <Link className="button primary compact" href="/auth/feishu?return_to=%2Fops">
+              重新使用飞书进入
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </form>
   );
@@ -224,13 +239,20 @@ export function InviteManagementPanel({
   identityAccess,
   tasks,
   journeys,
+  observedAt,
 }: {
   invites: OpsInvite[];
   invitationControl: OpsInvitationControl;
   identityAccess: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
   journeys: OpsFormalJourney[];
+  observedAt: string;
 }) {
+  const [observedAtMs, setObservedAtMs] = useState(() => new Date(observedAt).getTime());
+  useEffect(() => {
+    const timer = window.setInterval(() => setObservedAtMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const reviewers = identityAccess.filter(
     (item) => item.role === "REVIEWER" && item.identity_status === "LINKED",
   );
@@ -283,30 +305,33 @@ export function InviteManagementPanel({
       <h3>最近邀请</h3>
       {invites.length === 0 ? <p>尚未创建新人邀请。</p> : null}
       <ul className="ops-list invite-list">
-        {invites.map((invite) => (
-          <li key={invite.id}>
-            <div className="ops-enrollment-heading">
-              <div>
-                <strong>{invite.purpose}</strong>
-                <span>到期 {formatTime(invite.expires_at)} · revision {invite.revision}</span>
+        {invites.map((invite) => {
+          const effectiveStatus = visibleInviteStatus(invite, observedAtMs);
+          return (
+            <li key={invite.id}>
+              <div className="ops-enrollment-heading">
+                <div>
+                  <strong>{invite.purpose}</strong>
+                  <span>到期 {formatTime(invite.expires_at)} · revision {invite.revision}</span>
+                </div>
+                <span className={`material-status ${["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"].includes(effectiveStatus) ? "complete" : "incomplete"}`}>
+                  {STATUS_LABELS[effectiveStatus]}
+                </span>
               </div>
-              <span className={`material-status ${invite.status === "ACTIVE" ? "complete" : "incomplete"}`}>
-                {STATUS_LABELS[invite.status]}
-              </span>
-            </div>
-            {invite.status === "ACTIVE" ? (
-              <form action={revokeLearnerInvite} className="ops-command-form">
-                <input type="hidden" name="invite_id" value={invite.id} />
-                <input type="hidden" name="revision" value={invite.revision} />
-                <label>
-                  撤销理由
-                  <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
-                </label>
-                <button className="button secondary compact" type="submit">撤销邀请</button>
-              </form>
-            ) : null}
-          </li>
-        ))}
+              {["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"].includes(effectiveStatus) ? (
+                <form action={revokeLearnerInvite} className="ops-command-form">
+                  <input type="hidden" name="invite_id" value={invite.id} />
+                  <input type="hidden" name="revision" value={invite.revision} />
+                  <label>
+                    撤销理由
+                    <input name="reason" required minLength={10} maxLength={500} autoComplete="off" />
+                  </label>
+                  <button className="button secondary compact" type="submit">撤销邀请</button>
+                </form>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </>
   );

@@ -32,9 +32,18 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
   assert.match(actions, /task_version_id: taskVersionId/);
   assert.match(actions, /journey_version_id: journeyVersionId/);
   assert.match(actions, /target_user_id: null/);
-  assert.match(actions, /`\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
+  assert.match(actions, /createLearnerInvite[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
+  assert.match(actions, /createLearnerReentry[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}&flow=reentry`/);
   assert.match(panel, /new URL\(state\.joinPath, window\.location\.origin\)\.href/);
   assert.doesNotMatch(actions, /\/join\?token=/);
+});
+
+test("expired Operator invitation action recovers through explicit Feishu login", () => {
+  assert.match(actions, /createLearnerInvite[\s\S]*?error instanceof ApiRequestError && error\.status === 401/);
+  assert.match(actions, /loginRequired: true/);
+  assert.match(panel, /state\.loginRequired/);
+  assert.match(panel, /href="\/auth\/feishu\?return_to=%2Fops"/);
+  assert.match(panel, />\s*重新使用飞书进入\s*</);
 });
 
 test("formal journey publication requires an explicit offline review attestation", () => {
@@ -48,11 +57,21 @@ test("formal journey publication requires an explicit offline review attestation
   assert.match(actions, /export async function publishFormalJourney\([\s\S]*?return submissionError\(error\)/);
 });
 
-test("active invites can be revoked without persisted token display", () => {
+test("unused and exchanged invites can be distinguished and revoked without persisted token display", () => {
   assert.match(actions, /export async function revokeLearnerInvite/);
   assert.match(actions, /expected_revision: requiredRevision\(data\)/);
-  assert.match(panel, /invite\.status === "ACTIVE"/);
+  assert.match(panel, /EXCHANGED_PENDING_CONFIRMATION: "已兑换，待确认身份"/);
+  assert.match(panel, /\["ACTIVE", "EXCHANGED_PENDING_CONFIRMATION"\]\.includes\(effectiveStatus\)/);
   assert.doesNotMatch(panel, /invite_token/);
+});
+
+test("ops derives expired display state from time without mutating invitation facts", () => {
+  assert.match(panel, /function visibleInviteStatus\(invite: OpsInvite, observedAtMs: number\)/);
+  assert.match(panel, /invite\.status === "ACTIVE" && new Date\(invite\.expires_at\)\.getTime\(\) <= observedAtMs/);
+  assert.match(panel, /const effectiveStatus = visibleInviteStatus\(invite, observedAtMs\)/);
+  assert.match(panel, /STATUS_LABELS\[effectiveStatus\]/);
+  assert.match(panel, /setInterval\(\(\) => setObservedAtMs\(Date\.now\(\)\), 30_000\)/);
+  assert.doesNotMatch(panel, /invite\.status\s*=(?!=)/);
 });
 
 test("operator can freeze future invites without deleting accepted facts", () => {

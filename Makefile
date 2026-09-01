@@ -13,10 +13,10 @@ WP07_SYFT_IMAGE := anchore/syft@sha256:b4f1df79f97b817682d8b5ff941eb6bfe74f61725
 WP07_PYTHON_IMAGE := python:3.14.6-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
 WP08_LOCAL_DB_PORT ?= 35432
 WP08_LOCAL_API_PORT ?= 38000
-API_TEST_APK_PACKAGES := bash=5.3.9-r1 git=2.54.0-r0 grep=3.12-r0
+API_TEST_APK_PACKAGES := bash=5.3.9-r1 coreutils=9.11-r0 git=2.54.0-r0 grep=3.12-r0
 API_TEST_PYTEST_ARGS := -q -o cache_dir=/tmp/pytest-cache --ignore=tests/test_construction_legacy_zero_migration.py
 
-.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit human-experience-machine-gate wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke
+.PHONY: bootstrap up down migrate seed api-test migration-check migration-static-check fixture-manifest web-install web-static web-source-map-check web-check openapi-check isolation-check legacy-reference-scan traceability-check secret-scan dependency-audit human-experience-machine-gate wp12-hardening-check wp12-data-lifecycle-check wp12-retention-plan wp12-local-benchmark wp12-local-recovery wp12b-contract-check wp12b-pool-diagnostic wp13-15-plan-check wp15-alpha-cutover-check wp15-wartime-cutover-check wp17-prototype-check wp19-publication-web-only-check wp29-contract-check wp30-contract-check ci-fast ci-main candidate-preflight candidate-images candidate-task-versions candidate-sboms candidate-package candidate-registry-check candidate-registry-push candidate-image-archives http-negative-check verify wp06-backup wp06-drill wp06-alert-sim release-gate release-gate-check wp08-cold-preflight wp08-evidence-init wp08-evidence-check wp08-git-check wp08-staging-readiness wp08-staging-apply-check wp08-web-only-check wp08-workflow-check wp11-staging-audit-check browser-preflight browser-smoke browser-p0-journey-v3 browser-p0-identity
 
 bootstrap:
 	docker compose build api worker
@@ -191,10 +191,13 @@ candidate-registry-push: candidate-registry-check
 	docker tag $(WP07_API_IMAGE) $(WP07_API_GHCR_IMAGE)
 	docker tag $(WP07_WEB_IMAGE) $(WP07_WEB_GHCR_IMAGE)
 	docker tag $(WP07_WORKER_IMAGE) $(WP07_WORKER_GHCR_IMAGE)
-	docker push $(WP07_API_GHCR_IMAGE)
-	docker push $(WP07_WEB_GHCR_IMAGE)
-	docker push $(WP07_WORKER_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component api --reference $(WP07_API_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component web --reference $(WP07_WEB_GHCR_IMAGE)
+	python3 scripts/wp07_registry_push.py --component worker --reference $(WP07_WORKER_GHCR_IMAGE)
 	python3 scripts/wp07_candidate.py registry --manifest $(WP07_ARTIFACT_DIR)/release-manifest.json --registry-image api=$(WP07_API_GHCR_IMAGE) --registry-image web=$(WP07_WEB_GHCR_IMAGE) --registry-image worker=$(WP07_WORKER_GHCR_IMAGE)
+
+candidate-image-archives:
+	python3 scripts/wp07_image_archive.py pack --release-manifest $(WP07_ARTIFACT_DIR)/release-manifest.json --output $(WP07_ARTIFACT_DIR)/images
 
 http-negative-check:
 	MJ_DB_PORT=$${MJ_DB_PORT:-$(WP08_LOCAL_DB_PORT)} MJ_API_PORT=$${MJ_API_PORT:-$(WP08_LOCAL_API_PORT)} docker compose up --build -d --wait db api
@@ -249,3 +252,9 @@ browser-preflight:
 
 browser-smoke: browser-preflight
 	sh scripts/wp08_browser_smoke.sh
+
+browser-p0-journey-v3: browser-preflight
+	sh scripts/p0_journey_v3_browser.sh
+
+browser-p0-identity: browser-preflight
+	sh scripts/p0_identity_browser.sh

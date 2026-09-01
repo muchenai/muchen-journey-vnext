@@ -32,7 +32,11 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if self.path == "/api/v1/auth/feishu/start":
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length))
-            if payload != {"return_to": "/content"}:
+            if payload not in (
+                {"return_to": "/content"},
+                {"return_to": "/review"},
+                {"return_to": "/ops"},
+            ):
                 self.send_error(400)
                 return
             body = json.dumps(
@@ -82,16 +86,23 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if self.path != "/api/v1/reviews":
             self.send_error(404)
             return
+        wrong_role = "journey_next_session=wrong-role-runtime-only" in self.headers.get(
+            "Cookie", ""
+        )
         body = json.dumps(
             {
                 "error": {
-                    "code": "UNAUTHENTICATED",
-                    "message": "vNext session is no longer valid.",
+                    "code": "FORBIDDEN" if wrong_role else "UNAUTHENTICATED",
+                    "message": (
+                        "Current role cannot enter Reviewer."
+                        if wrong_role
+                        else "vNext session is no longer valid."
+                    ),
                 },
                 "request_id": "runtime-redacted-request",
             }
         ).encode()
-        self.send_response(401)
+        self.send_response(403 if wrong_role else 401)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -135,10 +146,10 @@ def normalized_headers(headers) -> dict[str, str]:  # type: ignore[no-untyped-de
 
 
 def request_without_redirect(
-    url: str, headers: dict[str, str]
+    url: str, headers: dict[str, str], data: bytes | None = None
 ) -> tuple[int, bytes, dict[str, str]]:
     opener = urllib.request.build_opener(NoRedirect)
-    request_value = urllib.request.Request(url, headers=headers)
+    request_value = urllib.request.Request(url, headers=headers, data=data)
     try:
         with opener.open(request_value, timeout=2) as response:
             return (
@@ -219,11 +230,64 @@ def main() -> None:
         if "no-store" not in ops_headers.get("cache-control", ""):
             raise RuntimeError("anonymous /ops denial is cacheable")
 
-        review_status, _, review_headers = request(f"{base_url}/review")
-        if review_status != 401:
-            raise RuntimeError(f"anonymous /review returned HTTP {review_status}")
+        ops_browser_status, _, ops_browser_headers = request_without_redirect(
+            f"{base_url}/ops", {"Accept": "text/html"}
+        )
+        if (
+            ops_browser_status != 303
+            or ops_browser_headers.get("location") != "/ops/login"
+        ):
+            raise RuntimeError(
+                "anonymous browser /ops did not redirect to the dedicated login page: "
+                f"status={ops_browser_status} "
+                f"location={ops_browser_headers.get('location')!r}"
+            )
+        if "no-store" not in ops_browser_headers.get("cache-control", ""):
+            raise RuntimeError("anonymous browser /ops redirect is cacheable")
+
+        ops_login_status, ops_login_body, _ = request(f"{base_url}/ops/login")
+        if ops_login_status != 200:
+            raise RuntimeError(f"Operator login page returned HTTP {ops_login_status}")
+        if "使用飞书进入".encode() not in ops_login_body:
+            raise RuntimeError("Operator login page has no Feishu entry action")
+
+        expired_action_status, _, expired_action_headers = request_without_redirect(
+            f"{base_url}/ops",
+            {"Accept": "text/x-component", "Next-Action": "expired-operator-action"},
+            data=b"",
+        )
+        if (
+            expired_action_status != 303
+            or expired_action_headers.get("location") != "/ops/login"
+        ):
+            raise RuntimeError(
+                "expired Operator Server Action did not recover through login: "
+                f"status={expired_action_status} "
+                f"location={expired_action_headers.get('location')!r}"
+            )
+        if "no-store" not in expired_action_headers.get("cache-control", ""):
+            raise RuntimeError("expired Operator Server Action redirect is cacheable")
+
+        review_status, _, review_headers = request_without_redirect(
+            f"{base_url}/review", {}
+        )
+        if review_status != 303 or review_headers.get("location") != "/review/login":
+            raise RuntimeError(
+                "anonymous /review did not redirect to the dedicated login page: "
+                f"status={review_status} location={review_headers.get('location')!r}"
+            )
         if "no-store" not in review_headers.get("cache-control", ""):
-            raise RuntimeError("anonymous /review denial is cacheable")
+            raise RuntimeError("anonymous /review redirect is cacheable")
+
+        review_login_status, review_login_body, _ = request(
+            f"{base_url}/review/login"
+        )
+        if review_login_status != 200:
+            raise RuntimeError(
+                f"Reviewer login page returned HTTP {review_login_status}"
+            )
+        if "使用飞书进入".encode() not in review_login_body:
+            raise RuntimeError("Reviewer login page has no Feishu entry action")
 
         content_status, _, content_headers = request_without_redirect(
             f"{base_url}/content", {}
@@ -246,6 +310,16 @@ def main() -> None:
         if "使用飞书进入".encode() not in content_login_body:
             raise RuntimeError("Content Editor login page has no Feishu entry action")
 
+        ops_oauth_status, _, ops_oauth_headers = request_without_redirect(
+            f"{base_url}/auth/feishu?return_to=%2Fops", proxy_headers,
+        )
+        if ops_oauth_status != 303:
+            raise RuntimeError(f"Operator OAuth start returned HTTP {ops_oauth_status}")
+        if not ops_oauth_headers.get("location", "").startswith(
+            "https://accounts.feishu.cn/open-apis/authen/v1/authorize?"
+        ):
+            raise RuntimeError("Operator OAuth start left the approved Feishu host")
+
         oauth_start_status, _, oauth_start_headers = request_without_redirect(
             f"{base_url}/auth/feishu?return_to=%2Fcontent", proxy_headers,
         )
@@ -263,12 +337,36 @@ def main() -> None:
         ):
             raise RuntimeError("Content Editor OAuth start did not preserve browser context")
 
+        reviewer_oauth_status, _, reviewer_oauth_headers = request_without_redirect(
+            f"{base_url}/auth/feishu?return_to=%2Freview", proxy_headers,
+        )
+        if reviewer_oauth_status != 303:
+            raise RuntimeError(
+                f"Reviewer OAuth start returned HTTP {reviewer_oauth_status}"
+            )
+        if not reviewer_oauth_headers.get("location", "").startswith(
+            "https://accounts.feishu.cn/open-apis/authen/v1/authorize?"
+        ):
+            raise RuntimeError("Reviewer OAuth start left the approved Feishu host")
+
+        wrong_role_status, _, wrong_role_headers = request_without_redirect(
+            f"{base_url}/review",
+            {"Cookie": "journey_next_session=wrong-role-runtime-only"},
+        )
+        if wrong_role_status not in {303, 307} or wrong_role_headers.get("location") != (
+            "/review/login?auth_error=FORBIDDEN"
+        ):
+            raise RuntimeError(
+                "wrong-role Reviewer session did not reach the role login path: "
+                f"status={wrong_role_status} location={wrong_role_headers.get('location')!r}"
+            )
+
         expired_status, _, expired_headers = request_without_redirect(
             f"{base_url}/review",
             {"Cookie": "journey_next_session=revoked-runtime-only"},
         )
         if expired_status not in {303, 307} or expired_headers.get("location") != (
-            "/?auth_error=SESSION_EXPIRED&return_to=%2Freview"
+            "/review/login?auth_error=SESSION_EXPIRED"
         ):
             raise RuntimeError(
                 "expired Reviewer session did not return to the explicit re-login path: "
@@ -336,7 +434,7 @@ def main() -> None:
         identity_api_thread.join(timeout=5)
 
     print(
-        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=401 anonymous_review=401"
+        "WP08_WEB_RUNTIME=PASS readiness=200 anonymous_ops=json-401/browser-login-page anonymous_review=login-page"
         " anonymous_content=login-page expired_reviewer=explicit-relogin"
         " root=200 csp_nonce=per-request oauth_redirect=root-relative-content"
     )

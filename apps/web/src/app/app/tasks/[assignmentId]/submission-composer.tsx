@@ -7,6 +7,18 @@ import { FactLabel } from "@/app/human-experience";
 import type { Attachment } from "@/lib/server/api";
 
 const INITIAL_STATE: SubmissionActionState = {};
+const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
+
+function splitInitialBody(initialBody: string) {
+  if (!initialBody.startsWith(FEISHU_EVIDENCE_PREFIX)) {
+    return { evidenceUrl: "", notes: initialBody };
+  }
+  const [firstLine, ...remaining] = initialBody.split("\n");
+  return {
+    evidenceUrl: firstLine.slice(FEISHU_EVIDENCE_PREFIX.length).trim(),
+    notes: remaining.join("\n").replace(/^\s*补充说明：\s*/u, "").trimStart(),
+  };
+}
 
 const FIRST_WIN_DIAGNOSTICS = {
   direction: { label: "方向很多，不知道先做什么", judgement: "你现在缺的不是更多选项，而是一个可验证的优先级。", experiment: "选出影响最大的一个问题；写下 24 小时内能找到的最小证据，并约定何时回看。" },
@@ -16,10 +28,10 @@ const FIRST_WIN_DIAGNOSTICS = {
 } as const;
 
 type FirstWinKey = keyof typeof FIRST_WIN_DIAGNOSTICS;
-type LocalDraft = { body: string; attachmentIds: string[]; savedAt: string };
+type LocalDraft = { body: string; evidenceUrl: string; attachmentIds: string[]; savedAt: string };
 
-function snapshot(body: string, attachmentIds: string[]) {
-  return JSON.stringify({ body, attachmentIds: [...attachmentIds].sort() });
+function snapshot(body: string, evidenceUrl: string, attachmentIds: string[]) {
+  return JSON.stringify({ body, evidenceUrl, attachmentIds: [...attachmentIds].sort() });
 }
 
 function subscribeToNetworkState(onChange: () => void) {
@@ -56,6 +68,8 @@ export function SubmissionComposer({
   rubricVersion,
   reviewerName,
   visibility,
+  expectsExternalDocument,
+  taskActionUrl,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -73,15 +87,23 @@ export function SubmissionComposer({
   rubricVersion: number;
   reviewerName: string;
   visibility: string;
+  expectsExternalDocument: boolean;
+  taskActionUrl: string | null;
 }) {
+  const initial = splitInitialBody(initialBody);
+  const isRevision = command === "submit_revision";
+  const documentLaunchUrl = isRevision && initial.evidenceUrl
+    ? initial.evidenceUrl
+    : taskActionUrl;
   const storageKey = `muchen-journey:draft:${assignmentId}:${assignmentRevision}`;
   const formRef = useRef<HTMLFormElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const pendingSnapshot = useRef<string | null>(null);
-  const [savedSnapshot, setSavedSnapshot] = useState(snapshot(initialBody, initialAttachmentIds));
-  const [body, setBody] = useState(initialBody);
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot(initial.notes, initial.evidenceUrl, initialAttachmentIds));
+  const [body, setBody] = useState(initial.notes);
+  const [evidenceUrl, setEvidenceUrl] = useState(initial.evidenceUrl);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState(initialAttachmentIds);
   const [firstWinKey, setFirstWinKey] = useState<FirstWinKey | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -95,7 +117,7 @@ export function SubmissionComposer({
   const [learnerAiPromptVersion, setLearnerAiPromptVersion] = useState("");
   const [submitState, submitAction, submitPending] = useActionState(submitAssignment, INITIAL_STATE);
   const [draftState, draftAction, draftPending] = useActionState(saveSubmissionDraft, INITIAL_STATE);
-  const currentSnapshot = snapshot(body, selectedAttachmentIds);
+  const currentSnapshot = snapshot(body, evidenceUrl, selectedAttachmentIds);
   const errorState = submitState.error ? submitState : draftState;
   const firstWin = firstWinKey ? FIRST_WIN_DIAGNOSTICS[firstWinKey] : null;
 
@@ -105,7 +127,7 @@ export function SubmissionComposer({
         const stored = window.localStorage.getItem(storageKey);
         if (stored) {
           const parsed = JSON.parse(stored) as LocalDraft;
-          if (typeof parsed.body === "string" && Array.isArray(parsed.attachmentIds) && snapshot(parsed.body, parsed.attachmentIds) !== savedSnapshot) {
+          if (typeof parsed.body === "string" && typeof parsed.evidenceUrl === "string" && Array.isArray(parsed.attachmentIds) && snapshot(parsed.body, parsed.evidenceUrl, parsed.attachmentIds) !== savedSnapshot) {
             setRecovery(parsed);
           }
         }
@@ -120,22 +142,23 @@ export function SubmissionComposer({
   useEffect(() => {
     if (!storageReady || currentSnapshot === savedSnapshot) return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ body, attachmentIds: selectedAttachmentIds, savedAt: new Date().toISOString() } satisfies LocalDraft));
+      window.localStorage.setItem(storageKey, JSON.stringify({ body, evidenceUrl, attachmentIds: selectedAttachmentIds, savedAt: new Date().toISOString() } satisfies LocalDraft));
     } catch {
       // The explicit server save remains available when local storage is unavailable.
     }
-  }, [body, currentSnapshot, savedSnapshot, selectedAttachmentIds, storageKey, storageReady]);
+  }, [body, currentSnapshot, evidenceUrl, savedSnapshot, selectedAttachmentIds, storageKey, storageReady]);
 
   const saveDraft = useCallback(() => {
     if (!formRef.current || !isOnline || draftPending || currentSnapshot === savedSnapshot) return;
     const data = new FormData(formRef.current);
     data.set("body", body);
+    data.set("evidence_url", evidenceUrl);
     data.set("draft_idempotency_key", crypto.randomUUID());
     data.delete("attachment_ids");
     selectedAttachmentIds.forEach((id) => data.append("attachment_ids", id));
     pendingSnapshot.current = currentSnapshot;
     startTransition(() => draftAction(data));
-  }, [body, currentSnapshot, draftAction, draftPending, isOnline, savedSnapshot, selectedAttachmentIds]);
+  }, [body, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, savedSnapshot, selectedAttachmentIds]);
 
   useEffect(() => {
     if (!storageReady || !isOnline || confirming || currentSnapshot === savedSnapshot) return;
@@ -166,8 +189,12 @@ export function SubmissionComposer({
   }, [errorState.error, localError]);
 
   function beginConfirmation() {
-    if (body.trim().length < 40 || body.length > 8_000) {
+    if ((!expectsExternalDocument && body.trim().length < 40) || body.length > 8_000) {
       setLocalError("提交内容需为 40–8000 个字符；当前内容仍保留。");
+      return;
+    }
+    if (expectsExternalDocument && !evidenceUrl.trim()) {
+      setLocalError("请先粘贴飞书文档链接，再提交给 Reviewer。");
       return;
     }
     if (learnerAiUsed && (!learnerAiPurpose.trim() || !learnerAiModelVersion.trim() || !learnerAiPromptVersion.trim())) {
@@ -181,6 +208,7 @@ export function SubmissionComposer({
   function restoreLocalDraft() {
     if (!recovery) return;
     setBody(recovery.body);
+    setEvidenceUrl(recovery.evidenceUrl);
     setSelectedAttachmentIds(recovery.attachmentIds.filter((id) => attachments.some((attachment) => attachment.id === id)));
     setRecovery(null);
     window.requestAnimationFrame(() => bodyRef.current?.focus());
@@ -200,6 +228,7 @@ export function SubmissionComposer({
       <input type="hidden" name="learner_ai_purpose" value={learnerAiPurpose} />
       <input type="hidden" name="learner_ai_model_version" value={learnerAiModelVersion} />
       <input type="hidden" name="learner_ai_prompt_version" value={learnerAiPromptVersion} />
+      <input type="hidden" name="evidence_url_required" value={expectsExternalDocument ? "true" : "false"} />
 
       {recovery ? (
         <aside className="draft-recovery" role="status">
@@ -234,14 +263,68 @@ export function SubmissionComposer({
           ) : null}
 
           {responseSections.length > 0 ? (
-            <div className="response-map" aria-labelledby="response-map-title">
+            <section className="response-map" aria-labelledby="response-map-title">
               <strong id="response-map-title">输出结构</strong>
               <ol>{responseSections.map((section) => <li key={section}>{section}</li>)}</ol>
+            </section>
+          ) : null}
+
+          {isRevision ? (
+            <div className="revision-edit-ready" role="status">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>上次提交已经为你载入</strong>
+                <small>保留正确的部分，只修改 Reviewer 指出的内容。</small>
+              </div>
             </div>
           ) : null}
 
-          <label htmlFor="submission-body">{requiresReview ? "你的作答" : "你的学习记录"}</label>
-          <textarea ref={bodyRef} id="submission-body" name="body" minLength={40} maxLength={8000} required aria-describedby="submission-body-help submission-save-status" placeholder={responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          {expectsExternalDocument ? (
+            <section className="external-document-path" aria-labelledby="external-document-title">
+              <p className="section-label">交付通道</p>
+              <h3 id="external-document-title">
+                {isRevision ? "修改原文档，再提交新版本" : "完成文档，再把链接交给 Reviewer"}
+              </h3>
+              <ol>
+                <li>
+                  <span aria-hidden="true">01</span>
+                  <strong>{isRevision ? "继续修改" : "创建副本"}</strong>
+                  <small>{isRevision ? "打开你上次提交的文档，按 Reviewer 反馈修改。" : "先打开本主题题面，再在飞书中创建自己的副本。"}</small>
+                  {documentLaunchUrl ? (
+                    <a className="external-document-launch" href={documentLaunchUrl} target="_blank" rel="noreferrer">
+                      {isRevision ? "打开我上次提交的文档" : "打开本主题题面"} <i aria-hidden="true">↗</i>
+                    </a>
+                  ) : null}
+                </li>
+                <li>
+                  <span aria-hidden="true">02</span>
+                  <strong>{isRevision ? "完成修订" : "完成作答"}</strong>
+                  <small>{isRevision ? "只改需要调整的部分，不必从头重做。" : "按照上方作答地图写完，不要修改原始题面。"}</small>
+                </li>
+                <li>
+                  <span aria-hidden="true">03</span>
+                  <strong>交付链接</strong>
+                  <small>{isRevision ? "确认下方链接仍能打开，再提交给 Reviewer。" : "从浏览器地址栏复制完整链接，粘贴到下方。"}</small>
+                </li>
+              </ol>
+              {documentLaunchUrl ? <p className="external-document-login-hint">首次打开需使用企业飞书登录。</p> : null}
+              <label htmlFor="evidence-url">你的飞书文档链接</label>
+              <input
+                id="evidence-url"
+                name="evidence_url"
+                type="url"
+                inputMode="url"
+                autoComplete="off"
+                placeholder="https://…feishu.cn/…"
+                value={evidenceUrl}
+                onChange={(event) => setEvidenceUrl(event.target.value)}
+                required
+              />
+            </section>
+          ) : null}
+
+          <label htmlFor="submission-body">{expectsExternalDocument ? "补充说明（可选）" : requiresReview ? "你的作答" : "你的学习记录"}</label>
+          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} maxLength={8000} required={!expectsExternalDocument} aria-describedby="submission-body-help submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
           <p id="submission-body-help" className="status-meta">40–8000 字符。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
 
           <section className="ai-self-check-gated" aria-labelledby="ai-self-check-title">
@@ -291,7 +374,9 @@ export function SubmissionComposer({
             <div><dt>AI 披露</dt><dd>{learnerAiUsed ? `${learnerAiPurpose} · ${learnerAiModelVersion} · ${learnerAiPromptVersion}` : "未使用"}</dd></div>
           </dl>
           <div className="submission-preview"><strong>提交正文</strong><p>{body}</p></div>
+          {evidenceUrl ? <div className="submission-preview"><strong>飞书文档</strong><p>{evidenceUrl}</p></div> : null}
           <input type="hidden" name="body" value={body} />
+          <input type="hidden" name="evidence_url" value={evidenceUrl} />
           {selectedAttachmentIds.map((id) => <input key={id} type="hidden" name="attachment_ids" value={id} />)}
         </section>
       )}

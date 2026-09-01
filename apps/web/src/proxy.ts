@@ -10,11 +10,13 @@ function withContentSecurityPolicy(response: NextResponse, policy: string) {
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
+  const isLocal = process.env.APP_ENV === "local";
   const developmentEval = isDevelopment ? " 'unsafe-eval'" : "";
+  const stylePolicy = isLocal ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`;
   const policy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentEval}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    stylePolicy,
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",
@@ -22,7 +24,7 @@ export function proxy(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
+    ...(isDevelopment || isLocal ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);
@@ -34,6 +36,14 @@ export function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const isReviewLogin = pathname === "/review/login";
+  const isReviewRoute = pathname === "/review" || pathname.startsWith("/review/");
+  if (isReviewRoute && !isReviewLogin && !hasSession) {
+    const response = NextResponse.redirect(new URL("/review/login", request.url), 303);
+    response.headers.set("Cache-Control", "no-store");
+    return withContentSecurityPolicy(response, policy);
+  }
+
   const isContentLogin = pathname === "/content/login";
   const isContentRoute = pathname === "/content" || pathname.startsWith("/content/");
   if (isContentRoute && !isContentLogin && !hasSession) {
@@ -42,11 +52,16 @@ export function proxy(request: NextRequest) {
     return withContentSecurityPolicy(response, policy);
   }
 
-  const isIdentityRoute = ["/ops", "/review"].some(
-    (prefix) => request.nextUrl.pathname === prefix
-      || request.nextUrl.pathname.startsWith(`${prefix}/`),
-  );
-  if (isIdentityRoute && !hasSession) {
+  const isOpsLogin = pathname === "/ops/login";
+  const isOpsRoute = pathname === "/ops" || pathname.startsWith("/ops/");
+  if (isOpsRoute && !isOpsLogin && !hasSession) {
+    const acceptsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+    const isServerAction = request.headers.has("next-action");
+    if (acceptsHtml || isServerAction) {
+      const response = NextResponse.redirect(new URL("/ops/login", request.url), 303);
+      response.headers.set("Cache-Control", "no-store");
+      return withContentSecurityPolicy(response, policy);
+    }
     const response = NextResponse.json(
       { error: { code: "AUTH_REQUIRED", message: "Authentication required." } },
       { status: 401 },

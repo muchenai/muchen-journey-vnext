@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -128,32 +129,57 @@ def assignments(path: Path) -> dict[str, Any]:
 
 
 def migration() -> dict[str, Any]:
-    revisions: dict[str, str | None] = {}
+    revisions: dict[str, tuple[str, ...]] = {}
     for path in sorted((ROOT / "migrations" / "versions").glob("*.py")):
         values = assignments(path)
         revision, parent = values.get("revision"), values.get("down_revision")
-        if not isinstance(revision, str) or (parent is not None and not isinstance(parent, str)):
-            raise CandidateError(f"migration metadata must be literal and linear: {path.name}")
+        if not isinstance(revision, str):
+            raise CandidateError(f"migration revision must be literal: {path.name}")
+        if parent is None:
+            parents: tuple[str, ...] = ()
+        elif isinstance(parent, str):
+            parents = (parent,)
+        elif (
+            isinstance(parent, tuple)
+            and parent
+            and all(isinstance(item, str) for item in parent)
+        ):
+            parents = parent
+        else:
+            raise CandidateError(f"migration parents must be literal revision IDs: {path.name}")
         if not revision or len(revision) > ALEMBIC_REVISION_MAX_LENGTH:
             raise CandidateError(
                 f"migration revision must be 1-{ALEMBIC_REVISION_MAX_LENGTH} characters: {path.name}"
             )
         if revision in revisions:
             raise CandidateError(f"duplicate migration revision: {revision}")
-        revisions[revision] = parent
-    roots = [item for item, parent in revisions.items() if parent is None]
-    heads = [item for item in revisions if item not in {parent for parent in revisions.values()}]
+        revisions[revision] = parents
+    all_parents = {parent for parents in revisions.values() for parent in parents}
+    roots = [item for item, parents in revisions.items() if not parents]
+    heads = [item for item in revisions if item not in all_parents]
     if roots != ["0001_initial"] or len(heads) != 1:
-        raise CandidateError(f"migration chain must have root 0001_initial and one head: {roots}, {heads}")
+        raise CandidateError(
+            f"migration graph must have root 0001_initial and one head: {roots}, {heads}"
+        )
     seen: set[str] = set()
-    cursor: str | None = heads[0]
-    while cursor:
-        if cursor in seen or cursor not in revisions:
-            raise CandidateError(f"migration chain is cyclic or disconnected at {cursor}")
-        seen.add(cursor)
-        cursor = revisions[cursor]
+    visiting: set[str] = set()
+
+    def visit(revision_id: str) -> None:
+        if revision_id in visiting:
+            raise CandidateError(f"migration graph is cyclic at {revision_id}")
+        if revision_id in seen:
+            return
+        if revision_id not in revisions:
+            raise CandidateError(f"migration graph references missing revision {revision_id}")
+        visiting.add(revision_id)
+        for parent_id in revisions[revision_id]:
+            visit(parent_id)
+        visiting.remove(revision_id)
+        seen.add(revision_id)
+
+    visit(heads[0])
     if seen != set(revisions):
-        raise CandidateError("migration chain contains disconnected revisions")
+        raise CandidateError("migration graph contains disconnected revisions")
     return {"root": roots[0], "head": heads[0], "revision_count": len(revisions)}
 
 
@@ -171,6 +197,22 @@ def config_schema() -> int:
     raise CandidateError("config schema version must be a literal integer")
 
 
+def validate_staging_candidate_binding(root: Path = ROOT) -> str:
+    contract_path = root / "config" / "wp08_staging.json"
+    variables_path = root / "infra" / "staging" / "variables.tf"
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        variables = variables_path.read_text(encoding="utf-8")
+    except (OSError, json.JSONDecodeError) as error:
+        raise CandidateError("staging candidate binding inputs are missing or invalid") from error
+    candidate = contract.get("candidate_commit")
+    if not isinstance(candidate, str) or not FULL_SHA.fullmatch(candidate):
+        raise CandidateError("staging candidate binding requires a full commit SHA")
+    if f'default = "{candidate}"' not in variables:
+        raise CandidateError("Terraform staging candidate differs from the machine contract")
+    return candidate
+
+
 def source_check() -> dict[str, Any]:
     for relative in (
         ".github/CODEOWNERS",
@@ -181,6 +223,8 @@ def source_check() -> dict[str, Any]:
         "contracts/openapi.json",
         "requirements.lock",
         "apps/web/package-lock.json",
+        "config/wp08_staging.json",
+        "infra/staging/variables.tf",
     ):
         if not (ROOT / relative).is_file():
             raise CandidateError(f"missing WP-07 source contract: {relative}")
@@ -198,6 +242,12 @@ def source_check() -> dict[str, Any]:
         "docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121",
         "password: ${{ secrets.GITHUB_TOKEN }}",
         "make candidate-registry-push",
+        "make candidate-image-archives",
+        "artifacts/wp07-candidate/image-archives.json",
+        "artifacts/wp07-candidate/images/api.tar",
+        "artifacts/wp07-candidate/images/web.tar",
+        "artifacts/wp07-candidate/images/worker.tar",
+        "always() && hashFiles('artifacts/wp07-candidate/release-manifest.json') != ''",
     )
     if any(item not in mainline for item in required_mainline) or ":latest" in mainline:
         raise CandidateError("mainline GHCR workflow contract is invalid")
@@ -230,11 +280,13 @@ def source_check() -> dict[str, Any]:
     missing = [item for item in TRACE_IDS if item not in evidence]
     if missing:
         raise CandidateError(f"missing WP-07 trace IDs: {missing}")
+    staging_candidate = validate_staging_candidate_binding()
     return {
         "openapi_sha256": sha256(ROOT / "contracts" / "openapi.json"),
         "migration": migration(),
         "config_schema_version": config_schema(),
         "trace_ids": list(TRACE_IDS),
+        "staging_candidate": staging_candidate,
     }
 
 
@@ -342,20 +394,70 @@ def registry_mapping(commit: str, values: Iterable[str]) -> dict[str, str]:
     return references
 
 
-def remote_manifest_digest(reference: str) -> str:
-    raw = run_bytes(("docker", "buildx", "imagetools", "inspect", "--raw", reference))
-    manifest = json.loads(raw)
-    if manifest.get("schemaVersion") != 2:
-        raise CandidateError(f"remote registry returned an invalid image manifest: {reference}")
-    digest = "sha256:" + hashlib.sha256(raw).hexdigest()
-    repository = reference.rsplit(":", 1)[0]
-    immutable = f"{repository}@{digest}"
-    immutable_raw = run_bytes(
-        ("docker", "buildx", "imagetools", "inspect", "--raw", immutable)
+def remote_manifest_digest(
+    reference: str,
+    *,
+    attempts: int = 3,
+    delay_seconds: int = 3,
+    sleeper=time.sleep,
+) -> str:
+    if attempts < 1 or attempts > 3:
+        raise CandidateError("registry verification attempts must be between 1 and 3")
+    component = next(
+        (item for item in COMPONENTS if f"-{item}:" in reference),
+        "unknown",
     )
-    if "sha256:" + hashlib.sha256(immutable_raw).hexdigest() != digest:
-        raise CandidateError(f"remote registry digest verification failed: {reference}")
-    return digest
+    for attempt in range(1, attempts + 1):
+        print(
+            f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+            "result=START",
+            file=sys.stderr,
+        )
+        try:
+            raw = run_bytes(
+                ("docker", "buildx", "imagetools", "inspect", "--raw", reference)
+            )
+            manifest = json.loads(raw)
+            if manifest.get("schemaVersion") != 2:
+                raise CandidateError(
+                    f"remote registry returned an invalid image manifest: {reference}"
+                )
+            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+            repository = reference.rsplit(":", 1)[0]
+            immutable = f"{repository}@{digest}"
+            immutable_raw = run_bytes(
+                ("docker", "buildx", "imagetools", "inspect", "--raw", immutable)
+            )
+            if "sha256:" + hashlib.sha256(immutable_raw).hexdigest() != digest:
+                raise CandidateError(
+                    f"remote registry digest verification failed: {reference}"
+                )
+        except (CandidateError, json.JSONDecodeError) as error:
+            if attempt == attempts:
+                print(
+                    f"WP07_REGISTRY_VERIFY component={component} "
+                    f"attempt={attempt}/{attempts} result=FAIL retries_exhausted=true",
+                    file=sys.stderr,
+                )
+                if isinstance(error, CandidateError):
+                    raise
+                raise CandidateError(
+                    f"remote registry returned invalid JSON: {reference}"
+                ) from error
+            print(
+                f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+                f"result=RETRY next_in_seconds={delay_seconds}",
+                file=sys.stderr,
+            )
+            sleeper(delay_seconds)
+            continue
+        print(
+            f"WP07_REGISTRY_VERIFY component={component} attempt={attempt}/{attempts} "
+            "result=PASS",
+            file=sys.stderr,
+        )
+        return digest
+    raise AssertionError("bounded registry verification loop did not terminate")
 
 
 def registry_check(commit: str, registry_args: Iterable[str]) -> dict[str, Any]:
