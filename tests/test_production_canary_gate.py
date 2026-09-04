@@ -34,7 +34,7 @@ def production_settings(**overrides: object) -> Settings:
         ),
         "attachments_enabled": False,
         "notification_channel": "FEISHU",
-        "notification_recipients_enabled": True,
+        "notification_recipients_enabled": False,
         "notification_recipient_key": (
             "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4"
         ),

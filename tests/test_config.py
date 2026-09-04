@@ -4,6 +4,48 @@ from pydantic import ValidationError
 from journey_api.config import DatabaseSettings, Settings
 
 
+@pytest.mark.parametrize(
+    ("release_marker", "notification_recipients_enabled", "expect_valid"),
+    [
+        ("PRODUCTION_CANARY_UAT", False, True),
+        ("PRODUCTION_CANARY_UAT", True, False),
+        ("DEVELOPMENT", False, False),
+    ],
+)
+def test_production_notification_policy_distinguishes_canary_and_regular_modes(
+    release_marker: str,
+    notification_recipients_enabled: bool,
+    expect_valid: bool,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv("ATTACHMENTS_ENABLED", raising=False)
+    values = {
+        "app_env": "production",
+        "app_release": "test",
+        "release_marker": release_marker,
+        "allow_fixture_identity": False,
+        "session_secret": "production-session-secret-example-123456",
+        "invite_secret": "production-invite-secret-example-1234567",
+        "import_signing_key": "production-import-signing-key-example-123456",
+        "identity_subject_secret": "production-identity-subject-key-example-123456",
+        "feishu_oauth_enabled": True,
+        "feishu_app_id": "cli_production",
+        "feishu_app_secret": "production-feishu-secret-123",
+        "feishu_oauth_redirect_uri": "https://journey.example.test/auth/feishu/callback",
+        "attachments_enabled": False,
+        "notification_channel": "FEISHU",
+        "notification_recipients_enabled": notification_recipients_enabled,
+        "notification_recipient_key": "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
+    }
+    if expect_valid:
+        configured = Settings(**values)
+        assert configured.release_marker == "PRODUCTION_CANARY_UAT"
+        assert configured.notification_recipients_enabled is False
+    else:
+        with pytest.raises(ValidationError, match="notification recipients"):
+            Settings(**values)
+
+
 def test_database_pool_configuration_is_explicit_and_bounded(
     monkeypatch: pytest.MonkeyPatch,
 ):
