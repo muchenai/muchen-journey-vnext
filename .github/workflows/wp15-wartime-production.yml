@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - greenfield-identity-bootstrap
           - greenfield-package
           - greenfield-preflight
           - greenfield-backup-restore
@@ -62,6 +63,11 @@ on:
         type: string
       execution_authorization_sha256:
         description: Exact protected Owner execution authorization evidence SHA-256
+        required: false
+        default: ""
+        type: string
+      recipient_public_key_b64:
+        description: Base64 RSA-4096 public key used to encrypt the bootstrap response
         required: false
         default: ""
         type: string
@@ -221,7 +227,8 @@ jobs:
   greenfield_authorize:
     if: >-
       inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
-      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_9E2D349_PRODUCTION_CANARY') ||
+      ((inputs.phase == 'greenfield-identity-bootstrap' && inputs.confirmation == 'BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_9E2D349_PRODUCTION_CANARY') ||
       (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_9E2D349_PRODUCTION_CANARY') ||
       (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_9E2D349_PRODUCTION_CANARY') ||
       (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_9E2D349_PRODUCTION_CANARY') ||
@@ -268,7 +275,12 @@ jobs:
           reviewed_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_ref"])' "$evidence")
           test "$reviewed" = "$GITHUB_SHA"
           test "$reviewed_ref" = "$GITHUB_REF"
-          if [[ '${{ inputs.phase }}' == greenfield-preflight ]]; then
+          if [[ '${{ inputs.phase }}' == greenfield-identity-bootstrap ]]; then
+            test -z '${{ inputs.preflight_run_id }}'
+            test -z '${{ inputs.backup_run_id }}'
+            test -z '${{ inputs.deploy_run_id }}'
+            test -z '${{ inputs.archive_run_id }}'
+          elif [[ '${{ inputs.phase }}' == greenfield-preflight ]]; then
             test -z '${{ inputs.preflight_run_id }}'
             test -z '${{ inputs.backup_run_id }}'
             test -z '${{ inputs.deploy_run_id }}'
@@ -814,6 +826,199 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${WP31_RUNNER_CIDR:-}" ]]; then python3 -m scripts.wp08_security_group close --security-group-id '${{ steps.frozen.outputs.security_group_id }}' --cidr "$WP31_RUNNER_CIDR"; fi
+          echo 'WP31_TEMPORARY_SSH_INGRESS=CLOSED'
+
+  greenfield_identity_bootstrap:
+    needs:
+      - greenfield_authorize
+      - greenfield_execution_authorize
+    if: >-
+      needs.greenfield_authorize.result == 'success' &&
+      needs.greenfield_execution_authorize.result == 'success' &&
+      needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha &&
+      needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref &&
+      needs.greenfield_execution_authorize.outputs.execution_authorization_sha256 == inputs.execution_authorization_sha256 &&
+      inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
+      inputs.phase == 'greenfield-identity-bootstrap' &&
+      inputs.confirmation == 'BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-canary-uat
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      WP08_MIGRATION_DB_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      WP08_RUNTIME_DB_PASSWORD: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      WP08_RDS_CA_PEM_B64: ${{ secrets.WP08_RDS_CA_PEM_B64 }}
+      WP09_IDENTITY_SUBJECT_SECRET: ${{ secrets.WP09_IDENTITY_SUBJECT_SECRET }}
+      WP09_FEISHU_APP_ID: ${{ secrets.WP09_FEISHU_APP_ID }}
+      WP09_FEISHU_APP_SECRET: ${{ secrets.WP09_FEISHU_APP_SECRET }}
+      WP15_SESSION_SECRET: ${{ secrets.WP15_SESSION_SECRET }}
+      WP15_INVITE_SECRET: ${{ secrets.WP15_INVITE_SECRET }}
+      WP15_IMPORT_SIGNING_KEY: ${{ secrets.WP15_IMPORT_SIGNING_KEY }}
+      WP31_IDENTITY_BOOTSTRAP_REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
+      WP31_EXECUTION_AUTHORIZATION_B64: ${{ secrets.WP31_EXECUTION_AUTHORIZATION_B64 }}
+    steps:
+      - name: Check out only the independently reviewed immutable commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}
+      - name: Verify exact authorization and public recipient key
+        env:
+          PRO_REVIEW_EVIDENCE_B64: ${{ inputs.pro_review_evidence_b64 }}
+          RECIPIENT_PUBLIC_KEY_B64: ${{ inputs.recipient_public_key_b64 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          test "$GITHUB_SHA" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}'
+          test "$GITHUB_REF" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_ref }}'
+          test -n "$PRO_REVIEW_EVIDENCE_B64"
+          test -n "$WP31_EXECUTION_AUTHORIZATION_B64"
+          test -n "$RECIPIENT_PUBLIC_KEY_B64"
+          pro="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+          authorization="$RUNNER_TEMP/wp31-execution-authorization.json"
+          public_key="$RUNNER_TEMP/wp31-recipient-public.pem"
+          umask 077
+          printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$pro"
+          printf '%s' "$WP31_EXECUTION_AUTHORIZATION_B64" | base64 --decode >"$authorization"
+          printf '%s' "$RECIPIENT_PUBLIC_KEY_B64" | base64 --decode >"$public_key"
+          openssl pkey -pubin -in "$public_key" -text_noout >/dev/null
+          openssl pkey -pubin -in "$public_key" -text -noout | grep -Fqx 'Public-Key: (4096 bit)'
+          python3 scripts/wp31_greenfield_canary.py contract-check
+          python3 scripts/wp31_ops_closure.py
+          python3 scripts/wp31_greenfield_canary.py review-check --evidence "$pro" --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' --executing-ref "$GITHUB_REF"
+          python3 scripts/wp31_greenfield_canary.py authorization-check --evidence "$authorization" --evidence-sha256 '${{ inputs.execution_authorization_sha256 }}' --pro-review-evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' --phase '${{ inputs.phase }}' --executing-ref "$GITHUB_REF" --reviewed-ops-commit-sha "$GITHUB_SHA"
+          rm -f -- "$pro" "$authorization"
+      - name: Initialize frozen infrastructure state read-only
+        working-directory: infra/staging
+        run: |
+          terraform init -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true"
+          terraform validate
+      - name: Read frozen host and RDS coordinates
+        id: frozen_identity
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          rds_host=$(terraform output -raw rds_private_host)
+          rds_port=$(terraform output -raw rds_private_port)
+          for value in "$public_ip" "$security_group_id" "$rds_host" "$rds_port"; do test -n "$value"; echo "::add-mask::$value"; done
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+          echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
+          echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
+      - name: Open bounded SSH ingress
+        id: open_identity_ssh
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\r\n')
+          python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$runner_ip"
+          echo "WP31_RUNNER_CIDR=$runner_ip/32" >>"$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id '${{ steps.frozen_identity.outputs.security_group_id }}' --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/wp31-key"
+          chmod 0600 "$RUNNER_TEMP/wp31-key"
+      - name: Recheck exact rollback release and no conflicting Canary
+        env:
+          PUBLIC_IP: ${{ steps.frozen_identity.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
+          test "$ready" = '{"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}'
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
+      - name: Prepare sealed source-database bootstrap bundle
+        env:
+          REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$REQUEST_B64"
+          bundle="$RUNNER_TEMP/wp31-identity-bootstrap"
+          python3 scripts/wp31_prepare_greenfield_canary.py --output "$bundle" --rds-host '${{ steps.frozen_identity.outputs.rds_host }}' --rds-port '${{ steps.frozen_identity.outputs.rds_port }}'
+          printf '%s' "$REQUEST_B64" | base64 --decode >"$bundle/request.json"
+          chmod 0600 "$bundle/request.json"
+          cp scripts/wp31_identity_bootstrap.py "$bundle/wp31_identity_bootstrap.py"
+          chmod 0555 "$bundle/wp31_identity_bootstrap.py"
+      - name: Run identity bootstrap and encrypt response for the requester
+        id: identity_result
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECIPIENT_PUBLIC_KEY_B64: ${{ inputs.recipient_public_key_b64 }}
+          PUBLIC_IP: ${{ steps.frozen_identity.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/wp31-identity-bootstrap"
+          public_key="$RUNNER_TEMP/wp31-recipient-public.pem"
+          printf '%s' "$RECIPIENT_PUBLIC_KEY_B64" | base64 --decode >"$public_key"
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          remote="/srv/journey-next-production/canary/identity-bootstrap-runs/$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
+          tar -C "$bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:850d5b1eb31eda6840fc31cae266af84aa96e5d8b6ed822db6bc03081374117c'
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm --network host --env-file '$remote/secrets/source-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/request.json:/tmp/request.json:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --request /tmp/request.json --confirm BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY >'$remote/result.json'"
+          scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/result.json" "$RUNNER_TEMP/wp31-identity-result.json"
+          python3 - "$RUNNER_TEMP/wp31-identity-result.json" <<'PY'
+          import json,sys
+          value=json.load(open(sys.argv[1], encoding="utf-8"))
+          required={"operator_user_id","learner_user_id","owner_user_id","operator_roles","owner_roles","operator_link_id","operator_link_start_path","operator_link_expires_at","expires_in_minutes"}
+          assert set(value) == required
+          assert value["operator_roles"] == ["OPERATOR","REVIEWER"]
+          assert value["owner_roles"] == ["LEARNER","REVIEWER"]
+          assert value["operator_link_start_path"].startswith("/auth/feishu?return_to=%2Fops&link_token=")
+          assert len(open(sys.argv[1], "rb").read()) < 446
+          PY
+          openssl pkeyutl -encrypt -pubin -inkey "$public_key" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256 -in "$RUNNER_TEMP/wp31-identity-result.json" -out "$RUNNER_TEMP/wp31-identity-result.json.enc"
+          install -d -m 0700 "$RUNNER_TEMP/wp31-identity-proof"
+          mv "$RUNNER_TEMP/wp31-identity-result.json.enc" "$RUNNER_TEMP/wp31-identity-proof/identity-bootstrap-result.json.enc"
+          printf '%s\n' '{"encrypted":true,"plaintext_retained":false,"worker_started":false,"canary_deployed":false}' >"$RUNNER_TEMP/wp31-identity-proof/identity-bootstrap-proof.json"
+          rm -f -- "$RUNNER_TEMP/wp31-identity-result.json" "$public_key"
+      - name: Upload encrypted identity bootstrap result only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-identity-bootstrap-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp31-identity-proof
+          if-no-files-found: error
+          retention-days: 1
+      - name: Always remove identity bootstrap credentials and remote result
+        if: always()
+        env:
+          PUBLIC_IP: ${{ steps.frozen_identity.outputs.public_ip }}
+        run: |
+          set +e
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          if [[ -s "$RUNNER_TEMP/wp31-key" && -n "$PUBLIC_IP" ]]; then
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- '/srv/journey-next-production/canary/identity-bootstrap-runs/$GITHUB_RUN_ID'"
+          fi
+          rm -rf -- "$RUNNER_TEMP/wp31-identity-bootstrap" "$RUNNER_TEMP/wp31-identity-proof"
+          rm -f -- "$RUNNER_TEMP/wp31-key" "$RUNNER_TEMP/wp31-known-hosts" "$RUNNER_TEMP/wp31-recipient-public.pem"
+          echo 'WP31_IDENTITY_BOOTSTRAP_TRANSIENT_CREDENTIALS=REMOVED'
+      - name: Close temporary SSH ingress
+        if: always() && steps.frozen_identity.outputs.security_group_id != ''
+        run: |
+          set -euo pipefail
+          if [[ -n "${WP31_RUNNER_CIDR:-}" ]]; then python3 -m scripts.wp08_security_group close --security-group-id '${{ steps.frozen_identity.outputs.security_group_id }}' --cidr "$WP31_RUNNER_CIDR"; fi
           echo 'WP31_TEMPORARY_SSH_INGRESS=CLOSED'
 
   operate:

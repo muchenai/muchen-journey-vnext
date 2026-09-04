@@ -12,7 +12,7 @@
     "max_allowlisted_learners": {"const": 8},
     "not_after_utc": {"format": "date-time", "type": "string"},
     "ops_manifest_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
-    "phase": {"enum": ["greenfield-preflight", "greenfield-backup-restore", "greenfield-deploy", "greenfield-inspect", "greenfield-rollback"]},
+    "phase": {"enum": ["greenfield-identity-bootstrap", "greenfield-preflight", "greenfield-backup-restore", "greenfield-deploy", "greenfield-inspect", "greenfield-rollback"]},
     "pro_review_evidence_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "production_job_execution_authorized": {"const": true},
     "release_go": {"const": false},
