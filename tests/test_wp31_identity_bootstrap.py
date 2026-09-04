@@ -71,25 +71,36 @@ def test_request_parser_rejects_owner_id_collision() -> None:
         bootstrap.parse_payload(_request(owner_user_id=user_id, learner_user_id=user_id))
 
 
-def test_runtime_guard_requires_exact_production_source_and_tls() -> None:
+def test_runtime_guard_allows_only_exact_isolated_canary_and_tls() -> None:
     valid = (
         "postgresql+psycopg://journey_next_migrator:pw@"
         "private.rds.example:5432/journey_next_cutover_20260810"
         "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
     )
+    with pytest.raises(bootstrap.BootstrapError, match="Canary database"):
+        bootstrap.validate_runtime(
+            valid,
+            app_env="production",
+            release_marker="PRODUCTION_CANARY_UAT",
+            confirmation=bootstrap.CONFIRMATION,
+        )
+
+    target = valid.replace("journey_next_cutover_20260810", "journey_next_canary_20260901_c72fea5")
     assert bootstrap.validate_runtime(
-        valid,
+        target,
         app_env="production",
         release_marker="PRODUCTION_CANARY_UAT",
         confirmation=bootstrap.CONFIRMATION,
+        database_kind="canary",
     ) is None
 
+    target = valid.replace("journey_next_cutover_20260810", "journey_next_canary_20260901_c72fea5")
     for database_url, message in [
-        (valid.replace("journey_next_cutover_20260810", "journey_next_dev"), "source database"),
-        (valid.replace("sslmode=verify-full", "sslmode=require"), "verify-full"),
-        (valid.replace("private.rds.example", "localhost"), "host"),
-        (valid.replace("journey_next_migrator", "journey_next_runtime"), "credentials"),
-        (valid.replace("/run/secrets/volcengine-rds-ca.pem", "/tmp/ca.pem"), "CA path"),
+        (valid.replace("journey_next_cutover_20260810", "journey_next_dev"), "Canary database"),
+        (target.replace("sslmode=verify-full", "sslmode=require"), "verify-full"),
+        (target.replace("private.rds.example", "localhost"), "host"),
+        (target.replace("journey_next_migrator", "journey_next_runtime"), "credentials"),
+        (target.replace("/run/secrets/volcengine-rds-ca.pem", "/tmp/ca.pem"), "CA path"),
     ]:
         with pytest.raises(bootstrap.BootstrapError, match=message):
             bootstrap.validate_runtime(
@@ -97,6 +108,7 @@ def test_runtime_guard_requires_exact_production_source_and_tls() -> None:
                 app_env="production",
                 release_marker="PRODUCTION_CANARY_UAT",
                 confirmation=bootstrap.CONFIRMATION,
+                database_kind="canary",
             )
 
 
@@ -128,18 +140,19 @@ def test_public_result_contains_ids_and_link_but_never_display_names() -> None:
     assert "刘默文" not in json.dumps(result, ensure_ascii=False)
 
 
-def test_workflow_exposes_identity_bootstrap_as_separate_non_deploy_phase() -> None:
+def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job() -> None:
     root = Path(__file__).resolve().parents[1]
     workflow = (root / ".github/workflows/wp15-wartime-production.yml").read_text(encoding="utf-8")
-    assert "greenfield-identity-bootstrap" in workflow
-    assert "BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY" in workflow
-    assert "WP31_IDENTITY_BOOTSTRAP_REQUEST_B64" in workflow
-    assert "scripts/wp31_identity_bootstrap.py" in workflow
-    assert '"canary_deployed":false' in workflow
-    assert '"worker_started":false' in workflow
-    job = workflow[workflow.index("  greenfield_identity_bootstrap:\n") : workflow.index("  operate:\n")]
-    assert "Deploy exact zero-worker Canary" not in job
-    assert "docker run --rm --network host" in job
-    assert "identity-bootstrap-result.json.enc" in job
-    assert 'value["owner_roles"] == ["LEARNER","REVIEWER"]' in job
-    assert "owner_user_id" in job
+    assert "greenfield-canary-fast" in workflow
+    assert "FAST_CANARY_9E2D349_PRODUCTION_CANARY" in workflow
+    assert "--database-kind canary" in workflow
+    assert "greenfield_identity_bootstrap:" not in workflow
+    assert "greenfield-identity-bootstrap" not in workflow
+    fast_job = workflow[workflow.index("  greenfield_canary:\n") : workflow.index("  operate:\n")]
+    assert "inputs.phase == 'greenfield-canary-fast'" in fast_job
+    assert "Create only the exact isolated canary database" in fast_job
+    assert "Deploy exact zero-worker Canary" in fast_job
+    assert "owner_user_id" in fast_job
+    assert 'value["owner_roles"] == ["LEARNER","REVIEWER"]' in fast_job
+    assert "Download exact preflight evidence before infrastructure access" in workflow
+    assert "if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'" in workflow

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bootstrap the two controlled-Canary identities without exposing secrets."""
+"""Bootstrap three controlled-Canary identities without exposing secrets."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, urlsplit
 
 
 CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
-SOURCE_DATABASE = "journey_next_cutover_20260810"
+CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
 CONFIRMATION = "BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY"
 _FIELDS = {
     "operator_user_id",
@@ -113,13 +113,14 @@ def validate_runtime(
     app_env: str,
     release_marker: str,
     confirmation: str,
+    database_kind: str = "source",
 ) -> None:
     if confirmation != CONFIRMATION:
         raise BootstrapError(f"confirmation must be {CONFIRMATION}")
     if app_env != "production" or release_marker != "PRODUCTION_CANARY_UAT":
         raise BootstrapError("identity bootstrap requires production Canary configuration")
     if not isinstance(database_url, str) or "\n" in database_url or "\r" in database_url:
-        raise BootstrapError("source database URL is invalid")
+        raise BootstrapError("Canary database URL is invalid")
     parsed = urlsplit(database_url)
     if parsed.scheme != "postgresql+psycopg" or parsed.hostname in {
         None,
@@ -127,16 +128,16 @@ def validate_runtime(
         "127.0.0.1",
         "::1",
     }:
-        raise BootstrapError("source database host is invalid")
+        raise BootstrapError("Canary database host is invalid")
     if parsed.username != "journey_next_migrator":
-        raise BootstrapError("source database credentials are invalid")
-    if parsed.path != f"/{SOURCE_DATABASE}":
-        raise BootstrapError("source database must be the exact production cutover database")
+        raise BootstrapError("Canary database credentials are invalid")
+    if database_kind != "canary" or parsed.path != f"/{CANARY_DATABASE}":
+        raise BootstrapError("Canary database must be the exact isolated database")
     query = parse_qs(parsed.query, keep_blank_values=True)
     if query.get("sslmode") != ["verify-full"]:
-        raise BootstrapError("source database must use sslmode=verify-full")
+        raise BootstrapError("Canary database must use sslmode=verify-full")
     if query.get("sslrootcert") != ["/run/secrets/volcengine-rds-ca.pem"]:
-        raise BootstrapError("source database CA path is invalid")
+        raise BootstrapError("Canary database CA path is invalid")
 
 
 def public_result(result: dict[str, object]) -> dict[str, object]:
@@ -268,6 +269,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--confirm", required=True)
+    parser.add_argument("--database-kind", choices=("canary",), default="canary")
     args = parser.parse_args()
     try:
         # Runtime configuration is read only after parsing the sealed request.
@@ -280,6 +282,7 @@ def main() -> int:
             app_env=settings.app_env,
             release_marker=settings.release_marker,
             confirmation=args.confirm,
+            database_kind=args.database_kind,
         )
         request = parse_request(args.request)
         with SessionLocal() as session:
