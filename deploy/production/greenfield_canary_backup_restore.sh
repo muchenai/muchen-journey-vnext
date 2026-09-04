@@ -3,7 +3,7 @@ set -euo pipefail
 
 fail() { printf 'WP31_CANARY_BACKUP_RESTORE_ERROR: %s\n' "$*" >&2; exit 1; }
 
-candidate=c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f
+candidate=9e2d3496f5df80da1291c77bd6f949a5078ef25d
 source_database=journey_next_cutover_20260810
 target_database=journey_next_canary_20260901_c72fea5
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
@@ -95,7 +95,7 @@ body = {
     "schema_version": 2,
     "run_id": run_id,
     "preflight_run_id": preflight_run_id,
-    "candidate_sha": "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f",
+    "candidate_sha": "9e2d3496f5df80da1291c77bd6f949a5078ef25d",
     "ops_manifest_sha256": ops_manifest_sha,
     "source_database": "journey_next_cutover_20260810",
     "isolated_canary_database": "journey_next_canary_20260901_c72fea5",

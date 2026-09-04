@@ -79,8 +79,8 @@ jobs:
   greenfield_package:
     if: >-
       inputs.phase == 'greenfield-package' &&
-      inputs.candidate == 'c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f' &&
-      inputs.confirmation == 'PACKAGE_C72FEA5_GREENFIELD_CANARY'
+      inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
+      inputs.confirmation == 'PACKAGE_9E2D349_GREENFIELD_CANARY'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -220,12 +220,12 @@ jobs:
 
   greenfield_authorize:
     if: >-
-      inputs.candidate == 'c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f' &&
-      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_C72FEA5_TO_FF53052'))
+      inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
+      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_9E2D349_TO_FF53052'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -348,12 +348,12 @@ jobs:
       needs.greenfield_authorize.outputs.reviewed_ops_commit_sha == github.sha &&
       needs.greenfield_authorize.outputs.reviewed_ops_ref == github.ref &&
       needs.greenfield_execution_authorize.outputs.execution_authorization_sha256 == inputs.execution_authorization_sha256 &&
-      inputs.candidate == 'c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f' &&
-      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_C72FEA5_PRODUCTION_CANARY') ||
-      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_C72FEA5_TO_FF53052'))
+      inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
+      ((inputs.phase == 'greenfield-preflight' && inputs.confirmation == 'PREFLIGHT_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-backup-restore' && inputs.confirmation == 'BACKUP_RESTORE_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-deploy' && inputs.confirmation == 'DEPLOY_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-inspect' && inputs.confirmation == 'INSPECT_9E2D349_PRODUCTION_CANARY') ||
+      (inputs.phase == 'greenfield-rollback' && inputs.confirmation == 'ROLLBACK_9E2D349_TO_FF53052'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production-canary-uat
@@ -436,14 +436,14 @@ jobs:
       - name: Download exact registry-bound candidate evidence
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          name: wp07-candidate-c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f
+          name: wp07-candidate-9e2d3496f5df80da1291c77bd6f949a5078ef25d
           path: artifacts/wp31-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 33489482777
+          run-id: 33838169130
       - name: Verify exact registry-bound package after both authorization Gates
         run: |
           set -euo pipefail
-          test '${{ inputs.candidate }}' = c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f
+          test '${{ inputs.candidate }}' = 9e2d3496f5df80da1291c77bd6f949a5078ef25d
           python3 scripts/wp31_greenfield_canary.py package-check \
             --manifest artifacts/wp31-candidate/release-manifest.json
       - name: Download exact preflight evidence before infrastructure access
@@ -486,7 +486,7 @@ jobs:
           assert value["run_id"] == sys.argv[2]
           assert value["preflight_run_id"] == sys.argv[3]
           assert value["ops_manifest_sha256"] == sys.argv[4]
-          assert value["candidate_sha"] == "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
+          assert value["candidate_sha"] == "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
           assert value["isolated_canary_database"] == "journey_next_canary_20260901_c72fea5"
           assert value["backup"] == value["restore"] == "PASS"
           assert value["source_modified"] is False
@@ -721,7 +721,7 @@ jobs:
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
           python3 - "$ready" <<'PY'
           import json, sys
-          assert json.loads(sys.argv[1]) == {"status": "ready", "release": "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"}
+          assert json.loads(sys.argv[1]) == {"status": "ready", "release": "9e2d3496f5df80da1291c77bd6f949a5078ef25d"}
           PY
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -e; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(docker compose -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; docker compose -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
@@ -730,7 +730,7 @@ jobs:
             install -d -m 0700 "$proof"
             python3 - "$proof/deploy-facts.json" <<'PY'
           import json,sys
-          value={"public_release":"c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f","services":["api","web"],"worker_started":False,"release_go":False}
+          value={"public_release":"9e2d3496f5df80da1291c77bd6f949a5078ef25d","services":["api","web"],"worker_started":False,"release_go":False}
           open(sys.argv[1],"x").write(json.dumps(value,sort_keys=True)+"\n")
           PY
             WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 scripts/wp31_phase_evidence.py create \
@@ -772,7 +772,7 @@ jobs:
               rm -f -- /srv/journey-next-production/canary/current
             fi
             install -d -m 0700 /srv/journey-next-production/canary/failures
-            printf '%s\n' '{\"candidate_sha\":\"c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f\",\"automatic_rollback\":\"ATTEMPTED\",\"database_preserved\":true,\"release_evidence_preserved\":true}' >'/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
+            printf '%s\n' '{\"candidate_sha\":\"9e2d3496f5df80da1291c77bd6f949a5078ef25d\",\"automatic_rollback\":\"ATTEMPTED\",\"database_preserved\":true,\"release_evidence_preserved\":true}' >'/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
             chmod 0600 '/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
           "
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
