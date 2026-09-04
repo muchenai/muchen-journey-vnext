@@ -19,7 +19,7 @@ OPS_MANIFEST = ROOT / "config/wp31_greenfield_canary_ops_manifest.json"
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 DIGEST_IMAGE = re.compile(r"ghcr\.io/muchenai/[a-z0-9-]+@sha256:[0-9a-f]{64}")
-EXPECTED_CANDIDATE = "c72fea573bf6ee1f85b4ca5cef9b80f729ee2c5f"
+EXPECTED_CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
 EXPECTED_ROLLBACK = "ff53052847a268d025bceb93c3eab37986d50219"
 
 
@@ -51,9 +51,9 @@ def load() -> dict[str, object]:
     expected_scalars = {
         "environment": "PRODUCTION_CANARY_UAT",
         "application_candidate_sha": EXPECTED_CANDIDATE,
-        "package_workflow_run_id": "33489482777",
+        "package_workflow_run_id": "33838169130",
         "package_manifest_sha256": (
-            "c9c1ac639e7b4b1ed963b6b9e31b777456784b3aa560816123afdaf6bb20cc8b"
+            "0efb1141903e295f879e4f63bc8172e6c009ebcdd2c06992215e1415db074056"
         ),
         "migration_head": "0028_canary_main_merge",
         "production_host": "journey.muchenai.com",
