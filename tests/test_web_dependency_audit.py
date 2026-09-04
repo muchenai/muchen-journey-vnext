@@ -1,3 +1,5 @@
+import json
+import subprocess
 from datetime import date
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 from scripts.web_dependency_audit import (
     BRACE_EXPANSION_DOS,
     AuditError,
+    main,
     validate_report,
 )
 
@@ -63,3 +66,30 @@ def test_clean_report_passes_without_waiver():
     )
     assert count == 0
     assert waived == set()
+
+
+def test_audit_allows_registry_response_within_five_minute_bound(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    def slow_registry_response(*args, timeout: int, **kwargs):
+        if timeout < 300:
+            raise subprocess.TimeoutExpired(args[0], timeout)
+        return subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout=json.dumps({"vulnerabilities": {}}),
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "scripts.web_dependency_audit.subprocess.run",
+        slow_registry_response,
+    )
+
+    main()
+
+    assert (
+        "WEB_DEPENDENCY_AUDIT=PASS vulnerability_packages=0"
+        in capsys.readouterr().out
+    )
