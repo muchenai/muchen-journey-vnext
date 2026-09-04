@@ -185,7 +185,10 @@ class Settings(BaseSettings):
             from journey_api.notification_recipients import decode_recipient_key
 
             decode_recipient_key(self.notification_recipient_key)
-        if self.app_env == "production" and not self.notification_recipients_enabled:
+        if self.release_marker == "PRODUCTION_CANARY_UAT":
+            if self.notification_recipients_enabled:
+                raise ValueError("Canary notification recipients must be disabled")
+        elif self.app_env == "production" and not self.notification_recipients_enabled:
             raise ValueError("production notification recipients must be enabled")
         if not 60 <= self.attachment_upload_ttl_seconds <= 900:
             raise ValueError("ATTACHMENT_UPLOAD_TTL_SECONDS must be between 60 and 900")
