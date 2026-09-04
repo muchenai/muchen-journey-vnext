@@ -95,7 +95,7 @@ def main() -> None:
             cwd=WEB_ROOT,
             capture_output=True,
             text=True,
-            timeout=90,
+            timeout=300,
             check=False,
         )
         if result.returncode not in {0, 1}:
