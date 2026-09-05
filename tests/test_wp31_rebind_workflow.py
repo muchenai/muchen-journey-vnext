@@ -48,6 +48,8 @@ def test_mainline_skips_candidate_package_for_ops_only_changes() -> None:
     assert "artifacts/wp07-candidate/candidate-binding.json" in mainline
     assert "Generate candidate handoff checksums" in mainline
     assert "artifacts/wp07-candidate/SHA256SUMS" in mainline
+    assert "Upload candidate binding handoff artifact" in mainline
+    assert "name: wp31-candidate-binding-${{ github.run_id }}" in mainline
     assert mainline.index("Push commit-tagged candidate images") < mainline.index("Generate candidate binding handoff")
 
 

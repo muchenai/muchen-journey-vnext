@@ -48,7 +48,7 @@
     "tests/test_wp31_candidate_binding.py": "0923cfd340e612a1479cbb7dfde4282ae79071f08a13670cbf74b7af8d7bef84",
     "tests/test_wp31_canary_database_guard.py": "9beebe7874cf5976bdd191608488a0c62cc999e7437a17e96e9ac33de6a9cd7c",
     "tests/test_wp31_rebind_candidate.py": "cd32f9f3259dda0b22d2c8edf2315991e6cde960f15b9eb766618e9614d1dcf5",
-    "tests/test_wp31_rebind_workflow.py": "beb045cacd0eeed7aff4d434f7f1380e5c459f70faa7b6be88a026c1d0412bc4"
+    "tests/test_wp31_rebind_workflow.py": "dd342a2b2ce62abd663b1e2b12d18694da0baa5caafd2c5d32d8d6fe473fe9e1"
   },
   "manifest_self_binding": "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT",
   "schema_version": 2
