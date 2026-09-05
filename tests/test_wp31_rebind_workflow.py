@@ -12,6 +12,7 @@ def test_rebind_workflow_is_successful_package_artifact_driven() -> None:
     assert "actions/download-artifact" in text
     assert "wp31_candidate_binding.py verify" in text
     assert "python3 -m pip install --user" in text
+    assert '"Mainline Candidate Gate"' in text
 
 
 def test_rebind_workflow_uses_unique_main_based_branch_and_pr() -> None:
@@ -41,6 +42,8 @@ def test_mainline_skips_candidate_package_for_ops_only_changes() -> None:
     assert "steps.scope.outputs.application_changed == 'true'" in mainline
     assert "Candidate-Operation: ops-only" in mainline
     assert "Candidate-Operation: ops-only" in WORKFLOW.read_text(encoding="utf-8")
+    assert "Generate candidate binding handoff" in mainline
+    assert "artifacts/wp07-candidate/candidate-binding.json" in mainline
 
 
 def test_rebind_workflow_stops_duplicate_candidate_package() -> None:
