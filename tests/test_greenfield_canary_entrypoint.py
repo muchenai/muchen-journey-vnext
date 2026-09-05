@@ -24,8 +24,8 @@ def job(name: str, next_name: str) -> str:
 
 def test_greenfield_package_is_exact_candidate_and_confirmation_bound() -> None:
     job = greenfield_package_job()
-    assert f"inputs.candidate == '{PACKAGE_CANDIDATE}'" in job
-    assert "inputs.confirmation == 'PACKAGE_9E2D349_GREENFIELD_CANARY'" in job
+    assert "inputs.confirmation == 'PACKAGE_GREENFIELD_CANARY'" in job
+    assert "grep -Eq '^[0-9a-f]{40}$'" in job
     assert "ref: ${{ inputs.candidate }}" in job
     assert "test \"$(git -C candidate rev-parse --verify HEAD)\" = '${{ inputs.candidate }}'" in job
 
