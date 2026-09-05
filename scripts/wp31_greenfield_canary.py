@@ -51,9 +51,9 @@ def load() -> dict[str, object]:
     expected_scalars = {
         "environment": "PRODUCTION_CANARY_UAT",
         "application_candidate_sha": EXPECTED_CANDIDATE,
-        "package_workflow_run_id": "33838169130",
+        "package_workflow_run_id": "33950428823",
         "package_manifest_sha256": (
-            "0efb1141903e295f879e4f63bc8172e6c009ebcdd2c06992215e1415db074056"
+            "84acfaad327814f6c981d8e185c40c40fbf6e2626d7fbb2ccae1ff85bc5d9096"
         ),
         "migration_head": "0028_canary_main_merge",
         "production_host": "journey.muchenai.com",

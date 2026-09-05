@@ -19,8 +19,8 @@ PRODUCTION_HOST = "journey.muchenai.com"
 SOURCE_DATABASE = "journey_next_cutover_20260810"
 CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:850d5b1eb31eda6840fc31cae266af84aa96e5d8b6ed822db6bc03081374117c",
-    "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:0d7599796c5eef2f451b50b9a5cfe851b64c76e54b7ba17c1604b25324d85899",
+    "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:a4ac42e4073ed630b74245230bee03b23ce7cb95747aa731ea52ee1e2263be02",
+    "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:1e83921455bc6b5ae9c090c0d6e2df9d5a47d5873b6100d42147436aaa137bb4",
 }
 DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
 
