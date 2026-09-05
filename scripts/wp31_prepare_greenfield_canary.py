@@ -13,7 +13,14 @@ from pathlib import Path
 from urllib.parse import quote
 from uuid import UUID
 
+try:
+    from scripts.wp31_candidate_binding import BindingError, verify_binding
+except ModuleNotFoundError:  # direct invocation from the scripts directory
+    from wp31_candidate_binding import BindingError, verify_binding
 
+
+ROOT = Path(__file__).resolve().parents[1]
+BINDING = ROOT / "config/wp31_candidate_binding.json"
 CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
 PRODUCTION_HOST = "journey.muchenai.com"
 SOURCE_DATABASE = "journey_next_cutover_20260810"
@@ -27,6 +34,25 @@ DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:
 
 class PrepareCanaryError(RuntimeError):
     pass
+
+
+def candidate_binding() -> dict[str, object]:
+    try:
+        return verify_binding(BINDING)
+    except BindingError as error:
+        raise PrepareCanaryError("candidate binding is invalid") from error
+
+
+def bound_candidate_and_images() -> tuple[str, dict[str, str]]:
+    binding = candidate_binding()
+    candidate = str(binding["application_candidate_sha"])
+    raw_images = binding["images"]
+    assert isinstance(raw_images, dict)
+    images = {
+        "API_IMAGE": f"ghcr.io/muchenai/muchen-journey-vnext-api@{raw_images['api']['registry_digest']}",
+        "WEB_IMAGE": f"ghcr.io/muchenai/muchen-journey-vnext-web@{raw_images['web']['registry_digest']}",
+    }
+    return candidate, images
 
 
 def require(name: str, minimum: int = 1) -> str:
@@ -74,6 +100,7 @@ def prepare(output: Path, host: str, port: int) -> None:
     if not 1 <= port <= 65535:
         raise PrepareCanaryError("RDS port is invalid")
 
+    candidate, images = bound_candidate_and_images()
     migration_password = require("WP08_MIGRATION_DB_PASSWORD", 20)
     runtime_password = require("WP08_RUNTIME_DB_PASSWORD", 20)
     session_secret = require("WP15_SESSION_SECRET", 32)
@@ -96,7 +123,7 @@ def prepare(output: Path, host: str, port: int) -> None:
     source_url = dsn("journey_next_migrator", migration_password, host, port, SOURCE_DATABASE)
     shared = {
         "APP_ENV": "production",
-        "APP_RELEASE": CANDIDATE,
+        "APP_RELEASE": candidate,
         "CONFIG_SCHEMA_VERSION": "3",
         "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
         "CANARY_LEARNER_USER_IDS": learner_ids,
@@ -125,7 +152,7 @@ def prepare(output: Path, host: str, port: int) -> None:
         secrets / "web.env",
         {
             "APP_ENV": "production",
-            "APP_RELEASE": CANDIDATE,
+            "APP_RELEASE": candidate,
             "CONFIG_SCHEMA_VERSION": "3",
             "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
             "API_INTERNAL_URL": "http://greenfield-canary-api:8000",
@@ -142,7 +169,7 @@ def prepare(output: Path, host: str, port: int) -> None:
             "MIGRATION_DB_PASSWORD": migration_password,
             "WP15_BACKUP_KEY": backup_key,
             "DBTOOL_IMAGE": DBTOOL_IMAGE,
-            "API_IMAGE": IMAGES["API_IMAGE"],
+            "API_IMAGE": images["API_IMAGE"],
         },
     )
     try:
@@ -157,11 +184,11 @@ def prepare(output: Path, host: str, port: int) -> None:
     write_env(
         output / ".deployment.env",
         {
-            "CANDIDATE_COMMIT": CANDIDATE,
+            "CANDIDATE_COMMIT": candidate,
             "PRODUCTION_HOST": PRODUCTION_HOST,
             "SOURCE_DATABASE": SOURCE_DATABASE,
             "CANARY_DATABASE": CANARY_DATABASE,
-            **IMAGES,
+            **images,
         },
     )
     proof = {

@@ -56,6 +56,17 @@ regexes = ['''"[^"\r\n]+"\s*:\s*"[0-9a-f]{64}"''']
 paths = ['''(^|/)outputs/controller-integration/[^/]+/candidate-manifest\.json$''']
 
 [[allowlists]]
+description = "WP-31 candidate binding and Ops closure files contain public artifact and file SHA-256 digests, not credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = [
+  '''"[^"\r\n]+"\s*:\s*"(?:sha256:)?[0-9a-f]{64}"''',
+  '''"registry_reference"\s*:\s*"ghcr\.io/muchenai/[a-z0-9-]+:[0-9a-f]{40}"''',
+]
+paths = ['''(^|/)config/wp31_candidate_binding\.json$''', '''(^|/)config/wp31_greenfield_canary_ops_manifest\.json$''']
+
+[[allowlists]]
 description = "Prototype browser storage keys are local namespace labels, not credentials."
 targetRules = ["generic-api-key"]
 condition = "AND"

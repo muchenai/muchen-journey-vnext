@@ -1,0 +1,20 @@
+{
+  "application_candidate_sha": "9e2d3496f5df80da1291c77bd6f949a5078ef25d",
+  "images": {
+    "api": {
+      "registry_digest": "sha256:a4ac42e4073ed630b74245230bee03b23ce7cb95747aa731ea52ee1e2263be02",
+      "registry_reference": "ghcr.io/muchenai/muchen-journey-vnext-api:9e2d3496f5df80da1291c77bd6f949a5078ef25d"
+    },
+    "web": {
+      "registry_digest": "sha256:1e83921455bc6b5ae9c090c0d6e2df9d5a47d5873b6100d42147436aaa137bb4",
+      "registry_reference": "ghcr.io/muchenai/muchen-journey-vnext-web:9e2d3496f5df80da1291c77bd6f949a5078ef25d"
+    },
+    "worker": {
+      "registry_digest": "sha256:7d1ccb3ae47626d69afcd8166917cc82b8d068d4de820de182a5d904e4392547",
+      "registry_reference": "ghcr.io/muchenai/muchen-journey-vnext-worker:9e2d3496f5df80da1291c77bd6f949a5078ef25d"
+    }
+  },
+  "package_workflow_run_id": "33950428823",
+  "release_manifest_sha256": "84acfaad327814f6c981d8e185c40c40fbf6e2626d7fbb2ccae1ff85bc5d9096",
+  "schema_version": 1
+}

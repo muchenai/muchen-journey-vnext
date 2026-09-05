@@ -199,14 +199,23 @@ jobs:
             --registry-image "worker=ghcr.io/muchenai/muchen-journey-vnext-worker:$candidate")
           (cd candidate && python3 scripts/wp07_candidate.py verify \
             artifacts/wp07-candidate/release-manifest.json)
+      - name: Generate and verify candidate binding artifact
+        run: |
+          set -euo pipefail
+          python3 scripts/wp31_candidate_binding.py generate \
+            --manifest candidate/artifacts/wp07-candidate/release-manifest.json \
+            --package-run-id "$GITHUB_RUN_ID" \
+            --output candidate/artifacts/wp07-candidate/candidate-binding.json
+          python3 scripts/wp31_candidate_binding.py verify \
+            --binding candidate/artifacts/wp07-candidate/candidate-binding.json
       - name: Generate verifiable non-self-referential evidence checksums
         run: |
           set -euo pipefail
           cd candidate/artifacts/wp07-candidate
-          files=(release-manifest.json api.spdx.json web.spdx.json worker.spdx.json task-versions.json amd64-build-definition-manifest.json)
+          files=(release-manifest.json api.spdx.json web.spdx.json worker.spdx.json task-versions.json amd64-build-definition-manifest.json candidate-binding.json)
           : >SHA256SUMS
           for file in "${files[@]}"; do sha256sum "$file" >>SHA256SUMS; done
-          test "$(wc -l <SHA256SUMS | tr -d ' ')" = 6
+          test "$(wc -l <SHA256SUMS | tr -d ' ')" = 7
           if grep -qE '[[:space:]]SHA256SUMS$' SHA256SUMS; then exit 2; fi
           sha256sum -c SHA256SUMS
       - name: Upload exact registry-bound candidate evidence
@@ -220,6 +229,20 @@ jobs:
             candidate/artifacts/wp07-candidate/worker.spdx.json
             candidate/artifacts/wp07-candidate/task-versions.json
             candidate/artifacts/wp07-candidate/amd64-build-definition-manifest.json
+            candidate/artifacts/wp07-candidate/candidate-binding.json
+            candidate/artifacts/wp07-candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload candidate binding handoff artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-candidate-binding-${{ github.run_id }}
+          path: |
+            candidate/artifacts/wp07-candidate/candidate-binding.json
+            candidate/artifacts/wp07-candidate/release-manifest.json
+            candidate/artifacts/wp07-candidate/api.spdx.json
+            candidate/artifacts/wp07-candidate/web.spdx.json
+            candidate/artifacts/wp07-candidate/worker.spdx.json
             candidate/artifacts/wp07-candidate/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
@@ -638,6 +661,54 @@ jobs:
             --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
             --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
             --payload-dir "$RUNNER_TEMP/wp31-preflight-proof"
+      - name: Read-only Canary database lifecycle guard
+        if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
+          RDS_INSTANCE_ID: ${{ steps.frozen.outputs.rds_instance_id }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          current_release_reference=false
+          if ssh "${opts[@]}" root@"$PUBLIC_IP" "test -L /srv/journey-next-production/canary/current"; then
+            current_release_reference=true
+          fi
+          canary_service_active=false
+          if ssh "${opts[@]}" root@"$PUBLIC_IP" "docker ps --format '{{.Names}}' | grep -Eq '^journey-next-production-canary'"; then
+            canary_service_active=true
+          fi
+          database_exists="$(python3 - "$RDS_INSTANCE_ID" <<'PY'
+          import os, sys
+          from scripts.wp15_rds_database import database_exists
+          print(str(database_exists(
+              sys.argv[1],
+              os.environ["VOLCENGINE_ACCESS_KEY"],
+              os.environ["VOLCENGINE_SECRET_KEY"],
+              session_token=os.environ.get("VOLCENGINE_SESSION_TOKEN", ""),
+              database_name="journey_next_canary_20260901_c72fea5",
+          )).lower())
+          PY
+          )"
+          in_progress="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+            --jq '[.workflow_runs[] | select((.status == "queued" or .status == "in_progress") and (.id != '${GITHUB_RUN_ID}'))] | length' | \
+            awk '{sum += $1} END {print sum + 0}')"
+          python3 - "$database_exists" "$canary_service_active" "$current_release_reference" "$in_progress" "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-facts.json" <<'PY'
+          import json, sys
+          from scripts.wp31_canary_database_guard import facts_from_read_only_observations, check
+          facts = facts_from_read_only_observations(
+              database_exists=sys.argv[1] == "true",
+              canary_service_active=sys.argv[2] == "true",
+              current_release_reference=sys.argv[3] == "true",
+              workflow_runs_in_progress=int(sys.argv[4]),
+          )
+          path = sys.argv[5]
+          with open(path, "x", encoding="utf-8") as handle:
+              json.dump(facts, handle, sort_keys=True)
+              handle.write("\n")
+          check(path, "create")
+          print("WP31_CANARY_DATABASE_GUARD=PASS")
+          PY
       - name: Create only the exact isolated canary database after preflight validation
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
         run: |

@@ -1,0 +1,99 @@
+name: WP-31 Candidate Evidence Rebind
+
+on:
+  workflow_run:
+    workflows: ["WP-15 Wartime Controlled Production"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  rebind:
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Detect package handoff artifact
+        id: handoff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          name="wp31-candidate-binding-${{ github.event.workflow_run.id }}"
+          count="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${{ github.event.workflow_run.id }}/artifacts" \
+            --jq "[.artifacts[] | select(.name == \"${name}\" and .expired == false)] | length" | \
+            awk '{sum += $1} END {print sum + 0}')"
+          if [ "$count" -eq 1 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No candidate handoff artifact for this successful run; nothing to rebind."
+          fi
+
+      - name: Download candidate binding handoff
+        if: steps.handoff.outputs.present == 'true'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: wp31-candidate-binding-${{ github.event.workflow_run.id }}
+          path: artifacts/wp31-binding
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify package binding provenance
+        if: steps.handoff.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          binding="$(find artifacts/wp31-binding -type f -name candidate-binding.json -print -quit)"
+          manifest="$(find artifacts/wp31-binding -type f -name release-manifest.json -print -quit)"
+          checksums="$(find artifacts/wp31-binding -type f -name SHA256SUMS -print -quit)"
+          test -n "$binding" -a -n "$manifest" -a -n "$checksums"
+          python3 scripts/wp31_candidate_binding.py verify --binding "$binding"
+          python3 scripts/wp31_candidate_binding.py generate \
+            --manifest "$manifest" \
+            --package-run-id '${{ github.event.workflow_run.id }}' \
+            --output "$RUNNER_TEMP/generated-binding.json"
+          cmp "$RUNNER_TEMP/generated-binding.json" "$binding"
+          (cd "$(dirname "$checksums")" && sha256sum -c "$(basename "$checksums")")
+
+      - name: Rebind contract and Ops tree
+        if: steps.handoff.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          binding="$(find artifacts/wp31-binding -type f -name candidate-binding.json -print -quit)"
+          python3 scripts/wp31_rebind_candidate.py --root . --binding "$binding"
+          python3 -m pytest -q \
+            tests/test_wp31_candidate_binding.py \
+            tests/test_wp31_rebind_candidate.py \
+            tests/test_wp31_greenfield_canary.py \
+            -o cache_dir="$RUNNER_TEMP/pytest-cache"
+          python3 scripts/wp31_ops_closure.py --repo . --manifest config/wp31_greenfield_canary_ops_manifest.json
+          git diff --check
+
+      - name: Create clean rebind branch and PR
+        if: steps.handoff.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id='${{ github.event.workflow_run.id }}'
+          branch="codex/canary-rebind-${{ github.event.workflow_run.id }}"
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config scripts tests .github/workflows/wp31-candidate-rebind.yml
+          git commit -m "chore(ops): rebind Canary evidence to package run ${run_id}"
+          git push origin HEAD:$branch
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "chore(ops): rebind Canary evidence to package run ${run_id}" \
+            --body "Automated from successful package workflow run ${run_id}. Candidate binding, contract references, hashes, and closure inputs were generated from the uploaded handoff artifact on a clean main-based branch."
