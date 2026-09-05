@@ -90,7 +90,9 @@ jobs:
           git switch -c "$branch"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add config scripts tests .github/workflows/wp31-candidate-rebind.yml
+          git add config scripts tests \
+            .github/workflows/wp15-wartime-production.yml \
+            .github/workflows/wp31-candidate-rebind.yml
           git commit -m "chore(ops): rebind Canary evidence to package run ${run_id}"
           git push origin HEAD:$branch
           gh pr create \

@@ -19,6 +19,7 @@ def test_rebind_workflow_uses_unique_main_based_branch_and_pr() -> None:
     assert "ref: main" in text
     assert "codex/canary-rebind-${{ github.event.workflow_run.id }}" in text
     assert "git push origin HEAD:$branch" in text
+    assert ".github/workflows/wp15-wartime-production.yml" in text
     assert "--force" not in text
     assert "gh pr create" in text
     assert "contents: write" in text
