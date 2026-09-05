@@ -53,6 +53,7 @@ def _fixture(root: Path) -> Path:
         "config/wp31_greenfield_canary_execution_authorization.schema.json": OLD_CANDIDATE,
         "config/wp31_greenfield_canary_pro_review_evidence.schema.json": OLD_CANDIDATE + " 0" * 64,
         "scripts/wp31_greenfield_canary.py": f'EXPECTED_CANDIDATE = "{OLD_CANDIDATE}"\n"package_workflow_run_id": "33838169130"\n"0" * 64',
+        "scripts/wp31_identity_bootstrap.py": f'CONFIRMATION = "BOOTSTRAP_IDENTITIES_{OLD_CANDIDATE[:7].upper()}_PRODUCTION_CANARY"\n',
         "scripts/wp31_prepare_greenfield_canary.py": (
             f'CANDIDATE = "{OLD_CANDIDATE}"\n'
             f'"API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@{OLD_DIGESTS["api"]}",\n'
@@ -61,6 +62,9 @@ def _fixture(root: Path) -> Path:
         ".github/workflows/wp15-wartime-production.yml": (
             f"{OLD_CANDIDATE} 33838169130 0{'x' * 64} "
             f"ghcr.io/muchenai/muchen-journey-vnext-api@{OLD_DIGESTS['api']}"
+        ),
+        "tests/test_wp31_identity_bootstrap.py": (
+            f'assert "FAST_CANARY_{OLD_CANDIDATE[:7].upper()}_PRODUCTION_CANARY" in workflow\n'
         ),
     }
     for relative, content in targets.items():

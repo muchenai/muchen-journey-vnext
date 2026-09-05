@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 
 CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
 CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
-CONFIRMATION = "BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY"
+CONFIRMATION = "BOOTSTRAP_IDENTITIES_129E16D_PRODUCTION_CANARY"
 _FIELDS = {
     "operator_user_id",
     "operator_display_name",
