@@ -245,6 +245,7 @@ jobs:
             candidate/artifacts/wp07-candidate/api.spdx.json
             candidate/artifacts/wp07-candidate/web.spdx.json
             candidate/artifacts/wp07-candidate/worker.spdx.json
+            candidate/artifacts/wp07-candidate/amd64-build-definition-manifest.json
             candidate/artifacts/wp07-candidate/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
