@@ -39,7 +39,7 @@
     "tests/test_greenfield_canary_entrypoint.py": "e999b1faf6df9cf2a9a09435caaacbfbaee18376bb9c4d5cdfe36cdfb9cd0d2d",
     "tests/test_wp31_greenfield_canary.py": "c33e7237a561813c863da6eb6100a95db44430bc51806695b22dbe8d0ec81c0d",
     "tests/test_wp31_identity_bootstrap.py": "3de6d38a2e4b6d82a2fc78efbef7266e9f23ff84e3dbfa9bc4bbf81b01a36ea6",
-    ".github/workflows/wp31-candidate-rebind.yml": "6de82b340971e8d51e234be5cd72b110425ff74b5187d65c922bb125e5a37d0a",
+    ".github/workflows/wp31-candidate-rebind.yml": "67be719bdbfb13d8b3e8668de3cd2f7763e415d842ab9f155f7b7324e0963002",
     "config/wp31_candidate_binding.json": "c607878f57fc393426ef5f5508c9a6900fca70fc3d06a2f0f183801ad058632a",
     "scripts/wp31_candidate_binding.py": "5323965aa175fddbc4cb50c0fd6949aea0e6edabd0ea921fcddc311092858a3c",
     "scripts/wp31_canary_database_guard.py": "59f283e9edfd392f0cab7696b501caa96e70fd69bb0f47ade5ed11afa6020828",
@@ -48,7 +48,7 @@
     "tests/test_wp31_candidate_binding.py": "0923cfd340e612a1479cbb7dfde4282ae79071f08a13670cbf74b7af8d7bef84",
     "tests/test_wp31_canary_database_guard.py": "9beebe7874cf5976bdd191608488a0c62cc999e7437a17e96e9ac33de6a9cd7c",
     "tests/test_wp31_rebind_candidate.py": "cd32f9f3259dda0b22d2c8edf2315991e6cde960f15b9eb766618e9614d1dcf5",
-    "tests/test_wp31_rebind_workflow.py": "17a87db675d6716ad721b192fbd26af27f1342e5cb6c2f3ba0e846ba2b0d67bb"
+    "tests/test_wp31_rebind_workflow.py": "9642156026d2386757bb284412f66344728f05681e5a9da498184105e78c9711"
   },
   "manifest_self_binding": "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT",
   "schema_version": 2

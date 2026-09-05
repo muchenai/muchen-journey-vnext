@@ -41,6 +41,8 @@ def test_mainline_skips_candidate_package_for_ops_only_changes() -> None:
     assert "git diff-tree" in mainline
     assert "steps.scope.outputs.application_changed == 'true'" in mainline
     assert "Candidate-Operation: ops-only" in mainline
+    assert 'subject="$(git log -1 --format=\'%s\' "$GITHUB_SHA")"' in mainline
+    assert '"[ops-only] chore(ops): rebind Canary evidence' in WORKFLOW.read_text(encoding="utf-8")
     assert "Candidate-Operation: ops-only" in WORKFLOW.read_text(encoding="utf-8")
     assert "Generate candidate binding handoff" in mainline
     assert "artifacts/wp07-candidate/candidate-binding.json" in mainline

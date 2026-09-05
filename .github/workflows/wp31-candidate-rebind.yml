@@ -115,11 +115,11 @@ jobs:
           git add config scripts tests \
             .github/workflows/wp15-wartime-production.yml \
             .github/workflows/wp31-candidate-rebind.yml
-          git commit -m "chore(ops): rebind Canary evidence to package run ${run_id}" \
+          git commit -m "[ops-only] chore(ops): rebind Canary evidence to package run ${run_id}" \
             -m "Candidate-Operation: ops-only"
           git push origin HEAD:$branch
           gh pr create \
             --base main \
             --head "$branch" \
-            --title "chore(ops): rebind Canary evidence to package run ${run_id}" \
+            --title "[ops-only] chore(ops): rebind Canary evidence to package run ${run_id}" \
             --body "Automated from successful package workflow run ${run_id}. Candidate binding, contract references, hashes, and closure inputs were generated from the uploaded handoff artifact on a clean main-based branch."
