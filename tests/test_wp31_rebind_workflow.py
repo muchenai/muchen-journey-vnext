@@ -46,6 +46,7 @@ def test_mainline_skips_candidate_package_for_ops_only_changes() -> None:
     assert "Candidate-Operation: ops-only" in WORKFLOW.read_text(encoding="utf-8")
     assert "Generate candidate binding handoff" in mainline
     assert "artifacts/wp07-candidate/candidate-binding.json" in mainline
+    assert mainline.index("Push commit-tagged candidate images") < mainline.index("Generate candidate binding handoff")
 
 
 def test_rebind_workflow_stops_duplicate_candidate_package() -> None:
