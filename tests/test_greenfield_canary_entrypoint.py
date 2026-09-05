@@ -69,6 +69,7 @@ def test_greenfield_package_emits_verified_candidate_binding_artifact() -> None:
     assert "scripts/wp31_candidate_binding.py generate" in job
     assert "--package-run-id \"$GITHUB_RUN_ID\"" in job
     assert "candidate-binding.json" in job
+    assert "amd64-build-definition-manifest.json" in job
     assert "scripts/wp31_candidate_binding.py verify" in job
     assert "wp31-candidate-binding-${{ github.run_id }}" in job
     assert "actions/upload-artifact" in job
