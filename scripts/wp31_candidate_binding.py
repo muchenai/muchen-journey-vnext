@@ -89,17 +89,20 @@ def build_binding(manifest: Path, package_run_id: str) -> dict[str, object]:
             "sbom_sha256": actual_sha,
         }
 
-    build_definition = manifest.parent / "amd64-build-definition-manifest.json"
-    if build_definition.is_symlink() or not build_definition.is_file():
-        raise BindingError("amd64 build definition manifest is missing")
-    return {
+    result = {
         "schema_version": 1,
         "application_candidate_sha": candidate_sha,
         "package_workflow_run_id": package_run_id,
         "release_manifest_sha256": sha256(manifest),
         "images": bound_images,
-        "build_definition_manifest_sha256": sha256(build_definition),
     }
+    # WP-15 supplies an architecture build-definition artifact. Mainline
+    # candidate packaging is platform-native and does not have that optional
+    # derived artifact, so bind it when present without making handoff fail.
+    build_definition = manifest.parent / "amd64-build-definition-manifest.json"
+    if build_definition.is_file() and not build_definition.is_symlink():
+        result["build_definition_manifest_sha256"] = sha256(build_definition)
+    return result
 
 
 def serialize(value: dict[str, object]) -> bytes:

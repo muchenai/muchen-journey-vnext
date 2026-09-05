@@ -41,14 +41,14 @@
     "tests/test_wp31_identity_bootstrap.py": "3de6d38a2e4b6d82a2fc78efbef7266e9f23ff84e3dbfa9bc4bbf81b01a36ea6",
     ".github/workflows/wp31-candidate-rebind.yml": "67be719bdbfb13d8b3e8668de3cd2f7763e415d842ab9f155f7b7324e0963002",
     "config/wp31_candidate_binding.json": "c607878f57fc393426ef5f5508c9a6900fca70fc3d06a2f0f183801ad058632a",
-    "scripts/wp31_candidate_binding.py": "5323965aa175fddbc4cb50c0fd6949aea0e6edabd0ea921fcddc311092858a3c",
+    "scripts/wp31_candidate_binding.py": "45b32ffce8fa9dab4224bd1d905f5aff2d00975fbae2ef5e9e56878afaf681e2",
     "scripts/wp31_canary_database_guard.py": "59f283e9edfd392f0cab7696b501caa96e70fd69bb0f47ade5ed11afa6020828",
     "scripts/wp31_rebind_candidate.py": "6d636f176028a20db9f050b7045c579f7cb44215234c614e14cff638a6fb9641",
     "tests/test_wp31_binding_consumers.py": "b2a1afd7ec4f21af7cad6c8ababdfa07d0a533b259c89065d39d92c321de4b97",
     "tests/test_wp31_candidate_binding.py": "0923cfd340e612a1479cbb7dfde4282ae79071f08a13670cbf74b7af8d7bef84",
     "tests/test_wp31_canary_database_guard.py": "9beebe7874cf5976bdd191608488a0c62cc999e7437a17e96e9ac33de6a9cd7c",
     "tests/test_wp31_rebind_candidate.py": "cd32f9f3259dda0b22d2c8edf2315991e6cde960f15b9eb766618e9614d1dcf5",
-    "tests/test_wp31_rebind_workflow.py": "2e8880613b46f9bcdb4cac6c7abeb4978c5477da85156c31c96ac9907a6b01ee"
+    "tests/test_wp31_rebind_workflow.py": "beb045cacd0eeed7aff4d434f7f1380e5c459f70faa7b6be88a026c1d0412bc4"
   },
   "manifest_self_binding": "PRO_EVIDENCE_SHA256_PLUS_EXACT_REVIEWED_COMMIT",
   "schema_version": 2

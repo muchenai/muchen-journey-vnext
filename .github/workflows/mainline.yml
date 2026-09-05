@@ -69,6 +69,11 @@ jobs:
             --manifest artifacts/wp07-candidate/release-manifest.json \
             --package-run-id "$GITHUB_RUN_ID" \
             --output artifacts/wp07-candidate/candidate-binding.json
+      - name: Generate candidate handoff checksums
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.scope.outputs.application_changed == 'true'
+        working-directory: artifacts/wp07-candidate
+        run: |
+          sha256sum candidate-binding.json release-manifest.json api.spdx.json web.spdx.json worker.spdx.json task-versions.json > SHA256SUMS
       - name: Package verified candidate images for restricted staging networks
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.scope.outputs.application_changed == 'true'
         run: make candidate-image-archives
@@ -79,6 +84,7 @@ jobs:
           path: |
             artifacts/wp07-candidate/release-manifest.json
             artifacts/wp07-candidate/candidate-binding.json
+            artifacts/wp07-candidate/SHA256SUMS
             artifacts/wp07-candidate/api.spdx.json
             artifacts/wp07-candidate/web.spdx.json
             artifacts/wp07-candidate/worker.spdx.json
