@@ -74,6 +74,21 @@ jobs:
         working-directory: artifacts/wp07-candidate
         run: |
           sha256sum candidate-binding.json release-manifest.json api.spdx.json web.spdx.json worker.spdx.json task-versions.json > SHA256SUMS
+      - name: Upload candidate binding handoff artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.scope.outputs.application_changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-candidate-binding-${{ github.run_id }}
+          path: |
+            artifacts/wp07-candidate/candidate-binding.json
+            artifacts/wp07-candidate/release-manifest.json
+            artifacts/wp07-candidate/api.spdx.json
+            artifacts/wp07-candidate/web.spdx.json
+            artifacts/wp07-candidate/worker.spdx.json
+            artifacts/wp07-candidate/task-versions.json
+            artifacts/wp07-candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
       - name: Package verified candidate images for restricted staging networks
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.scope.outputs.application_changed == 'true'
         run: make candidate-image-archives
