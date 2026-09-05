@@ -135,7 +135,9 @@ def discover(root: Path) -> set[str]:
         except (OSError, UnicodeError):
             continue
         pending.extend(_existing_references(root, path, text))
-    return {str(path.relative_to(root)) for path in discovered}
+    # Keep manifest keys platform-independent; Windows Path.__str__ uses
+    # backslashes while the repository manifest is deliberately POSIX-style.
+    return {path.relative_to(root).as_posix() for path in discovered}
 
 
 def validate(root: Path, manifest_path: Path) -> dict[str, object]:
@@ -148,7 +150,7 @@ def validate(root: Path, manifest_path: Path) -> dict[str, object]:
     if not isinstance(files, dict):
         raise ClosureError("ops manifest files map is missing")
     discovered = discover(root)
-    self_path = str(manifest_path.relative_to(root))
+    self_path = manifest_path.relative_to(root).as_posix()
     missing = sorted(discovered - set(files) - {self_path})
     if missing:
         raise ClosureError("unbound Greenfield dependencies: " + ",".join(missing))

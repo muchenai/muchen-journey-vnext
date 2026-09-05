@@ -28,5 +28,5 @@
     "does_not_require_database_restore": true
   },
   "canary_edge_upstream": "greenfield-canary-web:3000",
-  "authorization_model": "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+  "authorization_model": "ENVIRONMENT_APPROVAL_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
 }

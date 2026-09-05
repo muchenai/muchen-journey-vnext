@@ -108,7 +108,7 @@ def load() -> dict[str, object]:
     if rollback.get("database") != value["source_database"]:
         raise CanaryContractError("rollback database differs")
     if value.get("authorization_model") != (
-        "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+        "ENVIRONMENT_APPROVAL_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
     ):
         raise CanaryContractError("authorization model differs")
     workflow = (ROOT / ".github/workflows/wp15-wartime-production.yml").read_text()
@@ -275,7 +275,10 @@ def authorization_check(
     manifest_hash = sha256(OPS_MANIFEST)
     if not SHA256.fullmatch(provided_sha256) or sha256(evidence_path) != provided_sha256:
         raise CanaryContractError("provided Owner authorization evidence hash differs")
-    if not SHA256.fullmatch(pro_review_evidence_sha256):
+    if phase == "greenfield-canary-fast":
+        if pro_review_evidence_sha256:
+            raise CanaryContractError("fast Canary must not include Pro review evidence")
+    elif not SHA256.fullmatch(pro_review_evidence_sha256):
         raise CanaryContractError("Pro review evidence hash is invalid")
     evidence = _json_file(evidence_path)
     authorization_fields = {

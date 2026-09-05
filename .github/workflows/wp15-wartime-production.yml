@@ -283,26 +283,20 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_TYPE" = tag
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
-          test -n "$PRO_REVIEW_EVIDENCE_B64"
-          [[ '${{ inputs.pro_review_evidence_sha256 }}' =~ ^[0-9a-f]{64}$ ]]
           [[ '${{ inputs.execution_authorization_sha256 }}' =~ ^[0-9a-f]{64}$ ]]
           for name in VOLCENGINE_ACCESS_KEY VOLCENGINE_SECRET_KEY WP08_MIGRATION_DB_PASSWORD WP08_RUNTIME_DB_PASSWORD WP15_BACKUP_KEY WP31_EXECUTION_AUTHORIZATION_B64; do
             test -z "${!name:-}"
           done
-          evidence="$RUNNER_TEMP/wp31-pro-review-evidence.json"
-          umask 077
-          printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$evidence"
           python3 scripts/wp31_greenfield_canary.py contract-check
           python3 scripts/wp31_ops_closure.py
-          python3 scripts/wp31_greenfield_canary.py review-check \
-            --evidence "$evidence" \
-            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
-            --executing-ref "$GITHUB_REF"
-          reviewed=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_commit_sha"])' "$evidence")
-          reviewed_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_ref"])' "$evidence")
-          test "$reviewed" = "$GITHUB_SHA"
-          test "$reviewed_ref" = "$GITHUB_REF"
+          reviewed=""
+          reviewed_ref=""
+          pro_review_hash=""
           if [[ '${{ inputs.phase }}' == greenfield-canary-fast ]]; then
+            # The production-canary-uat Environment approval is the single human approval.
+            reviewed="$GITHUB_SHA"
+            reviewed_ref="$GITHUB_REF"
+            pro_review_hash=""
             test -z '${{ inputs.preflight_run_id }}'
             test -z '${{ inputs.backup_run_id }}'
             test -z '${{ inputs.deploy_run_id }}'
@@ -330,9 +324,25 @@ jobs:
           {
             echo "reviewed_ops_commit_sha=$reviewed"
             echo "reviewed_ops_ref=$reviewed_ref"
-            echo "pro_review_evidence_sha256=${{ inputs.pro_review_evidence_sha256 }}"
+            echo "pro_review_evidence_sha256=$pro_review_hash"
           } >>"$GITHUB_OUTPUT"
-          rm -f -- "$evidence"
+          if [[ '${{ inputs.phase }}' != greenfield-canary-fast ]]; then
+            test -n "$PRO_REVIEW_EVIDENCE_B64"
+            [[ '${{ inputs.pro_review_evidence_sha256 }}' =~ ^[0-9a-f]{64}$ ]]
+            evidence="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+            umask 077
+            printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$evidence"
+            python3 scripts/wp31_greenfield_canary.py review-check \
+              --evidence "$evidence" \
+              --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
+              --executing-ref "$GITHUB_REF"
+            reviewed=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_commit_sha"])' "$evidence")
+            reviewed_ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewed_ops_ref"])' "$evidence")
+            test "$reviewed" = "$GITHUB_SHA"
+            test "$reviewed_ref" = "$GITHUB_REF"
+            echo "pro_review_evidence_sha256=${{ inputs.pro_review_evidence_sha256 }}" >>"$GITHUB_OUTPUT"
+            rm -f -- "$evidence"
+          fi
 
   greenfield_execution_authorize:
     needs: greenfield_authorize
@@ -441,7 +451,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}
-      - name: Re-enforce exact Pro and protected Owner authorization before infrastructure tools
+      - name: Re-enforce exact Environment and protected Owner authorization before infrastructure tools
         env:
           PRO_REVIEW_EVIDENCE_B64: ${{ inputs.pro_review_evidence_b64 }}
         run: |
@@ -449,19 +459,21 @@ jobs:
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
           test "$GITHUB_SHA" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_commit_sha }}'
           test "$GITHUB_REF" = '${{ needs.greenfield_authorize.outputs.reviewed_ops_ref }}'
-          test -n "$PRO_REVIEW_EVIDENCE_B64"
           test -n "$WP31_EXECUTION_AUTHORIZATION_B64"
-          pro="$RUNNER_TEMP/wp31-pro-review-evidence.json"
           authorization="$RUNNER_TEMP/wp31-execution-authorization.json"
           umask 077
-          printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$pro"
           printf '%s' "$WP31_EXECUTION_AUTHORIZATION_B64" | base64 --decode >"$authorization"
           python3 scripts/wp31_greenfield_canary.py contract-check
           python3 scripts/wp31_ops_closure.py
-          python3 scripts/wp31_greenfield_canary.py review-check \
-            --evidence "$pro" \
-            --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
-            --executing-ref "$GITHUB_REF"
+          if [[ '${{ inputs.phase }}' != greenfield-canary-fast ]]; then
+            test -n "$PRO_REVIEW_EVIDENCE_B64"
+            pro="$RUNNER_TEMP/wp31-pro-review-evidence.json"
+            printf '%s' "$PRO_REVIEW_EVIDENCE_B64" | base64 --decode >"$pro"
+            python3 scripts/wp31_greenfield_canary.py review-check \
+              --evidence "$pro" \
+              --evidence-sha256 '${{ inputs.pro_review_evidence_sha256 }}' \
+              --executing-ref "$GITHUB_REF"
+          fi
           python3 scripts/wp31_greenfield_canary.py authorization-check \
             --evidence "$authorization" \
             --evidence-sha256 '${{ inputs.execution_authorization_sha256 }}' \
@@ -469,7 +481,7 @@ jobs:
             --phase '${{ inputs.phase }}' \
             --executing-ref "$GITHUB_REF" \
             --reviewed-ops-commit-sha "$GITHUB_SHA"
-          rm -f -- "$pro" "$authorization"
+          rm -f -- "${pro:-}" "$authorization"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.15.8
