@@ -85,7 +85,9 @@ def rebind(root: Path, binding_path: Path) -> list[str]:
         ("config/wp31_greenfield_canary_execution_authorization.schema.json", root / "config/wp31_greenfield_canary_execution_authorization.schema.json"),
         ("config/wp31_greenfield_canary_pro_review_evidence.schema.json", root / "config/wp31_greenfield_canary_pro_review_evidence.schema.json"),
         ("scripts/wp31_greenfield_canary.py", root / "scripts/wp31_greenfield_canary.py"),
+        ("scripts/wp31_identity_bootstrap.py", root / "scripts/wp31_identity_bootstrap.py"),
         ("scripts/wp31_prepare_greenfield_canary.py", root / "scripts/wp31_prepare_greenfield_canary.py"),
+        ("tests/test_wp31_identity_bootstrap.py", root / "tests/test_wp31_identity_bootstrap.py"),
         (".github/workflows/wp15-wartime-production.yml", root / ".github/workflows/wp15-wartime-production.yml"),
     )
     for relative, path in targets:
