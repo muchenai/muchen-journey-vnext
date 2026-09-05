@@ -2,7 +2,7 @@ name: WP-31 Candidate Evidence Rebind
 
 on:
   workflow_run:
-    workflows: ["WP-15 Wartime Controlled Production"]
+    workflows: ["WP-15 Wartime Controlled Production", "Mainline Candidate Gate"]
     types: [completed]
 
 permissions:

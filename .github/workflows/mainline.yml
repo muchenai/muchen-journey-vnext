@@ -49,6 +49,13 @@ jobs:
       - run: make ci-main
       - run: make candidate-package
         if: steps.scope.outputs.application_changed == 'true'
+      - name: Generate candidate binding handoff
+        if: steps.scope.outputs.application_changed == 'true'
+        run: |
+          python3 scripts/wp31_candidate_binding.py generate \
+            --manifest artifacts/wp07-candidate/release-manifest.json \
+            --package-run-id "$GITHUB_RUN_ID" \
+            --output artifacts/wp07-candidate/candidate-binding.json
       - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
@@ -70,6 +77,7 @@ jobs:
           name: wp07-candidate-${{ github.sha }}
           path: |
             artifacts/wp07-candidate/release-manifest.json
+            artifacts/wp07-candidate/candidate-binding.json
             artifacts/wp07-candidate/api.spdx.json
             artifacts/wp07-candidate/web.spdx.json
             artifacts/wp07-candidate/worker.spdx.json
