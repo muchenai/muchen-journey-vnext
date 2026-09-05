@@ -11,6 +11,7 @@ def test_rebind_workflow_is_successful_package_artifact_driven() -> None:
     assert "wp31-candidate-binding-${{ github.event.workflow_run.id }}" in text
     assert "actions/download-artifact" in text
     assert "wp31_candidate_binding.py verify" in text
+    assert "python3 -m pip install --user" in text
 
 
 def test_rebind_workflow_uses_unique_main_based_branch_and_pr() -> None:
