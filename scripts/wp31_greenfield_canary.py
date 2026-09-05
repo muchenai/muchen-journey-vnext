@@ -12,19 +12,34 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
+try:
+    from scripts.wp31_candidate_binding import BindingError, verify_binding
+except ModuleNotFoundError:  # direct invocation from the scripts directory
+    from wp31_candidate_binding import BindingError, verify_binding
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config/wp31_greenfield_canary.json"
 OPS_MANIFEST = ROOT / "config/wp31_greenfield_canary_ops_manifest.json"
+BINDING = ROOT / "config/wp31_candidate_binding.json"
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 DIGEST_IMAGE = re.compile(r"ghcr\.io/muchenai/[a-z0-9-]+@sha256:[0-9a-f]{64}")
-EXPECTED_CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
-EXPECTED_ROLLBACK = "ff53052847a268d025bceb93c3eab37986d50219"
 
 
 class CanaryContractError(RuntimeError):
     pass
+
+
+def _runtime_binding() -> dict[str, object]:
+    try:
+        return verify_binding(BINDING)
+    except BindingError as error:
+        raise CanaryContractError("candidate binding is invalid") from error
+
+
+EXPECTED_CANDIDATE = str(_runtime_binding()["application_candidate_sha"])
+EXPECTED_ROLLBACK = "ff53052847a268d025bceb93c3eab37986d50219"
 
 
 def sha256(path: Path) -> str:
@@ -48,13 +63,12 @@ def load() -> dict[str, object]:
     value = _json_file(CONTRACT)
     if value.get("schema_version") != 3:
         raise CanaryContractError("schema version differs")
+    binding = _runtime_binding()
     expected_scalars = {
         "environment": "PRODUCTION_CANARY_UAT",
-        "application_candidate_sha": EXPECTED_CANDIDATE,
-        "package_workflow_run_id": "33950428823",
-        "package_manifest_sha256": (
-            "84acfaad327814f6c981d8e185c40c40fbf6e2626d7fbb2ccae1ff85bc5d9096"
-        ),
+        "application_candidate_sha": binding["application_candidate_sha"],
+        "package_workflow_run_id": binding["package_workflow_run_id"],
+        "package_manifest_sha256": binding["release_manifest_sha256"],
         "migration_head": "0028_canary_main_merge",
         "production_host": "journey.muchenai.com",
         "source_database": "journey_next_cutover_20260810",
@@ -79,6 +93,15 @@ def load() -> dict[str, object]:
         raise CanaryContractError("image set differs")
     if any(not isinstance(item, str) or not DIGEST_IMAGE.fullmatch(item) for item in images.values()):
         raise CanaryContractError("image is not digest-pinned")
+    binding_images = binding["images"]
+    assert isinstance(binding_images, dict)
+    expected_images = {
+        "api": f"ghcr.io/muchenai/muchen-journey-vnext-api@{binding_images['api']['registry_digest']}",
+        "web": f"ghcr.io/muchenai/muchen-journey-vnext-web@{binding_images['web']['registry_digest']}",
+        "worker_evidence_only": f"ghcr.io/muchenai/muchen-journey-vnext-worker@{binding_images['worker']['registry_digest']}",
+    }
+    if images != expected_images:
+        raise CanaryContractError("contract images differ from candidate binding")
     rollback = value.get("rollback")
     if not isinstance(rollback, dict) or rollback.get("candidate_sha") != EXPECTED_ROLLBACK:
         raise CanaryContractError("rollback candidate differs")

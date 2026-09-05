@@ -117,6 +117,32 @@ def _database(result: dict[str, object], database_name: str = DATABASE_NAME) -> 
     return matches[0] if matches else None
 
 
+def database_exists(
+    instance_id: str,
+    access_key: str,
+    secret_key: str,
+    *,
+    session_token: str = "",
+    database_name: str = DATABASE_NAME,
+) -> bool:
+    """Read-only existence check used by lifecycle guards."""
+    if not INSTANCE_ID.fullmatch(instance_id):
+        raise ProductionDatabaseError("RDS instance identifier is invalid")
+    if database_name not in ALLOWED_DATABASES:
+        raise ProductionDatabaseError("database is outside the reviewed allowlist")
+    result = _request(
+        "DescribeDatabases",
+        {"InstanceId": instance_id, "DBName": database_name},
+        access_key,
+        secret_key,
+        session_token=session_token,
+    )
+    existing = _database(result, database_name)
+    if existing is not None:
+        validate_database(existing, database_name)
+    return existing is not None
+
+
 def validate_database(database: dict[str, object], database_name: str = DATABASE_NAME) -> None:
     expected = {
         "DBName": database_name,

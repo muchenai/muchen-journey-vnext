@@ -64,6 +64,25 @@ def test_greenfield_package_rechecks_candidate_and_uploads_digest_evidence() -> 
     assert "sha256sum -c SHA256SUMS" in job
 
 
+def test_greenfield_package_emits_verified_candidate_binding_artifact() -> None:
+    job = greenfield_package_job()
+    assert "scripts/wp31_candidate_binding.py generate" in job
+    assert "--package-run-id \"$GITHUB_RUN_ID\"" in job
+    assert "candidate-binding.json" in job
+    assert "scripts/wp31_candidate_binding.py verify" in job
+    assert "wp31-candidate-binding-${{ github.run_id }}" in job
+    assert "actions/upload-artifact" in job
+
+
+def test_fast_canary_runs_read_only_database_lifecycle_guard_before_create() -> None:
+    protected = job("greenfield_canary", "operate")
+    assert "Read-only Canary database lifecycle guard" in protected
+    assert "wp31_canary_database_guard" in protected
+    assert "database_exists" in protected
+    assert "canary_service_active" in protected
+    assert "workflow_runs_in_progress" in protected
+
+
 def test_legacy_wartime_candidate_guard_remains_distinct() -> None:
     text = workflow_text()
     legacy = text[text.index("  operate:\n") :]
