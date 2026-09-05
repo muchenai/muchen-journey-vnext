@@ -453,7 +453,7 @@ jobs:
           name: wp07-candidate-9e2d3496f5df80da1291c77bd6f949a5078ef25d
           path: artifacts/wp31-candidate
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 33838169130
+          run-id: 33950428823
       - name: Verify exact registry-bound package after both authorization Gates
         run: |
           set -euo pipefail
@@ -746,7 +746,7 @@ jobs:
           remote="/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID"
           tar -C "$bundle" -czf - request.json wp31_identity_bootstrap.py | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
-          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:850d5b1eb31eda6840fc31cae266af84aa96e5d8b6ed822db6bc03081374117c'
+          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:a4ac42e4073ed630b74245230bee03b23ce7cb95747aa731ea52ee1e2263be02'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm --network host --env-file '$remote/secrets/target-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/request.json:/tmp/request.json:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --database-kind canary --request /tmp/request.json --confirm BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY >'$remote/identity-result.json'"
           scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/identity-result.json" "$RUNNER_TEMP/identity-result.json"
           python3 - "$RUNNER_TEMP/identity-result.json" <<'PY'
@@ -1035,7 +1035,7 @@ jobs:
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
           tar -C "$bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
-          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:850d5b1eb31eda6840fc31cae266af84aa96e5d8b6ed822db6bc03081374117c'
+          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:a4ac42e4073ed630b74245230bee03b23ce7cb95747aa731ea52ee1e2263be02'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm --network host --env-file '$remote/secrets/source-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/request.json:/tmp/request.json:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --request /tmp/request.json --confirm BOOTSTRAP_IDENTITIES_9E2D349_PRODUCTION_CANARY >'$remote/result.json'"
           scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/result.json" "$RUNNER_TEMP/wp31-identity-result.json"
           python3 - "$RUNNER_TEMP/wp31-identity-result.json" <<'PY'
