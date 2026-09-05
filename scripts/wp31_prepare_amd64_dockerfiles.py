@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -52,10 +53,16 @@ def git(root: Path, *arguments: str) -> str:
     return result.stdout.strip()
 
 
-def prepare(candidate_root: Path, output: Path) -> dict[str, object]:
+def prepare(
+    candidate_root: Path,
+    output: Path,
+    candidate: str = CANDIDATE,
+) -> dict[str, object]:
     candidate_root = candidate_root.resolve()
     output = output.resolve()
-    if git(candidate_root, "rev-parse", "--verify", "HEAD") != CANDIDATE:
+    if not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        raise Amd64DockerfileError("application candidate SHA is invalid")
+    if git(candidate_root, "rev-parse", "--verify", "HEAD") != candidate:
         raise Amd64DockerfileError("application candidate SHA does not match")
     if git(candidate_root, "status", "--porcelain=v1", "--untracked-files=all"):
         raise Amd64DockerfileError("application candidate must be clean")
@@ -83,7 +90,7 @@ def prepare(candidate_root: Path, output: Path) -> dict[str, object]:
             }
         manifest = {
             "schema_version": 1,
-            "application_candidate_sha": CANDIDATE,
+            "application_candidate_sha": candidate,
             "target_platform": "linux/amd64",
             "semantic_change": False,
             "files": files,
@@ -105,9 +112,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--candidate", default=CANDIDATE)
     args = parser.parse_args()
     try:
-        result = prepare(args.candidate_root, args.output)
+        result = prepare(args.candidate_root, args.output, args.candidate)
     except (Amd64DockerfileError, OSError, UnicodeDecodeError) as error:
         print(f"WP31_AMD64_BUILD_DEFINITION=FAIL reason={error}")
         return 2

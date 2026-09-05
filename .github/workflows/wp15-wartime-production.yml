@@ -120,7 +120,8 @@ jobs:
           (cd candidate && python3 scripts/wp07_candidate.py preflight)
           python3 scripts/wp31_prepare_amd64_dockerfiles.py \
             --candidate-root candidate \
-            --output "$RUNNER_TEMP/wp31-amd64-build"
+            --output "$RUNNER_TEMP/wp31-amd64-build" \
+            --candidate "$candidate"
       - name: Re-run candidate machine gates
         run: |
           set -euo pipefail

@@ -51,6 +51,19 @@ def test_prepare_binds_exact_candidate_and_refuses_existing_output(
         build.prepare(ROOT, output)
 
 
+def test_prepare_accepts_explicit_candidate_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    candidate = "a" * 40
+    monkeypatch.setattr(
+        build,
+        "git",
+        lambda _root, *arguments: candidate
+        if arguments == ("rev-parse", "--verify", "HEAD")
+        else "",
+    )
+    result = build.prepare(ROOT, tmp_path / "derived", candidate)
+    assert result["application_candidate_sha"] == candidate
+
+
 def test_cli_fails_closed_for_wrong_candidate_without_traceback(tmp_path: Path) -> None:
     wrong = tmp_path / "wrong"
     wrong.mkdir()
