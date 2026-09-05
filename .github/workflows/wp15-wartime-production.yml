@@ -85,8 +85,7 @@ jobs:
   greenfield_package:
     if: >-
       inputs.phase == 'greenfield-package' &&
-      inputs.candidate == '9e2d3496f5df80da1291c77bd6f949a5078ef25d' &&
-      inputs.confirmation == 'PACKAGE_9E2D349_GREENFIELD_CANARY'
+      inputs.confirmation == 'PACKAGE_GREENFIELD_CANARY'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -112,6 +111,8 @@ jobs:
       - name: Verify exact clean application candidate
         run: |
           set -euo pipefail
+          candidate='${{ inputs.candidate }}'
+          printf '%s\n' "$candidate" | grep -Eq '^[0-9a-f]{40}$'
           test "$(git -C candidate rev-parse --verify HEAD)" = '${{ inputs.candidate }}'
           test -z "$(git -C candidate status --porcelain=v1 --untracked-files=all)"
           test '${{ inputs.backup_run_id }}' = ''
@@ -119,7 +120,8 @@ jobs:
           (cd candidate && python3 scripts/wp07_candidate.py preflight)
           python3 scripts/wp31_prepare_amd64_dockerfiles.py \
             --candidate-root candidate \
-            --output "$RUNNER_TEMP/wp31-amd64-build"
+            --output "$RUNNER_TEMP/wp31-amd64-build" \
+            --candidate "$candidate"
       - name: Re-run candidate machine gates
         run: |
           set -euo pipefail
