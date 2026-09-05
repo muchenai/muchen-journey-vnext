@@ -26,7 +26,7 @@ def test_contract_is_exact_and_mutable_authorization_is_external() -> None:
     assert value["scope"]["worker_started"] is False
     assert value["scope"]["release_go"] is False
     assert value["authorization_model"] == (
-        "EXTERNAL_PRO_EVIDENCE_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
+        "ENVIRONMENT_APPROVAL_PLUS_PROTECTED_OWNER_EXECUTION_EVIDENCE"
     )
     assert "owner_canary_deployment_go" not in value
     assert "entrypoint_execution_granted" not in value
@@ -132,6 +132,56 @@ def test_owner_authorization_is_external_exact_phase_short_lived_and_hash_bound(
             contract.sha256(evidence),
             "2" * 64,
             "greenfield-preflight",
+            reviewed_ref,
+            reviewed,
+        )
+
+
+def test_fast_canary_authorization_uses_empty_pro_review_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = contract.load()
+    monkeypatch.setattr(contract, "load", lambda: value)
+    reviewed = "1" * 40
+    reviewed_ref = f"refs/tags/muchen-journey-greenfield-ops-{reviewed}"
+    monkeypatch.setattr(
+        contract,
+        "_git",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, (reviewed + "\n").encode(), b""),
+    )
+    now = datetime.now(timezone.utc)
+    payload = {
+        "authorization_id": str(uuid.uuid4()),
+        "authorization_status": "GRANTED",
+        "authorized_at_utc": (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
+        "not_after_utc": (now + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
+        "authorized_by": "刘默文",
+        "authority": "PRODUCT_OWNER_AND_RELEASE_OPS_OWNER",
+        "environment": "PRODUCTION_CANARY_UAT",
+        "application_candidate_sha": value["application_candidate_sha"],
+        "reviewed_ops_commit_sha": reviewed,
+        "reviewed_ops_ref": reviewed_ref,
+        "ops_manifest_sha256": contract.sha256(contract.OPS_MANIFEST),
+        "pro_review_evidence_sha256": "",
+        "phase": "greenfield-canary-fast",
+        "max_allowlisted_learners": 8,
+        "production_job_execution_authorized": True,
+        "worker_start_authorized": False,
+        "release_go": False,
+    }
+    evidence = tmp_path / "fast-owner-authorization.json"
+    evidence.write_text(json.dumps(payload, sort_keys=True) + "\n")
+    assert contract.authorization_check(
+        evidence, contract.sha256(evidence), "", "greenfield-canary-fast", reviewed_ref, reviewed
+    )["status"] == "PASS"
+    payload["pro_review_evidence_sha256"] = "2" * 64
+    evidence.write_text(json.dumps(payload, sort_keys=True) + "\n")
+    with pytest.raises(contract.CanaryContractError, match="must not include Pro review evidence"):
+        contract.authorization_check(
+            evidence,
+            contract.sha256(evidence),
+            "2" * 64,
+            "greenfield-canary-fast",
             reviewed_ref,
             reviewed,
         )
@@ -292,6 +342,13 @@ def test_workflow_requires_real_review_before_infrastructure_read() -> None:
     assert "greenfield-deploy" in job
     assert "greenfield-rollback" in job
     assert "WP31_CANARY_LEARNER_USER_IDS: ${{ secrets.WP31_CANARY_LEARNER_USER_IDS }}" in job
+
+
+def test_fast_canary_uses_environment_approval_without_pro_review() -> None:
+    workflow = (ROOT / ".github/workflows/wp15-wartime-production.yml").read_text()
+    assert "if [[ '${{ inputs.phase }}' == greenfield-canary-fast ]]; then" in workflow
+    assert "pro_review_evidence_sha256=" in workflow
+    assert "greenfield-canary-fast" in workflow
 
 
 def test_workflow_closes_phase_chain_and_has_failure_rollback_cleanup() -> None:

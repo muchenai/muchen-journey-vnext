@@ -32,3 +32,19 @@ def test_rebind_workflow_does_not_receive_production_secrets() -> None:
     assert "WP08_" not in text
     assert "WP15_" not in text
     assert "WP09_" not in text
+
+
+def test_mainline_skips_candidate_package_for_ops_only_changes() -> None:
+    mainline = (WORKFLOW.parent / "mainline.yml").read_text(encoding="utf-8")
+    assert "application_changed" in mainline
+    assert "git diff-tree" in mainline
+    assert "steps.scope.outputs.application_changed == 'true'" in mainline
+    assert "Candidate-Operation: ops-only" in mainline
+    assert "Candidate-Operation: ops-only" in WORKFLOW.read_text(encoding="utf-8")
+
+
+def test_rebind_workflow_stops_duplicate_candidate_package() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "duplicate candidate/package" in text
+    assert "WP31_REBIND=STOP" in text
+    assert "config/wp31_candidate_binding.json" in text

@@ -64,6 +64,28 @@ jobs:
           cmp "$RUNNER_TEMP/generated-binding.json" "$binding"
           (cd "$(dirname "$checksums")" && sha256sum -c "$(basename "$checksums")")
 
+      - name: Stop duplicate candidate/package rebind
+        if: steps.handoff.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          incoming="$(find artifacts/wp31-binding -type f -name candidate-binding.json -print -quit)"
+          python3 - "$incoming" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          incoming = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          current_path = Path("config/wp31_candidate_binding.json")
+          if current_path.is_file():
+              current = json.loads(current_path.read_text(encoding="utf-8"))
+              pair = (current.get("application_candidate_sha"), current.get("package_workflow_run_id"))
+              incoming_pair = (incoming.get("application_candidate_sha"), incoming.get("package_workflow_run_id"))
+              if pair == incoming_pair:
+                  print("WP31_REBIND=STOP duplicate candidate/package")
+                  raise SystemExit(1)
+          print("WP31_REBIND=PASS unique candidate/package")
+          PY
+
       - name: Rebind contract and Ops tree
         if: steps.handoff.outputs.present == 'true'
         run: |
@@ -93,7 +115,8 @@ jobs:
           git add config scripts tests \
             .github/workflows/wp15-wartime-production.yml \
             .github/workflows/wp31-candidate-rebind.yml
-          git commit -m "chore(ops): rebind Canary evidence to package run ${run_id}"
+          git commit -m "chore(ops): rebind Canary evidence to package run ${run_id}" \
+            -m "Candidate-Operation: ops-only"
           git push origin HEAD:$branch
           gh pr create \
             --base main \
