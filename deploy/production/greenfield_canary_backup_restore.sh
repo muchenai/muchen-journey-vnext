@@ -3,26 +3,32 @@ set -euo pipefail
 
 fail() { printf 'WP31_CANARY_BACKUP_RESTORE_ERROR: %s\n' "$*" >&2; exit 1; }
 
-candidate=9e2d3496f5df80da1291c77bd6f949a5078ef25d
+candidate="${CANDIDATE_COMMIT:-}"
 source_database=journey_next_cutover_20260810
 target_database=journey_next_canary_20260901_c72fea5
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
+[[ "$candidate" =~ ^[0-9a-f]{40}$ ]] || fail "candidate is invalid"
 [[ "${SOURCE_DATABASE:-}" == "$source_database" ]] || fail "unexpected source database"
 [[ "${TARGET_DATABASE:-}" == "$target_database" ]] || fail "unexpected target database"
 [[ "${WP31_RUN_ID:-}" =~ ^[1-9][0-9]{5,19}$ ]] || fail "workflow run ID is invalid"
 [[ "${WP31_PREFLIGHT_RUN_ID:-}" =~ ^[1-9][0-9]{5,19}$ ]] || fail "preflight run ID is invalid"
 [[ "${WP31_OPS_MANIFEST_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "ops manifest hash is invalid"
 [[ -n "${WP15_BACKUP_KEY:-}" && ${#WP15_BACKUP_KEY} -ge 32 ]] || fail "backup key is missing"
-[[ "${DBTOOL_IMAGE:-}" == ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9 ]] || fail "database tool differs"
+[[ "${DBTOOL_IMAGE:-}" == ghcr.io/muchenai/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9 ]] || fail "database tool differs"
 
 bundle=$(pwd -P)
 ca="$bundle/secrets/volcengine-rds-ca.pem"
 facts_script="$bundle/db_facts.py"
 target_env="$bundle/secrets/target-facts.env"
 source_env="$bundle/secrets/source-facts.env"
-for path in "$ca" "$facts_script" "$target_env" "$source_env"; do
+binding_proof="$bundle/candidate-binding-proof.json"
+binding_module="$bundle/wp31_candidate_binding.py"
+for path in "$ca" "$facts_script" "$target_env" "$source_env" "$binding_proof" "$binding_module"; do
   [[ -f "$path" && ! -L "$path" ]] || fail "required input is missing"
 done
+python3 "$binding_module" runtime-verify \
+  --binding "$binding_proof" --candidate "$candidate" \
+  --api-image "${API_IMAGE:-}" --web-image "${WEB_IMAGE:-}" || fail "runtime binding differs"
 root="/srv/journey-next-production/canary/backups/$WP31_RUN_ID"
 [[ ! -e "$root" ]] || fail "backup run already exists"
 install -d -m 0700 "$root"
@@ -86,16 +92,16 @@ facts_sha=$(sha256sum "$facts" | awk '{print $1}')
 source_facts_sha=$(sha256sum "$source_facts" | awk '{print $1}')
 WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$manifest" "$WP31_RUN_ID" \
   "$plain_sha" "$encrypted_sha" "$source_facts_sha" "$facts_sha" \
-  "$WP31_PREFLIGHT_RUN_ID" "$WP31_OPS_MANIFEST_SHA256" <<'PY'
+  "$WP31_PREFLIGHT_RUN_ID" "$WP31_OPS_MANIFEST_SHA256" "$candidate" <<'PY'
 import hashlib, hmac, json, os, sys
 from datetime import datetime, timedelta, timezone
-path, run_id, plain_sha, encrypted_sha, source_facts_sha, facts_sha, preflight_run_id, ops_manifest_sha = sys.argv[1:]
+path, run_id, plain_sha, encrypted_sha, source_facts_sha, facts_sha, preflight_run_id, ops_manifest_sha, candidate = sys.argv[1:]
 now = datetime.now(timezone.utc).replace(microsecond=0)
 body = {
     "schema_version": 2,
     "run_id": run_id,
     "preflight_run_id": preflight_run_id,
-    "candidate_sha": "9e2d3496f5df80da1291c77bd6f949a5078ef25d",
+    "candidate_sha": candidate,
     "ops_manifest_sha256": ops_manifest_sha,
     "source_database": "journey_next_cutover_20260810",
     "isolated_canary_database": "journey_next_canary_20260901_c72fea5",

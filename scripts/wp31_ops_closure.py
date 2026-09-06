@@ -14,6 +14,7 @@ WORKFLOW = ".github/workflows/wp15-wartime-production.yml"
 MANIFEST = "config/wp31_greenfield_canary_ops_manifest.json"
 STATIC_ROOTS = {
     WORKFLOW,
+    ".github/workflows/wp31-dbtool-mirror.yml",
     MANIFEST,
     "config/wp31_greenfield_canary.json",
     "config/wp31_greenfield_canary_pro_review_evidence.schema.json",

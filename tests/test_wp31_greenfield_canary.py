@@ -443,6 +443,8 @@ def test_prepare_accepts_zero_allowlist_and_never_writes_worker_env(
     output = tmp_path / "bundle"
     prepare.prepare(output, "private.example.internal", 5432)
     proof = json.loads((output / "allowlist-proof.json").read_text())
+    binding_proof = json.loads((output / "candidate-binding-proof.json").read_text())
+    assert binding_proof == prepare.candidate_binding()
     assert proof["allowlist_count"] == 0
     assert proof["raw_identifiers_in_proof"] is False
     assert not (output / "secrets/worker.env").exists()

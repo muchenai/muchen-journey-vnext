@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -77,3 +79,58 @@ def test_binding_serialization_is_deterministic(tmp_path: Path) -> None:
     second = binding.build_binding(manifest, package_run_id="33950428823")
 
     assert binding.serialize(first) == binding.serialize(second)
+
+
+def test_runtime_images_must_match_the_verified_binding(tmp_path: Path) -> None:
+    manifest = _write_package(tmp_path / "package")
+    value = binding.build_binding(manifest, package_run_id="33999999999")
+    api = f"ghcr.io/muchenai/muchen-journey-vnext-api@{DIGESTS['api']}"
+    web = f"ghcr.io/muchenai/muchen-journey-vnext-web@{DIGESTS['web']}"
+
+    binding.verify_runtime_images(value, candidate=CANDIDATE, api_image=api, web_image=web)
+
+    with pytest.raises(binding.BindingError, match="api runtime image"):
+        binding.verify_runtime_images(
+            value,
+            candidate=CANDIDATE,
+            api_image="ghcr.io/muchenai/muchen-journey-vnext-api@sha256:" + "0" * 64,
+            web_image=web,
+        )
+
+
+def test_runtime_verify_cli_rejects_a_same_namespace_wrong_digest(tmp_path: Path) -> None:
+    manifest = _write_package(tmp_path / "package")
+    value = binding.build_binding(manifest, package_run_id="33999999999")
+    proof = tmp_path / "candidate-binding-proof.json"
+    proof.write_bytes(binding.serialize(value))
+    api = f"ghcr.io/muchenai/muchen-journey-vnext-api@{DIGESTS['api']}"
+    web = f"ghcr.io/muchenai/muchen-journey-vnext-web@{DIGESTS['web']}"
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve().parents[1] / "scripts/wp31_candidate_binding.py"),
+        "runtime-verify",
+        "--binding",
+        str(proof),
+        "--candidate",
+        CANDIDATE,
+        "--api-image",
+        api,
+        "--web-image",
+        web,
+    ]
+    passed = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert passed.returncode == 0
+    failed = subprocess.run(
+        [
+            *command[:-4],
+            "--api-image",
+            "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:" + "0" * 64,
+            "--web-image",
+            web,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert failed.returncode != 0
+    assert "api runtime image" in (failed.stdout + failed.stderr)

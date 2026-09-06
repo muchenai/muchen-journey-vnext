@@ -59,6 +59,7 @@ def _fixture(root: Path) -> Path:
             f'"API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@{OLD_DIGESTS["api"]}",\n'
             f'"WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@{OLD_DIGESTS["web"]}",'
         ),
+        "scripts/wp31_prepare_amd64_dockerfiles.py": f'CANDIDATE = "{OLD_CANDIDATE}"\n',
         ".github/workflows/wp15-wartime-production.yml": (
             f"{OLD_CANDIDATE} 33838169130 0{'x' * 64} "
             f"ghcr.io/muchenai/muchen-journey-vnext-api@{OLD_DIGESTS['api']}"
