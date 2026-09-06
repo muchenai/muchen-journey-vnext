@@ -5,7 +5,7 @@
   ],
   "closure_model": "REPOSITORY_GREENFIELD_TRANSITIVE_V2",
   "files": {
-    ".github/workflows/wp15-wartime-production.yml": "d349232b34df549741b9582faeded384fd84e0e6fa5bf0c2725e6700480b7511",
+    ".github/workflows/wp15-wartime-production.yml": "22ccc7586a88ef932ba3b90acf9223e5b6d590f711b7c902ca9d84fde1b39316",
     ".github/workflows/wp31-dbtool-mirror.yml": "b2717f51902dfec474d3fd90d4f0e2df131e8706fe81741bbac11ffe0b524eab",
     "config/wp31_greenfield_canary.json": "050942c8fe62ed7399f2cba1d5e133ef9ce78a701b3e2992460ad07aa4dbfe0a",
     "config/wp31_greenfield_canary_execution_authorization.schema.json": "59fede75948aa9347c5b6bdc821a427041025f5ebda5efc88f2180901b068c8b",
@@ -40,6 +40,7 @@
     "tests/test_greenfield_canary_entrypoint.py": "f6c0d951344c9f75d6633a8db03820dcab7ee84ae48ae59a6fef28c09cc8574e",
     "tests/test_wp31_greenfield_canary.py": "b329681f0dc838dec0ccc1223514d26d08d1963c7df79f63ca159beb4e3063da",
     "tests/test_wp31_identity_bootstrap.py": "85323120aec7c651ddac8d67550574591d18baee1020f3d0842d5c6812ab776b",
+    "tests/test_wp31_ssh_options.py": "bf77e4db7d47c464f2b748873c105dddb00ac9983660353cc22e5cc627925074",
     ".github/workflows/wp31-candidate-rebind.yml": "67be719bdbfb13d8b3e8668de3cd2f7763e415d842ab9f155f7b7324e0963002",
     "config/wp31_candidate_binding.json": "c4915191d6afb09551e0e36f6433ff8cb5bf569f833b10ec3e480bb48a209d41",
     "scripts/wp31_candidate_binding.py": "9af52a89c7cb9da0ebafd98228116d45727fba28faac6b1f97bfa045d5a97837",

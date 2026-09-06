@@ -623,7 +623,7 @@ jobs:
           import json,sys
           assert json.loads(sys.argv[1]) == {"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}
           PY
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
       - name: Verify rollback target and no conflicting canary
@@ -632,7 +632,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
@@ -700,7 +700,7 @@ jobs:
               --path "$diagnostic" --category "$category" --exit-code "$status" >/dev/null 2>&1 || true
             exit "$status"
           }
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           set +e
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test -L /srv/journey-next-production/canary/current" >/dev/null 2>&1
           probe_status=$?
@@ -873,7 +873,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           remote="/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID"
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
           tar -C "$RUNNER_TEMP/wp31-bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
@@ -888,7 +888,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           source="/srv/journey-next-production/canary/backups/$GITHUB_RUN_ID"
           destination="$RUNNER_TEMP/wp31-backup-proof"
           install -d -m 0700 "$destination"
@@ -948,7 +948,7 @@ jobs:
           public_key="$RUNNER_TEMP/wp31-recipient-public.pem"
           printf '%s' "$RECIPIENT_PUBLIC_KEY_B64" | base64 --decode >"$public_key"
           openssl pkey -pubin -in "$public_key" -text -noout | grep -Fqx 'Public-Key: (4096 bit)'
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           remote="/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID"
           tar -C "$bundle" -czf - request.json wp31_identity_bootstrap.py | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
@@ -978,7 +978,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           release="/srv/journey-next-production/canary/releases/${{ inputs.candidate }}-$GITHUB_RUN_ID"
           echo "release=$release" >>"$GITHUB_OUTPUT"
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$release' && install -d -m 0700 '$release'"
@@ -1000,7 +1000,7 @@ jobs:
           import json, sys
           assert json.loads(sys.argv[1]) == {"status": "ready", "release": '${{ inputs.candidate }}'}
           PY
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -e; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(docker compose -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; docker compose -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
           if [[ '${{ inputs.phase }}' == greenfield-deploy || '${{ inputs.phase }}' == greenfield-canary-fast ]]; then
             proof="$RUNNER_TEMP/wp31-deploy-proof"
@@ -1044,7 +1044,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set +e
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           release='${{ steps.deploy.outputs.release }}'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "
             set +e
@@ -1071,7 +1071,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
           set -euo pipefail
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" '/srv/journey-next-production/canary/current/rollback.sh'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
@@ -1087,7 +1087,7 @@ jobs:
           set +e
           cleanup_status=0
           if [[ -s "$RUNNER_TEMP/wp31-key" && -n "$PUBLIC_IP" ]]; then
-            opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+            opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
             ssh "${opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- '/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID'" || cleanup_status=1
           fi
           rm -rf -- "$RUNNER_TEMP/wp31-bundle" "$RUNNER_TEMP/wp31-identity-proof" "$RUNNER_TEMP/wp31-pro-review-evidence.json"
@@ -1210,7 +1210,7 @@ jobs:
           set -euo pipefail
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
           test "$ready" = '{"status":"ready","release":"ff53052847a268d025bceb93c3eab37986d50219"}'
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 - --profile cutover" <scripts/wp15_production_inventory.py
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L /srv/journey-next-production/canary/current"
       - name: Prepare sealed source-database bootstrap bundle
@@ -1236,7 +1236,7 @@ jobs:
           bundle="$RUNNER_TEMP/wp31-identity-bootstrap"
           public_key="$RUNNER_TEMP/wp31-recipient-public.pem"
           printf '%s' "$RECIPIENT_PUBLIC_KEY_B64" | base64 --decode >"$public_key"
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           remote="/srv/journey-next-production/canary/identity-bootstrap-runs/$GITHUB_RUN_ID"
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
           tar -C "$bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
@@ -1272,7 +1272,7 @@ jobs:
           PUBLIC_IP: ${{ steps.frozen_identity.outputs.public_ip }}
         run: |
           set +e
-          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
+          opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           if [[ -s "$RUNNER_TEMP/wp31-key" && -n "$PUBLIC_IP" ]]; then
             ssh "${opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- '/srv/journey-next-production/canary/identity-bootstrap-runs/$GITHUB_RUN_ID'"
           fi
