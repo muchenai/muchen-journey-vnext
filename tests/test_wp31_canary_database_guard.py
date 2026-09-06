@@ -27,6 +27,7 @@ def test_rebuild_requires_existing_unused_database():
 
 def test_create_allows_absent_database_but_still_blocks_references():
     assert guard.safe_to_create(facts(database_exists=False)) is True
+    assert guard.safe_to_create(facts(database_exists=True)) is False
     assert guard.safe_to_create(facts(canary_service_active=True)) is False
     assert guard.safe_to_create(facts(current_release_reference=True)) is False
 
