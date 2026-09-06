@@ -40,7 +40,7 @@ def safe_to_rebuild(facts: dict[str, object]) -> bool:
 
 
 def safe_to_create(facts: dict[str, object]) -> bool:
-    """Allow first-time creation only when no service/workflow/release uses it."""
+    """Allow first-time creation only when the exact database is absent."""
     if facts.get("database_name") != CANARY_DATABASE:
         return False
     if facts.get("canary_service_active") is not False:
@@ -49,7 +49,10 @@ def safe_to_create(facts: dict[str, object]) -> bool:
         return False
     if facts.get("workflow_runs_in_progress") != 0:
         return False
-    return facts.get("database_exists") in {True, False}
+    # An existing database must use the explicit rebuild path.  Allowing it here
+    # lets a stale/non-empty Canary database pass the create guard and fail only
+    # after the workflow has begun the backup/restore mutation.
+    return facts.get("database_exists") is False
 
 
 def check(path: Path, operation: str) -> dict[str, object]:
