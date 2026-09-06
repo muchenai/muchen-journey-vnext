@@ -24,7 +24,7 @@
 - 让备份、部署、edge 和 rollback 脚本从生成 bundle 的候选变量或 release path 读取候选，不再硬编码历史 SHA。
 - 让生成脚本把候选写入备份环境，并把 dbtool 目标固定到 `ghcr.io/muchenai/muchen-journey-vnext-dbtool` 的已知 digest。
 - 保持 API/Web/Worker 仅使用 candidate binding 提供的 digest；不改变 API/Web only、worker 关闭、`release_go=false` 和独立数据库语义。
-- 同步修正 dbtool mirror Workflow 的目标 namespace；源镜像是否仍可读取必须由 Actions 运行时验证，不能由本地 login 推断。
+- 保留历史 WP-15 dbtool mirror 不变，新增独立 WP-31 canonical mirror；源镜像仅作不可变输入，是否可读取以及 canonical target 的 digest/包权限必须由 Actions 运行时验证，不能由本地 login 推断。
 
 ### 3. 本地验证与 closure 更新
 

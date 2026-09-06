@@ -14,6 +14,10 @@ CURRENT_DBTOOL_TARGET = (
     "ghcr.io/muchenai/muchen-journey-vnext-dbtool:"
     "postgres-client-17.6-3a8282847477"
 )
+LEGACY_DBTOOL_SOURCE = (
+    "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@"
+    "$digest"
+)
 
 
 def test_canary_contract_uses_the_unified_candidate_binding() -> None:
@@ -68,7 +72,10 @@ def test_runtime_images_and_dbtool_use_the_current_registry_namespace() -> None:
         encoding="utf-8"
     )
     deploy = (ROOT / "deploy/production/greenfield_canary_deploy.sh").read_text(encoding="utf-8")
-    mirror = (ROOT / ".github/workflows/wp15-dbtool-mirror.yml").read_text(encoding="utf-8")
+    mirror = (ROOT / ".github/workflows/wp31-dbtool-mirror.yml").read_text(encoding="utf-8")
+    historical_mirror = (ROOT / ".github/workflows/wp15-dbtool-mirror.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert CURRENT_DBTOOL_NAMESPACE in prepare
     assert CURRENT_DBTOOL_NAMESPACE in backup
@@ -79,9 +86,14 @@ def test_runtime_images_and_dbtool_use_the_current_registry_namespace() -> None:
     assert "runtime-verify" in backup
     assert "runtime-verify" in deploy
     assert "=~ ^ghcr\\.io/muchenai/muchen-journey-vnext-api@sha256:[0-9a-f]{64}$" not in deploy
-    assert LEGACY_DBTOOL_TARGET in mirror
+    assert LEGACY_DBTOOL_SOURCE in mirror
+    assert LEGACY_DBTOOL_TARGET not in mirror
     assert CURRENT_DBTOOL_TARGET in mirror
-    assert 'for target in "$legacy_target" "$canonical_target"' in mirror
+    assert LEGACY_DBTOOL_TARGET in historical_mirror
+    assert CURRENT_DBTOOL_TARGET not in historical_mirror
+    assert "wp31-dbtool-mirror.yml" in (
+        ROOT / "scripts/wp31_ops_closure.py"
+    ).read_text(encoding="utf-8")
 
 
 def test_prepare_passes_bound_candidate_to_backup_runtime() -> None:
