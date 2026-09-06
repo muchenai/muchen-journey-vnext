@@ -2,11 +2,12 @@
 set -euo pipefail
 
 fail() { printf 'WP31_CANARY_DEPLOY_ERROR: %s\n' "$*" >&2; return 1; }
-candidate=9e2d3496f5df80da1291c77bd6f949a5078ef25d
+candidate="${CANDIDATE_COMMIT:-}"
 database=journey_next_canary_20260901_c72fea5
 migration=0028_canary_main_merge
 root=/srv/journey-next-production/canary
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
+[[ "$candidate" =~ ^[0-9a-f]{40}$ ]] || fail "candidate is invalid"
 [[ "${CANDIDATE_COMMIT:-}" == "$candidate" ]] || fail "candidate differs"
 [[ "${CANARY_DATABASE:-}" == "$database" ]] || fail "database differs"
 [[ "${PRODUCTION_HOST:-}" == journey.muchenai.com ]] || fail "host differs"
@@ -15,12 +16,13 @@ root=/srv/journey-next-production/canary
 [[ "${WP31_OPS_MANIFEST_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "ops manifest hash is invalid"
 [[ "${WP31_DEPLOY_RUN_ID:-}" =~ ^[1-9][0-9]{5,19}$ ]] || fail "deploy run ID is invalid"
 [[ -n "${WP15_BACKUP_KEY:-}" && ${#WP15_BACKUP_KEY} -ge 32 ]] || fail "backup key is missing"
-[[ "${API_IMAGE:-}" == ghcr.io/muchenai/muchen-journey-vnext-api@sha256:850d5b1eb31eda6840fc31cae266af84aa96e5d8b6ed822db6bc03081374117c ]] || fail "API digest differs"
-[[ "${WEB_IMAGE:-}" == ghcr.io/muchenai/muchen-journey-vnext-web@sha256:0d7599796c5eef2f451b50b9a5cfe851b64c76e54b7ba17c1604b25324d85899 ]] || fail "Web digest differs"
 
-for path in compose.canary.yaml compose.migrate.yaml grant_runtime.py edge.sh Caddyfile.canary Caddyfile.rollback allowlist-proof.json db_facts.py; do
+for path in compose.canary.yaml compose.migrate.yaml grant_runtime.py edge.sh Caddyfile.canary Caddyfile.rollback allowlist-proof.json db_facts.py candidate-binding-proof.json wp31_candidate_binding.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "required input is missing: $path"
 done
+python3 ./wp31_candidate_binding.py runtime-verify \
+  --binding candidate-binding-proof.json --candidate "$candidate" \
+  --api-image "${API_IMAGE:-}" --web-image "${WEB_IMAGE:-}" || fail "runtime binding differs"
 for path in api.env migration.env web.env backup.env target-facts.env; do
   [[ -f "$PWD/secrets/$path" && ! -L "$PWD/secrets/$path" && "$(stat -c '%a' "$PWD/secrets/$path")" == 600 ]] || fail "secret input is invalid: $path"
 done
@@ -46,7 +48,7 @@ PY
 
 manifest="$root/backups/$BACKUP_RUN_ID/backup-manifest.json"
 [[ -f "$manifest" && ! -L "$manifest" ]] || fail "backup/restore proof is missing"
-WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$manifest" "$BACKUP_RUN_ID" "$PREFLIGHT_RUN_ID" "$WP31_OPS_MANIFEST_SHA256" "$root/backups/$BACKUP_RUN_ID" <<'PY'
+WP15_BACKUP_KEY="$WP15_BACKUP_KEY" python3 - "$manifest" "$BACKUP_RUN_ID" "$PREFLIGHT_RUN_ID" "$WP31_OPS_MANIFEST_SHA256" "$root/backups/$BACKUP_RUN_ID" "$candidate" <<'PY'
 import hashlib, hmac, json, os, sys
 from datetime import datetime, timezone
 value = json.load(open(sys.argv[1])); signature = value.pop("manifest_hmac_sha256", "")
@@ -55,7 +57,7 @@ assert hmac.compare_digest(signature, expected)
 assert value["run_id"] == sys.argv[2]
 assert value["preflight_run_id"] == sys.argv[3]
 assert value["ops_manifest_sha256"] == sys.argv[4]
-assert value["candidate_sha"] == "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
+assert value["candidate_sha"] == sys.argv[6]
 assert value["isolated_canary_database"] == "journey_next_canary_20260901_c72fea5"
 assert value["backup"] == value["restore"] == "PASS"
 assert value["source_modified"] is False
@@ -116,18 +118,18 @@ docker compose -f compose.canary.yaml up -d --wait
 started=1
 api_health=$(docker compose -f compose.canary.yaml exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3).read().decode())")
 web_release=$(docker compose -f compose.canary.yaml exec -T web printenv APP_RELEASE)
-python3 - "$api_health" "$web_release" <<'PY'
+python3 - "$api_health" "$web_release" "$candidate" <<'PY'
 import json, sys
-assert json.loads(sys.argv[1]) == {"status": "ok", "release": "9e2d3496f5df80da1291c77bd6f949a5078ef25d"}
-assert sys.argv[2] == "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
+assert json.loads(sys.argv[1]) == {"status": "ok", "release": sys.argv[3]}
+assert sys.argv[2] == sys.argv[3]
 PY
 install -d -m 0700 "$root"
 ln -sfn "$PWD" "$root/current"
 WP31_EDGE_MODE=canary WP31_EDGE_SOURCE="$PWD/Caddyfile.canary" ./edge.sh
 ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
-python3 - "$ready" <<'PY'
+python3 - "$ready" "$candidate" <<'PY'
 import json,sys
-assert json.loads(sys.argv[1]) == {"status":"ready","release":"9e2d3496f5df80da1291c77bd6f949a5078ef25d"}
+assert json.loads(sys.argv[1]) == {"status":"ready","release":sys.argv[2]}
 PY
 trap - ERR
 printf 'WP31_CANARY_DEPLOY=PASS candidate=%s database=%s migration=%s worker_started=false release_go=false\n' "$candidate" "$database" "$migration"

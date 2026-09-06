@@ -29,7 +29,7 @@ IMAGES = {
     "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:01e74f77faf364e65d157403262676f19d98f4862cd5ee0a80396fac91a7bce8",
     "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:5408e32b62ce8a2b954c63fecd8863ecd631cdb66ca82ab9d14adbb34e68cdd5",
 }
-DBTOOL_IMAGE = "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
+DBTOOL_IMAGE = "ghcr.io/muchenai/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
 
 
 class PrepareCanaryError(RuntimeError):
@@ -43,8 +43,8 @@ def candidate_binding() -> dict[str, object]:
         raise PrepareCanaryError("candidate binding is invalid") from error
 
 
-def bound_candidate_and_images() -> tuple[str, dict[str, str]]:
-    binding = candidate_binding()
+def bound_candidate_and_images(binding: dict[str, object] | None = None) -> tuple[str, dict[str, str]]:
+    binding = binding or candidate_binding()
     candidate = str(binding["application_candidate_sha"])
     raw_images = binding["images"]
     assert isinstance(raw_images, dict)
@@ -100,7 +100,8 @@ def prepare(output: Path, host: str, port: int) -> None:
     if not 1 <= port <= 65535:
         raise PrepareCanaryError("RDS port is invalid")
 
-    candidate, images = bound_candidate_and_images()
+    binding = candidate_binding()
+    candidate, images = bound_candidate_and_images(binding)
     migration_password = require("WP08_MIGRATION_DB_PASSWORD", 20)
     runtime_password = require("WP08_RUNTIME_DB_PASSWORD", 20)
     session_secret = require("WP15_SESSION_SECRET", 32)
@@ -118,6 +119,9 @@ def prepare(output: Path, host: str, port: int) -> None:
     output.mkdir(parents=True, mode=0o700)
     secrets = output / "secrets"
     secrets.mkdir(mode=0o700)
+    binding_proof = output / "candidate-binding-proof.json"
+    binding_proof.write_bytes(BINDING.read_bytes())
+    binding_proof.chmod(0o600)
     runtime_url = dsn("journey_next_runtime", runtime_password, host, port, CANARY_DATABASE)
     migration_url = dsn("journey_next_migrator", migration_password, host, port, CANARY_DATABASE)
     source_url = dsn("journey_next_migrator", migration_password, host, port, SOURCE_DATABASE)
@@ -162,6 +166,7 @@ def prepare(output: Path, host: str, port: int) -> None:
     write_env(
         secrets / "backup.env",
         {
+            "CANDIDATE_COMMIT": candidate,
             "SOURCE_DATABASE": SOURCE_DATABASE,
             "TARGET_DATABASE": CANARY_DATABASE,
             "RDS_HOST": host,
@@ -170,6 +175,7 @@ def prepare(output: Path, host: str, port: int) -> None:
             "WP15_BACKUP_KEY": backup_key,
             "DBTOOL_IMAGE": DBTOOL_IMAGE,
             "API_IMAGE": images["API_IMAGE"],
+            "WEB_IMAGE": images["WEB_IMAGE"],
         },
     )
     try:

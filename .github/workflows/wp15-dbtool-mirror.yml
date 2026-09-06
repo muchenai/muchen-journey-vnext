@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           digest=sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9
           source="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool@$digest"
-          target="ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:postgres-client-17.6-3a8282847477"
+          target="ghcr.io/muchenai/muchen-journey-vnext-dbtool:postgres-client-17.6-3a8282847477"
           docker buildx imagetools create --prefer-index=false --tag "$target" "$source"
           actual=$(docker buildx imagetools inspect "$target" --raw | sha256sum | awk '{print "sha256:" $1}')
           test "$actual" = "$digest"

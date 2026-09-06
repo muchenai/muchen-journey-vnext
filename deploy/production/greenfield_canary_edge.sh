@@ -4,7 +4,9 @@ set -euo pipefail
 fail() { printf 'WP31_CANARY_EDGE_ERROR: %s\n' "$*" >&2; exit 1; }
 [[ "${EUID}" -eq 0 ]] || fail "must run as root"
 [[ "${WP31_EDGE_MODE:-}" == canary || "${WP31_EDGE_MODE:-}" == rollback ]] || fail "edge mode is invalid"
-[[ "${WP31_EDGE_SOURCE:-}" =~ ^/srv/journey-next-production/canary/releases/9e2d3496f5df80da1291c77bd6f949a5078ef25d-[1-9][0-9]*/Caddyfile\.(canary|rollback)$ ]] || fail "edge source is invalid"
+edge_source_pattern='^/srv/journey-next-production/canary/releases/([0-9a-f]{40})-[1-9][0-9]*/Caddyfile\.(canary|rollback)$'
+[[ "${WP31_EDGE_SOURCE:-}" =~ $edge_source_pattern ]] || fail "edge source is invalid"
+candidate="${BASH_REMATCH[1]}"
 [[ -f "$WP31_EDGE_SOURCE" && ! -L "$WP31_EDGE_SOURCE" ]] || fail "edge source is missing"
 
 staging=/srv/journey-next-staging/current
@@ -40,7 +42,7 @@ docker compose up -d --no-deps --force-recreate --pull never edge
 sleep 2
 ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)
 expected=ff53052847a268d025bceb93c3eab37986d50219
-[[ "$WP31_EDGE_MODE" == canary ]] && expected=9e2d3496f5df80da1291c77bd6f949a5078ef25d
+[[ "$WP31_EDGE_MODE" == canary ]] && expected="$candidate"
 python3 - "$ready" "$expected" <<'PY'
 import json,sys
 assert json.loads(sys.argv[1]) == {"status":"ready","release":sys.argv[2]}

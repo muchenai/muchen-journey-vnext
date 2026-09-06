@@ -144,6 +144,34 @@ def verify_binding(path: Path, *, require_supply_chain: bool = False) -> dict[st
     return value
 
 
+def verify_runtime_images(
+    value: dict[str, object], *, candidate: str, api_image: str, web_image: str
+) -> None:
+    """Require runtime image references to equal the verified candidate binding exactly."""
+    if not _SHA.fullmatch(candidate):
+        raise BindingError("runtime candidate SHA is invalid")
+    if value.get("application_candidate_sha") != candidate:
+        raise BindingError("runtime candidate differs from binding")
+    images = value.get("images")
+    if not isinstance(images, dict) or set(images) != set(_SERVICES):
+        raise BindingError("runtime binding image set differs")
+    actual_images = {"api": api_image, "web": web_image}
+    for service, actual in actual_images.items():
+        item = images.get(service)
+        if not isinstance(item, dict):
+            raise BindingError(f"{service} runtime image binding is invalid")
+        digest = item.get("registry_digest")
+        reference = item.get("registry_reference")
+        expected_tag = f"ghcr.io/muchenai/muchen-journey-vnext-{service}:{candidate}"
+        if reference != expected_tag:
+            raise BindingError(f"{service} runtime tag binding differs")
+        if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
+            raise BindingError(f"{service} runtime digest binding is invalid")
+        expected_digest = f"ghcr.io/muchenai/muchen-journey-vnext-{service}@{digest}"
+        if actual != expected_digest:
+            raise BindingError(f"{service} runtime image differs from binding")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -153,14 +181,31 @@ def main() -> int:
     generate.add_argument("--output", type=Path, required=True)
     verify = subparsers.add_parser("verify")
     verify.add_argument("--binding", type=Path, required=True)
+    runtime_verify = subparsers.add_parser("runtime-verify")
+    runtime_verify.add_argument("--binding", type=Path, required=True)
+    runtime_verify.add_argument("--candidate", required=True)
+    runtime_verify.add_argument("--api-image", required=True)
+    runtime_verify.add_argument("--web-image", required=True)
     args = parser.parse_args()
     try:
         if args.command == "generate":
             value = build_binding(args.manifest, args.package_run_id)
             args.output.write_bytes(serialize(value))
-        else:
+        elif args.command == "verify":
             verify_binding(args.binding, require_supply_chain=True)
-        print("WP31_CANDIDATE_BINDING=PASS")
+        else:
+            value = verify_binding(args.binding, require_supply_chain=True)
+            verify_runtime_images(
+                value,
+                candidate=args.candidate,
+                api_image=args.api_image,
+                web_image=args.web_image,
+            )
+        print(
+            "WP31_RUNTIME_BINDING=PASS"
+            if args.command == "runtime-verify"
+            else "WP31_CANDIDATE_BINDING=PASS"
+        )
         return 0
     except (BindingError, OSError, ValueError, TypeError) as error:
         print(f"WP31_CANDIDATE_BINDING=FAIL reason={error}")
