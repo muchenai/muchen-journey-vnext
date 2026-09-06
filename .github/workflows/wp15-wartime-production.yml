@@ -677,6 +677,13 @@ jobs:
             --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
             --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
             --payload-dir "$RUNNER_TEMP/wp31-preflight-proof"
+      - name: Initialize Canary lifecycle diagnostic
+        if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/wp31-preflight-proof"
+          python3 scripts/wp31_canary_lifecycle_diagnostic.py init \
+            --path "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-diagnostic.json"
       - name: Read-only Canary database lifecycle guard
         if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
         env:
@@ -685,16 +692,35 @@ jobs:
           RDS_INSTANCE_ID: ${{ steps.frozen.outputs.rds_instance_id }}
         run: |
           set -euo pipefail
+          diagnostic="$RUNNER_TEMP/wp31-preflight-proof/lifecycle-diagnostic.json"
+          fail_probe() {
+            status="$1"
+            category="$2"
+            python3 scripts/wp31_canary_lifecycle_diagnostic.py failure \
+              --path "$diagnostic" --category "$category" --exit-code "$status" >/dev/null 2>&1 || true
+            exit "$status"
+          }
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
-          current_release_reference=false
-          if ssh "${opts[@]}" root@"$PUBLIC_IP" "test -L /srv/journey-next-production/canary/current"; then
-            current_release_reference=true
-          fi
-          canary_service_active=false
-          if ssh "${opts[@]}" root@"$PUBLIC_IP" "docker ps --format '{{.Names}}' | grep -Eq '^journey-next-production-canary'"; then
-            canary_service_active=true
-          fi
-          database_exists="$(python3 - "$RDS_INSTANCE_ID" <<'PY'
+          set +e
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test -L /srv/journey-next-production/canary/current" >/dev/null 2>&1
+          probe_status=$?
+          set -e
+          case "$probe_status" in
+            0) current_release_reference=true ;;
+            1) current_release_reference=false ;;
+            *) fail_probe "$probe_status" SSH_CURRENT_RELEASE_PROBE ;;
+          esac
+          set +e
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker ps --format '{{.Names}}' | grep -Eq '^journey-next-production-canary'" >/dev/null 2>&1
+          probe_status=$?
+          set -e
+          case "$probe_status" in
+            0) canary_service_active=true ;;
+            1) canary_service_active=false ;;
+            *) fail_probe "$probe_status" SSH_CANARY_SERVICE_PROBE ;;
+          esac
+          set +e
+          database_exists="$(python3 - "$RDS_INSTANCE_ID" 2>/dev/null <<'PY'
           import os, sys
           from scripts.wp15_rds_database import database_exists
           print(str(database_exists(
@@ -706,25 +732,116 @@ jobs:
           )).lower())
           PY
           )"
-          in_progress="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
-            --jq '[.workflow_runs[] | select((.status == "queued" or .status == "in_progress") and (.id != '${GITHUB_RUN_ID}'))] | length' | \
-            awk '{sum += $1} END {print sum + 0}')"
-          python3 - "$database_exists" "$canary_service_active" "$current_release_reference" "$in_progress" "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-facts.json" <<'PY'
+          probe_status=$?
+          set -e
+          if [[ "$probe_status" -ne 0 ]]; then
+            fail_probe "$probe_status" RDS_DATABASE_EXISTS_PROBE
+          fi
+          if [[ "$database_exists" != true && "$database_exists" != false ]]; then
+            fail_probe 2 RDS_DATABASE_EXISTS_PROBE
+          fi
+          set +e
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+            --jq '[.workflow_runs[] | select((.status == "queued" or .status == "in_progress") and (.id != '${GITHUB_RUN_ID}'))] | length' \
+            >"$RUNNER_TEMP/wp31-workflow-run-count" 2>/dev/null
+          probe_status=$?
+          set -e
+          if [[ "$probe_status" -ne 0 ]]; then
+            fail_probe "$probe_status" GITHUB_WORKFLOW_RUNS_PROBE
+          fi
+          in_progress="$(awk '{sum += $1} END {print sum + 0}' "$RUNNER_TEMP/wp31-workflow-run-count")"
+          rm -f -- "$RUNNER_TEMP/wp31-workflow-run-count"
+          if ! [[ "$in_progress" =~ ^[0-9]+$ ]]; then
+            fail_probe 2 GITHUB_WORKFLOW_RUNS_PROBE
+          fi
+          set +e
+          python3 - "$database_exists" "$canary_service_active" "$current_release_reference" "$in_progress" \
+            "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-facts.json" "$diagnostic" 2>/dev/null <<'PY'
           import json, sys
-          from scripts.wp31_canary_database_guard import facts_from_read_only_observations, check
-          facts = facts_from_read_only_observations(
-              database_exists=sys.argv[1] == "true",
-              canary_service_active=sys.argv[2] == "true",
-              current_release_reference=sys.argv[3] == "true",
-              workflow_runs_in_progress=int(sys.argv[4]),
+          from pathlib import Path
+
+          from scripts.wp31_canary_database_guard import (
+              DatabaseGuardError,
+              check,
+              facts_from_read_only_observations,
           )
-          path = sys.argv[5]
-          with open(path, "x", encoding="utf-8") as handle:
-              json.dump(facts, handle, sort_keys=True)
-              handle.write("\n")
-          check(path, "create")
+          from scripts.wp31_canary_lifecycle_diagnostic import (
+              write_failure,
+              write_observations,
+          )
+
+          database_exists = sys.argv[1] == "true"
+          canary_service_active = sys.argv[2] == "true"
+          current_release_reference = sys.argv[3] == "true"
+          workflow_runs_in_progress = int(sys.argv[4])
+          path = Path(sys.argv[5])
+          diagnostic = Path(sys.argv[6])
+          try:
+              facts = facts_from_read_only_observations(
+                  database_exists=database_exists,
+                  canary_service_active=canary_service_active,
+                  current_release_reference=current_release_reference,
+                  workflow_runs_in_progress=workflow_runs_in_progress,
+              )
+          except Exception:
+              write_failure(diagnostic, category="GUARD_EVALUATION", exit_code=1)
+              raise SystemExit(1)
+          try:
+              with path.open("x", encoding="utf-8") as handle:
+                  json.dump(facts, handle, sort_keys=True)
+                  handle.write("\n")
+              check(path, "create")
+          except DatabaseGuardError:
+              write_observations(
+                  diagnostic,
+                  status="FAILED",
+                  failure_category="GUARD_REJECTED",
+                  exit_code=2,
+                  database_exists=facts["database_exists"],
+                  canary_service_active=facts["canary_service_active"],
+                  current_release_reference=facts["current_release_reference"],
+                  workflow_runs_in_progress=facts["workflow_runs_in_progress"],
+              )
+              raise SystemExit(2)
+          except (OSError, TypeError, ValueError):
+              write_observations(
+                  diagnostic,
+                  status="FAILED",
+                  failure_category="GUARD_EVALUATION",
+                  exit_code=1,
+                  database_exists=facts["database_exists"],
+                  canary_service_active=facts["canary_service_active"],
+                  current_release_reference=facts["current_release_reference"],
+                  workflow_runs_in_progress=facts["workflow_runs_in_progress"],
+              )
+              raise SystemExit(1)
+          write_observations(
+              diagnostic,
+              status="PASSED",
+              failure_category="NONE",
+              exit_code=0,
+              database_exists=facts["database_exists"],
+              canary_service_active=facts["canary_service_active"],
+              current_release_reference=facts["current_release_reference"],
+              workflow_runs_in_progress=facts["workflow_runs_in_progress"],
+          )
           print("WP31_CANARY_DATABASE_GUARD=PASS")
           PY
+          guard_status=$?
+          set -e
+          if [[ "$guard_status" -ne 0 ]]; then
+            exit "$guard_status"
+          fi
+      - name: Upload Canary lifecycle diagnostic
+        if: >-
+          always() &&
+          (inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp31-canary-lifecycle-${{ github.run_id }}
+          path: ${{ runner.temp }}/wp31-preflight-proof/lifecycle-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Create only the exact isolated canary database after preflight validation
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
         run: |

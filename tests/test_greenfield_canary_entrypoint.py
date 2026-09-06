@@ -85,6 +85,16 @@ def test_fast_canary_runs_read_only_database_lifecycle_guard_before_create() -> 
     assert "workflow_runs_in_progress" in protected
 
 
+def test_lifecycle_guard_uploads_only_sanitized_diagnostic_on_failure() -> None:
+    protected = job("greenfield_canary", "operate")
+    assert "wp31_canary_lifecycle_diagnostic.py init" in protected
+    assert "wp31_canary_lifecycle_diagnostic.py failure" in protected
+    assert "GUARD_REJECTED" in protected
+    assert "name: wp31-canary-lifecycle-${{ github.run_id }}" in protected
+    assert "lifecycle-diagnostic.json" in protected
+    assert "always()" in protected
+
+
 def test_legacy_wartime_candidate_guard_remains_distinct() -> None:
     text = workflow_text()
     legacy = text[text.index("  operate:\n") :]
