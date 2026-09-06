@@ -6,6 +6,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_RUNTIME_CANDIDATE = "9e2d3496f5df80da1291c77bd6f949a5078ef25d"
 CURRENT_DBTOOL_NAMESPACE = "ghcr.io/muchenai/muchen-journey-vnext-dbtool"
+LEGACY_DBTOOL_TARGET = (
+    "ghcr.io/muchenai2024-creator/muchen-journey-vnext-dbtool:"
+    "postgres-client-17.6-3a8282847477"
+)
+CURRENT_DBTOOL_TARGET = (
+    "ghcr.io/muchenai/muchen-journey-vnext-dbtool:"
+    "postgres-client-17.6-3a8282847477"
+)
 
 
 def test_canary_contract_uses_the_unified_candidate_binding() -> None:
@@ -71,8 +79,9 @@ def test_runtime_images_and_dbtool_use_the_current_registry_namespace() -> None:
     assert "runtime-verify" in backup
     assert "runtime-verify" in deploy
     assert "=~ ^ghcr\\.io/muchenai/muchen-journey-vnext-api@sha256:[0-9a-f]{64}$" not in deploy
-    assert "muchenai2024-creator/muchen-journey-vnext" not in mirror.split("target=", 1)[1]
-    assert 'target="ghcr.io/muchenai/muchen-journey-vnext-dbtool:' in mirror
+    assert LEGACY_DBTOOL_TARGET in mirror
+    assert CURRENT_DBTOOL_TARGET in mirror
+    assert 'for target in "$legacy_target" "$canonical_target"' in mirror
 
 
 def test_prepare_passes_bound_candidate_to_backup_runtime() -> None:

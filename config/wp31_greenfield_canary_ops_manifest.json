@@ -44,7 +44,7 @@
     "scripts/wp31_candidate_binding.py": "9af52a89c7cb9da0ebafd98228116d45727fba28faac6b1f97bfa045d5a97837",
     "scripts/wp31_canary_database_guard.py": "59f283e9edfd392f0cab7696b501caa96e70fd69bb0f47ade5ed11afa6020828",
     "scripts/wp31_rebind_candidate.py": "c5a12cbcc6d2e1e0beea2344e320e19e6c89c904d74f574bc6c6fe15ad213f83",
-    "tests/test_wp31_binding_consumers.py": "0259d38fcb4e596708c2f1f847ca57c17bd741a31094d2b597582a8d5e7adbfa",
+    "tests/test_wp31_binding_consumers.py": "763db5d95d119e1498c38eb73cae18c51839d4d1507fb8a2dc211528db6c6794",
     "tests/test_wp31_candidate_binding.py": "4adb12678bdd1004b42067bc1d2944c5373fb62c10f12f2501ac44e2a469bf70",
     "tests/test_wp31_canary_database_guard.py": "9beebe7874cf5976bdd191608488a0c62cc999e7437a17e96e9ac33de6a9cd7c",
     "tests/test_wp31_rebind_candidate.py": "391172b329cf1db7b6333206c1dbb281f31f55cf5e601c2c19047e17b9868cf3",
