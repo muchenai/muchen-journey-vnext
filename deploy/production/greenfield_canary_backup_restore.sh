@@ -39,8 +39,10 @@ verify="$root/canary-source.verify.dump"
 facts="$root/restored-facts.json"
 source_facts="$root/source-facts.json"
 manifest="$root/backup-manifest.json"
+snapshot_dump_stderr="$root/snapshot-pg-dump.stderr"
 snapshot_exchange="$root/snapshot-exchange"
 snapshot_id_file="$snapshot_exchange/snapshot-id"
+snapshot_pending_file="$snapshot_exchange/.snapshot-id.pending"
 snapshot_release_file="$snapshot_exchange/snapshot-release"
 snapshot_container="wp31-canary-snapshot-$WP31_RUN_ID"
 snapshot_started=false
@@ -71,7 +73,8 @@ cleanup() {
   set +e
   release_snapshot
   docker rm -f "$snapshot_container" >/dev/null 2>&1
-  rm -f -- "$snapshot_id_file" "$snapshot_release_file" "$plain" "$verify"
+  rm -f -- "$snapshot_id_file" "$snapshot_pending_file" "$snapshot_release_file" \
+    "$snapshot_dump_stderr" "$plain" "$verify"
   rmdir "$snapshot_exchange" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -131,9 +134,14 @@ done
 IFS= read -r snapshot_id <"$snapshot_id_file"
 [[ "$snapshot_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]+$ ]] || fail "snapshot identifier is invalid"
 
-pg pg_dump -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \
+if ! pg pg_dump -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \
   -d "$source_database" --format=custom --compress=9 --no-owner --no-acl \
-  --snapshot="$snapshot_id" --file=/backup/canary-source.dump
+  --snapshot="$snapshot_id" --file=/backup/canary-source.dump \
+  2>"$snapshot_dump_stderr"; then
+  rm -f -- "$snapshot_dump_stderr" || true
+  fail "SNAPSHOT_PG_DUMP_FAILED"
+fi
+rm -f -- "$snapshot_dump_stderr"
 facts "$source_env" "$source_facts" "$snapshot_id"
 release_snapshot || fail "snapshot holder release failed"
 pg pg_restore -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \

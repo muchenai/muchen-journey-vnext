@@ -44,7 +44,7 @@ def import_snapshot(connection: object, snapshot_id: str) -> None:
     connection.exec_driver_sql(
         "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
     )
-    connection.exec_driver_sql("SET TRANSACTION SNAPSHOT %s", (value,))
+    connection.exec_driver_sql(f"SET TRANSACTION SNAPSHOT '{value}'")
 
 
 def _resolve_exchange_dir(value: str | os.PathLike[str]) -> Path:
@@ -61,25 +61,29 @@ def _resolve_exchange_dir(value: str | os.PathLike[str]) -> Path:
 
 
 def _write_snapshot_id(path: Path, snapshot_id: str) -> None:
+    pending = path.with_name(".snapshot-id.pending")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(path, flags, 0o600)
+        descriptor = os.open(pending, flags, 0o600)
     except OSError as error:
         raise SnapshotError("snapshot identifier file cannot be created") from error
     try:
-        os.write(descriptor, (snapshot_id + "\n").encode("ascii"))
-        os.fsync(descriptor)
-    except OSError as error:
         try:
-            path.unlink()
+            os.write(descriptor, (snapshot_id + "\n").encode("ascii"))
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.chmod(pending, 0o600)
+        os.link(pending, path)
+    except OSError as error:
+        raise SnapshotError("snapshot identifier file cannot be published") from error
+    finally:
+        try:
+            pending.unlink()
         except OSError:
             pass
-        raise SnapshotError("snapshot identifier file cannot be written") from error
-    finally:
-        os.close(descriptor)
-    os.chmod(path, 0o600)
 
 
 def hold_snapshot(

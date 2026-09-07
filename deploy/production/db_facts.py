@@ -18,9 +18,12 @@ with engine.connect() as connection:
     if snapshot_id:
         if os.getenv("REQUIRE_READ_ONLY") != "true":
             raise RuntimeError("snapshot facts require read-only mode")
-        from wp31_database_snapshot import import_snapshot
+        try:
+            from wp31_database_snapshot import import_snapshot
 
-        import_snapshot(connection, snapshot_id)
+            import_snapshot(connection, snapshot_id)
+        except Exception:
+            raise SystemExit("WP31_DATABASE_SNAPSHOT_IMPORT=FAIL") from None
     if os.getenv("REQUIRE_READ_ONLY") == "true":
         read_only = connection.execute(text("SHOW transaction_read_only")).scalar_one()
         if read_only != "on":

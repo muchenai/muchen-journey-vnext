@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import importlib
 import os
+import runpy
 import stat
+import sys
+import traceback
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 
 SNAPSHOT_ID = "00000003-0000001B-1"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeResult:
@@ -67,9 +71,9 @@ def test_export_and_import_snapshot_transaction_order() -> None:
     snapshot.import_snapshot(imported, SNAPSHOT_ID)
     assert imported.statements == [
         "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
-        "SET TRANSACTION SNAPSHOT %s",
+        f"SET TRANSACTION SNAPSHOT '{SNAPSHOT_ID}'",
     ]
-    assert imported.parameters == [None, (SNAPSHOT_ID,)]
+    assert imported.parameters == [None, None]
 
 
 @pytest.mark.parametrize("value", ["", "abc", "x'; SELECT 1; --", "00000003/0000001B/1"])
@@ -90,12 +94,26 @@ def test_holder_releases_snapshot_without_disclosing_identifier(
     connection = FakeConnection(snapshot_id=SNAPSHOT_ID)
     open_calls: list[tuple[str, int, int]] = []
     real_open = os.open
+    real_write = os.write
+    real_fsync = os.fsync
+    identifier_path = exchange / "snapshot-id"
+    publication_observations: list[tuple[str, bool]] = []
 
     def record_open(path: os.PathLike[str], flags: int, mode: int = 0o777) -> int:
         open_calls.append((Path(path).name, flags, mode))
         return real_open(path, flags, mode)
 
+    def record_write(descriptor: int, value: bytes) -> int:
+        publication_observations.append(("write", identifier_path.exists()))
+        return real_write(descriptor, value)
+
+    def record_fsync(descriptor: int) -> None:
+        publication_observations.append(("fsync", identifier_path.exists()))
+        real_fsync(descriptor)
+
     monkeypatch.setattr(os, "open", record_open)
+    monkeypatch.setattr(os, "write", record_write)
+    monkeypatch.setattr(os, "fsync", record_fsync)
 
     def release_snapshot(_: float) -> None:
         write_release(exchange / "snapshot-release")
@@ -114,12 +132,14 @@ def test_holder_releases_snapshot_without_disclosing_identifier(
     ]
     assert captured.err == ""
     assert SNAPSHOT_ID not in captured.out
-    assert (exchange / "snapshot-id").read_text() == SNAPSHOT_ID + "\n"
+    assert identifier_path.read_text() == SNAPSHOT_ID + "\n"
+    assert publication_observations == [("write", False), ("fsync", False)]
     assert [(name, mode) for name, _, mode in open_calls] == [
-        ("snapshot-id", 0o600),
+        (".snapshot-id.pending", 0o600),
         ("snapshot-release", 0o600),
     ]
     assert all(flags & os.O_CREAT and flags & os.O_EXCL for _, flags, _ in open_calls)
+    assert not (exchange / ".snapshot-id.pending").exists()
     if os.name != "nt":
         assert stat.S_IMODE((exchange / "snapshot-id").stat().st_mode) == 0o600
         assert stat.S_IMODE((exchange / "snapshot-release").stat().st_mode) == 0o600
@@ -186,3 +206,57 @@ def test_holder_rolls_back_when_export_fails(tmp_path: Path) -> None:
 
     assert connection.rollback_count == 2
     assert not (exchange / "snapshot-id").exists()
+
+
+def test_db_facts_snapshot_import_failure_has_only_stable_category(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queries: list[str] = []
+
+    class FakeFactsConnection:
+        def __enter__(self) -> FakeFactsConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, statement: str) -> None:
+            queries.append(statement)
+            raise AssertionError("facts query ran after snapshot import failure")
+
+    class FakeEngine:
+        def connect(self) -> FakeFactsConnection:
+            return FakeFactsConnection()
+
+    sqlalchemy = ModuleType("sqlalchemy")
+    sqlalchemy.create_engine = lambda _url: FakeEngine()
+    sqlalchemy.text = lambda statement: statement
+    journey_api = ModuleType("journey_api")
+    journey_api.__path__ = []
+    config = ModuleType("journey_api.config")
+    config.get_settings = lambda: SimpleNamespace(database_url="unused")
+    failing_snapshot = ModuleType("wp31_database_snapshot")
+
+    def fail_import(_connection: object, _snapshot_id: str) -> None:
+        raise RuntimeError(f"driver parameters exposed {SNAPSHOT_ID}")
+
+    failing_snapshot.import_snapshot = fail_import
+    monkeypatch.setitem(sys.modules, "sqlalchemy", sqlalchemy)
+    monkeypatch.setitem(sys.modules, "journey_api", journey_api)
+    monkeypatch.setitem(sys.modules, "journey_api.config", config)
+    monkeypatch.setitem(sys.modules, "wp31_database_snapshot", failing_snapshot)
+    monkeypatch.setenv("WP31_DATABASE_SNAPSHOT", SNAPSHOT_ID)
+    monkeypatch.setenv("REQUIRE_READ_ONLY", "true")
+
+    with pytest.raises(SystemExit) as raised:
+        runpy.run_path(str(ROOT / "deploy/production/db_facts.py"), run_name="__main__")
+
+    rendered = "".join(
+        traceback.format_exception(
+            type(raised.value), raised.value, raised.value.__traceback__
+        )
+    )
+    assert str(raised.value) == "WP31_DATABASE_SNAPSHOT_IMPORT=FAIL"
+    assert raised.value.__suppress_context__ is True
+    assert SNAPSHOT_ID not in rendered
+    assert queries == []

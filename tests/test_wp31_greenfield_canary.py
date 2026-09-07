@@ -380,6 +380,10 @@ def test_backup_and_deploy_proofs_bind_real_files_and_exact_release() -> None:
     assert "wp31_database_snapshot.py" in backup
     assert '--snapshot="$snapshot_id"' in backup
     assert '-e WP31_DATABASE_SNAPSHOT="$snapshot_id"' in backup
+    assert 'snapshot_dump_stderr="$root/snapshot-pg-dump.stderr"' in backup
+    assert '2>"$snapshot_dump_stderr"' in backup
+    assert 'fail "SNAPSHOT_PG_DUMP_FAILED"' in backup
+    assert 'cat "$snapshot_dump_stderr"' not in backup
     assert "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT" in backup
     assert "assert source == restored" not in backup
     assert (
