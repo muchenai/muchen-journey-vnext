@@ -371,7 +371,21 @@ def test_backup_and_deploy_proofs_bind_real_files_and_exact_release() -> None:
     backup = (ROOT / "deploy/production/greenfield_canary_backup_restore.sh").read_text()
     deploy = (ROOT / "deploy/production/greenfield_canary_deploy.sh").read_text()
     edge = (ROOT / "deploy/production/greenfield_canary_edge.sh").read_text()
-    assert 'assert source == restored' in backup
+    workflow = (ROOT / ".github/workflows/wp15-wartime-production.yml").read_text()
+    assert 'docker pull "$DBTOOL_IMAGE"' in backup
+    assert 'docker pull "$API_IMAGE"' in backup
+    assert backup.index('docker pull "$API_IMAGE"') < backup.index(
+        'docker run -d --name "$snapshot_container"'
+    )
+    assert "wp31_database_snapshot.py" in backup
+    assert '--snapshot="$snapshot_id"' in backup
+    assert '-e WP31_DATABASE_SNAPSHOT="$snapshot_id"' in backup
+    assert "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT" in backup
+    assert "assert source == restored" not in backup
+    assert (
+        'cp scripts/wp31_database_snapshot.py "$bundle/wp31_database_snapshot.py"'
+        in workflow
+    )
     assert '"encrypted_backup_sha256": encrypted_sha' in backup
     assert '"source_facts_sha256": source_facts_sha' in backup
     assert '"restored_facts_sha256": facts_sha' in backup

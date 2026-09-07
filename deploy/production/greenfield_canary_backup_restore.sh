@@ -19,11 +19,12 @@ target_database=journey_next_canary_20260901_c72fea5
 bundle=$(pwd -P)
 ca="$bundle/secrets/volcengine-rds-ca.pem"
 facts_script="$bundle/db_facts.py"
+snapshot_script="$bundle/wp31_database_snapshot.py"
 target_env="$bundle/secrets/target-facts.env"
 source_env="$bundle/secrets/source-facts.env"
 binding_proof="$bundle/candidate-binding-proof.json"
 binding_module="$bundle/wp31_candidate_binding.py"
-for path in "$ca" "$facts_script" "$target_env" "$source_env" "$binding_proof" "$binding_module"; do
+for path in "$ca" "$facts_script" "$snapshot_script" "$target_env" "$source_env" "$binding_proof" "$binding_module"; do
   [[ -f "$path" && ! -L "$path" ]] || fail "required input is missing"
 done
 python3 "$binding_module" runtime-verify \
@@ -38,7 +39,41 @@ verify="$root/canary-source.verify.dump"
 facts="$root/restored-facts.json"
 source_facts="$root/source-facts.json"
 manifest="$root/backup-manifest.json"
-cleanup() { rm -f -- "$plain" "$verify"; }
+snapshot_exchange="$root/snapshot-exchange"
+snapshot_id_file="$snapshot_exchange/snapshot-id"
+snapshot_release_file="$snapshot_exchange/snapshot-release"
+snapshot_container="wp31-canary-snapshot-$WP31_RUN_ID"
+snapshot_started=false
+install -d -m 0700 "$snapshot_exchange"
+
+release_snapshot() {
+  local holder_status
+  [[ "$snapshot_started" == true ]] || return 0
+  if [[ -L "$snapshot_release_file" || ( -e "$snapshot_release_file" && ! -f "$snapshot_release_file" ) ]]; then
+    return 1
+  fi
+  if [[ ! -e "$snapshot_release_file" ]]; then
+    install -m 0600 /dev/null "$snapshot_release_file" || return 1
+  fi
+  if ! holder_status=$(timeout 30 docker wait "$snapshot_container"); then
+    docker rm -f "$snapshot_container" >/dev/null 2>&1 || true
+    snapshot_started=false
+    return 1
+  fi
+  if ! docker rm "$snapshot_container" >/dev/null 2>&1; then
+    docker rm -f "$snapshot_container" >/dev/null 2>&1 || return 1
+  fi
+  snapshot_started=false
+  [[ "$holder_status" == 0 ]]
+}
+
+cleanup() {
+  set +e
+  release_snapshot
+  docker rm -f "$snapshot_container" >/dev/null 2>&1
+  rm -f -- "$snapshot_id_file" "$snapshot_release_file" "$plain" "$verify"
+  rmdir "$snapshot_exchange" >/dev/null 2>&1
+}
 trap cleanup EXIT
 
 pg() {
@@ -50,30 +85,72 @@ pg() {
     -v "$root:/backup" "$DBTOOL_IMAGE" "$@"
 }
 
+facts() {
+  local env_file="$1"
+  local output="$2"
+  local snapshot_id="${3:-}"
+  local snapshot_env=()
+  if [[ -n "$snapshot_id" ]]; then
+    snapshot_env=(-e WP31_DATABASE_SNAPSHOT="$snapshot_id")
+  fi
+  docker run --rm --network host --env-file "$env_file" \
+    -e PGOPTIONS=-c\ default_transaction_read_only=on -e REQUIRE_READ_ONLY=true \
+    "${snapshot_env[@]}" \
+    -v "$ca:/run/secrets/volcengine-rds-ca.pem:ro" \
+    -v "$facts_script:/tmp/db_facts.py:ro" \
+    -v "$snapshot_script:/tmp/wp31_database_snapshot.py:ro" "$API_IMAGE" \
+    python /tmp/db_facts.py >"$output"
+}
+
+docker pull "$DBTOOL_IMAGE" >/dev/null
+docker pull "$API_IMAGE" >/dev/null
 tables=$(pg psql -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \
   -d "$target_database" -Atqc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")
 [[ "$tables" == 0 ]] || fail "isolated canary database is not empty"
+
+docker run -d --name "$snapshot_container" --user 0:0 --network host \
+  --env-file "$source_env" \
+  -e PGOPTIONS=-c\ default_transaction_read_only=on \
+  -v "$ca:/run/secrets/volcengine-rds-ca.pem:ro" \
+  -v "$snapshot_script:/tmp/wp31_database_snapshot.py:ro" \
+  -v "$snapshot_exchange:/exchange" "$API_IMAGE" \
+  python /tmp/wp31_database_snapshot.py \
+    --exchange-dir /exchange --timeout-seconds 900 >/dev/null
+snapshot_started=true
+snapshot_ready_deadline=$((SECONDS + 900))
+while [[ ! -f "$snapshot_id_file" || -L "$snapshot_id_file" ]]; do
+  if [[ "$(docker inspect -f '{{.State.Running}}' "$snapshot_container" 2>/dev/null)" != true ]]; then
+    docker logs "$snapshot_container" >&2 || true
+    fail "snapshot holder exited before becoming ready"
+  fi
+  (( SECONDS < snapshot_ready_deadline )) || fail "snapshot holder readiness timed out"
+  sleep 1
+done
+[[ "$(stat -c '%a' "$snapshot_id_file")" == 600 ]] || fail "snapshot identifier file mode is invalid"
+IFS= read -r snapshot_id <"$snapshot_id_file"
+[[ "$snapshot_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]+$ ]] || fail "snapshot identifier is invalid"
+
 pg pg_dump -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \
   -d "$source_database" --format=custom --compress=9 --no-owner --no-acl \
-  --serializable-deferrable --file=/backup/canary-source.dump
+  --snapshot="$snapshot_id" --file=/backup/canary-source.dump
+facts "$source_env" "$source_facts" "$snapshot_id"
+release_snapshot || fail "snapshot holder release failed"
 pg pg_restore -h "$RDS_HOST" -p "$RDS_PORT" -U journey_next_migrator \
-  -d "$target_database" --exit-on-error --no-owner --no-acl /backup/canary-source.dump
+  -d "$target_database" --exit-on-error --no-owner --no-acl \
+  /backup/canary-source.dump
 
-docker run --rm --network host --env-file "$source_env" \
-  -e PGOPTIONS=-c\ default_transaction_read_only=on -e REQUIRE_READ_ONLY=true \
-  -v "$ca:/run/secrets/volcengine-rds-ca.pem:ro" \
-  -v "$facts_script:/tmp/db_facts.py:ro" "$API_IMAGE" \
-  python /tmp/db_facts.py >"$source_facts"
-docker run --rm --network host --env-file "$target_env" \
-  -e PGOPTIONS=-c\ default_transaction_read_only=on -e REQUIRE_READ_ONLY=true \
-  -v "$ca:/run/secrets/volcengine-rds-ca.pem:ro" \
-  -v "$facts_script:/tmp/db_facts.py:ro" "$API_IMAGE" \
-  python /tmp/db_facts.py >"$facts"
-python3 - "$source_facts" "$facts" <<'PY'
+facts "$target_env" "$facts"
+if ! cmp -s "$source_facts" "$facts"; then
+  source_facts_sha=$(sha256sum "$source_facts" | awk '{print $1}')
+  restored_facts_sha=$(sha256sum "$facts" | awk '{print $1}')
+  printf 'WP31_CANARY_FACTS_MISMATCH source_sha256=%s restored_sha256=%s\n' \
+    "$source_facts_sha" "$restored_facts_sha" >&2
+  fail "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT"
+fi
+python3 - "$facts" <<'PY'
 import json, sys
-source, restored = (json.load(open(path)) for path in sys.argv[1:])
-assert source == restored
+restored = json.load(open(sys.argv[1]))
 assert restored["migration"] == "0019_wp30_invitation_control"
 assert restored["counts"]
 assert len(restored["schema_sha256"]) == 64

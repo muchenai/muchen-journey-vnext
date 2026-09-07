@@ -862,6 +862,7 @@ jobs:
           cp deploy/production/greenfield_canary_rollback.sh "$bundle/rollback.sh"
           cp deploy/production/greenfield_canary_edge.sh "$bundle/edge.sh"
           cp deploy/production/db_facts.py "$bundle/db_facts.py"
+          cp scripts/wp31_database_snapshot.py "$bundle/wp31_database_snapshot.py"
           cp scripts/wp31_candidate_binding.py "$bundle/wp31_candidate_binding.py"
           cp deploy/production/Caddyfile.greenfield-canary "$bundle/Caddyfile.canary"
           cp deploy/staging/Caddyfile "$bundle/Caddyfile.rollback"
