@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -27,10 +29,20 @@ _FIELDS = {
     "expires_in_minutes",
 }
 _AUTHORIZATION_REFERENCE = re.compile(r"^[A-Za-z0-9._:-]{8,120}$")
+_WP12B_ORGANIZATION_NAME = re.compile(
+    r"^WP12B:wp12b-[1-9][0-9]{5,19}:org-[0-9]{3}$"
+)
 
 
 class BootstrapError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, category: str = "BOOTSTRAP_REJECTED") -> None:
+        super().__init__(message)
+        self.category = category
+
+
+def _uses_wp12b_namespace(value: str) -> bool:
+    normalized = unicodedata.normalize("NFKC", value).strip().casefold()
+    return normalized.startswith("wp12b:")
 
 
 @dataclass(frozen=True)
@@ -165,13 +177,29 @@ def bootstrap(session: object, request: BootstrapRequest, secret: str, now: date
 
     from journey_api.identity import add_audit, utc_now
     from journey_api.models import Organization, Role, RoleAssignment, User, UserStatus
+    from journey_api.wp09_bootstrap import (
+        BootstrapError as OperatorLinkBootstrapError,
+    )
     from journey_api.wp09_bootstrap import create_operator_link
 
     issued_at = now or utc_now()
     organizations = session.scalars(select(Organization)).all()
-    if len(organizations) != 1:
-        raise BootstrapError("identity bootstrap requires exactly one organization")
-    organization = organizations[0]
+    malformed_wp12b_marker = any(
+        _uses_wp12b_namespace(organization.name)
+        and not _WP12B_ORGANIZATION_NAME.fullmatch(organization.name)
+        for organization in organizations
+    )
+    business_organizations = [
+        organization
+        for organization in organizations
+        if not _uses_wp12b_namespace(organization.name)
+    ]
+    if malformed_wp12b_marker or len(business_organizations) != 1:
+        raise BootstrapError(
+            "identity bootstrap organization topology is ambiguous",
+            category="ORGANIZATION_TOPOLOGY_REJECTED",
+        )
+    organization = business_organizations[0]
     for user_id in (request.operator_user_id, request.learner_user_id, request.owner_user_id):
         if session.scalar(select(User.id).where(User.id == user_id)) is not None:
             raise BootstrapError("requested user ID already exists; bootstrap is not replayable")
@@ -242,14 +270,20 @@ def bootstrap(session: object, request: BootstrapRequest, secret: str, now: date
         result="SUCCESS",
         details={"roles": [Role.LEARNER.value, Role.REVIEWER.value], "authorization_reference": request.authorization_reference},
     )
-    link = create_operator_link(
-        session,
-        target_user_id=operator.id,
-        secret=secret,
-        authorization_reference=request.authorization_reference,
-        expires_in_minutes=request.expires_in_minutes,
-        now=issued_at,
-    )
+    try:
+        link = create_operator_link(
+            session,
+            target_user_id=operator.id,
+            secret=secret,
+            authorization_reference=request.authorization_reference,
+            expires_in_minutes=request.expires_in_minutes,
+            now=issued_at,
+        )
+    except OperatorLinkBootstrapError as error:
+        raise BootstrapError(
+            "operator link bootstrap was rejected",
+            category="OPERATOR_LINK_REJECTED",
+        ) from error
     return public_result(
         {
             "operator_user_id": str(operator.id),
@@ -289,8 +323,19 @@ def main() -> int:
             result = bootstrap(session, request, settings.identity_subject_secret)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         return 0
-    except (BootstrapError, OSError, ValueError, TypeError) as error:
-        print(f"WP31_IDENTITY_BOOTSTRAP=FAIL reason={error}")
+    except BootstrapError as error:
+        print(
+            f"WP31_IDENTITY_BOOTSTRAP=FAIL category={error.category}",
+            file=sys.stderr,
+        )
+        return 2
+    except Exception:
+        # This privileged job must never put SQL parameters, identity data, or
+        # infrastructure details from an unexpected exception into Actions logs.
+        print(
+            "WP31_IDENTITY_BOOTSTRAP=FAIL category=BOOTSTRAP_RUNTIME_REJECTED",
+            file=sys.stderr,
+        )
         return 2
 
 
