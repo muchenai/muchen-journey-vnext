@@ -21,13 +21,13 @@ except ModuleNotFoundError:  # direct invocation from the scripts directory
 
 ROOT = Path(__file__).resolve().parents[1]
 BINDING = ROOT / "config/wp31_candidate_binding.json"
-CANDIDATE = "8e302758a8dc361975f986e733057e72c4e94cbc"
+CANDIDATE = "5d2c42fdb9abdf4ca4e7756546fab99111f7c6c3"
 PRODUCTION_HOST = "journey.muchenai.com"
 SOURCE_DATABASE = "journey_next_cutover_20260810"
 CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
 IMAGES = {
-    "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:111b4f41666ded0841f1c4c8e118c29958b88b52b0acb9181da4cd6e4add6e4a",
-    "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:3a968efa9d9a64cab49b41a6a7a724f020680453fd72d5830c10ecf5414c7c8e",
+    "API_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:61a7f5043b1bf4bd38fd896bd19db05b3ab3585846fab2908650ddca6b95c3e7",
+    "WEB_IMAGE": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:3297df6320eff52ee9b65b3bde4944547ca5dce811bb12af2914f873de8e0ea3",
 }
 DBTOOL_IMAGE = "ghcr.io/muchenai/muchen-journey-vnext-dbtool@sha256:3a82828474772d2b9c94fb51ae343e464c2f13dd1f2d7d90c807a46b104f53e9"
 
