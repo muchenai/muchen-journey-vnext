@@ -169,7 +169,7 @@ def public_result(result: dict[str, object]) -> dict[str, object]:
 
 
 def bootstrap(session: object, request: BootstrapRequest, secret: str, now: datetime | None = None) -> dict[str, object]:
-    """Create ACTIVE operator/reviewer, bare learner target, and owner learner/reviewer."""
+    """Create or exactly reuse the three controlled Canary identities."""
     if len(secret) < 32 or "\n" in secret or "\r" in secret:
         raise BootstrapError("identity subject secret is invalid")
     # Imports stay inside the operation so request validation remains dependency-light and testable.
@@ -200,76 +200,150 @@ def bootstrap(session: object, request: BootstrapRequest, secret: str, now: date
             category="ORGANIZATION_TOPOLOGY_REJECTED",
         )
     organization = business_organizations[0]
-    for user_id in (request.operator_user_id, request.learner_user_id, request.owner_user_id):
-        if session.scalar(select(User.id).where(User.id == user_id)) is not None:
-            raise BootstrapError("requested user ID already exists; bootstrap is not replayable")
+    requested_user_ids = (
+        request.operator_user_id,
+        request.learner_user_id,
+        request.owner_user_id,
+    )
+    existing_users = session.scalars(select(User).where(User.id.in_(requested_user_ids))).all()
+    if existing_users and len(existing_users) != len(requested_user_ids):
+        raise BootstrapError(
+            "controlled identity state is partial",
+            category="IDENTITY_STATE_REJECTED",
+        )
 
-    operator = User(
-        id=request.operator_user_id,
-        organization_id=organization.id,
-        display_name=request.operator_display_name,
-        status=UserStatus.ACTIVE,
-    )
-    learner = User(
-        id=request.learner_user_id,
-        organization_id=organization.id,
-        display_name=request.learner_display_name,
-        status=UserStatus.ACTIVE,
-    )
-    owner = User(
-        id=request.owner_user_id,
-        organization_id=organization.id,
-        display_name=request.owner_display_name,
-        status=UserStatus.ACTIVE,
-    )
-    session.add_all([operator, learner, owner])
-    session.flush()
-    session.add_all(
-        [
-            RoleAssignment(
-                id=uuid.uuid4(), organization_id=organization.id, user_id=operator.id, role=Role.OPERATOR
+    if existing_users:
+        users_by_id = {user.id: user for user in existing_users}
+        expected_user_ids = set(requested_user_ids)
+        if set(users_by_id) != expected_user_ids:
+            raise BootstrapError(
+                "controlled identity state differs",
+                category="IDENTITY_STATE_REJECTED",
+            )
+        expected_users = {
+            request.operator_user_id: (
+                organization.id,
+                request.operator_display_name,
+                UserStatus.ACTIVE,
             ),
-            RoleAssignment(
-                id=uuid.uuid4(), organization_id=organization.id, user_id=operator.id, role=Role.REVIEWER
+            request.learner_user_id: (
+                organization.id,
+                request.learner_display_name,
+                UserStatus.ACTIVE,
             ),
-            RoleAssignment(
-                id=uuid.uuid4(), organization_id=organization.id, user_id=owner.id, role=Role.LEARNER
+            request.owner_user_id: (
+                organization.id,
+                request.owner_display_name,
+                UserStatus.ACTIVE,
             ),
-            RoleAssignment(
-                id=uuid.uuid4(), organization_id=organization.id, user_id=owner.id, role=Role.REVIEWER
-            ),
-        ]
-    )
-    add_audit(
-        session,
-        request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
-        organization_id=organization.id,
-        action="identity.bootstrap_operator_created",
-        resource_type="user",
-        resource_id=operator.id,
-        result="SUCCESS",
-        details={"roles": [Role.OPERATOR.value, Role.REVIEWER.value], "authorization_reference": request.authorization_reference},
-    )
-    add_audit(
-        session,
-        request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
-        organization_id=organization.id,
-        action="identity.bootstrap_learner_target_created",
-        resource_type="user",
-        resource_id=learner.id,
-        result="SUCCESS",
-        details={"status": UserStatus.ACTIVE.value, "role_assignment": False, "authorization_reference": request.authorization_reference},
-    )
-    add_audit(
-        session,
-        request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
-        organization_id=organization.id,
-        action="identity.bootstrap_owner_created",
-        resource_type="user",
-        resource_id=owner.id,
-        result="SUCCESS",
-        details={"roles": [Role.LEARNER.value, Role.REVIEWER.value], "authorization_reference": request.authorization_reference},
-    )
+        }
+        if any(
+            (
+                users_by_id[user_id].organization_id,
+                users_by_id[user_id].display_name,
+                users_by_id[user_id].status,
+            )
+            != expected
+            for user_id, expected in expected_users.items()
+        ):
+            raise BootstrapError(
+                "controlled identity state differs",
+                category="IDENTITY_STATE_REJECTED",
+            )
+        role_assignments = session.scalars(
+            select(RoleAssignment).where(RoleAssignment.user_id.in_(requested_user_ids))
+        ).all()
+        actual_roles = {user_id: set() for user_id in requested_user_ids}
+        for assignment in role_assignments:
+            if (
+                assignment.user_id not in actual_roles
+                or assignment.organization_id != organization.id
+            ):
+                raise BootstrapError(
+                    "controlled identity state differs",
+                    category="IDENTITY_STATE_REJECTED",
+                )
+            actual_roles[assignment.user_id].add(assignment.role)
+        expected_roles = {
+            request.operator_user_id: {Role.OPERATOR, Role.REVIEWER},
+            request.learner_user_id: set(),
+            request.owner_user_id: {Role.LEARNER, Role.REVIEWER},
+        }
+        if actual_roles != expected_roles:
+            raise BootstrapError(
+                "controlled identity state differs",
+                category="IDENTITY_STATE_REJECTED",
+            )
+        operator = users_by_id[request.operator_user_id]
+        learner = users_by_id[request.learner_user_id]
+        owner = users_by_id[request.owner_user_id]
+    else:
+        operator = User(
+            id=request.operator_user_id,
+            organization_id=organization.id,
+            display_name=request.operator_display_name,
+            status=UserStatus.ACTIVE,
+        )
+        learner = User(
+            id=request.learner_user_id,
+            organization_id=organization.id,
+            display_name=request.learner_display_name,
+            status=UserStatus.ACTIVE,
+        )
+        owner = User(
+            id=request.owner_user_id,
+            organization_id=organization.id,
+            display_name=request.owner_display_name,
+            status=UserStatus.ACTIVE,
+        )
+        session.add_all([operator, learner, owner])
+        session.flush()
+        session.add_all(
+            [
+                RoleAssignment(
+                    id=uuid.uuid4(), organization_id=organization.id, user_id=operator.id, role=Role.OPERATOR
+                ),
+                RoleAssignment(
+                    id=uuid.uuid4(), organization_id=organization.id, user_id=operator.id, role=Role.REVIEWER
+                ),
+                RoleAssignment(
+                    id=uuid.uuid4(), organization_id=organization.id, user_id=owner.id, role=Role.LEARNER
+                ),
+                RoleAssignment(
+                    id=uuid.uuid4(), organization_id=organization.id, user_id=owner.id, role=Role.REVIEWER
+                ),
+            ]
+        )
+        add_audit(
+            session,
+            request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
+            organization_id=organization.id,
+            action="identity.bootstrap_operator_created",
+            resource_type="user",
+            resource_id=operator.id,
+            result="SUCCESS",
+            details={"roles": [Role.OPERATOR.value, Role.REVIEWER.value], "authorization_reference": request.authorization_reference},
+        )
+        add_audit(
+            session,
+            request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
+            organization_id=organization.id,
+            action="identity.bootstrap_learner_target_created",
+            resource_type="user",
+            resource_id=learner.id,
+            result="SUCCESS",
+            details={"status": UserStatus.ACTIVE.value, "role_assignment": False, "authorization_reference": request.authorization_reference},
+        )
+        add_audit(
+            session,
+            request_id=f"wp31-identity-bootstrap:{uuid.uuid4()}",
+            organization_id=organization.id,
+            action="identity.bootstrap_owner_created",
+            resource_type="user",
+            resource_id=owner.id,
+            result="SUCCESS",
+            details={"roles": [Role.LEARNER.value, Role.REVIEWER.value], "authorization_reference": request.authorization_reference},
+        )
     try:
         link = create_operator_link(
             session,
