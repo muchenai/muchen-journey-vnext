@@ -20,15 +20,40 @@ class _ScalarRows:
 
 
 class _BootstrapSession:
-    def __init__(self, organizations: list[object]) -> None:
+    def __init__(
+        self,
+        organizations: list[object],
+        *,
+        existing_users: list[object] | None = None,
+        role_assignments: list[object] | None = None,
+    ) -> None:
         self.organizations = organizations
+        self.existing_users = {
+            getattr(user, "id"): user for user in (existing_users or [])
+        }
+        self.role_assignments = role_assignments or []
         self.added: list[object] = []
 
-    def scalars(self, _statement: object) -> _ScalarRows:
-        return _ScalarRows(self.organizations)
+    def scalars(self, statement: object) -> _ScalarRows:
+        descriptions = getattr(statement, "column_descriptions", [])
+        entity = descriptions[0].get("entity") if descriptions else None
+        if getattr(entity, "__name__", None) == "Organization":
+            return _ScalarRows(self.organizations)
+        if getattr(entity, "__name__", None) == "User":
+            return _ScalarRows(list(self.existing_users.values()))
+        if getattr(entity, "__name__", None) == "RoleAssignment":
+            return _ScalarRows(self.role_assignments)
+        return _ScalarRows([])
 
-    def scalar(self, _statement: object) -> None:
+    def scalar(self, statement: object) -> object | None:
+        parameters = getattr(statement, "compile")().params
+        for value in parameters.values():
+            if value in self.existing_users:
+                return value
         return None
+
+    def get(self, _model: object, identity: object) -> object | None:
+        return self.existing_users.get(identity)
 
     def add_all(self, rows: list[object]) -> None:
         self.added.extend(rows)
@@ -50,6 +75,61 @@ def _request(**overrides: object) -> dict[str, object]:
     }
     value.update(overrides)
     return value
+
+
+def _matching_existing_identities(
+    request: bootstrap.BootstrapRequest,
+    organization: object,
+) -> tuple[list[object], list[object]]:
+    from journey_api.models import Role, RoleAssignment, User, UserStatus
+
+    users = [
+        User(
+            id=request.operator_user_id,
+            organization_id=getattr(organization, "id"),
+            display_name=request.operator_display_name,
+            status=UserStatus.ACTIVE,
+        ),
+        User(
+            id=request.learner_user_id,
+            organization_id=getattr(organization, "id"),
+            display_name=request.learner_display_name,
+            status=UserStatus.ACTIVE,
+        ),
+        User(
+            id=request.owner_user_id,
+            organization_id=getattr(organization, "id"),
+            display_name=request.owner_display_name,
+            status=UserStatus.ACTIVE,
+        ),
+    ]
+    assignments = [
+        RoleAssignment(
+            id=uuid.uuid4(),
+            organization_id=getattr(organization, "id"),
+            user_id=request.operator_user_id,
+            role=Role.OPERATOR,
+        ),
+        RoleAssignment(
+            id=uuid.uuid4(),
+            organization_id=getattr(organization, "id"),
+            user_id=request.operator_user_id,
+            role=Role.REVIEWER,
+        ),
+        RoleAssignment(
+            id=uuid.uuid4(),
+            organization_id=getattr(organization, "id"),
+            user_id=request.owner_user_id,
+            role=Role.LEARNER,
+        ),
+        RoleAssignment(
+            id=uuid.uuid4(),
+            organization_id=getattr(organization, "id"),
+            user_id=request.owner_user_id,
+            role=Role.REVIEWER,
+        ),
+    ]
+    return users, assignments
 
 
 def test_request_parser_accepts_exact_non_sensitive_shape(tmp_path: Path) -> None:
@@ -218,6 +298,176 @@ def test_bootstrap_uses_the_only_non_wp12b_organization_in_the_restored_topology
     assert len(users) == 3
     assert {user.organization_id for user in users} == {business.id}
     assert result["operator_link_id"] == "link"
+
+
+def test_bootstrap_reuses_three_exact_existing_controlled_identities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+    from journey_api import identity as identity_module
+    from journey_api import wp09_bootstrap
+    from journey_api.models import Organization
+
+    business = Organization(id=uuid.uuid4(), name="Muchen Journey")
+    request = bootstrap.parse_payload(_request())
+    users, assignments = _matching_existing_identities(request, business)
+    session = _BootstrapSession(
+        [business],
+        existing_users=users,
+        role_assignments=assignments,
+    )
+    creation_audits: list[str] = []
+    monkeypatch.setattr(
+        identity_module,
+        "add_audit",
+        lambda *args, **kwargs: creation_audits.append(kwargs["action"]),
+    )
+
+    def create_replacement_link(*_args: object, **kwargs: object) -> dict[str, object]:
+        assert kwargs["target_user_id"] == request.operator_user_id
+        return {
+            "link_id": "replacement-link",
+            "start_path": "/auth/feishu?return_to=%2Fops&link_token=replacement",
+            "expires_at": "2026-09-08T04:15:00+00:00",
+            "expires_in_minutes": 15,
+        }
+
+    monkeypatch.setattr(
+        wp09_bootstrap,
+        "create_operator_link",
+        create_replacement_link,
+    )
+
+    result = bootstrap.bootstrap(
+        session,
+        request,
+        "identity-subject-secret-with-32-bytes",
+    )
+
+    assert result["operator_link_id"] == "replacement-link"
+    assert session.added == []
+    assert creation_audits == []
+
+
+def test_bootstrap_rejects_existing_identities_with_wrong_role_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+    from journey_api import identity as identity_module
+    from journey_api import wp09_bootstrap
+    from journey_api.models import Organization, Role
+
+    business = Organization(id=uuid.uuid4(), name="Muchen Journey")
+    request = bootstrap.parse_payload(_request())
+    users, assignments = _matching_existing_identities(request, business)
+    assignments = [
+        assignment
+        for assignment in assignments
+        if not (
+            assignment.user_id == request.owner_user_id
+            and assignment.role == Role.REVIEWER
+        )
+    ]
+    session = _BootstrapSession(
+        [business],
+        existing_users=users,
+        role_assignments=assignments,
+    )
+    monkeypatch.setattr(identity_module, "add_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        wp09_bootstrap,
+        "create_operator_link",
+        lambda *args, **kwargs: {
+            "link_id": "must-not-be-created",
+            "start_path": "/auth/feishu?link_token=must-not-be-created",
+            "expires_at": "2026-09-08T04:15:00+00:00",
+            "expires_in_minutes": 15,
+        },
+    )
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.bootstrap(
+            session,
+            request,
+            "identity-subject-secret-with-32-bytes",
+        )
+
+    assert captured.value.category == "IDENTITY_STATE_REJECTED"
+
+
+def test_bootstrap_rejects_partial_existing_identity_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+    from journey_api import wp09_bootstrap
+    from journey_api.models import Organization
+
+    business = Organization(id=uuid.uuid4(), name="Muchen Journey")
+    request = bootstrap.parse_payload(_request())
+    users, assignments = _matching_existing_identities(request, business)
+    session = _BootstrapSession(
+        [business],
+        existing_users=users[:2],
+        role_assignments=assignments,
+    )
+
+    def must_not_create_link(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("partial identity state must be rejected before link creation")
+
+    monkeypatch.setattr(wp09_bootstrap, "create_operator_link", must_not_create_link)
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.bootstrap(
+            session,
+            request,
+            "identity-subject-secret-with-32-bytes",
+        )
+
+    assert captured.value.category == "IDENTITY_STATE_REJECTED"
+
+
+@pytest.mark.parametrize("mismatch", ["display_name", "status", "organization"])
+def test_bootstrap_rejects_existing_identities_with_mismatched_attributes(
+    monkeypatch: pytest.MonkeyPatch,
+    mismatch: str,
+) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+    from journey_api import wp09_bootstrap
+    from journey_api.models import Organization, UserStatus
+
+    business = Organization(id=uuid.uuid4(), name="Muchen Journey")
+    request = bootstrap.parse_payload(_request())
+    users, assignments = _matching_existing_identities(request, business)
+    if mismatch == "display_name":
+        users[0].display_name = "Unexpected Operator"
+    elif mismatch == "status":
+        users[1].status = UserStatus.DISABLED
+    else:
+        users[2].organization_id = uuid.uuid4()
+    session = _BootstrapSession(
+        [business],
+        existing_users=users,
+        role_assignments=assignments,
+    )
+    monkeypatch.setattr(
+        wp09_bootstrap,
+        "create_operator_link",
+        lambda *args, **kwargs: {
+            "link_id": "must-not-be-created",
+            "start_path": "/auth/feishu?link_token=must-not-be-created",
+            "expires_at": "2026-09-08T04:15:00+00:00",
+            "expires_in_minutes": 15,
+        },
+    )
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.bootstrap(
+            session,
+            request,
+            "identity-subject-secret-with-32-bytes",
+        )
+
+    assert captured.value.category == "IDENTITY_STATE_REJECTED"
 
 
 @pytest.mark.parametrize(
