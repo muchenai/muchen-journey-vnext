@@ -657,7 +657,7 @@ def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job()
     root = Path(__file__).resolve().parents[1]
     workflow = (root / ".github/workflows/wp15-wartime-production.yml").read_text(encoding="utf-8")
     assert "greenfield-canary-fast" in workflow
-    assert "FAST_CANARY_8E30275_PRODUCTION_CANARY" in workflow
+    assert "FAST_CANARY_5D2C42F_PRODUCTION_CANARY" in workflow
     assert "--database-kind canary" in workflow
     assert "greenfield_identity_bootstrap:" not in workflow
     assert "greenfield-identity-bootstrap" not in workflow
