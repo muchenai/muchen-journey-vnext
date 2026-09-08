@@ -842,14 +842,8 @@ jobs:
           path: ${{ runner.temp }}/wp31-preflight-proof/lifecycle-diagnostic.json
           if-no-files-found: error
           retention-days: 7
-      - name: Create only the exact isolated canary database after preflight validation
-        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
-        run: |
-          set -euo pipefail
-          python3 -m scripts.wp15_rds_database --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260901_c72fea5
-          python3 -m scripts.wp15_rds_schema_owner --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260901_c72fea5
       - name: Prepare exact owner-only canary bundle
-        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-canary-fast'
+        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-canary-fast'
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp31-bundle"
@@ -867,6 +861,31 @@ jobs:
           cp deploy/production/Caddyfile.greenfield-canary "$bundle/Caddyfile.canary"
           cp deploy/staging/Caddyfile "$bundle/Caddyfile.rollback"
           chmod 0755 "$bundle"/*.sh
+      - name: Preflight identity bootstrap contract without database mutation
+        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
+        env:
+          REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$REQUEST_B64"
+          request="$RUNNER_TEMP/wp31-contract-request.json"
+          trap 'rm -f -- "$request"' EXIT
+          printf '%s' "$REQUEST_B64" | base64 --decode >"$request"
+          set -a
+          . "$RUNNER_TEMP/wp31-bundle/secrets/target-facts.env"
+          set +a
+          python3 scripts/wp31_identity_bootstrap.py \
+            --contract-only \
+            --request "$request" \
+            --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY \
+            --database-kind canary
+      - name: Create only the exact isolated canary database after preflight validation
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
+        run: |
+          set -euo pipefail
+          python3 -m scripts.wp15_rds_database --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260901_c72fea5
+          python3 -m scripts.wp15_rds_schema_owner --instance-id '${{ steps.frozen.outputs.rds_instance_id }}' --database journey_next_canary_20260901_c72fea5
       - name: Execute encrypted current-production backup and isolated restore
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
         env:
@@ -1092,7 +1111,7 @@ jobs:
             ssh "${opts[@]}" root@"$PUBLIC_IP" "docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- '/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID'" || cleanup_status=1
           fi
           rm -rf -- "$RUNNER_TEMP/wp31-bundle" "$RUNNER_TEMP/wp31-identity-proof" "$RUNNER_TEMP/wp31-pro-review-evidence.json"
-          rm -f -- "$RUNNER_TEMP/identity-result.json" "$RUNNER_TEMP/wp31-recipient-public.pem" "$RUNNER_TEMP/wp31-key" "$RUNNER_TEMP/wp31-known-hosts"
+          rm -f -- "$RUNNER_TEMP/wp31-contract-request.json" "$RUNNER_TEMP/identity-result.json" "$RUNNER_TEMP/wp31-recipient-public.pem" "$RUNNER_TEMP/wp31-key" "$RUNNER_TEMP/wp31-known-hosts"
           echo 'WP31_TRANSIENT_CREDENTIALS=REMOVED'
           exit "$cleanup_status"
       - name: Close temporary SSH ingress

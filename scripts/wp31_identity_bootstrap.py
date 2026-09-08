@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -38,6 +39,11 @@ class BootstrapError(RuntimeError):
     def __init__(self, message: str, *, category: str = "BOOTSTRAP_REJECTED") -> None:
         super().__init__(message)
         self.category = category
+
+
+REQUEST_CONTRACT_CATEGORY = "REQUEST_CONTRACT_REJECTED"
+RUNTIME_CONTRACT_CATEGORY = "RUNTIME_CONTRACT_REJECTED"
+IDENTITY_SECRET_CATEGORY = "IDENTITY_SECRET_REJECTED"
 
 
 def _uses_wp12b_namespace(value: str) -> bool:
@@ -119,6 +125,17 @@ def parse_request(path: Path) -> BootstrapRequest:
     return parse_payload(payload)
 
 
+def parse_request_contract(path: Path) -> BootstrapRequest:
+    """Parse the sealed request and expose only a stable failure category."""
+    try:
+        return parse_request(path)
+    except BootstrapError as error:
+        raise BootstrapError(
+            "identity bootstrap request contract rejected",
+            category=REQUEST_CONTRACT_CATEGORY,
+        ) from error
+
+
 def validate_runtime(
     database_url: str,
     *,
@@ -152,6 +169,39 @@ def validate_runtime(
         raise BootstrapError("Canary database CA path is invalid")
 
 
+def validate_runtime_contract(
+    database_url: str,
+    *,
+    app_env: str,
+    release_marker: str,
+    confirmation: str,
+    database_kind: str = "source",
+) -> None:
+    """Validate runtime guards while suppressing implementation details."""
+    try:
+        validate_runtime(
+            database_url,
+            app_env=app_env,
+            release_marker=release_marker,
+            confirmation=confirmation,
+            database_kind=database_kind,
+        )
+    except Exception as error:
+        raise BootstrapError(
+            "identity bootstrap runtime contract rejected",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        ) from error
+
+
+def validate_identity_secret(secret: object) -> None:
+    """Validate the subject secret without ever returning or logging it."""
+    if not isinstance(secret, str) or len(secret) < 32 or "\n" in secret or "\r" in secret:
+        raise BootstrapError(
+            "identity subject secret contract rejected",
+            category=IDENTITY_SECRET_CATEGORY,
+        )
+
+
 def public_result(result: dict[str, object]) -> dict[str, object]:
     """Select the encrypted response fields; names and request material never leave the DB job."""
     fields = (
@@ -170,8 +220,7 @@ def public_result(result: dict[str, object]) -> dict[str, object]:
 
 def bootstrap(session: object, request: BootstrapRequest, secret: str, now: datetime | None = None) -> dict[str, object]:
     """Create or exactly reuse the three controlled Canary identities."""
-    if len(secret) < 32 or "\n" in secret or "\r" in secret:
-        raise BootstrapError("identity subject secret is invalid")
+    validate_identity_secret(secret)
     # Imports stay inside the operation so request validation remains dependency-light and testable.
     from sqlalchemy import select
 
@@ -378,21 +427,53 @@ def main() -> int:
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--confirm", required=True)
     parser.add_argument("--database-kind", choices=("canary",), default="canary")
+    parser.add_argument("--contract-only", action="store_true")
     args = parser.parse_args()
     try:
-        # Runtime configuration is read only after parsing the sealed request.
-        from journey_api.config import get_settings
-        from journey_api.db import SessionLocal
+        request = parse_request_contract(args.request)
+        if args.contract_only:
+            validate_runtime_contract(
+                os.environ.get("DATABASE_URL", ""),
+                app_env=os.environ.get("APP_ENV", ""),
+                release_marker=os.environ.get("RELEASE_MARKER", ""),
+                confirmation=args.confirm,
+                database_kind=args.database_kind,
+            )
+            validate_identity_secret(os.environ.get("IDENTITY_SUBJECT_SECRET", ""))
+            print(
+                json.dumps(
+                    {
+                        "request_contract": "PASS",
+                        "runtime_contract": "PASS",
+                        "identity_secret_contract": "PASS",
+                        "request_field_count": len(_FIELDS),
+                        "request_identity_count": 3,
+                    },
+                    separators=(",", ":"),
+                )
+            )
+            return 0
 
-        settings = get_settings()
-        validate_runtime(
+        try:
+            from journey_api.config import get_settings
+
+            settings = get_settings()
+        except Exception as error:
+            raise BootstrapError(
+                "identity bootstrap runtime contract rejected",
+                category=RUNTIME_CONTRACT_CATEGORY,
+            ) from error
+        validate_runtime_contract(
             settings.database_url,
             app_env=settings.app_env,
             release_marker=settings.release_marker,
             confirmation=args.confirm,
             database_kind=args.database_kind,
         )
-        request = parse_request(args.request)
+        validate_identity_secret(settings.identity_subject_secret)
+
+        from journey_api.db import SessionLocal
+
         with SessionLocal() as session:
             result = bootstrap(session, request, settings.identity_subject_secret)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))

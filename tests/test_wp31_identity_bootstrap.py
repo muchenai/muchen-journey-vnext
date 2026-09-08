@@ -145,6 +145,17 @@ def test_request_parser_accepts_exact_non_sensitive_shape(tmp_path: Path) -> Non
     assert parsed.learner_user_id.version == 4
 
 
+def test_request_contract_wrapper_returns_a_stable_stage_category(tmp_path: Path) -> None:
+    path = tmp_path / "request.json"
+    path.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.parse_request_contract(path)
+
+    assert captured.value.category == "REQUEST_CONTRACT_REJECTED"
+    assert str(captured.value) == "identity bootstrap request contract rejected"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -220,6 +231,83 @@ def test_runtime_guard_allows_only_exact_isolated_canary_and_tls() -> None:
                 confirmation=bootstrap.CONFIRMATION,
                 database_kind="canary",
             )
+
+
+def test_runtime_contract_wrapper_returns_a_stable_stage_category() -> None:
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_runtime_contract(
+            "postgresql+psycopg://journey_next_migrator:pw@private.rds.example:5432/other",
+            app_env="production",
+            release_marker="PRODUCTION_CANARY_UAT",
+            confirmation=bootstrap.CONFIRMATION,
+            database_kind="canary",
+        )
+
+    assert captured.value.category == "RUNTIME_CONTRACT_REJECTED"
+    assert str(captured.value) == "identity bootstrap runtime contract rejected"
+
+
+@pytest.mark.parametrize("secret", ["short", "s" * 32 + "\n"])
+def test_identity_secret_contract_wrapper_returns_a_stable_stage_category(
+    secret: str,
+) -> None:
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_identity_secret(secret)
+
+    assert captured.value.category == "IDENTITY_SECRET_REJECTED"
+    assert str(captured.value) == "identity subject secret contract rejected"
+
+
+def test_contract_only_cli_validates_without_importing_application_dependencies(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(_request(), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(tmp_path),
+        "APP_ENV": "production",
+        "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
+        "DATABASE_URL": (
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        "IDENTITY_SUBJECT_SECRET": "d" * 32,
+    }
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts" / "wp31_identity_bootstrap.py"),
+            "--database-kind",
+            "canary",
+            "--request",
+            str(request),
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--contract-only",
+        ],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {
+        "request_contract": "PASS",
+        "runtime_contract": "PASS",
+        "identity_secret_contract": "PASS",
+        "request_field_count": 8,
+        "request_identity_count": 3,
+    }
+    assert result.stderr == ""
 
 
 def test_public_result_contains_ids_and_link_but_never_display_names() -> None:
@@ -594,7 +682,7 @@ def test_cli_reports_a_stable_failure_category_on_stderr_without_reason_details(
 
     assert result.returncode == 2
     assert result.stdout == ""
-    assert result.stderr == "WP31_IDENTITY_BOOTSTRAP=FAIL category=BOOTSTRAP_REJECTED\n"
+    assert result.stderr == "WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED\n"
     assert "fields differ" not in result.stderr
 
 
@@ -669,3 +757,8 @@ def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job()
     assert 'value["owner_roles"] == ["LEARNER","REVIEWER"]' in fast_job
     assert "Download exact preflight evidence before infrastructure access" in workflow
     assert "if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'" in workflow
+    probe = "Preflight identity bootstrap contract without database mutation"
+    assert probe in workflow
+    assert "--contract-only" in workflow
+    assert workflow.index(probe) < workflow.index("Create only the exact isolated canary database")
+    assert "inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'" in workflow
