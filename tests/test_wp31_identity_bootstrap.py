@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 import subprocess
 import sys
 import uuid
@@ -9,6 +10,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from scripts import wp31_identity_bootstrap as bootstrap
+from scripts import wp31_prepare_greenfield_canary as prepare_canary
 
 
 class _ScalarRows:
@@ -145,6 +147,17 @@ def test_request_parser_accepts_exact_non_sensitive_shape(tmp_path: Path) -> Non
     assert parsed.learner_user_id.version == 4
 
 
+def test_request_contract_wrapper_returns_a_stable_stage_category(tmp_path: Path) -> None:
+    path = tmp_path / "request.json"
+    path.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.parse_request_contract(path)
+
+    assert captured.value.category == "REQUEST_CONTRACT_REJECTED"
+    assert str(captured.value) == "identity bootstrap request contract rejected"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -220,6 +233,349 @@ def test_runtime_guard_allows_only_exact_isolated_canary_and_tls() -> None:
                 confirmation=bootstrap.CONFIRMATION,
                 database_kind="canary",
             )
+
+
+def test_runtime_contract_wrapper_returns_a_stable_stage_category() -> None:
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_runtime_contract(
+            "postgresql+psycopg://journey_next_migrator:pw@private.rds.example:5432/other",
+            app_env="production",
+            release_marker="PRODUCTION_CANARY_UAT",
+            confirmation=bootstrap.CONFIRMATION,
+            database_kind="canary",
+        )
+
+    assert captured.value.category == "RUNTIME_CONTRACT_REJECTED"
+    assert str(captured.value) == "identity bootstrap runtime contract rejected"
+
+
+def test_application_settings_contract_validates_without_opening_a_database() -> None:
+    settings = SimpleNamespace(
+        database_url=(
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        app_env="production",
+        release_marker="PRODUCTION_CANARY_UAT",
+        identity_subject_secret="d" * 32,
+        session_secret="s" * 32,
+        invite_secret="i" * 32,
+        import_signing_key="k" * 32,
+    )
+    database_settings = SimpleNamespace(
+        database_url=settings.database_url,
+        db_pool_size=8,
+        db_max_overflow=2,
+        db_pool_timeout_seconds=5,
+    )
+
+    assert bootstrap.validate_application_settings_contract(
+        settings,
+        database_settings,
+        confirmation=bootstrap.CONFIRMATION,
+        database_kind="canary",
+    ) is None
+
+
+@pytest.mark.parametrize("secret", ["short", "s" * 32 + "\n"])
+def test_identity_secret_contract_wrapper_returns_a_stable_stage_category(
+    secret: str,
+) -> None:
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_identity_secret(secret)
+
+    assert captured.value.category == "IDENTITY_SECRET_REJECTED"
+    assert str(captured.value) == "identity subject secret contract rejected"
+
+
+def test_identity_secret_set_rejects_reuse_with_stable_category() -> None:
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_identity_secret_set(
+            identity_secret="d" * 32,
+            session_secret="s" * 32,
+            invite_secret="s" * 32,
+            import_signing_key="k" * 32,
+        )
+
+    assert captured.value.category == "IDENTITY_SECRET_REJECTED"
+
+
+def test_application_settings_contract_rejects_invalid_database_pool() -> None:
+    settings = SimpleNamespace(
+        database_url=(
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        app_env="production",
+        release_marker="PRODUCTION_CANARY_UAT",
+        identity_subject_secret="d" * 32,
+        session_secret="s" * 32,
+        invite_secret="i" * 32,
+        import_signing_key="k" * 32,
+    )
+    database_settings = SimpleNamespace(
+        database_url=settings.database_url,
+        db_pool_size=26,
+        db_max_overflow=2,
+        db_pool_timeout_seconds=5,
+    )
+
+    with pytest.raises(bootstrap.BootstrapError) as captured:
+        bootstrap.validate_application_settings_contract(
+            settings,
+            database_settings,
+            confirmation=bootstrap.CONFIRMATION,
+            database_kind="canary",
+        )
+
+    assert captured.value.category == "RUNTIME_CONTRACT_REJECTED"
+
+
+def test_prepare_env_file_is_owner_only_at_creation(tmp_path: Path) -> None:
+    target = tmp_path / "safe.env"
+    prepare_canary.write_env(target, {"SYNTHETIC_VALUE": "not-sensitive"})
+
+    assert target.is_file()
+    if os.name != "nt":
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_contract_only_cli_validates_without_importing_application_dependencies(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(_request(), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(tmp_path),
+        "APP_ENV": "production",
+        "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
+        "DATABASE_URL": (
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        "IDENTITY_SUBJECT_SECRET": "d" * 32,
+    }
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts" / "wp31_identity_bootstrap.py"),
+            "--database-kind",
+            "canary",
+            "--request",
+            str(request),
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--contract-only",
+        ],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {
+        "identity_contract_probe": "PASS",
+        "request_contract": "PASS",
+        "runtime_contract": "PASS",
+        "identity_secret_contract": "PASS",
+        "request_field_count": 8,
+        "request_identity_count": 3,
+    }
+    assert result.stderr == ""
+
+
+def test_contract_only_accepts_the_request_from_stdin(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(tmp_path),
+        "APP_ENV": "production",
+        "RELEASE_MARKER": "PRODUCTION_CANARY_UAT",
+        "DATABASE_URL": (
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        "IDENTITY_SUBJECT_SECRET": "d" * 32,
+    }
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts" / "wp31_identity_bootstrap.py"),
+            "--database-kind",
+            "canary",
+            "--request",
+            "-",
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--contract-only",
+        ],
+        cwd=root,
+        env=environment,
+        input=json.dumps(_request(), ensure_ascii=False) + "\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["identity_contract_probe"] == "PASS"
+    assert result.stderr == ""
+
+
+def test_contract_only_settings_check_loads_config_without_opening_a_database(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(_request(), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    config_module = ModuleType("journey_api.config")
+    config_module.get_settings = lambda: SimpleNamespace(
+        database_url=(
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        app_env="production",
+        release_marker="PRODUCTION_CANARY_UAT",
+        identity_subject_secret="d" * 32,
+        session_secret="s" * 32,
+        invite_secret="i" * 32,
+        import_signing_key="k" * 32,
+    )
+    config_module.get_database_settings = lambda: SimpleNamespace(
+        database_url=(
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        db_pool_size=8,
+        db_max_overflow=2,
+        db_pool_timeout_seconds=5,
+    )
+    monkeypatch.setitem(sys.modules, "journey_api.config", config_module)
+    monkeypatch.setenv("IDENTITY_SUBJECT_SECRET", "d" * 32)
+    monkeypatch.setenv("SESSION_SECRET", "s" * 32)
+    monkeypatch.setenv("INVITE_SECRET", "i" * 32)
+    monkeypatch.setenv("IMPORT_SIGNING_KEY", "k" * 32)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "wp31_identity_bootstrap.py",
+            "--database-kind",
+            "canary",
+            "--request",
+            str(request),
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--contract-only",
+            "--settings-check",
+        ],
+    )
+
+    assert bootstrap.main() == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {
+        "identity_contract_probe": "PASS",
+        "request_contract": "PASS",
+        "runtime_contract": "PASS",
+        "identity_secret_contract": "PASS",
+        "request_field_count": 8,
+        "request_identity_count": 3,
+    }
+    assert captured.err == ""
+
+
+def test_settings_check_requires_contract_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(_request()) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "wp31_identity_bootstrap.py",
+            "--database-kind",
+            "canary",
+            "--request",
+            str(request),
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--settings-check",
+        ],
+    )
+
+    assert bootstrap.main() == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "WP31_IDENTITY_BOOTSTRAP=FAIL category=RUNTIME_CONTRACT_REJECTED\n"
+
+
+def test_contract_only_cli_builds_the_same_runtime_contract_from_source_secrets(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(_request(), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(tmp_path),
+        "WP08_MIGRATION_DB_PASSWORD": "m" * 24,
+        "WP09_IDENTITY_SUBJECT_SECRET": "d" * 32,
+        "WP15_SESSION_SECRET": "s" * 32,
+        "WP15_INVITE_SECRET": "i" * 32,
+        "WP15_IMPORT_SIGNING_KEY": "k" * 32,
+    }
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts" / "wp31_identity_bootstrap.py"),
+            "--database-kind",
+            "canary",
+            "--request",
+            str(request),
+            "--confirm",
+            bootstrap.CONFIRMATION,
+            "--contract-only",
+            "--rds-host",
+            "private.rds.example",
+            "--rds-port",
+            "5432",
+        ],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["runtime_contract"] == "PASS"
+    assert result.stderr == ""
 
 
 def test_public_result_contains_ids_and_link_but_never_display_names() -> None:
@@ -594,7 +950,7 @@ def test_cli_reports_a_stable_failure_category_on_stderr_without_reason_details(
 
     assert result.returncode == 2
     assert result.stdout == ""
-    assert result.stderr == "WP31_IDENTITY_BOOTSTRAP=FAIL category=BOOTSTRAP_REJECTED\n"
+    assert result.stderr == "WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED\n"
     assert "fields differ" not in result.stderr
 
 
@@ -620,6 +976,19 @@ def test_main_redacts_unexpected_runtime_exception(
         app_env="production",
         release_marker="PRODUCTION_CANARY_UAT",
         identity_subject_secret="d" * 32,
+        session_secret="s" * 32,
+        invite_secret="i" * 32,
+        import_signing_key="k" * 32,
+    )
+    config_module.get_database_settings = lambda: SimpleNamespace(
+        database_url=(
+            "postgresql+psycopg://journey_next_migrator:dummy-password@"
+            "private.rds.example:5432/journey_next_canary_20260901_c72fea5"
+            "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+        ),
+        db_pool_size=8,
+        db_max_overflow=2,
+        db_pool_timeout_seconds=5,
     )
     db_module = ModuleType("journey_api.db")
 
@@ -629,6 +998,10 @@ def test_main_redacts_unexpected_runtime_exception(
     db_module.SessionLocal = fail_session
     monkeypatch.setitem(sys.modules, "journey_api.config", config_module)
     monkeypatch.setitem(sys.modules, "journey_api.db", db_module)
+    monkeypatch.setenv("SESSION_SECRET", "s" * 32)
+    monkeypatch.setenv("INVITE_SECRET", "i" * 32)
+    monkeypatch.setenv("IMPORT_SIGNING_KEY", "k" * 32)
+    monkeypatch.setenv("IDENTITY_SUBJECT_SECRET", "d" * 32)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -669,3 +1042,44 @@ def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job()
     assert 'value["owner_roles"] == ["LEARNER","REVIEWER"]' in fast_job
     assert "Download exact preflight evidence before infrastructure access" in workflow
     assert "if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'" in workflow
+    minimal_probe = "Preflight identity request and secret contract before bundle creation"
+    image_probe = "Preflight candidate image settings before infrastructure mutation"
+    assert minimal_probe in workflow
+    assert image_probe in workflow
+    assert "--contract-only" in workflow
+    prepare = "Prepare exact owner-only canary bundle after minimal contract probe"
+    assert prepare in workflow
+    assert workflow.index(minimal_probe) < workflow.index(prepare)
+    assert workflow.index(prepare) < workflow.index(image_probe)
+    assert workflow.index(image_probe) < workflow.index("Open bounded SSH ingress")
+    assert workflow.index(image_probe) < workflow.index("Create only the exact isolated canary database")
+    assert "inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'" in workflow
+    minimal_block = workflow[workflow.index(minimal_probe) : workflow.index(prepare)]
+    assert "--rds-host" in minimal_block
+    assert "--request -" in minimal_block
+    assert "wp31_prepare_greenfield_canary.py" not in minimal_block
+    probe_block = workflow[workflow.index(image_probe) : workflow.index("Open bounded SSH ingress")]
+    assert "--settings-check" in probe_block
+    assert "--env-file" in probe_block
+    assert "--network none" in probe_block
+    assert "--request -" in probe_block
+    assert "base64 --decode" in probe_block
+    assert "DOCKER_CONFIG" in probe_block
+    assert ". \"$RUNNER_TEMP/wp31-bundle/secrets/target-facts.env\"" not in probe_block
+    assert "set -a" not in probe_block
+    assert workflow.count("--request -") >= 2
+    assert "-v '$remote/request.json:/tmp/request.json:ro'" not in workflow
+    assert "chmod 0600 \"$bundle/request.json\"" in workflow
+    identity_step = workflow[
+        workflow.index("Bootstrap three controlled identities inside isolated Canary database") :
+        workflow.index("Deploy exact zero-worker Canary against isolated restore")
+    ]
+    assert 'image="$(awk -F=' in identity_step
+    assert "image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:" not in identity_step
+    assert 'cp scripts/wp31_exec_env.py "$bundle/wp31_exec_env.py"' in fast_job
+    assert "python3 ./wp31_exec_env.py --env-file ./secrets/backup.env" in fast_job
+    assert "python3 ./wp31_exec_env.py --env-file ./.deployment.env --env-file ./secrets/backup.env" in fast_job
+    assert ". ./secrets/backup.env" not in fast_job
+    upload = workflow[workflow.index("Upload exact expiring preflight evidence") : workflow.index("Verify in-run preflight evidence")]
+    assert "inputs.phase == 'greenfield-preflight'" in upload
+    assert "inputs.phase == 'greenfield-canary-fast'" not in upload
