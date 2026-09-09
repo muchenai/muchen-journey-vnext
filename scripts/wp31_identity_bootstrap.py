@@ -16,9 +16,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlsplit
 
 
-CANDIDATE = "a6ba9678bf2e44411e1577588b82939664242dd1"
+CANDIDATE = "913611fac9ac4962d3b367fa93af60d7e80cccd7"
 CANARY_DATABASE = "journey_next_canary_20260901_c72fea5"
-CONFIRMATION = "BOOTSTRAP_IDENTITIES_A6BA967_PRODUCTION_CANARY"
+CONFIRMATION = "BOOTSTRAP_IDENTITIES_913611F_PRODUCTION_CANARY"
 _FIELDS = {
     "operator_user_id",
     "operator_display_name",

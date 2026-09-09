@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 
 
-CANDIDATE = "a6ba9678bf2e44411e1577588b82939664242dd1"
+CANDIDATE = "913611fac9ac4962d3b367fa93af60d7e80cccd7"
 FILES = {
     "api": ("apps/api/Dockerfile", "1fa62338133de375f12fc169b220fb361b902c99159dfe8ec17cdc82e28577a9"),
     "worker": ("apps/worker/Dockerfile", "762be601360c5178c52bc734926493cf10ca503e08ac29a065e5254ba370feb8"),
