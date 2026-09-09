@@ -599,6 +599,88 @@ jobs:
           echo "rds_host=$rds_host" >>"$GITHUB_OUTPUT"
           echo "rds_port=$rds_port" >>"$GITHUB_OUTPUT"
           echo "rds_instance_id=$rds_instance_id" >>"$GITHUB_OUTPUT"
+      - name: Preflight identity request and secret contract before bundle creation
+        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
+        env:
+          REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          request="$RUNNER_TEMP/wp31-minimal-contract-request.json"
+          trap 'rm -f -- "$request"' EXIT
+          if [[ -z "$REQUEST_B64" ]]; then
+            echo 'WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED' >&2
+            exit 2
+          fi
+          set +e
+          printf '%s' "$REQUEST_B64" | base64 --decode >"$request" 2>/dev/null
+          decode_status=$?
+          set -e
+          if [[ "$decode_status" -ne 0 ]]; then
+            echo 'WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED' >&2
+            exit 2
+          fi
+          python3 scripts/wp31_identity_bootstrap.py \
+            --contract-only \
+            --request - \
+            --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY \
+            --database-kind canary \
+            --rds-host '${{ steps.frozen.outputs.rds_host }}' \
+            --rds-port '${{ steps.frozen.outputs.rds_port }}' \
+            <"$request"
+      - name: Prepare exact owner-only canary bundle after minimal contract probe
+        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
+        run: |
+          set -euo pipefail
+          umask 077
+          bundle="$RUNNER_TEMP/wp31-bundle"
+          python3 scripts/wp31_prepare_greenfield_canary.py \
+            --output "$bundle" \
+            --rds-host '${{ steps.frozen.outputs.rds_host }}' \
+            --rds-port '${{ steps.frozen.outputs.rds_port }}'
+      - name: Preflight candidate image settings before infrastructure mutation
+        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          request="$RUNNER_TEMP/wp31-contract-request.json"
+          docker_config="$RUNNER_TEMP/wp31-contract-docker-config"
+          install -d -m 0700 "$docker_config"
+          export DOCKER_CONFIG="$docker_config"
+          trap 'rm -f -- "$request"; rm -rf -- "$docker_config"' EXIT
+          if [[ -z "$REQUEST_B64" ]]; then
+            echo 'WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED' >&2
+            exit 2
+          fi
+          set +e
+          printf '%s' "$REQUEST_B64" | base64 --decode >"$request" 2>/dev/null
+          decode_status=$?
+          set -e
+          if [[ "$decode_status" -ne 0 ]]; then
+            echo 'WP31_IDENTITY_BOOTSTRAP=FAIL category=REQUEST_CONTRACT_REJECTED' >&2
+            exit 2
+          fi
+          bundle="$RUNNER_TEMP/wp31-bundle"
+          api_image="$(awk -F= '$1 == "API_IMAGE" { print substr($0, index($0, "=") + 1); exit }' "$bundle/.deployment.env")"
+          [[ "$api_image" =~ ^ghcr\.io/muchenai/muchen-journey-vnext-api@sha256:[0-9a-f]{64}$ ]]
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null
+          docker pull "$api_image" >/dev/null
+          # The image runs as non-root; keep the request 0600 and stream it
+          # through stdin instead of bind-mounting an unreadable root-owned file.
+          docker run --rm -i --network none --read-only \
+            --env-file "$bundle/secrets/target-facts.env" \
+            -v "$GITHUB_WORKSPACE/scripts/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro" \
+            -v "$bundle/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro" \
+            "$api_image" python /tmp/wp31_identity_bootstrap.py \
+            --contract-only \
+            --settings-check \
+            --request - \
+            --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY \
+            --database-kind canary \
+            <"$request"
       - name: Open bounded SSH ingress
         id: open_ssh
         run: |
@@ -659,7 +741,7 @@ jobs:
             --payload "$RUNNER_TEMP/wp31-preflight-proof/preflight-facts.json" \
             --lifetime-minutes 60
       - name: Upload exact expiring preflight evidence
-        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
+        if: inputs.phase == 'greenfield-preflight'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp31-canary-preflight-${{ github.run_id }}
@@ -842,12 +924,14 @@ jobs:
           path: ${{ runner.temp }}/wp31-preflight-proof/lifecycle-diagnostic.json
           if-no-files-found: error
           retention-days: 7
-      - name: Prepare exact owner-only canary bundle
-        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-canary-fast'
+      - name: Add exact owner-only canary runtime files after lifecycle validation
+        if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-canary-fast'
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/wp31-bundle"
-          python3 scripts/wp31_prepare_greenfield_canary.py --output "$bundle" --rds-host '${{ steps.frozen.outputs.rds_host }}' --rds-port '${{ steps.frozen.outputs.rds_port }}'
+          if [[ ! -d "$bundle" ]]; then
+            python3 scripts/wp31_prepare_greenfield_canary.py --output "$bundle" --rds-host '${{ steps.frozen.outputs.rds_host }}' --rds-port '${{ steps.frozen.outputs.rds_port }}'
+          fi
           cp deploy/production/compose.greenfield-canary.yaml "$bundle/compose.canary.yaml"
           cp deploy/production/compose.greenfield-canary.migrate.yaml "$bundle/compose.migrate.yaml"
           cp deploy/production/wartime_grant_runtime.py "$bundle/grant_runtime.py"
@@ -858,28 +942,11 @@ jobs:
           cp deploy/production/db_facts.py "$bundle/db_facts.py"
           cp scripts/wp31_database_snapshot.py "$bundle/wp31_database_snapshot.py"
           cp scripts/wp31_candidate_binding.py "$bundle/wp31_candidate_binding.py"
+          cp scripts/wp31_exec_env.py "$bundle/wp31_exec_env.py"
           cp deploy/production/Caddyfile.greenfield-canary "$bundle/Caddyfile.canary"
           cp deploy/staging/Caddyfile "$bundle/Caddyfile.rollback"
           chmod 0755 "$bundle"/*.sh
-      - name: Preflight identity bootstrap contract without database mutation
-        if: inputs.phase == 'greenfield-preflight' || inputs.phase == 'greenfield-canary-fast'
-        env:
-          REQUEST_B64: ${{ secrets.WP31_IDENTITY_BOOTSTRAP_REQUEST_B64 }}
-        run: |
-          set -euo pipefail
-          umask 077
-          test -n "$REQUEST_B64"
-          request="$RUNNER_TEMP/wp31-contract-request.json"
-          trap 'rm -f -- "$request"' EXIT
-          printf '%s' "$REQUEST_B64" | base64 --decode >"$request"
-          set -a
-          . "$RUNNER_TEMP/wp31-bundle/secrets/target-facts.env"
-          set +a
-          python3 scripts/wp31_identity_bootstrap.py \
-            --contract-only \
-            --request "$request" \
-            --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY \
-            --database-kind canary
+          chmod 0555 "$bundle/wp31_exec_env.py"
       - name: Create only the exact isolated canary database after preflight validation
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
         run: |
@@ -901,7 +968,7 @@ jobs:
           ops_sha=$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')
           preflight_run_id='${{ inputs.preflight_run_id }}'
           if [[ '${{ inputs.phase }}' == greenfield-canary-fast ]]; then preflight_run_id="$GITHUB_RUN_ID"; fi
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$remote' && set -a && . ./secrets/backup.env && set +a && WP31_RUN_ID='$GITHUB_RUN_ID' WP31_PREFLIGHT_RUN_ID='$preflight_run_id' WP31_OPS_MANIFEST_SHA256='$ops_sha' ./backup_restore.sh"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$remote' && python3 ./wp31_exec_env.py --env-file ./secrets/backup.env --set 'WP31_RUN_ID=$GITHUB_RUN_ID' --set 'WP31_PREFLIGHT_RUN_ID=$preflight_run_id' --set 'WP31_OPS_MANIFEST_SHA256=$ops_sha' -- ./backup_restore.sh"
       - name: Collect exact encrypted off-host recovery proof
         if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-canary-fast'
         env:
@@ -972,8 +1039,11 @@ jobs:
           remote="/srv/journey-next-production/canary/restore-runs/$GITHUB_RUN_ID"
           tar -C "$bundle" -czf - request.json wp31_identity_bootstrap.py | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
-          image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:61a7f5043b1bf4bd38fd896bd19db05b3ab3585846fab2908650ddca6b95c3e7'
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm --network host --env-file '$remote/secrets/target-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/request.json:/tmp/request.json:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --database-kind canary --request /tmp/request.json --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY >'$remote/identity-result.json'"
+          image="$(awk -F= '$1 == "API_IMAGE" { print substr($0, index($0, "=") + 1); exit }' "$bundle/.deployment.env")"
+          [[ "$image" =~ ^ghcr\.io/muchenai/muchen-journey-vnext-api@sha256:[0-9a-f]{64}$ ]]
+          # The remote shell can read the 0600 file as root; the container
+          # receives it on stdin and retains its non-root runtime user.
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm -i --network host --env-file '$remote/secrets/target-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --database-kind canary --request - --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY >'$remote/identity-result.json' <'$remote/request.json'"
           scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/identity-result.json" "$RUNNER_TEMP/identity-result.json"
           python3 - "$RUNNER_TEMP/identity-result.json" <<'PY'
           import json,sys
@@ -1007,7 +1077,7 @@ jobs:
           ops_sha=$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')
           backup_run_id='${{ inputs.backup_run_id }}'; preflight_run_id='${{ inputs.preflight_run_id }}'
           if [[ '${{ inputs.phase }}' == greenfield-canary-fast ]]; then backup_run_id="$GITHUB_RUN_ID"; preflight_run_id="$GITHUB_RUN_ID"; fi
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$release' && set -a && . ./.deployment.env && . ./secrets/backup.env && set +a && BACKUP_RUN_ID='$backup_run_id' PREFLIGHT_RUN_ID='$preflight_run_id' WP31_OPS_MANIFEST_SHA256='$ops_sha' WP31_DEPLOY_RUN_ID='$GITHUB_RUN_ID' ./deploy.sh"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "cd '$release' && python3 ./wp31_exec_env.py --env-file ./.deployment.env --env-file ./secrets/backup.env --set 'BACKUP_RUN_ID=$backup_run_id' --set 'PREFLIGHT_RUN_ID=$preflight_run_id' --set 'WP31_OPS_MANIFEST_SHA256=$ops_sha' --set 'WP31_DEPLOY_RUN_ID=$GITHUB_RUN_ID' -- ./deploy.sh"
       - name: Inspect exact public and remote Canary state
         id: inspect
         if: inputs.phase == 'greenfield-deploy' || inputs.phase == 'greenfield-inspect' || inputs.phase == 'greenfield-canary-fast'
@@ -1262,7 +1332,7 @@ jobs:
           tar -C "$bundle" -czf - . | ssh "${opts[@]}" root@"$PUBLIC_IP" "tar -xzf - -C '$remote'"
           printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
           image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:61a7f5043b1bf4bd38fd896bd19db05b3ab3585846fab2908650ddca6b95c3e7'
-          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm --network host --env-file '$remote/secrets/source-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/request.json:/tmp/request.json:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --request /tmp/request.json --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY >'$remote/result.json'"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "docker pull '$image' >/dev/null && docker run --rm -i --network host --env-file '$remote/secrets/source-facts.env' -v '$remote/wp31_identity_bootstrap.py:/tmp/wp31_identity_bootstrap.py:ro' -v '$remote/secrets/volcengine-rds-ca.pem:/run/secrets/volcengine-rds-ca.pem:ro' '$image' python /tmp/wp31_identity_bootstrap.py --request - --confirm BOOTSTRAP_IDENTITIES_5D2C42F_PRODUCTION_CANARY >'$remote/result.json' <'$remote/request.json'"
           scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/result.json" "$RUNNER_TEMP/wp31-identity-result.json"
           python3 - "$RUNNER_TEMP/wp31-identity-result.json" <<'PY'
           import json,sys

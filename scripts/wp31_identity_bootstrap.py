@@ -13,7 +13,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 
 CANDIDATE = "5d2c42fdb9abdf4ca4e7756546fab99111f7c6c3"
@@ -44,6 +44,12 @@ class BootstrapError(RuntimeError):
 REQUEST_CONTRACT_CATEGORY = "REQUEST_CONTRACT_REJECTED"
 RUNTIME_CONTRACT_CATEGORY = "RUNTIME_CONTRACT_REJECTED"
 IDENTITY_SECRET_CATEGORY = "IDENTITY_SECRET_REJECTED"
+_INSECURE_IDENTITY_DEFAULTS = {
+    "journey-next-local-session-secret-change-me",
+    "journey-next-local-invite-secret-change-me",
+    "journey-next-local-import-signing-key-change-me",
+    "journey-next-local-identity-subject-secret",
+}
 
 
 def _uses_wp12b_namespace(value: str) -> bool:
@@ -119,7 +125,8 @@ def parse_payload(payload: object) -> BootstrapRequest:
 
 def parse_request(path: Path) -> BootstrapRequest:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        raw = sys.stdin.read() if str(path) == "-" else path.read_text(encoding="utf-8")
+        payload = json.loads(raw)
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise BootstrapError("bootstrap request is not valid JSON") from error
     return parse_payload(payload)
@@ -199,6 +206,115 @@ def validate_identity_secret(secret: object) -> None:
         raise BootstrapError(
             "identity subject secret contract rejected",
             category=IDENTITY_SECRET_CATEGORY,
+        )
+
+
+def validate_identity_secret_set(
+    *,
+    identity_secret: object,
+    session_secret: object,
+    invite_secret: object,
+    import_signing_key: object,
+) -> None:
+    """Mirror the application identity-secret contract without exposing values."""
+    values = (identity_secret, session_secret, invite_secret, import_signing_key)
+    if any(
+        not isinstance(value, str)
+        or len(value) < 32
+        or "\n" in value
+        or "\r" in value
+        or value in _INSECURE_IDENTITY_DEFAULTS
+        for value in values
+    ) or len(set(values)) != len(values):
+        raise BootstrapError(
+            "identity secret set contract rejected",
+            category=IDENTITY_SECRET_CATEGORY,
+        )
+
+
+def _contract_database_url(host: object, port: object, password: object) -> str:
+    """Build the same target URL as the Canary bundle without writing a bundle."""
+    if (
+        not isinstance(host, str)
+        or not re.fullmatch(r"[A-Za-z0-9.-]+", host)
+        or host in {"localhost", "127.0.0.1"}
+    ):
+        raise BootstrapError(
+            "Canary database host is invalid",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        )
+    if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+        raise BootstrapError(
+            "Canary database port is invalid",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        )
+    if not isinstance(password, str) or len(password) < 20 or "\n" in password or "\r" in password:
+        raise BootstrapError(
+            "Canary migration credential is invalid",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        )
+    return (
+        "postgresql+psycopg://journey_next_migrator:"
+        f"{quote(password, safe='')}@{host}:{port}/{CANARY_DATABASE}"
+        "?sslmode=verify-full&sslrootcert=/run/secrets/volcengine-rds-ca.pem"
+    )
+
+
+def validate_application_settings_contract(
+    settings: object,
+    database_settings: object,
+    *,
+    confirmation: str,
+    database_kind: str,
+) -> None:
+    """Validate loaded application settings without opening a database session."""
+    try:
+        database_url = settings.database_url
+        app_env = settings.app_env
+        release_marker = settings.release_marker
+        identity_secret = settings.identity_subject_secret
+        session_secret = settings.session_secret
+        invite_secret = settings.invite_secret
+        import_signing_key = settings.import_signing_key
+        database_settings_url = database_settings.database_url
+        db_pool_size = database_settings.db_pool_size
+        db_max_overflow = database_settings.db_max_overflow
+        db_pool_timeout_seconds = database_settings.db_pool_timeout_seconds
+    except Exception as error:
+        raise BootstrapError(
+            "identity bootstrap runtime contract rejected",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        ) from error
+    validate_runtime_contract(
+        database_url,
+        app_env=app_env,
+        release_marker=release_marker,
+        confirmation=confirmation,
+        database_kind=database_kind,
+    )
+    validate_identity_secret_set(
+        identity_secret=identity_secret,
+        session_secret=session_secret,
+        invite_secret=invite_secret,
+        import_signing_key=import_signing_key,
+    )
+    if database_settings_url != database_url or any(
+        isinstance(value, bool) or not isinstance(value, int)
+        for value in (db_pool_size, db_max_overflow, db_pool_timeout_seconds)
+    ):
+        raise BootstrapError(
+            "identity bootstrap database settings contract rejected",
+            category=RUNTIME_CONTRACT_CATEGORY,
+        )
+    if (
+        not 1 <= db_pool_size <= 25
+        or not 0 <= db_max_overflow <= 25
+        or db_pool_size + db_max_overflow > 30
+        or not 1 <= db_pool_timeout_seconds <= 30
+    ):
+        raise BootstrapError(
+            "identity bootstrap database settings contract rejected",
+            category=RUNTIME_CONTRACT_CATEGORY,
         )
 
 
@@ -428,21 +544,94 @@ def main() -> int:
     parser.add_argument("--confirm", required=True)
     parser.add_argument("--database-kind", choices=("canary",), default="canary")
     parser.add_argument("--contract-only", action="store_true")
+    parser.add_argument(
+        "--settings-check",
+        action="store_true",
+        help="load application settings but do not open a database session",
+    )
+    parser.add_argument("--rds-host")
+    parser.add_argument("--rds-port", type=int)
     args = parser.parse_args()
     try:
         request = parse_request_contract(args.request)
-        if args.contract_only:
-            validate_runtime_contract(
-                os.environ.get("DATABASE_URL", ""),
-                app_env=os.environ.get("APP_ENV", ""),
-                release_marker=os.environ.get("RELEASE_MARKER", ""),
-                confirmation=args.confirm,
-                database_kind=args.database_kind,
+        if args.settings_check and not args.contract_only:
+            raise BootstrapError(
+                "settings check requires contract-only mode",
+                category=RUNTIME_CONTRACT_CATEGORY,
             )
-            validate_identity_secret(os.environ.get("IDENTITY_SUBJECT_SECRET", ""))
+        if args.contract_only:
+            if args.settings_check:
+                if args.rds_host is not None or args.rds_port is not None:
+                    raise BootstrapError(
+                        "settings check cannot combine with raw RDS coordinates",
+                        category=RUNTIME_CONTRACT_CATEGORY,
+                    )
+                validate_identity_secret_set(
+                    identity_secret=os.environ.get(
+                        "IDENTITY_SUBJECT_SECRET",
+                        os.environ.get("WP09_IDENTITY_SUBJECT_SECRET", ""),
+                    ),
+                    session_secret=os.environ.get("SESSION_SECRET", ""),
+                    invite_secret=os.environ.get("INVITE_SECRET", ""),
+                    import_signing_key=os.environ.get("IMPORT_SIGNING_KEY", ""),
+                )
+                try:
+                    from journey_api.config import get_database_settings, get_settings
+
+                    settings = get_settings()
+                    database_settings = get_database_settings()
+                except Exception as error:
+                    raise BootstrapError(
+                        "identity bootstrap runtime contract rejected",
+                        category=RUNTIME_CONTRACT_CATEGORY,
+                    ) from error
+                validate_application_settings_contract(
+                    settings,
+                    database_settings,
+                    confirmation=args.confirm,
+                    database_kind=args.database_kind,
+                )
+            else:
+                if (args.rds_host is None) != (args.rds_port is None):
+                    raise BootstrapError(
+                        "Canary database coordinates are incomplete",
+                        category=RUNTIME_CONTRACT_CATEGORY,
+                    )
+                if args.rds_host is not None:
+                    database_url = _contract_database_url(
+                        args.rds_host,
+                        args.rds_port,
+                        os.environ.get("WP08_MIGRATION_DB_PASSWORD", ""),
+                    )
+                    validate_identity_secret_set(
+                        identity_secret=os.environ.get("WP09_IDENTITY_SUBJECT_SECRET", ""),
+                        session_secret=os.environ.get("WP15_SESSION_SECRET", ""),
+                        invite_secret=os.environ.get("WP15_INVITE_SECRET", ""),
+                        import_signing_key=os.environ.get("WP15_IMPORT_SIGNING_KEY", ""),
+                    )
+                    identity_secret = os.environ.get("WP09_IDENTITY_SUBJECT_SECRET", "")
+                    app_env = "production"
+                    release_marker = "PRODUCTION_CANARY_UAT"
+                else:
+                    database_url = os.environ.get("DATABASE_URL", "")
+                    identity_secret = os.environ.get(
+                        "IDENTITY_SUBJECT_SECRET",
+                        os.environ.get("WP09_IDENTITY_SUBJECT_SECRET", ""),
+                    )
+                    app_env = os.environ.get("APP_ENV", "")
+                    release_marker = os.environ.get("RELEASE_MARKER", "")
+                validate_runtime_contract(
+                    database_url,
+                    app_env=app_env,
+                    release_marker=release_marker,
+                    confirmation=args.confirm,
+                    database_kind=args.database_kind,
+                )
+                validate_identity_secret(identity_secret)
             print(
                 json.dumps(
                     {
+                        "identity_contract_probe": "PASS",
                         "request_contract": "PASS",
                         "runtime_contract": "PASS",
                         "identity_secret_contract": "PASS",
@@ -454,23 +643,28 @@ def main() -> int:
             )
             return 0
 
+        validate_identity_secret_set(
+            identity_secret=os.environ.get("IDENTITY_SUBJECT_SECRET", ""),
+            session_secret=os.environ.get("SESSION_SECRET", ""),
+            invite_secret=os.environ.get("INVITE_SECRET", ""),
+            import_signing_key=os.environ.get("IMPORT_SIGNING_KEY", ""),
+        )
         try:
-            from journey_api.config import get_settings
+            from journey_api.config import get_database_settings, get_settings
 
             settings = get_settings()
+            database_settings = get_database_settings()
         except Exception as error:
             raise BootstrapError(
                 "identity bootstrap runtime contract rejected",
                 category=RUNTIME_CONTRACT_CATEGORY,
             ) from error
-        validate_runtime_contract(
-            settings.database_url,
-            app_env=settings.app_env,
-            release_marker=settings.release_marker,
+        validate_application_settings_contract(
+            settings,
+            database_settings,
             confirmation=args.confirm,
             database_kind=args.database_kind,
         )
-        validate_identity_secret(settings.identity_subject_secret)
 
         from journey_api.db import SessionLocal
 

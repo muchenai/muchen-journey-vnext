@@ -87,7 +87,8 @@ def write_env(path: Path, values: dict[str, str], mode: int = 0o600) -> None:
     for key, value in values.items():
         if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key) or "\n" in value or "\r" in value:
             raise PrepareCanaryError(f"unsafe env value: {key}")
-    with path.open("x", encoding="utf-8") as handle:
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("".join(f"{key}={value}\n" for key, value in values.items()))
     path.chmod(mode)
 
