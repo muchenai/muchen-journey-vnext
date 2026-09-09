@@ -5,7 +5,7 @@
   ],
   "closure_model": "REPOSITORY_GREENFIELD_TRANSITIVE_V2",
   "files": {
-    ".github/workflows/wp15-wartime-production.yml": "f86c4d9416edecf92134b2a05eac09f730cb357c38c9078f03b6066ada6ca702",
+    ".github/workflows/wp15-wartime-production.yml": "f55b58656b5e75f6208271e3b9ffff31c66773ba86f7967ab357e92ccbdde20a",
     ".github/workflows/wp31-dbtool-mirror.yml": "b2717f51902dfec474d3fd90d4f0e2df131e8706fe81741bbac11ffe0b524eab",
     "config/wp31_greenfield_canary.json": "c52ee96b3ff18b9ce1e06f7b472621c2ef8aee023f151deac53475895583453e",
     "config/wp31_greenfield_canary_execution_authorization.schema.json": "ad9a197e9750440fec9aad5f85e5e77e1f9951e396aab1e87516a35817127f3b",

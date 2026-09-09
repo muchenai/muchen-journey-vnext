@@ -571,6 +571,14 @@ jobs:
             --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
             --previous-run-id '${{ inputs.backup_run_id }}' \
             --payload-dir "$RUNNER_TEMP/wp31-downloaded-deploy"
+      - name: Initialize Canary lifecycle diagnostic before infrastructure access
+        id: lifecycle_init
+        if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/wp31-preflight-proof"
+          python3 scripts/wp31_canary_lifecycle_diagnostic.py init \
+            --path "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-diagnostic.json"
       - name: Initialize frozen infrastructure state read-only
         working-directory: infra/staging
         run: |
@@ -759,13 +767,6 @@ jobs:
             --ops-manifest-sha256 "$(sha256sum config/wp31_greenfield_canary_ops_manifest.json | awk '{print $1}')" \
             --rollback-candidate ff53052847a268d025bceb93c3eab37986d50219 \
             --payload-dir "$RUNNER_TEMP/wp31-preflight-proof"
-      - name: Initialize Canary lifecycle diagnostic
-        if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
-        run: |
-          set -euo pipefail
-          install -d -m 0700 "$RUNNER_TEMP/wp31-preflight-proof"
-          python3 scripts/wp31_canary_lifecycle_diagnostic.py init \
-            --path "$RUNNER_TEMP/wp31-preflight-proof/lifecycle-diagnostic.json"
       - name: Read-only Canary database lifecycle guard
         if: inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore'
         env:
@@ -917,7 +918,8 @@ jobs:
       - name: Upload Canary lifecycle diagnostic
         if: >-
           always() &&
-          (inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore')
+          (inputs.phase == 'greenfield-canary-fast' || inputs.phase == 'greenfield-backup-restore') &&
+          steps.lifecycle_init.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wp31-canary-lifecycle-${{ github.run_id }}
