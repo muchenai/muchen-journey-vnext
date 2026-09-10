@@ -395,7 +395,10 @@ def test_backup_and_deploy_proofs_bind_real_files_and_exact_release() -> None:
     assert '"restored_facts_sha256": facts_sha' in backup
     assert 'digest("canary-source.dump.enc") == value["encrypted_backup_sha256"]' in deploy
     assert 'cmp -s "$before" "$current_before"' in deploy
-    assert 'rm -f -- "$root/current"' in deploy
+    rollback = (ROOT / "deploy/production/greenfield_canary_rollback.sh").read_text()
+    assert './rollback.sh "$PWD"' in deploy
+    assert 'rm -f -- "$root/current"' in rollback
+    assert rollback.index('[[ "$result" -eq 0 ]]') < rollback.index('rm -f -- "$root/current"')
     assert "grep -qx 'RELEASE_MARKER=PRODUCTION_CANARY_UAT' secrets/web.env" in deploy
     assert '"release":sys.argv[2]' in edge
 
