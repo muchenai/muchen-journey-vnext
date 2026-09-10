@@ -361,7 +361,7 @@ def test_workflow_closes_phase_chain_and_has_failure_rollback_cleanup() -> None:
     assert "scripts/wp31_phase_evidence.py verify" in job
     assert "steps.deploy.outcome == 'failure' || steps.inspect.outcome == 'failure'" in job
     assert "steps.upload_deploy_evidence.outcome == 'failure'" in job
-    assert "Automatic rollback after any deploy or public inspection failure" in job
+    assert "Automatic rollback after any deploy identity delivery or inspection failure" in job
     assert "Always remove transient credentials and remote registry session" in job
     assert "docker logout ghcr.io" in job
     assert "Close temporary SSH ingress" in job
