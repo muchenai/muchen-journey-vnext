@@ -1,9 +1,9 @@
 {
   "schema_version": 3,
   "environment": "PRODUCTION_CANARY_UAT",
-  "application_candidate_sha": "49ed91161b4aed2cf0a154316e3b280fbabf7496",
-  "package_workflow_run_id": "34465639401",
-  "package_manifest_sha256": "552f9d109a65cf5d81e70cb2d53336c7950ff65965b59781a17c1e1033529146",
+  "application_candidate_sha": "8f1b7e81dca9755c07babe10e1c270744a3d5717",
+  "package_workflow_run_id": "34488400416",
+  "package_manifest_sha256": "d387d632a9869e81686c2652ad81115d79e86f779bc8cf95dd9db529aae79181",
   "migration_head": "0028_canary_main_merge",
   "production_host": "journey.muchenai.com",
   "source_database": "journey_next_cutover_20260810",
@@ -17,9 +17,9 @@
     "release_go": false
   },
   "images": {
-    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:72f594b5130549cc994d87359e670fab4807fc48ba530d05fab77b7edfacaab0",
-    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:18aa69b49c171f89d07845c9d4f2b10e5c5cd3b648bb68ebfb4c87b46ceedf5a",
-    "worker_evidence_only": "ghcr.io/muchenai/muchen-journey-vnext-worker@sha256:5265cba012f6dc1f756257005bfff42bb1b514328d38200618d9737b3503a3bf"
+    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:93736fbdf9670503e97ec90c2b472f4b85a1893501a6162afac39df10fc05a69",
+    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:e35136c749b3b7844ce391f304467823620195cb3437a9977f6438e81b53a0e9",
+    "worker_evidence_only": "ghcr.io/muchenai/muchen-journey-vnext-worker@sha256:a337bab8f919a95f86e8506e583561e282e0787eb2fa9b5f6f20a7f1c66fae22"
   },
   "rollback": {
     "candidate_sha": "ff53052847a268d025bceb93c3eab37986d50219",
