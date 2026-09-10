@@ -1038,8 +1038,7 @@ def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job()
     assert "inputs.phase == 'greenfield-canary-fast'" in fast_job
     assert "Create only the exact isolated canary database" in fast_job
     assert "Deploy exact zero-worker Canary" in fast_job
-    assert "owner_user_id" in fast_job
-    assert 'value["owner_roles"] == ["LEARNER","REVIEWER"]' in fast_job
+    assert "scripts/wp31_identity_result.py encrypt" in fast_job
     assert "Download exact preflight evidence before infrastructure access" in workflow
     assert "if: inputs.phase == 'greenfield-backup-restore' || inputs.phase == 'greenfield-deploy'" in workflow
     minimal_probe = "Preflight identity request and secret contract before bundle creation"
@@ -1072,7 +1071,7 @@ def test_workflow_has_one_fast_canary_path_and_no_source_database_identity_job()
     assert "chmod 0600 \"$bundle/request.json\"" in workflow
     identity_step = workflow[
         workflow.index("Bootstrap three controlled identities inside isolated Canary database") :
-        workflow.index("Deploy exact zero-worker Canary against isolated restore")
+        workflow.index("Upload encrypted identity bootstrap result")
     ]
     assert 'image="$(awk -F=' in identity_step
     assert "image='ghcr.io/muchenai/muchen-journey-vnext-api@sha256:" not in identity_step
