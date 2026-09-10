@@ -951,6 +951,7 @@ jobs:
           fi
           cp deploy/production/compose.greenfield-canary.yaml "$bundle/compose.canary.yaml"
           cp deploy/production/compose.greenfield-canary.migrate.yaml "$bundle/compose.migrate.yaml"
+          cp deploy/production/greenfield_canary_compose.sh "$bundle/compose.sh"
           cp deploy/production/greenfield_canary_grant_runtime.py "$bundle/grant_runtime.py"
           cp deploy/production/greenfield_canary_backup_restore.sh "$bundle/backup_restore.sh"
           cp deploy/production/greenfield_canary_deploy.sh "$bundle/deploy.sh"
@@ -1115,7 +1116,7 @@ jobs:
           assert json.loads(sys.argv[1]) == {"status": "ready", "release": '${{ inputs.candidate }}'}
           PY
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
-          ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -e; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(docker compose -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; docker compose -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
+          ssh "${opts[@]}" root@"$PUBLIC_IP" 'set -euo pipefail; release=$(readlink -f /srv/journey-next-production/canary/current); cd "$release"; test "$(./compose.sh -f compose.canary.yaml config --services | tr "\n" ",")" = api,web,; ./compose.sh -f compose.canary.yaml ps --status running --services | sort | diff -u <(printf "api\nweb\n") -'
           if [[ '${{ inputs.phase }}' == greenfield-deploy || '${{ inputs.phase }}' == greenfield-canary-fast ]]; then
             proof="$RUNNER_TEMP/wp31-deploy-proof"
             install -d -m 0700 "$proof"
@@ -1153,21 +1154,16 @@ jobs:
         env:
           PUBLIC_IP: ${{ steps.frozen.outputs.public_ip }}
         run: |
-          set +e
+          set -euo pipefail
           opts=(-i "$RUNNER_TEMP/wp31-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -o UserKnownHostsFile="$RUNNER_TEMP/wp31-known-hosts")
           release='${{ steps.deploy.outputs.release }}'
           ssh "${opts[@]}" root@"$PUBLIC_IP" "
-            set +e
-            if test -n '$release' && test -d '$release'; then
-              cd '$release'
-              WP31_EDGE_MODE=rollback WP31_EDGE_SOURCE='$release/Caddyfile.rollback' ./edge.sh
-              docker compose -f compose.canary.yaml down
-            fi
-            if test -L /srv/journey-next-production/canary/current && test \"\$(readlink -f /srv/journey-next-production/canary/current)\" = '$release'; then
-              rm -f -- /srv/journey-next-production/canary/current
-            fi
+            set -euo pipefail
+            test -n '$release' && test -d '$release'
+            cd '$release'
+            ./rollback.sh '$release'
             install -d -m 0700 /srv/journey-next-production/canary/failures
-            printf '%s\n' '{\"candidate_sha\":\"${{ inputs.candidate }}\",\"automatic_rollback\":\"ATTEMPTED\",\"database_preserved\":true,\"release_evidence_preserved\":true}' >'/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
+            printf '%s\n' '{\"candidate_sha\":\"${{ inputs.candidate }}\",\"automatic_rollback\":\"PASS\",\"database_preserved\":true,\"release_evidence_preserved\":true}' >'/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
             chmod 0600 '/srv/journey-next-production/canary/failures/$GITHUB_RUN_ID.workflow.json'
           "
           ready=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muchenai.com/health/ready)

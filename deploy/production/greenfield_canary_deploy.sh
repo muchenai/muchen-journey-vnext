@@ -17,7 +17,7 @@ root=/srv/journey-next-production/canary
 [[ "${WP31_DEPLOY_RUN_ID:-}" =~ ^[1-9][0-9]{5,19}$ ]] || fail "deploy run ID is invalid"
 [[ -n "${WP15_BACKUP_KEY:-}" && ${#WP15_BACKUP_KEY} -ge 32 ]] || fail "backup key is missing"
 
-for path in compose.canary.yaml compose.migrate.yaml grant_runtime.py edge.sh Caddyfile.canary Caddyfile.rollback allowlist-proof.json db_facts.py candidate-binding-proof.json wp31_candidate_binding.py; do
+for path in compose.canary.yaml compose.migrate.yaml compose.sh rollback.sh grant_runtime.py edge.sh Caddyfile.canary Caddyfile.rollback allowlist-proof.json db_facts.py candidate-binding-proof.json wp31_candidate_binding.py; do
   [[ -f "$PWD/$path" && ! -L "$PWD/$path" ]] || fail "required input is missing: $path"
 done
 python3 ./wp31_candidate_binding.py runtime-verify \
@@ -78,14 +78,13 @@ rollback() {
   code=$?
   trap - ERR
   printf 'WP31_CANARY_DEPLOY_AUTOMATIC_ROLLBACK=START\n' >&2
-  WP31_EDGE_MODE=rollback WP31_EDGE_SOURCE="$PWD/Caddyfile.rollback" ./edge.sh || true
-  docker compose -f compose.canary.yaml down || true
-  if [[ -L "$root/current" && "$(readlink -f "$root/current")" == "$PWD" ]]; then rm -f -- "$root/current"; fi
+  rollback_result=PASS
+  ./rollback.sh "$PWD" || rollback_result=FAIL
   install -d -m 0700 "$root/failures"
   printf '{"candidate_sha":"%s","database_preserved":true,"release_path_preserved":true,"rollback_attempted":true}\n' "$candidate" \
     >"$root/failures/$WP31_DEPLOY_RUN_ID.json" || true
   chmod 0600 "$root/failures/$WP31_DEPLOY_RUN_ID.json" 2>/dev/null || true
-  printf 'WP31_CANARY_DEPLOY_AUTOMATIC_ROLLBACK=ATTEMPTED\n' >&2
+  printf 'WP31_CANARY_DEPLOY_AUTOMATIC_ROLLBACK=%s\n' "$rollback_result" >&2
   exit "$code"
 }
 trap rollback ERR
