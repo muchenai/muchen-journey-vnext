@@ -1,0 +1,138 @@
+name: Canary Application Prepare Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PREPARE_ONLY_3FA84FD_NO_SWITCH
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-app-prepare-only
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: inputs.confirmation == 'PREPARE_ONLY_3FA84FD_NO_SWITCH' && startsWith(github.ref, 'refs/tags/canary-app-prepare-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-canary-uat
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Require exact separately authorized immutable operations tag
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/tags/canary-app-prepare-$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Download and verify the existing successful package without rebuilding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/34589305423" > "$RUNNER_TEMP/package-run.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads((Path(os.environ['RUNNER_TEMP'])/'package-run.json').read_text())
+          assert r['repository']['full_name']=='muchenai/muchen-journey-vnext'
+          assert r['path']=='.github/workflows/canary-app-package.yml'
+          assert r['event']=='workflow_dispatch' and r['head_sha']=='3fa84fdfe0d0e38fbab0b649e6a78f49713be10d'
+          assert r['status']=='completed' and r['conclusion']=='success' and r['run_attempt']==1
+          PY
+          gh run download 34589305423 --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-3fa84fdfe0d0e38fbab0b649e6a78f49713be10d --dir "$RUNNER_TEMP/prepare-package"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.canary_prepare_remote import verify_package
+          verify_package(Path(os.environ['RUNNER_TEMP'])/'prepare-package')
+          print('PINNED_PACKAGE=PASS')
+          PY
+          cp scripts/canary_prepare_remote.py "$RUNNER_TEMP/prepare-package/"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Read existing host coordinates only; never apply Terraform
+        id: host
+        working-directory: infra/staging
+        env:
+          TF_IN_AUTOMATION: "true"
+          TF_INPUT: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          AWS_REGION: cn-beijing
+          AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+          AWS_S3_USE_PATH_STYLE: "false"
+          STATE_BUCKET: ${{ secrets.WP08_TF_STATE_BUCKET }}
+        run: |
+          set -euo pipefail
+          terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true"
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          test -n "$public_ip" && test -n "$security_group_id"
+          echo "::add-mask::$public_ip"
+          echo "::add-mask::$security_group_id"
+          echo "public_ip=$public_ip" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >> "$GITHUB_OUTPUT"
+      - name: Open only this runner's temporary SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS --connect-timeout 5 --max-time 15 https://checkip.amazonaws.com | tr -d '\n')
+          export RUNNER_CIDR="$runner_ip/32"
+          python3 - <<'PY'
+          import os
+          from scripts.wp08_security_group import api_request, rule_parameters, exact_rule_count
+          cidr=os.environ['RUNNER_CIDR']
+          p=rule_parameters('DescribeSecurityGroupAttributes',os.environ['SECURITY_GROUP_ID'],cidr)
+          r=api_request(p,os.environ['VOLCENGINE_ACCESS_KEY'],os.environ['VOLCENGINE_SECRET_KEY'])
+          assert exact_rule_count(r,cidr)==0, 'Existing SSH rule must not be adopted or removed'
+          PY
+          echo "PREPARE_RUNNER_CIDR=$RUNNER_CIDR" >> "$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
+          umask 077
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/prepare-key"
+      - name: Transfer verified package and prepare API/Web only
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/prepare-key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/prepare-known-hosts")
+          remote="/srv/journey-next-production/canary/app-prepare-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$remote' && test ! -L /srv/journey-next-production/canary && test ! -L /srv/journey-next-production/canary/app-prepare-runs && install -d -m 0700 '$remote'"
+          scp "${opts[@]}" "$RUNNER_TEMP/prepare-package/manifest.json" "$RUNNER_TEMP/prepare-package/compatibility.json" "$RUNNER_TEMP/prepare-package/canary_app_upgrade.py" "$RUNNER_TEMP/prepare-package/canary_prepare_remote.py" root@"$PUBLIC_IP":"$remote/"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_prepare_remote.py' '$GITHUB_ACTOR'"
+          scp "${opts[@]}" root@"$PUBLIC_IP":"$remote/result.json" "$RUNNER_TEMP/prepare-result.json"
+      - name: Retain non-sensitive preparation receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canary-prepare-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/prepare-result.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Always close this runner's temporary SSH rule
+        if: always() && env.PREPARE_RUNNER_CIDR != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$PREPARE_RUNNER_CIDR"
+      - name: Remove local ephemeral SSH files
+        if: always()
+        run: |
+          rm -f -- "$RUNNER_TEMP/prepare-key" "$RUNNER_TEMP/prepare-known-hosts"
