@@ -15,6 +15,7 @@ import {
   OpsFormalJourney,
   OpsIdentityAccess,
   OpsInvite,
+  OpsInviteTargets,
   OpsInvitationControl,
   OpsTaskDefinition,
 } from "@/lib/server/api";
@@ -57,11 +58,13 @@ function formatJourneyOptionLabel(journey: OpsFormalJourney): string {
 }
 
 function CreateInviteForm({
+  inviteTargets,
   reviewers,
   tasks,
   journeys,
   invitationsEnabled,
 }: {
+  inviteTargets: OpsInviteTargets;
   reviewers: OpsIdentityAccess[];
   tasks: OpsTaskDefinition[];
   journeys: OpsFormalJourney[];
@@ -114,8 +117,23 @@ function CreateInviteForm({
     );
   }
 
+  if (inviteTargets.target_required && inviteTargets.items.length === 0) {
+    return <p className="inline-error" role="alert">当前没有可邀请的内测学员。请核对当前组织的内测允许名单，不能创建不指定学员的邀请。</p>;
+  }
+
   return (
     <form action={action} className="ops-command-form invite-create-form">
+      {inviteTargets.target_required ? (
+        <label>
+          内测学员
+          <select name="target_user_id" required defaultValue="" aria-describedby="canary-target-help">
+            <option value="" disabled>选择本次受邀学员</option>
+            {inviteTargets.items.map((learner) => (
+              <option key={learner.user_id} value={learner.user_id}>{learner.display_name}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label>
         分配主管
         <select name="reviewer_id" required defaultValue="">
@@ -151,6 +169,9 @@ function CreateInviteForm({
           </select>
         </label>
       )}
+      {inviteTargets.target_required ? (
+        <p id="canary-target-help" className="invite-purpose-field status-meta">仅显示当前组织允许参加内测的学员；每条邀请只对应所选人员，请勿转发他人。</p>
+      ) : null}
       <label className="invite-purpose-field">
         邀请用途
         <input
@@ -234,6 +255,7 @@ function PublishFormalJourneyForm({
 }
 
 export function InviteManagementPanel({
+  inviteTargets,
   invites,
   invitationControl,
   identityAccess,
@@ -241,6 +263,7 @@ export function InviteManagementPanel({
   journeys,
   observedAt,
 }: {
+  inviteTargets: OpsInviteTargets;
   invites: OpsInvite[];
   invitationControl: OpsInvitationControl;
   identityAccess: OpsIdentityAccess[];
@@ -297,6 +320,7 @@ export function InviteManagementPanel({
         />
       ) : null}
       <CreateInviteForm
+        inviteTargets={inviteTargets}
         reviewers={reviewers}
         tasks={tasks}
         journeys={journeys}

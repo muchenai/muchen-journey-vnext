@@ -508,6 +508,21 @@ class InviteListResponse(StrictModel):
     request_id: str
 
 
+class InviteTargetOut(StrictModel):
+    user_id: UUID
+    display_name: str
+
+
+class InviteTargetsOut(StrictModel):
+    target_required: bool
+    items: list[InviteTargetOut]
+
+
+class InviteTargetsResponse(StrictModel):
+    data: InviteTargetsOut
+    request_id: str
+
+
 class InvitationControlOut(StrictModel):
     state: Literal["OPEN", "FROZEN"]
     new_invites_enabled: bool

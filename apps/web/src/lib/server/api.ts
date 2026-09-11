@@ -597,6 +597,11 @@ export type OpsRevokedIdentityTransferCandidate = {
   active_session_count: number;
 };
 
+export type OpsInviteTargets = {
+  target_required: boolean;
+  items: { user_id: string; display_name: string }[];
+};
+
 export type OpsInvite = {
   id: string;
   purpose: string;

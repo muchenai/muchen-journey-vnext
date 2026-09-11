@@ -1,0 +1,91 @@
+name: Canary Application-only Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact reviewed application commit; never switches a server
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-app-package-${{ inputs.candidate }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+      COMPOSE_PROJECT_NAME: canary-upgrade-ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.candidate }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.16.0
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Verify exact clean candidate and unchanged schema/identity core
+        run: |
+          set -euo pipefail
+          python3 scripts/canary_app_compatibility.py --candidate "$CANDIDATE" --output "$RUNNER_TEMP/app-compatibility.json"
+      - name: Run existing machine gates in disposable runner environment
+        run: make ci-main
+      - name: Build API and Web only
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 --build-arg VCS_REF="$CANDIDATE" -t "canary-api:$CANDIDATE" -f apps/api/Dockerfile .
+          docker build --platform linux/amd64 --build-arg VCS_REF="$CANDIDATE" -t "canary-web:$CANDIDATE" -f apps/web/Dockerfile apps/web
+      - name: Publish immutable references; no deployment credentials are used
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for service in api web; do
+            ref="ghcr.io/muchenai/muchen-journey-vnext-$service:app-upgrade-$CANDIDATE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            docker tag "canary-$service:$CANDIDATE" "$ref"
+            docker push "$ref"
+            docker pull "$ref"
+            docker image inspect "$ref" > "$RUNNER_TEMP/$service-image.json"
+          done
+      - name: Produce upgrade manifest and audit evidence
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/app-upgrade-package"
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          proof=json.loads((root/"app-compatibility.json").read_text())
+          images={}
+          for service in ("api","web"):
+              image=json.loads((root/f"{service}-image.json").read_text())[0]
+              assert image["Architecture"]=="amd64" and image["Os"]=="linux"
+              assert image["Config"]["Labels"]["org.opencontainers.image.revision"]==proof["candidate"]
+              refs=[r for r in image["RepoDigests"] if r.startswith(f"ghcr.io/muchenai/muchen-journey-vnext-{service}@sha256:")]
+              assert len(refs)==1
+              images[service]=refs[0]
+          manifest={"schema_version":1,"base_candidate":proof["base_candidate"],"candidate":proof["candidate"],"images":images,"compatibility":proof["compatibility"]}
+          out=root/"app-upgrade-package"
+          (out/"manifest.json").write_text(json.dumps(manifest,sort_keys=True)+"\n")
+          (out/"compatibility.json").write_text(json.dumps(proof,sort_keys=True)+"\n")
+          (out/"canary_app_upgrade.py").write_bytes(Path("scripts/canary_app_upgrade.py").read_bytes())
+          (out/"SHA256SUMS").write_text("".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in sorted(out.iterdir())))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canary-app-upgrade-${{ inputs.candidate }}
+          path: ${{ runner.temp }}/app-upgrade-package
+          if-no-files-found: error
+          retention-days: 7
