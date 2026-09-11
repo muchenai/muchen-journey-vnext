@@ -31,7 +31,7 @@ test("ops reuses scoped invitation contracts and keeps credentials out of query 
   assert.match(actions, /reviewer_id: reviewerId/);
   assert.match(actions, /task_version_id: taskVersionId/);
   assert.match(actions, /journey_version_id: journeyVersionId/);
-  assert.match(actions, /target_user_id: null/);
+  assert.match(actions, /target_user_id: targetUserId/);
   assert.match(actions, /createLearnerInvite[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}`/);
   assert.match(actions, /createLearnerReentry[\s\S]*?joinPath: `\/join#token=\$\{encodeURIComponent\(result\.invite_token\)\}&flow=reentry`/);
   assert.match(panel, /new URL\(state\.joinPath, window\.location\.origin\)\.href/);

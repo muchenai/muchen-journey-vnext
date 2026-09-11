@@ -16,6 +16,7 @@ import {
   OpsIdentityAccess,
   OpsRevokedIdentityTransferCandidate,
   OpsInvite,
+  OpsInviteTargets,
   OpsInvitationControl,
   OpsNotificationDelivery,
   OpsNotificationEndpoint,
@@ -58,6 +59,7 @@ export default async function OpsPage({
     formalJourneys,
     contentDrafts,
     reviewerWorkload,
+    inviteTargets,
   ] = await Promise.all([
     searchParams,
     identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
@@ -90,6 +92,7 @@ export default async function OpsPage({
       "/api/v1/ops/reviewer-workload",
       "OPERATOR",
     ),
+    identityPageRequest<OpsInviteTargets>("/api/v1/ops/invite-targets", "OPERATOR"),
   ]);
   const overdueReviewCount = reviewerWorkload.items.reduce(
     (total, item) => total + item.overdue_review_count,
@@ -156,6 +159,7 @@ export default async function OpsPage({
           为一名新人选择已绑定主管和已发布任务，生成一条独立的一次性邀请链接。页面不会要求或展示内部 UUID。
         </p>
         <InviteManagementPanel
+          inviteTargets={inviteTargets}
           invites={invites.items}
           invitationControl={invitationControl}
           identityAccess={identityAccess.items}

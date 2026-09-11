@@ -71,6 +71,7 @@ from journey_api.schemas import (
     IdentityConfirmResponse,
     InviteListOut,
     InviteListResponse,
+    InviteTargetsResponse,
     InviteOut,
     InvitationControlOut,
     InvitationControlResponse,
@@ -192,6 +193,29 @@ def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrol
         )
     )
     return [enrollment] if assignment is not None else []
+
+
+@router.get("/ops/invite-targets", response_model=InviteTargetsResponse)
+def list_invite_targets(
+    request: Request,
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.OPERATOR)
+    settings = get_settings()
+    required = settings.release_marker == "PRODUCTION_CANARY_UAT"
+    items = []
+    if required and settings.canary_learner_user_ids:
+        # Role-less pre-created learner identities are intentionally eligible.
+        targets = session.execute(
+            select(User.id, User.display_name).where(
+                User.organization_id == actor.organization_id,
+                User.id.in_(settings.canary_learner_user_ids),
+                User.status == UserStatus.ACTIVE,
+            ).order_by(User.display_name, User.id).limit(8)
+        ).all()
+        items = [{"user_id": user_id, "display_name": name} for user_id, name in targets]
+    return envelope(request, {"target_required": required, "items": items})
 
 
 @router.post("/ops/invites", response_model=CreateInviteResponse)

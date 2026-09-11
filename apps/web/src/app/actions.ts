@@ -15,6 +15,7 @@ import {
   SESSION_COOKIE,
   SubmissionDraft,
   TaskContentInput,
+  OpsInviteTargets,
 } from "@/lib/server/api";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -953,6 +954,14 @@ export async function createLearnerInvite(
     if (typeof purpose !== "string" || purpose.trim().length < 3 || purpose.length > 200) {
       return { error: "邀请用途需为 3–200 个字符。" };
     }
+    const targetValue = data.get("target_user_id");
+    const targetUserId = targetValue === null || targetValue === ""
+      ? null : requiredUuid(data, "target_user_id");
+    // Re-read server policy: hidden inputs and a stale page cannot relax Canary scope.
+    const targets = await apiRequest<OpsInviteTargets>("/api/v1/ops/invite-targets", "OPERATOR");
+    if (targets.target_required && !targets.items.some((item) => item.user_id === targetUserId)) {
+      return { error: "请选择当前允许的内测学员；名单可能已变化，请刷新后重试。" };
+    }
     const result = await apiRequest<{ invite_token: string; expires_at: string }>(
       "/api/v1/ops/invites",
       "OPERATOR",
@@ -966,7 +975,7 @@ export async function createLearnerInvite(
           reviewer_id: reviewerId,
           task_version_id: taskVersionId,
           journey_version_id: journeyVersionId,
-          target_user_id: null,
+          target_user_id: targetUserId,
         }),
       },
     );

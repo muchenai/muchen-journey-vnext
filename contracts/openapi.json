@@ -5,6 +5,52 @@
     "version": "0.2.0-local"
   },
   "paths": {
+    "/api/v1/ops/invite-targets": {
+      "get": {
+        "summary": "List Invite Targets",
+        "operationId": "list_invite_targets_api_v1_ops_invite_targets_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteTargetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Live",
@@ -5692,6 +5738,66 @@
   },
   "components": {
     "schemas": {
+      "InviteTargetOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "display_name"
+        ],
+        "title": "InviteTargetOut"
+      },
+      "InviteTargetsOut": {
+        "properties": {
+          "target_required": {
+            "type": "boolean",
+            "title": "Target Required"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InviteTargetOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_required",
+          "items"
+        ],
+        "title": "InviteTargetsOut"
+      },
+      "InviteTargetsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InviteTargetsOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "InviteTargetsResponse"
+      },
       "ActivateControlledTaskAuthorizationCommand": {
         "properties": {
           "expected_revision": {
