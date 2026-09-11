@@ -19,7 +19,7 @@ jobs:
   prepare:
     if: inputs.confirmation == 'PREPARE_ONLY_3FA84FD_NO_SWITCH' && startsWith(github.ref, 'refs/tags/canary-app-prepare-')
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     environment: production-canary-uat
     permissions:
       contents: read
