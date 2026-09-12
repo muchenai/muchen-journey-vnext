@@ -8,7 +8,60 @@ on:
         type: string
 jobs:
   repair:
-    uses: ./.github/workflows/canary-containerd-repair.yml
-    with:
-      confirmation: ${{ inputs.confirmation }}
-    secrets: inherit
+    if: inputs.confirmation == 'REPAIR_CONTAINERD_3FA84FD'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-canary-uat
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with: {terraform_version: 1.15.8, terraform_wrapper: false}
+      - name: Read host
+        id: host
+        working-directory: infra/staging
+        env:
+          TF_IN_AUTOMATION: true
+          TF_INPUT: false
+          AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          AWS_REGION: cn-beijing
+          AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+          STATE_BUCKET: ${{ secrets.WP08_TF_STATE_BUCKET }}
+        run: |
+          set -euo pipefail
+          terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true" >/dev/null
+          echo "public_ip=$(terraform output -raw staging_public_ip)" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$(terraform output -raw staging_security_group_id)" >> "$GITHUB_OUTPUT"
+      - name: Open SSH
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: |
+          set -euo pipefail
+          ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\n')
+          echo "RUNNER_CIDR=$ip/32" >> "$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$ip/32"
+          umask 077
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' > "$RUNNER_TEMP/key"
+      - name: Repair Docker and pull API only
+        env:
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          o=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
+          r=/tmp/canary-containerd-repair-$GITHUB_RUN_ID
+          ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && install -d -m 0700 '$r'"
+          scp "${o[@]}" scripts/canary_containerd_repair.py root@"$PUBLIC_IP":"$r/"
+          printf '%s' "$GHCR_TOKEN" | ssh "${o[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin && python3 '$r/canary_containerd_repair.py'"
+      - name: Cleanup SSH
+        if: always() && env.RUNNER_CIDR != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
