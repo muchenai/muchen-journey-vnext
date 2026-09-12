@@ -1,0 +1,102 @@
+name: Canary Application Switch
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type SWITCH_3FA84FD_ACK_30S
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-app-switch
+  cancel-in-progress: false
+
+jobs:
+  switch:
+    if: inputs.confirmation == 'SWITCH_3FA84FD_ACK_30S' && startsWith(github.ref, 'refs/tags/canary-app-switch-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-canary-uat
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    env:
+      PACKAGE_RUN: '34589305423'
+      CANDIDATE: '3fa84fdfe0d0e38fbab0b649e6a78f49713be10d'
+      MANIFEST_SHA256: '90ebd5a71306ee97b1ea6080ae34b7d42317f3712b85c6da0b717afe70806310'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify exact switch tag
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/tags/canary-app-switch-$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Download and verify pinned package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh run download "$PACKAGE_RUN" --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-$CANDIDATE --dir "$RUNNER_TEMP/package"
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'package'/'manifest.json'
+          assert hashlib.sha256(p.read_bytes()).hexdigest()==os.environ['MANIFEST_SHA256']
+          print('PINNED_MANIFEST=PASS')
+          PY
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Read host coordinates only
+        id: host
+        working-directory: infra/staging
+        env:
+          TF_IN_AUTOMATION: 'true'
+          TF_INPUT: 'false'
+          AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          AWS_REGION: cn-beijing
+          AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+          AWS_S3_USE_PATH_STYLE: 'false'
+          STATE_BUCKET: ${{ secrets.WP08_TF_STATE_BUCKET }}
+        run: |
+          set -euo pipefail
+          terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true"
+          echo "public_ip=$(terraform output -raw staging_public_ip)" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$(terraform output -raw staging_security_group_id)" >> "$GITHUB_OUTPUT"
+      - name: Open runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: |
+          set -euo pipefail
+          ip=$(curl -fsS --connect-timeout 5 --max-time 15 https://checkip.amazonaws.com | tr -d '\n')
+          echo "SWITCH_RUNNER_CIDR=$ip/32" >> "$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$ip/32"
+          umask 077; printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' > "$RUNNER_TEMP/key"
+      - name: Switch API/Web with automatic rollback
+        env:
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          o=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
+          r="/tmp/canary-app-switch-$GITHUB_RUN_ID"
+          ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && install -d -m 0700 '$r'"
+          scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" "$RUNNER_TEMP/package/canary_app_upgrade.py" root@"$PUBLIC_IP":"$r/"
+          ssh "${o[@]}" root@"$PUBLIC_IP" "python3 '$r/canary_app_upgrade.py' switch --manifest '$r/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --acknowledge-interruption"
+      - name: Close runner SSH rule
+        if: always() && env.SWITCH_RUNNER_CIDR != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$SWITCH_RUNNER_CIDR"
