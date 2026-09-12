@@ -1,0 +1,14 @@
+name: Canary containerd repair v2
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type REPAIR_CONTAINERD_3FA84FD
+        required: true
+        type: string
+jobs:
+  repair:
+    uses: ./.github/workflows/canary-containerd-repair.yml
+    with:
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
