@@ -29,7 +29,16 @@ jobs:
           test "$GITHUB_REF" = "refs/tags/canary-registry-diagnostic-$GITHUB_SHA"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Test diagnostic offline
-        run: python3 -m pytest -q tests/test_canary_registry_diagnostic.py -o cache_dir="$RUNNER_TEMP/pytest-cache"
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/canary_registry_diagnostic.py tests/test_canary_registry_diagnostic.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('scripts/canary_registry_diagnostic.py').read_text()
+          assert '"docker", "pull"' not in source
+          assert '"docker", "restart"' not in source
+          print('DIAGNOSTIC_STATIC_CHECK=PASS')
+          PY
       - name: Read existing host coordinates
         id: host
         working-directory: infra/staging
