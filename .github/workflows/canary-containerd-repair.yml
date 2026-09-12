@@ -42,10 +42,21 @@ jobs:
           STATE_BUCKET: ${{ secrets.WP08_TF_STATE_BUCKET }}
         run: terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true" >/dev/null; echo "public_ip=$(terraform output -raw staging_public_ip)" >> "$GITHUB_OUTPUT"; echo "security_group_id=$(terraform output -raw staging_security_group_id)" >> "$GITHUB_OUTPUT"
       - name: Open SSH
-        env: {VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}, VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}, SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}}
-        run: ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\n'); echo "RUNNER_CIDR=$ip/32" >> "$GITHUB_ENV"; python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$ip/32"; umask 077; printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' > "$RUNNER_TEMP/key"
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: |
+          set -euo pipefail
+          ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\n')
+          echo "RUNNER_CIDR=$ip/32" >> "$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$ip/32"
+          umask 077
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' > "$RUNNER_TEMP/key"
       - name: Login, restart Docker, and pull API only
-        env: {PUBLIC_IP: ${{ steps.host.outputs.public_ip }}, GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+        env:
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           o=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
