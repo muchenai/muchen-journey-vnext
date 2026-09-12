@@ -94,6 +94,13 @@ def test_remote_wrapper_has_no_switch_entrypoint():
     assert 'config.resolve().parent != directory' in source
 
 
+def test_pull_timeout_is_bounded_but_longer_than_old_default(monkeypatch):
+    calls = []
+    monkeypatch.setattr(mod.subprocess, "run", Mock(side_effect=lambda *args, **kwargs: calls.append(kwargs) or subprocess.CompletedProcess([], 0, b"", b"")))
+    mod.safe_run(["docker", "pull", "synthetic-api@sha256:synthetic"], timeout=600)
+    assert calls[0]["timeout"] == 1800
+
+
 @pytest.mark.parametrize("failure", [None, "login", "prepare"])
 def test_temporary_login_cleanup_and_existing_config_preserved(tmp_path, monkeypatch, capsys, failure):
     root = tmp_path / "canary"

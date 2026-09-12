@@ -60,6 +60,8 @@ def command_label(args):
 
 def safe_run(args, *, cwd=None, timeout=30):
     label = command_label(args)
+    if label.startswith("pull_") and timeout < 1800:
+        timeout = 1800
     print(json.dumps({"step": label, "state": "START"}), flush=True)
     try:
         p = subprocess.run(args, cwd=cwd, capture_output=True, timeout=timeout)
