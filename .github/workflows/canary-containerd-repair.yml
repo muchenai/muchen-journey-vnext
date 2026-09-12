@@ -12,7 +12,7 @@ on:
 permissions: {contents: read}
 jobs:
   repair:
-    if: startsWith(github.ref, 'refs/tags/canary-containerd-repair-')
+    if: startsWith(github.ref, 'refs/tags/canary-containerd-repair-') && (github.event_name == 'push' || inputs.confirmation == 'REPAIR_CONTAINERD_3FA84FD')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: production-canary-uat
