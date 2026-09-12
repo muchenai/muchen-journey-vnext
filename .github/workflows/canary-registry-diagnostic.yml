@@ -39,6 +39,10 @@ jobs:
           assert '"docker", "restart"' not in source
           print('DIAGNOSTIC_STATIC_CHECK=PASS')
           PY
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
       - name: Read existing host coordinates
         id: host
         working-directory: infra/staging
