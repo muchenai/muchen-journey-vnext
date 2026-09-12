@@ -1,0 +1,78 @@
+name: Canary Registry Diagnostic Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DIAGNOSE_REGISTRY_3FA84FD_NO_PULL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: inputs.confirmation == 'DIAGNOSE_REGISTRY_3FA84FD_NO_PULL' && startsWith(github.ref, 'refs/tags/canary-registry-diagnostic-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-canary-uat
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: {persist-credentials: false}
+      - name: Verify exact diagnostic tag
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/tags/canary-registry-diagnostic-$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Test diagnostic offline
+        run: python3 -m pytest -q tests/test_canary_registry_diagnostic.py -o cache_dir="$RUNNER_TEMP/pytest-cache"
+      - name: Read existing host coordinates
+        id: host
+        working-directory: infra/staging
+        env:
+          TF_IN_AUTOMATION: "true"
+          TF_INPUT: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          AWS_REGION: cn-beijing
+          AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+          AWS_S3_USE_PATH_STYLE: "false"
+          STATE_BUCKET: ${{ secrets.WP08_TF_STATE_BUCKET }}
+        run: |
+          set -euo pipefail
+          terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=terraform/wp08-staging.tfstate" -backend-config="region=cn-beijing" -backend-config="skip_credentials_validation=true" -backend-config="skip_region_validation=true" -backend-config="skip_requesting_account_id=true" -backend-config="skip_s3_checksum=true" >/dev/null
+          echo "public_ip=$(terraform output -raw staging_public_ip)" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$(terraform output -raw staging_security_group_id)" >> "$GITHUB_OUTPUT"
+      - name: Open temporary runner SSH access
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: |
+          set -euo pipefail
+          ip=$(curl -fsS --connect-timeout 5 --max-time 15 https://checkip.amazonaws.com | tr -d '\n'); export RUNNER_CIDR="$ip/32"
+          echo "RUNNER_CIDR=$RUNNER_CIDR" >> "$GITHUB_ENV"
+          python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
+          umask 077; printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' > "$RUNNER_TEMP/key"
+      - name: Run read-only ECS registry diagnosis
+        env:
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
+          remote="/tmp/canary-registry-diagnostic-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$remote' && install -d -m 0700 '$remote'"
+          scp "${opts[@]}" scripts/canary_registry_diagnostic.py root@"$PUBLIC_IP":"$remote/"
+          printf '%s' "$GHCR_TOKEN" | ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_registry_diagnostic.py' '$GITHUB_ACTOR'"
+      - name: Close temporary runner SSH access
+        if: always() && env.RUNNER_CIDR != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
