@@ -26,6 +26,8 @@ def run(args, timeout=40):
         return {"command": args[:3], "status": "TIMEOUT", "seconds": round(time.monotonic() - start, 2)}
     out = {"command": args[:3], "status": "PASS" if p.returncode == 0 else "FAIL",
            "exit": p.returncode, "seconds": round(time.monotonic() - start, 2)}
+    if p.returncode == 0 and args[:2] in (["df", "-P"], ["docker", "info"], ["docker", "system"], ["bash", "-lc"]):
+        out["output"] = p.stdout[-12000:]
     if p.returncode == 0 and args[:3] == ["docker", "manifest", "inspect"]:
         try:
             value = json.loads(p.stdout)
@@ -44,6 +46,10 @@ def run(args, timeout=40):
     return out
 
 
+def run_shell(command, timeout=40):
+    return run(["bash", "-lc", command], timeout=timeout)
+
+
 def main():
     if os.geteuid() != 0 or sys.platform != "linux" or len(sys.argv) != 2:
         raise DiagnosticError("INVOCATION_INVALID")
@@ -59,6 +65,10 @@ def main():
         result = {"diagnostic": "PASS", "pull_performed": False, "container_changed": False,
                   "database_changed": False, "credential_cleanup": False,
                   "old_api": run(["docker", "image", "inspect", OLD_API]),
+                  "disk_root": run(["df", "-P", "/"]),
+                  "docker_info": run(["docker", "info", "--format", "{{json .}}"]),
+                  "docker_disk_usage": run(["docker", "system", "df", "--format", "{{json .}}"]),
+                  "docker_service_log": run_shell("journalctl -u docker --since '2026-09-12 00:00:00' --no-pager -n 100", timeout=30),
                   "new_api_manifest": run(["docker", "manifest", "inspect", API], timeout=60),
                   "new_web_manifest": run(["docker", "manifest", "inspect", WEB], timeout=60),
                   # GHCR deliberately returns 401 for an unauthenticated /v2/ probe;
