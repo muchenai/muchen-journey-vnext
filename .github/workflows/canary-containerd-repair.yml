@@ -5,7 +5,6 @@ on:
       confirmation:
         required: true
         type: string
-    secrets: inherit
   repository_dispatch:
     types: [containerd_repair]
   push:
@@ -65,6 +64,10 @@ jobs:
           scp "${o[@]}" scripts/canary_containerd_repair.py root@"$PUBLIC_IP":"$r/"
           printf '%s' "$GHCR_TOKEN" | ssh "${o[@]}" root@"$PUBLIC_IP" "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin && python3 '$r/canary_containerd_repair.py'"
       - name: Cleanup SSH
-        if: always() && env.RUNNER_CIDR != ''
-        env: {VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}, VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}, SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}}
-        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
+        if: "${{ always() && env.RUNNER_CIDR != '' }}"
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
+        run: |
+          python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
