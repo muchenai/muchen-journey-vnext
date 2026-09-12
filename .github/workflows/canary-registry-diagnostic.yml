@@ -89,3 +89,12 @@ jobs:
           VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
           SECURITY_GROUP_ID: ${{ steps.host.outputs.security_group_id }}
         run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP_ID" --cidr "$RUNNER_CIDR"
+      - name: Remove exact temporary remote diagnostic files
+        if: always() && env.RUNNER_CIDR != ''
+        env:
+          PUBLIC_IP: ${{ steps.host.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
+          remote="/tmp/canary-registry-diagnostic-$GITHUB_RUN_ID"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && rm -rf -- '$remote'" || true

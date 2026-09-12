@@ -61,7 +61,9 @@ def main():
                   "old_api": run(["docker", "image", "inspect", OLD_API]),
                   "new_api_manifest": run(["docker", "manifest", "inspect", API], timeout=60),
                   "new_web_manifest": run(["docker", "manifest", "inspect", WEB], timeout=60),
-                  "network_probe": run(["curl", "-fsS", "--connect-timeout", "5", "--max-time", "20", "-o", "/dev/null", "-w", "%{http_code}", "https://ghcr.io/v2/"], timeout=30)}
+                  # GHCR deliberately returns 401 for an unauthenticated /v2/ probe;
+                  # transport reachability is the signal here, not HTTP auth status.
+                  "network_probe": run(["curl", "-sS", "--connect-timeout", "5", "--max-time", "20", "-o", "/dev/null", "-w", "%{http_code}", "https://ghcr.io/v2/"], timeout=30)}
     result["credential_cleanup"] = True
     print(json.dumps(result, separators=(",", ":"), sort_keys=True))
 
