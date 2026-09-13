@@ -64,7 +64,8 @@ def run(args, *, cwd=None, timeout=30):
                 logs = health.get("Log") or []
                 output = logs[-1].get("Output", "") if logs else ""
                 output = re.sub(r"(?i)(secret|token|password|database_url|authorization)[^ ]*", "[REDACTED]", output)
-                detail_lines.append("|".join((record.get("Name", ""), state.get("Status", ""), str(state.get("ExitCode", "")), health.get("Status", ""), output.replace("\r", "").replace("\n", "\\n")[:1024])))
+                compact = output.replace("\r", "").replace("\n", "\\n")
+                detail_lines.append("|".join((record.get("Name", ""), state.get("Status", ""), str(state.get("ExitCode", "")), health.get("Status", ""), compact[-4096:])))
             print(json.dumps({"compose_failure": True, "compose_exit": result.returncode,
                               "containers": safe[:4], "health_probe": detail_lines[:4]},
                        separators=(",", ":")), flush=True)
