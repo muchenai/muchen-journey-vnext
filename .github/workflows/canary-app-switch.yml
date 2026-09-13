@@ -96,7 +96,7 @@ jobs:
           o=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
           r="/tmp/canary-app-switch-$GITHUB_RUN_ID"
           ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && install -d -m 0700 '$r'"
-          scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" "$RUNNER_TEMP/package/canary_app_upgrade.py" root@"$PUBLIC_IP":"$r/"
+          scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" scripts/canary_app_upgrade.py root@"$PUBLIC_IP":"$r/"
           ssh "${o[@]}" root@"$PUBLIC_IP" "python3 '$r/canary_app_upgrade.py' switch --manifest '$r/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --acknowledge-interruption"
       - name: Close runner SSH rule
         if: always() && env.SWITCH_RUNNER_CIDR != ''

@@ -27,10 +27,10 @@ def upgrade(monkeypatch):
 def test_success_updates_pointer_only_after_new_health(upgrade):
     events = []
     upgrade.up.side_effect = lambda path: events.append(("up", path))
-    upgrade.healthy.side_effect = lambda path, *_: events.append(("healthy", path))
+    upgrade.healthy.side_effect = lambda path, *_, **__: events.append(("healthy", path))
     upgrade.pointer.side_effect = lambda path: events.append(("pointer", path))
     upgrade.switch()
-    assert events == [("healthy", mod.OLD), ("up", upgrade.new), ("healthy", upgrade.new), ("pointer", upgrade.new)]
+    assert events == [("healthy", mod.OLD), ("up", upgrade.new), ("healthy", upgrade.new), ("pointer", upgrade.new), ("healthy", upgrade.new)]
 
 
 @pytest.mark.parametrize("failed_step", ["up", "healthy", "pointer"])
