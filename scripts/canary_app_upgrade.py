@@ -54,6 +54,7 @@ def run(args, *, cwd=None, timeout=30):
             names = [PROJECT + "-" + service + "-1" for service in ("api", "web")]
             details = subprocess.run(["docker", "inspect", *names], capture_output=True, timeout=10)
             detail_lines = []
+            log_hints = []
             try:
                 records = json.loads(details.stdout)
             except (ValueError, TypeError):
@@ -66,8 +67,14 @@ def run(args, *, cwd=None, timeout=30):
                 output = re.sub(r"(?i)(secret|token|password|database_url|authorization)[^ ]*", "[REDACTED]", output)
                 compact = output.replace("\r", "").replace("\n", "\\n")
                 detail_lines.append("|".join((record.get("Name", ""), state.get("Status", ""), str(state.get("ExitCode", "")), health.get("Status", ""), compact[-4096:])))
+                if state.get("Status") == "running":
+                    logs = subprocess.run(["docker", "logs", "--tail", "80", record.get("Name", "")], capture_output=True, timeout=10)
+                    for raw_line in logs.stdout.decode(errors="replace").splitlines() + logs.stderr.decode(errors="replace").splitlines():
+                        if re.search(r"(?i)(exception|traceback|database|sqlalchemy|psycopg|connection refused|feishu|importerror)", raw_line):
+                            safe_line = re.sub(r"(?i)(secret|token|password|database_url|authorization)\S*", "[REDACTED]", raw_line)
+                            log_hints.append(safe_line[:512])
             print(json.dumps({"compose_failure": True, "compose_exit": result.returncode,
-                              "containers": safe[:4], "health_probe": detail_lines[:4]},
+                              "containers": safe[:4], "health_probe": detail_lines[:4], "log_hints": log_hints[-8:]},
                        separators=(",", ":")), flush=True)
         require(False, "COMMAND_FAILED")
     return result.stdout
