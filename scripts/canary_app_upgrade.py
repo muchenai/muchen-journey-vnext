@@ -217,12 +217,13 @@ class Upgrade:
             self.healthy(self.new, self.m["candidate"], self.m["images"], public=False)
             self.pointer(self.new)
             self.healthy(self.new, self.m["candidate"], self.m["images"])
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt) as error:
+            failure_category = str(error) if isinstance(error, UpgradeError) else type(error).__name__
             try:
                 self.rollback()
             except (Exception, KeyboardInterrupt):
                 raise UpgradeError("SWITCH_FAILED_ROLLBACK_NOT_CONFIRMED") from None
-            raise UpgradeError("SWITCH_FAILED_OLD_VERSION_HEALTHY") from None
+            raise UpgradeError(f"SWITCH_FAILED_OLD_VERSION_HEALTHY:{failure_category}") from None
 
 
 def main():
