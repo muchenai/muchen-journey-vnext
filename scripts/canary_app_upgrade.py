@@ -51,8 +51,21 @@ def run(args, *, cwd=None, timeout=30):
                 capture_output=True, timeout=10,
             )
             safe = probe.stdout.decode(errors="replace").strip().splitlines()
+            names = [PROJECT + "-" + service + "-1" for service in ("api", "web")]
+            details = subprocess.run(
+                ["docker", "inspect", *names, "--format",
+                 "{{.Name}}|{{.State.Status}}|{{.State.ExitCode}}|{{.State.Health.Status}}|{{with index .State.Health.Log 0}}{{.Output}}{{end}}"],
+                capture_output=True, timeout=10,
+            )
+            detail_lines = []
+            for line in details.stdout.decode(errors="replace").strip().splitlines():
+                fields = line.split("|", 4)
+                if len(fields) == 5:
+                    fields[4] = re.sub(r"(?i)(secret|token|password|database_url|authorization)[^ ]*", "[REDACTED]", fields[4])[:512]
+                    detail_lines.append("|".join(fields))
             print(json.dumps({"compose_failure": True, "compose_exit": result.returncode,
-                              "containers": safe[:4]}, separators=(",", ":")), flush=True)
+                              "containers": safe[:4], "health_probe": detail_lines[:4]},
+                       separators=(",", ":")), flush=True)
         require(False, "COMMAND_FAILED")
     return result.stdout
 
