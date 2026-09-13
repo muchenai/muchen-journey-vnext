@@ -88,8 +88,8 @@ def test_only_up_api_web_no_pull_build_migration_or_down(monkeypatch):
     monkeypatch.setattr(mod, "compose", execute)
     u = mod.Upgrade(manifest())
     u.up(u.new)
-    assert execute.call_args.args == (u.new, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "90", "api", "web")
-    assert execute.call_args.kwargs["timeout"] == 120
+    assert execute.call_args.args == (u.new, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "240", "api", "web")
+    assert execute.call_args.kwargs["timeout"] == 300
 
 
 def test_env_rewrite_preserves_all_secrets_database_and_allowlist():
