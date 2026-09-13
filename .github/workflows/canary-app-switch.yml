@@ -17,7 +17,6 @@ concurrency:
 
 jobs:
   switch:
-    if: inputs.confirmation == 'SWITCH_3FA84FD_ACK_30S' && startsWith(github.ref, 'refs/tags/canary-app-switch-')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: production-canary-uat
@@ -29,10 +28,16 @@ jobs:
       PACKAGE_RUN: '34589305423'
       CANDIDATE: '3fa84fdfe0d0e38fbab0b649e6a78f49713be10d'
       MANIFEST_SHA256: '90ebd5a71306ee97b1ea6080ae34b7d42317f3712b85c6da0b717afe70806310'
+      SWITCH_CONFIRMATION: ${{ inputs.confirmation }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Verify switch authorization and exact tag
+        run: |
+          set -euo pipefail
+          test "$SWITCH_CONFIRMATION" = 'SWITCH_3FA84FD_ACK_30S'
+          test "$GITHUB_REF" = "refs/tags/canary-app-switch-$GITHUB_SHA"
       - name: Verify exact switch tag
         run: |
           set -euo pipefail
