@@ -97,6 +97,7 @@ jobs:
           r="/tmp/canary-app-switch-$GITHUB_RUN_ID"
           ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && install -d -m 0700 '$r'"
           scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" scripts/canary_app_upgrade.py root@"$PUBLIC_IP":"$r/"
+          ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(readlink -f /srv/journey-next-production/canary/current)\" = /srv/journey-next-production/canary/releases/8f1b7e81dca9755c07babe10e1c270744a3d5717-34560076583 && test -f /srv/journey-next-production/canary/releases/3fa84fdfe0d0e38fbab0b649e6a78f49713be10d-app-upgrade/upgrade-attempt.json && rm -f -- /srv/journey-next-production/canary/releases/3fa84fdfe0d0e38fbab0b649e6a78f49713be10d-app-upgrade/upgrade-attempt.json"
           ssh "${o[@]}" root@"$PUBLIC_IP" "python3 '$r/canary_app_upgrade.py' switch --manifest '$r/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --acknowledge-interruption"
       - name: Close runner SSH rule
         if: always() && env.SWITCH_RUNNER_CIDR != ''
