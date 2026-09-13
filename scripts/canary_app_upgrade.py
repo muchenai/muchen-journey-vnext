@@ -43,7 +43,17 @@ def digest(raw):
 
 def run(args, *, cwd=None, timeout=30):
     result = subprocess.run(args, cwd=cwd, capture_output=True, timeout=timeout)
-    require(result.returncode == 0, "COMMAND_FAILED")
+    if result.returncode != 0:
+        if Path(args[0]).name == "compose.sh":
+            probe = subprocess.run(
+                ["docker", "ps", "-a", "--filter", "label=com.docker.compose.project=" + PROJECT,
+                 "--format", "{{.Names}}|{{.State}}|{{.Status}}"],
+                capture_output=True, timeout=10,
+            )
+            safe = probe.stdout.decode(errors="replace").strip().splitlines()
+            print(json.dumps({"compose_failure": True, "compose_exit": result.returncode,
+                              "containers": safe[:4]}, separators=(",", ":")), flush=True)
+        require(False, "COMMAND_FAILED")
     return result.stdout
 
 
