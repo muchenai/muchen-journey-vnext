@@ -41,7 +41,7 @@ def test_any_switch_failure_recreates_old_application_once(upgrade, failed_step)
         upgrade.healthy.side_effect = [None, RuntimeError("synthetic"), None]
     else:
         upgrade.pointer.side_effect = RuntimeError("synthetic")
-    with pytest.raises(mod.UpgradeError, match="^SWITCH_FAILED_OLD_VERSION_HEALTHY$"):
+    with pytest.raises(mod.UpgradeError, match="^SWITCH_FAILED_OLD_VERSION_HEALTHY:"):
         upgrade.switch()
     assert [c.args[0] for c in upgrade.up.call_args_list] == [upgrade.new, mod.OLD]
 
