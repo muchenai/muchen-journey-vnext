@@ -123,15 +123,16 @@ class Upgrade:
             require(labels["com.docker.compose.project.working_dir"] in (str(OLD), str(self.new)), "CONTAINER_RELEASE")
         return records
 
-    def healthy(self, release, candidate, images):
+    def healthy(self, release, candidate, images, *, public=True):
         for item in self.containers({k: {v} for k, v in images.items()}):
             require(item["State"]["Running"] and item["State"].get("Health", {}).get("Status") == "healthy", "UNHEALTHY")
             values = dict(pair.split("=", 1) for pair in item["Config"]["Env"])
             service = item["Config"]["Labels"]["com.docker.compose.service"]
             require(all(values.get(k) == v for k, v in env(read_file(release / "secrets" / (service + ".env"))).items()), "RUNTIME_ENV_DRIFT")
             require(values.get("APP_RELEASE") == candidate, "RUNTIME_RELEASE")
-        public = json.loads(run(["curl", "-fsS", "--connect-timeout", "3", "--max-time", "10", "https://journey.muchenai.com/health/ready"]))
-        require(public == {"status": "ready", "release": candidate}, "PUBLIC_HEALTH")
+        if public:
+            public_result = json.loads(run(["curl", "-fsS", "--connect-timeout", "3", "--max-time", "10", "https://journey.muchenai.com/health/ready"]))
+            require(public_result == {"status": "ready", "release": candidate}, "PUBLIC_HEALTH")
 
     def image_check(self, service, ref, candidate):
         value = json.loads(run(["docker", "image", "inspect", ref]))[0]
@@ -213,8 +214,9 @@ class Upgrade:
         write_new(self.new / "upgrade-attempt.json", b'{"started":true}')
         try:
             self.up(self.new)
-            self.healthy(self.new, self.m["candidate"], self.m["images"])
+            self.healthy(self.new, self.m["candidate"], self.m["images"], public=False)
             self.pointer(self.new)
+            self.healthy(self.new, self.m["candidate"], self.m["images"])
         except (Exception, KeyboardInterrupt):
             try:
                 self.rollback()
