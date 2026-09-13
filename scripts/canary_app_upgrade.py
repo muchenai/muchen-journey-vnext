@@ -52,17 +52,19 @@ def run(args, *, cwd=None, timeout=30):
             )
             safe = probe.stdout.decode(errors="replace").strip().splitlines()
             names = [PROJECT + "-" + service + "-1" for service in ("api", "web")]
-            details = subprocess.run(
-                ["docker", "inspect", *names, "--format",
-                 "{{.Name}}|{{.State.Status}}|{{.State.ExitCode}}|{{.State.Health.Status}}|{{with index .State.Health.Log 0}}{{.Output}}{{end}}"],
-                capture_output=True, timeout=10,
-            )
+            details = subprocess.run(["docker", "inspect", *names], capture_output=True, timeout=10)
             detail_lines = []
-            for line in details.stdout.decode(errors="replace").strip().splitlines():
-                fields = line.split("|", 4)
-                if len(fields) == 5:
-                    fields[4] = re.sub(r"(?i)(secret|token|password|database_url|authorization)[^ ]*", "[REDACTED]", fields[4])[:512]
-                    detail_lines.append("|".join(fields))
+            try:
+                records = json.loads(details.stdout)
+            except (ValueError, TypeError):
+                records = []
+            for record in records:
+                state = record.get("State", {})
+                health = state.get("Health") or {}
+                logs = health.get("Log") or []
+                output = logs[-1].get("Output", "") if logs else ""
+                output = re.sub(r"(?i)(secret|token|password|database_url|authorization)[^ ]*", "[REDACTED]", output)
+                detail_lines.append("|".join((record.get("Name", ""), state.get("Status", ""), str(state.get("ExitCode", "")), health.get("Status", ""), output.replace("\r", "").replace("\n", "\\n")[:1024])))
             print(json.dumps({"compose_failure": True, "compose_exit": result.returncode,
                               "containers": safe[:4], "health_probe": detail_lines[:4]},
                        separators=(",", ":")), flush=True)
