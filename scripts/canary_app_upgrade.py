@@ -196,7 +196,8 @@ class Upgrade:
         self.new.mkdir(mode=0o700)
         (self.new / "secrets").mkdir(mode=0o700)
         for name in COPY_FILES:
-            write_new(self.new / name, originals[name], stat.S_IMODE((OLD / name).stat().st_mode))
+            mode = 0o644 if name == "secrets/volcengine-rds-ca.pem" else stat.S_IMODE((OLD / name).stat().st_mode)
+            write_new(self.new / name, originals[name], mode)
         changes = {"secrets/api.env": {"APP_RELEASE": self.m["candidate"]}, "secrets/web.env": {"APP_RELEASE": self.m["candidate"]}, ".deployment.env": {"CANDIDATE_COMMIT": self.m["candidate"], "API_IMAGE": self.m["images"]["api"], "WEB_IMAGE": self.m["images"]["web"]}}
         for name in ENV_FILES:
             write_new(self.new / name, changed_env(originals[name], changes[name]))
