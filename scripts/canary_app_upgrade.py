@@ -191,7 +191,7 @@ class Upgrade:
         os.replace(temp, ROOT / "current")
 
     def up(self, path):
-        compose(path, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "90", "api", "web", timeout=120)
+        compose(path, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "240", "api", "web", timeout=300)
 
     def rollback(self):
         self.verify_prepared()
