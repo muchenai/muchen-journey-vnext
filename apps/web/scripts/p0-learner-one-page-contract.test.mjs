@@ -31,8 +31,8 @@ test("learner copy removes repeated locking and stage labels", () => {
 });
 
 test("stage completion is seen before the learner chooses the next station", () => {
-  assert.match(learnerActions, /redirect\("\/app\?transition=submitted"\)/);
-  assert.doesNotMatch(learnerActions, /transition=submitted#next-action/);
+  assert.match(learnerActions, /success: "本阶段已提交，正在等待审核。"/);
+  assert.doesNotMatch(learnerActions, /redirect\("\/app\?transition=submitted"\)/);
   assert.match(learnerHome, /className="button transition-action"/);
   assert.match(learnerHome, /进入下一站/);
   assert.match(learnerHome, /query\.transition === "submitted" && \(opensTask \|\| opensResult\) \? null/);

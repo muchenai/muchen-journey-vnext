@@ -221,6 +221,7 @@ export type SubmissionActionState = {
   requestId?: string;
   savedAt?: string;
   draftRevision?: number;
+  success?: string;
 };
 
 function aiUseDisclosure(data: FormData, prefix: "learner_ai" | "reviewer_ai") {
@@ -607,8 +608,9 @@ export async function submitAssignment(
   } catch (error) {
     return submissionError(error);
   }
+  revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  redirect("/app?transition=submitted");
+  return { success: "本阶段已提交，正在等待审核。" };
 }
 
 export async function saveSubmissionDraft(
