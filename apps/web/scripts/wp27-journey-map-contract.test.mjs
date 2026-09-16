@@ -14,6 +14,10 @@ const learnerHome = readFileSync(
   new URL("../src/app/app/page.tsx", import.meta.url),
   "utf8",
 );
+const taskPage = readFileSync(
+  new URL("../src/app/app/tasks/[assignmentId]/page.tsx", import.meta.url),
+  "utf8",
+);
 
 test("journey nodes and route line share one coordinate source", () => {
   assert.match(component, /const ROUTE_POINTS =/);
@@ -25,8 +29,13 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);
 });
 
-test("the route is orientation-only and leaves one primary current-stage entry", () => {
-  assert.doesNotMatch(component, /href=\{`\/app\/tasks/);
+test("completed stages are reachable while the current stage keeps one primary entry", () => {
+  assert.match(component, /node\.status === "COMPLETED"/);
+  assert.match(component, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
+  assert.match(component, /journey-completed-links/);
+  assert.match(taskPage, /allowed_commands/);
+  assert.match(taskPage, /assignment\.allowed_commands/);
+  assert.match(taskPage, /\["submit", "submit_revision"\]/);
   assert.doesNotMatch(component, /route-node-link/);
   assert.match(learnerHome, /打开第一份必读材料/);
   assert.match(learnerHome, /#first-learning-input/);

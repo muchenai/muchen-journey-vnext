@@ -165,6 +165,7 @@ function attachmentIds(data: FormData): string[] {
 }
 
 export type SubmissionActionState = {
+  success?: string;
   error?: string;
   requestId?: string;
   savedAt?: string;
@@ -454,8 +455,9 @@ export async function submitAssignment(
   } catch (error) {
     return submissionError(error);
   }
+  revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  redirect("/app");
+  return { success: "本阶段已提交，正在等待审核。" };
 }
 
 export async function saveSubmissionDraft(

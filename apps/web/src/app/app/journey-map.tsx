@@ -141,12 +141,22 @@ export function JourneyMap({
           {journey.nodes.map((node) => {
             const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
             return (
-              <li key={node.stable_key}>{label}</li>
+            <li key={node.stable_key}>
+              {node.status === "COMPLETED" ? <Link href={`/app/tasks/${node.assignment_id}`}>{label} · 查看提交</Link> : label}
+            </li>
             );
           })}
         </ol>
       </div>
       <p className="journey-map-hint">暖金色路标是当前位置；方形路标是能力评测。</p>
+      {journey.nodes.some((node) => node.status === "COMPLETED") ? (
+        <nav className="journey-completed-links" aria-label="已完成站点">
+          <span>已完成站点</span>
+          {journey.nodes.filter((node) => node.status === "COMPLETED").map((node) => (
+            <Link key={node.stable_key} href={`/app/tasks/${node.assignment_id}`}>{node.title} · 查看提交</Link>
+          ))}
+        </nav>
+      ) : null}
     </section>
   );
 }
