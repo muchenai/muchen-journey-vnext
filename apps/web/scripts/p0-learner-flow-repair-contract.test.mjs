@@ -125,8 +125,8 @@ test("Feishu-document work has a visible submission entry and novice guidance", 
 test("material transitions preserve context while submissions show completion first", () => {
   assert.match(actions, /redirect\(`\/app\/tasks\/\$\{assignmentId\}#task-workspace`\)/);
   assert.match(actions, /#\$\{anchor\}/);
-  assert.match(actions, /redirect\("\/app\?transition=submitted"\)/);
-  assert.doesNotMatch(actions, /transition=submitted#next-action/);
+  assert.match(actions, /success: "本阶段已提交，正在等待审核。"/);
+  assert.doesNotMatch(actions, /redirect\("\/app\?transition=submitted"\)/);
   assert.match(styles, /\.skip-link\s*\{[^}]*left: -10000px/);
   assert.match(styles, /\.skip-link:focus-visible\s*\{[^}]*left: 8px/);
   assert.doesNotMatch(styles, /\.skip-link:focus\s*\{/);
@@ -139,7 +139,7 @@ test("material transitions preserve context while submissions show completion fi
 });
 
 test("route map remains orientation-only while the current task card owns navigation", () => {
-  assert.doesNotMatch(journeyMap, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
+  assert.match(journeyMap, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
   assert.doesNotMatch(journeyMap, /route-node-link/);
 });
 

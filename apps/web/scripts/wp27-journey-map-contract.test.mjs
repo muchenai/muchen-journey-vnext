@@ -32,7 +32,9 @@ test("journey nodes and route line share one coordinate source", () => {
 });
 
 test("the route is orientation-only and leaves one primary current-stage entry", () => {
-  assert.doesNotMatch(component, /href=\{`\/app\/tasks/);
+  assert.match(component, /journey-completed-links/);
+  assert.match(component, /node\.status === "COMPLETED"/);
+  assert.match(component, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
   assert.doesNotMatch(component, /route-node-link/);
   assert.match(learnerHome, /打开第一份必读材料/);
   assert.match(learnerHome, /#first-learning-input/);

@@ -143,6 +143,16 @@ export function JourneyMap({
             return <li key={node.stable_key}>{label}</li>;
           })}
         </ol>
+        {journey.nodes.some((node) => node.status === "COMPLETED") ? (
+          <nav className="journey-completed-links" aria-label="已完成站点">
+            <strong>已完成站点</strong>
+            {journey.nodes.filter((node) => node.status === "COMPLETED").map((node) => (
+              <Link key={node.assignment_id} href={`/app/tasks/${node.assignment_id}`}>
+                {stageDisplayTitle(node.title)} · 查看提交
+              </Link>
+            ))}
+          </nav>
+        ) : null}
       </div>
       <p className="journey-map-hint">暖金色路标是当前位置；方形路标是能力评测。</p>
       <span hidden>{FORMAL_STAGE_KEYS.join(" ")}</span>

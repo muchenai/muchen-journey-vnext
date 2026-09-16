@@ -388,6 +388,13 @@ export function SubmissionComposer({
         </div>
       ) : null}
 
+      {submitState.success ? (
+        <div className="inline-success" role="status" aria-live="polite">
+          <strong>{submitState.success}</strong>
+          <a href="/app">返回旅程地图</a>
+        </div>
+      ) : null}
+
       <p id="submission-save-status" className="draft-save-status" role="status" aria-live="polite">
         {!isOnline ? "当前离线：修改已保留为本浏览器未同步副本；恢复网络后再保存或正式提交。" : draftPending ? "正在自动保存到服务器…" : draftState.savedAt ? `已自动保存到服务器 · 草稿 revision ${draftState.draftRevision} · ${new Date(draftState.savedAt).toLocaleString("zh-CN")}` : initialDraftUpdatedAt ? `服务器草稿 revision ${initialDraftRevision} · ${new Date(initialDraftUpdatedAt).toLocaleString("zh-CN")}` : "尚未保存；编辑后会自动保存到服务器，并保留本地恢复副本。"}
       </p>
