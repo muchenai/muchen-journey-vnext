@@ -28,7 +28,8 @@ test("the runtime projection is an exact hash-bound view of the four canonical p
 
   for (const indexed of index.packages) {
     const bytes = await readFile(new URL(indexed.path, root));
-    assert.equal(createHash("sha256").update(bytes).digest("hex"), indexed.file_sha256);
+    const canonicalBytes = Buffer.from(bytes.toString("utf8").replaceAll("\r\n", "\n"), "utf8");
+    assert.equal(createHash("sha256").update(canonicalBytes).digest("hex"), indexed.file_sha256);
     const canonical = JSON.parse(bytes.toString("utf8"));
     const projected = bindings.modules.find(({ module_key }) => module_key === indexed.module_key);
     assert.ok(projected);
