@@ -109,6 +109,10 @@ def write_new(path, raw, mode=0o600):
     with os.fdopen(fd, "wb") as f:
         f.write(raw)
         f.flush()
+        # os.open applies the process umask (077 in main). Restore the exact
+        # reviewed mode on this newly created descriptor, including readable CA
+        # certificates and executable compose wrappers, without changing umask.
+        os.fchmod(f.fileno(), mode)
         os.fsync(f.fileno())
 
 
@@ -211,6 +215,7 @@ class Upgrade:
         require(normalized == before, "COMPOSE_EXTRA_CHANGE")
         state = {"manifest": self.m, "old_hashes": {k: digest(v) for k, v in originals.items()}, "new_hashes": {k: digest(read_file(self.new / k)) for k in COPY_FILES + ENV_FILES}}
         write_new(self.new / "upgrade-prepared.json", json.dumps(state, sort_keys=True).encode())
+        self.verify_prepared()
 
     def verify_prepared(self):
         state = json.loads(read_file(self.new / "upgrade-prepared.json"))
@@ -218,6 +223,8 @@ class Upgrade:
         for path, key in ((OLD, "old_hashes"), (self.new, "new_hashes")):
             require(set(state[key]) == set(COPY_FILES + ENV_FILES), "PREPARED_FIELDS")
             require(all(digest(read_file(path / name)) == value for name, value in state[key].items()), "PREPARED_FILES_CHANGED")
+        require(stat.S_IMODE((self.new / "secrets/volcengine-rds-ca.pem").stat().st_mode) == 0o644, "CA_PERMISSIONS")
+        require(all(stat.S_IMODE((self.new / name).stat().st_mode) == 0o600 for name in ENV_FILES), "ENV_PERMISSIONS")
 
     def pointer(self, path):
         temp = ROOT / (".current-app-upgrade-" + self.m["candidate"])
