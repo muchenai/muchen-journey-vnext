@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type SWITCH_3FA84FD_ACK_30S
+        description: Type SWITCH_FA99907_ACK_30S
         required: true
         type: string
 
@@ -25,9 +25,9 @@ jobs:
       actions: read
       packages: read
     env:
-      PACKAGE_RUN: '34589305423'
-      CANDIDATE: '3fa84fdfe0d0e38fbab0b649e6a78f49713be10d'
-      MANIFEST_SHA256: '90ebd5a71306ee97b1ea6080ae34b7d42317f3712b85c6da0b717afe70806310'
+      PACKAGE_RUN: '35197298977'
+      CANDIDATE: 'fa99907311ae450c5ce20db0a6d645021c8dc91f'
+      MANIFEST_SHA256: '21d634df4e0dd9d424640b60a7987b1665d1b2b7012e864baf94fceeeb007f82'
       SWITCH_CONFIRMATION: ${{ inputs.confirmation }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -36,7 +36,7 @@ jobs:
       - name: Verify switch authorization and exact tag
         run: |
           set -euo pipefail
-          test "$SWITCH_CONFIRMATION" = 'SWITCH_3FA84FD_ACK_30S'
+          test "$SWITCH_CONFIRMATION" = 'SWITCH_FA99907_ACK_30S'
           test "$GITHUB_REF" = "refs/tags/canary-app-switch-$GITHUB_SHA"
       - name: Verify exact switch tag
         run: |
@@ -50,10 +50,15 @@ jobs:
           set -euo pipefail
           gh run download "$PACKAGE_RUN" --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-$CANDIDATE --dir "$RUNNER_TEMP/package"
           python3 - <<'PY'
-          import hashlib, os
+          import os
+          from scripts.canary_app_upgrade import load_manifest
+          from scripts.canary_prepare_remote import verify_package
           from pathlib import Path
-          p=Path(os.environ['RUNNER_TEMP'])/'package'/'manifest.json'
-          assert hashlib.sha256(p.read_bytes()).hexdigest()==os.environ['MANIFEST_SHA256']
+          directory=Path(os.environ['RUNNER_TEMP'])/'package'
+          verify_package(directory)
+          p=directory/'manifest.json'
+          manifest=load_manifest(p.resolve(), os.environ['MANIFEST_SHA256'])
+          assert manifest['candidate']==os.environ['CANDIDATE']
           print('PINNED_MANIFEST=PASS')
           PY
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
@@ -96,9 +101,7 @@ jobs:
           o=(-i "$RUNNER_TEMP/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known-hosts")
           r="/tmp/canary-app-switch-$GITHUB_RUN_ID"
           ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && install -d -m 0700 '$r'"
-          scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" scripts/canary_app_upgrade.py root@"$PUBLIC_IP":"$r/"
-          ssh "${o[@]}" root@"$PUBLIC_IP" "test \"\$(readlink -f /srv/journey-next-production/canary/current)\" = /srv/journey-next-production/canary/releases/8f1b7e81dca9755c07babe10e1c270744a3d5717-34560076583 && test -f /srv/journey-next-production/canary/releases/3fa84fdfe0d0e38fbab0b649e6a78f49713be10d-app-upgrade/upgrade-attempt.json && rm -f -- /srv/journey-next-production/canary/releases/3fa84fdfe0d0e38fbab0b649e6a78f49713be10d-app-upgrade/upgrade-attempt.json"
-          ssh "${o[@]}" root@"$PUBLIC_IP" "old=/srv/journey-next-production/canary/releases/8f1b7e81dca9755c07babe10e1c270744a3d5717-34560076583/secrets/volcengine-rds-ca.pem; new=/srv/journey-next-production/canary/releases/3fa84fdfe0d0e38fbab0b649e6a78f49713be10d-app-upgrade/secrets/volcengine-rds-ca.pem; test -f \"\$old\" && test -f \"\$new\" && cmp -s \"\$old\" \"\$new\" && chmod 0644 \"\$new\""
+          scp "${o[@]}" "$RUNNER_TEMP/package/manifest.json" "$RUNNER_TEMP/package/canary_app_upgrade.py" root@"$PUBLIC_IP":"$r/"
           ssh "${o[@]}" root@"$PUBLIC_IP" "python3 '$r/canary_app_upgrade.py' switch --manifest '$r/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --acknowledge-interruption"
       - name: Close runner SSH rule
         if: always() && env.SWITCH_RUNNER_CIDR != ''

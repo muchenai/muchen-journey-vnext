@@ -9,13 +9,20 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "8f1b7e81dca9755c07babe10e1c270744a3d5717"
-SOURCE_BASE = "954924c53f58714e486ba1ab9db660b019e9ba1e"
+BASE = "3fa84fdfe0d0e38fbab0b649e6a78f49713be10d"
+SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
     "apps/api/journey_api/identity_routes.py", "apps/api/journey_api/schemas.py",
     "apps/web/src/app/actions.ts", "apps/web/src/app/ops/invite-management-panel.tsx",
     "apps/web/src/app/ops/page.tsx", "apps/web/src/lib/server/api.ts",
     "apps/web/scripts/invite-contract.test.mjs", "apps/web/scripts/canary-invite-action.test.mjs",
+    "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
+    "apps/web/scripts/p0-learner-one-page-contract.test.mjs",
+    "apps/web/scripts/submission-feedback-contract.test.mjs",
+    "apps/web/scripts/wp27-journey-map-contract.test.mjs",
+    "apps/web/src/app/app/journey-map.tsx",
+    "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+    "apps/web/src/app/globals.css",
     "contracts/openapi.json",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
@@ -38,8 +45,8 @@ def verify(candidate):
         raise ValueError("Candidate checkout must be exact and clean")
     git("merge-base", "--is-ancestor", BASE, candidate)
     git("merge-base", "--is-ancestor", SOURCE_BASE, candidate)
-    # SOURCE_BASE is the already-reviewed operations revision for the live BASE.
-    # It contains newer packaging proofs, but identical application/schema sources.
+    # Compare against the deployed application revision, not the earlier release
+    # that preceded the invitation upgrade. Packaging and rollback share this BASE.
     if git("diff", "--name-only", BASE, SOURCE_BASE, "apps", "migrations", "requirements.lock", "requirements-build.lock", "pyproject.toml", "alembic.ini"):
         raise ValueError("Reviewed operations baseline changed runtime sources")
     paths = git("diff", "--name-only", SOURCE_BASE, candidate).splitlines()

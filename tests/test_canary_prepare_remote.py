@@ -85,6 +85,16 @@ def test_workflow_keeps_environment_and_exact_tag_boundary():
         assert forbidden not in source
 
 
+def test_prepare_and_switch_bind_the_same_package():
+    prepare_source = Path(".github/workflows/canary-app-prepare.yml").read_text()
+    switch_source = Path(".github/workflows/canary-app-switch.yml").read_text()
+    for source in (prepare_source, switch_source):
+        assert mod.CANDIDATE in source
+        assert str(mod.PACKAGE_RUN) in source
+    assert mod.HASHES["manifest.json"] in switch_source
+    assert "verify_package(directory)" in switch_source
+
+
 def test_remote_wrapper_has_no_switch_entrypoint():
     source = Path("scripts/canary_prepare_remote.py").read_text()
     assert "upgrade.prepare()" in source
