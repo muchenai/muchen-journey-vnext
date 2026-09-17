@@ -136,6 +136,8 @@ def test_manifest_for_previous_upgrade_is_rejected(tmp_path):
 def test_switch_validates_baseline_before_host_access_and_keeps_attempt_guard():
     source = Path(".github/workflows/canary-app-switch.yml").read_text()
     assert source.index("manifest=load_manifest(") < source.index("terraform init")
+    assert source.index("verify_package(directory)") < source.index("terraform init")
+    assert '"$RUNNER_TEMP/package/canary_app_upgrade.py"' in source
     assert "upgrade-attempt.json" not in source
     assert "chmod 0644" not in source
 
