@@ -463,7 +463,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .route-node-link:hover .route-node-orb,
 .route-node-link:focus-visible .route-node-orb { stroke: #fff; filter: drop-shadow(0 0 10px rgba(255, 255, 255, .58)); }
 .journey-route-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-.journey-completed-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; align-items: center; }
+.journey-completed-links { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; align-items: center; }
 .journey-completed-links a { color: #f7e4a2; text-decoration: underline; }
 .inline-success { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid rgba(120, 210, 170, .45); border-radius: 10px; color: #d8f5e7; }
 .journey-map-hint { position: relative; z-index: 3; margin: -10px 0 0; color: #bce0df; font-size: 11px; }
