@@ -67,6 +67,9 @@ from journey_api.schemas import (
     SubmissionMutationOut,
     SubmissionMutationResponse,
     SubmissionCommand,
+    CommandOut,
+    CommandResponse,
+    RevisionCommand,
 )
 from journey_api.submission_service import (
     attachment_out,
@@ -108,6 +111,38 @@ def lock_learner_assignment(
         session, actor, assignment_id
     )
     return assignment
+
+
+def lock_active_owned_assignment(
+    session: Session, actor: Actor, assignment_id: uuid.UUID
+) -> tuple[Assignment, Enrollment]:
+    """Lock an assignment in an active enrollment without requiring it to be current."""
+    enrollment = session.scalar(
+        select(Enrollment)
+        .join(Assignment, Assignment.enrollment_id == Enrollment.id)
+        .where(
+            Assignment.id == assignment_id,
+            Assignment.organization_id == actor.organization_id,
+            Enrollment.organization_id == actor.organization_id,
+            Enrollment.learner_id == actor.id,
+            Enrollment.status == EnrollmentStatus.ACTIVE,
+        )
+        .with_for_update(of=Enrollment)
+    )
+    if enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
+    assignment = session.scalar(
+        select(Assignment)
+        .where(
+            Assignment.id == assignment_id,
+            Assignment.organization_id == actor.organization_id,
+            Assignment.enrollment_id == enrollment.id,
+        )
+        .with_for_update()
+    )
+    if assignment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
+    return assignment, enrollment
 
 
 def add_event(
@@ -629,6 +664,199 @@ def save_submission_draft(
     )
     session.commit()
     return envelope(request, result)
+
+
+@api.post(
+    "/me/assignments/{assignment_id}/evidence-revision/start",
+    response_model=CommandResponse,
+)
+def start_evidence_revision(
+    assignment_id: uuid.UUID,
+    command: RevisionCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.LEARNER)
+    payload = {**command.model_dump(mode="json"), "assignment_id": str(assignment_id)}
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.start",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    assignment, _enrollment = lock_active_owned_assignment(
+        session, actor, assignment_id
+    )
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.start",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    ensure_revision(assignment.revision, command.expected_revision)
+    stage = assignment_stage(session, assignment)
+    if (
+        assignment.status != AssignmentStatus.COMPLETED
+        or stage is None
+        or stage.completion_policy != JourneyCompletionPolicy.LEARNER_EVIDENCE
+    ):
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有已完成的自证站点可以重新测试。")
+    submission = session.scalar(
+        select(Submission)
+        .where(Submission.assignment_id == assignment.id)
+        .with_for_update()
+    )
+    if submission is None or submission.current_version_no < 1:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点缺少可修订的历史提交。")
+    latest = session.scalar(
+        select(SubmissionVersion).where(
+            SubmissionVersion.submission_id == submission.id,
+            SubmissionVersion.version_no == submission.current_version_no,
+        )
+    )
+    if latest is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点缺少可修订的固定版本。")
+    existing_draft = session.scalar(
+        select(SubmissionDraft)
+        .where(SubmissionDraft.assignment_id == assignment.id)
+        .with_for_update()
+    )
+    if existing_draft is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点已有未完成草稿。")
+    session.add(
+        SubmissionDraft(
+            id=uuid.uuid4(),
+            organization_id=actor.organization_id,
+            assignment_id=assignment.id,
+            owner_id=actor.id,
+            body=latest.body,
+            attachment_ids=[],
+            revision=1,
+        )
+    )
+    assignment.status = AssignmentStatus.IN_PROGRESS
+    assignment.revision += 1
+    result = {
+        "resource_id": str(assignment.id),
+        "status": assignment.status.value,
+        "revision": assignment.revision,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.start",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_event(
+        session,
+        "journey_stage.evidence_revision_started.v1",
+        "assignment",
+        assignment.id,
+    )
+    add_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="journey_stage.evidence_revision_started",
+        resource_type="assignment",
+        resource_id=assignment.id,
+        details={"source_version_no": submission.current_version_no},
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
+
+
+@api.post(
+    "/me/assignments/{assignment_id}/evidence-revision/cancel",
+    response_model=CommandResponse,
+)
+def cancel_evidence_revision(
+    assignment_id: uuid.UUID,
+    command: RevisionCommand,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.LEARNER)
+    payload = {**command.model_dump(mode="json"), "assignment_id": str(assignment_id)}
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.cancel",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    assignment = lock_learner_assignment(session, actor, assignment_id)
+    replay = find_replay(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.cancel",
+        key=idempotency_key,
+        payload=payload,
+    )
+    if replay is not None:
+        return envelope(request, CommandOut(**replay))
+    ensure_revision(assignment.revision, command.expected_revision)
+    stage = assignment_stage(session, assignment)
+    submission = session.scalar(
+        select(Submission).where(Submission.assignment_id == assignment.id)
+    )
+    if (
+        assignment.status != AssignmentStatus.IN_PROGRESS
+        or stage is None
+        or stage.completion_policy != JourneyCompletionPolicy.LEARNER_EVIDENCE
+        or submission is None
+        or submission.current_version_no < 1
+    ):
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点没有可取消的重新测试。")
+    session.execute(
+        delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
+    )
+    assignment.status = AssignmentStatus.COMPLETED
+    assignment.revision += 1
+    result = {
+        "resource_id": str(assignment.id),
+        "status": assignment.status.value,
+        "revision": assignment.revision,
+    }
+    store_result(
+        session,
+        actor_id=actor.id,
+        command="journey_stage.evidence_revision.cancel",
+        key=idempotency_key,
+        payload=payload,
+        response=result,
+    )
+    add_event(
+        session,
+        "journey_stage.evidence_revision_cancelled.v1",
+        "assignment",
+        assignment.id,
+    )
+    add_audit(
+        session,
+        request=request,
+        actor=actor,
+        action="journey_stage.evidence_revision_cancelled",
+        resource_type="assignment",
+        resource_id=assignment.id,
+        details={"preserved_version_no": submission.current_version_no},
+    )
+    session.commit()
+    return envelope(request, CommandOut(**result))
 
 
 @api.post(

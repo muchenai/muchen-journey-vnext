@@ -557,6 +557,40 @@ export async function startAssignment(data: FormData) {
   redirect(`/app/tasks/${assignmentId}#task-workspace`);
 }
 
+export async function startEvidenceRevision(data: FormData) {
+  const assignmentId = requiredUuid(data, "assignment_id");
+  const expectedRevision = requiredRevision(data);
+  await apiRequest(
+    `/api/v1/me/assignments/${assignmentId}/evidence-revision/start`,
+    "LEARNER",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ expected_revision: expectedRevision }),
+    },
+  );
+  revalidatePath("/app");
+  revalidatePath(`/app/tasks/${assignmentId}`);
+  redirect(`/app/tasks/${assignmentId}?revision=retest#task-workspace`);
+}
+
+export async function cancelEvidenceRevision(data: FormData) {
+  const assignmentId = requiredUuid(data, "assignment_id");
+  const expectedRevision = requiredRevision(data);
+  await apiRequest(
+    `/api/v1/me/assignments/${assignmentId}/evidence-revision/cancel`,
+    "LEARNER",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ expected_revision: expectedRevision }),
+    },
+  );
+  revalidatePath("/app");
+  revalidatePath(`/app/tasks/${assignmentId}`);
+  redirect(`/app/tasks/${assignmentId}?revision=cancelled#task-workspace`);
+}
+
 export async function completeLearningMaterial(data: FormData) {
   const assignmentId = requiredUuid(data, "assignment_id");
   const materialKey = data.get("material_key");
@@ -595,7 +629,7 @@ export async function submitAssignment(
   const body = submissionBody(data, true);
   if (typeof body !== "string") return body;
   try {
-    await apiRequest(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
+    const result = await apiRequest<{ version_no: number }>(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
@@ -605,12 +639,17 @@ export async function submitAssignment(
         ai_use: aiUseDisclosure(data, "learner_ai"),
       }),
     });
+    const evidenceRetest = data.get("submission_command") === "submit_evidence_revision";
+    if (!evidenceRetest) {
+      revalidatePath(`/app/tasks/${assignmentId}`);
+      revalidatePath("/app");
+    }
+    return evidenceRetest
+      ? { success: `重新提交成功，Version ${result.version_no} 已保存。` }
+      : { success: "本阶段已提交，正在等待审核。" };
   } catch (error) {
     return submissionError(error);
   }
-  revalidatePath(`/app/tasks/${assignmentId}`);
-  revalidatePath("/app");
-  return { success: "本阶段已提交，正在等待审核。" };
 }
 
 export async function saveSubmissionDraft(

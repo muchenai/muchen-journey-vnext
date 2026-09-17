@@ -1120,7 +1120,14 @@ def assignment_detail(
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
     row = session.execute(
-        select(Assignment, TaskVersion, TaskDefinition, JourneyStageVersion, User)
+        select(
+            Assignment,
+            TaskVersion,
+            TaskDefinition,
+            JourneyStageVersion,
+            User,
+            Enrollment,
+        )
         .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
         .join(
             User,
@@ -1146,11 +1153,26 @@ def assignment_detail(
     ).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
-    assignment, task, definition, journey_stage, reviewer = row
-    commands = () if assignment.status == AssignmentStatus.CANCELLED else assignment_action(assignment.status)[4]
+    assignment, task, definition, journey_stage, reviewer, enrollment = row
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
     )
+    if assignment.status == AssignmentStatus.CANCELLED:
+        commands: tuple[str, ...] = ()
+    elif (
+        enrollment.status == EnrollmentStatus.ACTIVE
+        and journey_stage is not None
+        and journey_stage.completion_policy is JourneyCompletionPolicy.LEARNER_EVIDENCE
+        and submission is not None
+    ):
+        if assignment.status == AssignmentStatus.COMPLETED:
+            commands = ("start_evidence_revision",)
+        elif assignment.status == AssignmentStatus.IN_PROGRESS:
+            commands = ("submit_evidence_revision", "cancel_evidence_revision")
+        else:
+            commands = assignment_action(assignment.status)[4]
+    else:
+        commands = assignment_action(assignment.status)[4]
     material_completions = completed_materials(session, assignment)
     data = AssignmentOut(
         id=assignment.id,

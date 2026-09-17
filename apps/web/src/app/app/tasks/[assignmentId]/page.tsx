@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { CSSProperties } from "react";
 
 import {
+  cancelEvidenceRevision,
   completeLearningMaterial,
   deleteSubmissionAttachment,
   startAssignment,
+  startEvidenceRevision,
 } from "@/app/actions";
 import { ExperienceState, FactLabel } from "@/app/human-experience";
 import { Assignment, learnerPageRequest } from "@/lib/server/api";
@@ -145,7 +147,13 @@ export default async function TaskPage({
   searchParams,
 }: {
   params: Promise<{ assignmentId: string }>;
-  searchParams: Promise<{ draft?: string; attachment?: string; material?: string; revision?: string }>;
+  searchParams: Promise<{
+    draft?: string;
+    attachment?: string;
+    material?: string;
+    revision?: string;
+    submitted?: string;
+  }>;
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
@@ -157,11 +165,16 @@ export default async function TaskPage({
   );
   const canStart = assignment.allowed_commands.includes("start");
   const submitCommand = assignment.allowed_commands.find((command) =>
-    ["submit", "submit_revision"].includes(command),
+    ["submit", "submit_revision", "submit_evidence_revision"].includes(command),
   );
+  const canStartEvidenceRevision = assignment.allowed_commands.includes("start_evidence_revision");
+  const canCancelEvidenceRevision = assignment.allowed_commands.includes("cancel_evidence_revision");
+  const evidenceRetest = submitCommand === "submit_evidence_revision";
   const latestVersion = assignment.submission?.versions.at(-1);
   const initialBody = assignment.draft?.body
-    ?? (submitCommand === "submit_revision" ? latestVersion?.body ?? "" : "");
+    ?? (["submit_revision", "submit_evidence_revision"].includes(submitCommand ?? "")
+      ? latestVersion?.body ?? ""
+      : "");
   const initialAttachmentIds = assignment.draft?.attachment_ids ?? [];
   const experience = "learning_blocks" in assignment.learning_experience
     ? assignment.learning_experience
@@ -239,6 +252,8 @@ export default async function TaskPage({
       ? `看清挑战，开始${practiceNoun}`
       : needsRevision
         ? "根据 Reviewer 反馈完成修订"
+        : evidenceRetest
+          ? "修改后重新提交这一站"
         : submitCommand
           ? isAssessment ? "完成作答并交给 Reviewer" : "留下这一站的学习证据"
           : awaitingReview
@@ -272,26 +287,6 @@ export default async function TaskPage({
         </div>
       </header>
 
-      <section className="task-governance" aria-labelledby="task-governance-title">
-        <FactLabel kind="system" />
-        <h2 id="task-governance-title">固定任务与安全边界</h2>
-        <dl>
-          <div><dt>任务版本</dt><dd>TaskVersion v{assignment.task_version}</dd></div>
-          <div><dt>Rubric 版本</dt><dd>v{assignment.rubric.version}</dd></div>
-          <div><dt>Reviewer</dt><dd>{assignment.reviewer_display_name}</dd></div>
-          <div><dt>可见与敏感级别</dt><dd>{assignment.audience} · {assignment.sensitivity}</dd></div>
-          <div><dt>积分规则</dt><dd>积分规则：未配置；积分不会改变正式状态或人才结论</dd></div>
-        </dl>
-        <details>
-          <summary>任务非目标与安全边界</summary>
-          <ul className="checklist">
-            <li>阅读、点击、自证、AI 建议或积分都不能产生正式通过。</li>
-            <li>Journey 内不执行外部生产作业，不上传未获批准的敏感或原始客户数据。</li>
-            <li>正式任务尚未批准撤回；页面不提供绕过审核的动作。</li>
-          </ul>
-        </details>
-      </section>
-
       <section className="mission-now" aria-labelledby="mission-now-title">
         <div>
           <p className="section-label">现在只做这一步</p>
@@ -313,6 +308,26 @@ export default async function TaskPage({
           <span style={{ "--mission-progress": `${requiredMaterials.length === 0 ? 100 : completedRequiredMaterials / requiredMaterials.length * 100}%` } as CSSProperties} />
           <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
         </div>
+      </section>
+
+      <section className="task-governance" aria-labelledby="task-governance-title">
+        <FactLabel kind="system" />
+        <h2 id="task-governance-title">固定任务与安全边界</h2>
+        <dl>
+          <div><dt>任务版本</dt><dd>TaskVersion v{assignment.task_version}</dd></div>
+          <div><dt>Rubric 版本</dt><dd>v{assignment.rubric.version}</dd></div>
+          <div><dt>Reviewer</dt><dd>{assignment.reviewer_display_name}</dd></div>
+          <div><dt>可见与敏感级别</dt><dd>{assignment.audience} · {assignment.sensitivity}</dd></div>
+          <div><dt>积分规则</dt><dd>积分规则：未配置；积分不会改变正式状态或人才结论</dd></div>
+        </dl>
+        <details>
+          <summary>任务非目标与安全边界</summary>
+          <ul className="checklist">
+            <li>阅读、点击、自证、AI 建议或积分都不能产生正式通过。</li>
+            <li>Journey 内不执行外部生产作业，不上传未获批准的敏感或原始客户数据。</li>
+            <li>正式任务尚未批准撤回；页面不提供绕过审核的动作。</li>
+          </ul>
+        </details>
       </section>
 
       {stageComplete ? (
@@ -340,6 +355,13 @@ export default async function TaskPage({
             <a className="button primary compact" href="/app">
               回到旅程地图 <span aria-hidden="true">→</span>
             </a>
+            {canStartEvidenceRevision ? (
+              <form action={startEvidenceRevision}>
+                <input type="hidden" name="assignment_id" value={assignment.id} />
+                <input type="hidden" name="revision" value={assignment.revision} />
+                <button className="button secondary compact" type="submit">修改并重新测试</button>
+              </form>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -763,7 +785,7 @@ export default async function TaskPage({
 
       {materialsReady ? <section id="task-workspace" className="task-workspace" aria-labelledby="task-workspace-title">
       <p className="section-label">
-        {stageComplete ? "路标已点亮" : needsRevision ? "Reviewer 已回应" : "你的行动"}
+        {stageComplete ? "路标已点亮" : needsRevision ? "Reviewer 已回应" : evidenceRetest ? "重新测试中" : "你的行动"}
       </p>
       <h2 id="task-workspace-title">
         {stageComplete
@@ -774,8 +796,35 @@ export default async function TaskPage({
               : "这一站，已经完成"
           : needsRevision
             ? "带着反馈，再走一步"
+          : evidenceRetest
+            ? "修改后，重新提交这一站"
           : isDayZero ? "写下你的三句出发卡" : isAssessment ? "完成这次能力挑战" : "留下你的判断与证据"}
       </h2>
+
+      {query.revision === "cancelled" ? (
+        <p className="success-text" role="status">已取消重新测试；原提交历史保持不变。</p>
+      ) : null}
+
+      {evidenceRetest ? (
+        <section className="evidence-retest-state" aria-labelledby="evidence-retest-title">
+          <div>
+            <p className="section-label">主动重新测试</p>
+            <h3 id="evidence-retest-title">正在重新测试，原版本不会被覆盖</h3>
+            <p>本次提交将生成 Version {(assignment.submission?.current_version_no ?? 0) + 1}；已经完成的后续记录不会被删除。</p>
+          </div>
+          {canCancelEvidenceRevision ? (
+            <details className="evidence-retest-cancel">
+              <summary>取消重新测试</summary>
+              <p>取消后会丢弃本轮未提交草稿并恢复“已完成”；已有版本与评审记录不会变化。</p>
+              <form action={cancelEvidenceRevision}>
+                <input type="hidden" name="assignment_id" value={assignment.id} />
+                <input type="hidden" name="revision" value={assignment.revision} />
+                <button className="button secondary compact" type="submit">确认取消并丢弃草稿</button>
+              </form>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
 
       {query.draft === "saved" ? (
         <p className="success-text" role="status">草稿已保存，刷新后仍可恢复。</p>
@@ -865,6 +914,7 @@ export default async function TaskPage({
             visibility={`${assignment.audience} · ${assignment.sensitivity}`}
             expectsExternalDocument={expectsExternalDocument}
             taskActionUrl={taskActionUrl}
+            nextVersionNo={(assignment.submission?.current_version_no ?? 0) + 1}
           />
         </>
       ) : null}
@@ -883,7 +933,12 @@ export default async function TaskPage({
       </section> : null}
 
       {assignment.submission ? (
-        <details className="submission-history" aria-label="查看已提交版本">
+        <details
+          id="submission-history"
+          className="submission-history"
+          aria-label="查看已提交版本"
+          open={query.submitted === "retest"}
+        >
           <summary>查看提交历史</summary>
           <p className="status-meta">
             当前为 Version {assignment.submission.current_version_no}；历史版本和评审引用永久只读。
