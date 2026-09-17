@@ -116,6 +116,30 @@ def test_manifest_hash_and_digest_are_mandatory(tmp_path):
         mod.load_manifest(p, mod.digest(raw))
 
 
+def test_package_and_rollback_use_the_same_deployed_base():
+    from scripts.canary_app_compatibility import BASE, SOURCE_BASE
+    assert BASE == SOURCE_BASE == mod.BASE
+    assert mod.OLD == mod.ROOT / "releases" / (BASE + "-app-upgrade")
+
+
+def test_manifest_for_previous_upgrade_is_rejected(tmp_path):
+    m = manifest()
+    m["base_candidate"] = "8f1b7e81dca9755c07babe10e1c270744a3d5717"
+    m["candidate"] = mod.BASE
+    raw = json.dumps(m).encode()
+    p = tmp_path / "manifest.json"
+    p.write_bytes(raw)
+    with pytest.raises(mod.UpgradeError, match="BASE_CANDIDATE"):
+        mod.load_manifest(p, mod.digest(raw))
+
+
+def test_switch_validates_baseline_before_host_access_and_keeps_attempt_guard():
+    source = Path(".github/workflows/canary-app-switch.yml").read_text()
+    assert source.index("manifest=load_manifest(") < source.index("terraform init")
+    assert "upgrade-attempt.json" not in source
+    assert "chmod 0644" not in source
+
+
 def test_no_containers_after_failed_recreate_still_allows_recovery(monkeypatch):
     monkeypatch.setattr(mod, "run", Mock(return_value=b""))
     u = mod.Upgrade(manifest())
