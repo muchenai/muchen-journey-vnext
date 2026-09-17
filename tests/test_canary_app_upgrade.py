@@ -1,11 +1,61 @@
 """Switch/rollback failure injection. All containers and paths are synthetic."""
 import json
+import os
 from pathlib import Path
+import stat
 from unittest.mock import Mock
 
 import pytest
 
 from scripts import canary_app_upgrade as mod
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Deployment uses Linux file modes")
+@pytest.mark.parametrize("mask", [0o077, 0o777])
+@pytest.mark.parametrize("mode", [0o600, 0o644, 0o755])
+def test_new_file_preserves_required_mode_under_restrictive_umask(tmp_path, mask, mode):
+    path = tmp_path / "new-file"
+    previous = os.umask(mask)
+    try:
+        mod.write_new(path, b"synthetic", mode)
+        assert os.umask(mask) == mask
+    finally:
+        os.umask(previous)
+    assert path.read_bytes() == b"synthetic"
+    assert stat.S_IMODE(path.stat().st_mode) == mode
+    with pytest.raises(FileExistsError):
+        mod.write_new(path, b"replacement", 0o600)
+    assert path.read_bytes() == b"synthetic"
+    assert stat.S_IMODE(path.stat().st_mode) == mode
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Deployment uses Linux file modes")
+@pytest.mark.parametrize("changed_file,mode,category", [
+    ("secrets/volcengine-rds-ca.pem", 0o600, "CA_PERMISSIONS"),
+    ("secrets/api.env", 0o644, "ENV_PERMISSIONS"),
+])
+def test_prepared_permission_drift_fails_before_switch(tmp_path, monkeypatch, changed_file, mode, category):
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    monkeypatch.setattr(mod, "OLD", tmp_path / "old")
+    u = mod.Upgrade(manifest())
+    hashes = {}
+    for release in (mod.OLD, u.new):
+        (release / "secrets").mkdir(parents=True)
+        for name in mod.COPY_FILES + mod.ENV_FILES:
+            required_mode = 0o644 if name == "secrets/volcengine-rds-ca.pem" else 0o600
+            mod.write_new(release / name, b"synthetic", required_mode)
+            hashes[name] = mod.digest(b"synthetic")
+    mod.write_new(u.new / "upgrade-prepared.json", json.dumps({
+        "manifest": u.m, "old_hashes": hashes, "new_hashes": hashes,
+    }).encode())
+    u.verify_prepared()
+    (u.new / changed_file).chmod(mode)
+    up = Mock()
+    monkeypatch.setattr(u, "up", up)
+    with pytest.raises(mod.UpgradeError, match=category):
+        u.switch()
+    up.assert_not_called()
+    assert not (u.new / "upgrade-attempt.json").exists()
 
 
 def manifest():
