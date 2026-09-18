@@ -1,4 +1,4 @@
-"""Narrow allowlist for this application-only upgrade; unchanged schema/auth core.
+"""Narrow allowlist for the Learner evidence retest upgrade; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,18 +9,16 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "3fa84fdfe0d0e38fbab0b649e6a78f49713be10d"
-SOURCE_BASE = BASE
+BASE = "a00b18dc077c128597bb50cd4a1e20699aedb6fa"
+# The deployed candidate was packaged from a pre-merge branch. This mainline squash
+# commit has the same protected runtime tree and is the ancestry anchor for new work.
+SOURCE_BASE = "a81392ea42d6d2ccd47bb62438fdf887b87c3887"
 ALLOWED_RUNTIME_CHANGES = {
-    "apps/api/journey_api/identity_routes.py", "apps/api/journey_api/schemas.py",
-    "apps/web/src/app/actions.ts", "apps/web/src/app/ops/invite-management-panel.tsx",
-    "apps/web/src/app/ops/page.tsx", "apps/web/src/lib/server/api.ts",
-    "apps/web/scripts/invite-contract.test.mjs", "apps/web/scripts/canary-invite-action.test.mjs",
+    "apps/api/journey_api/routes.py",
+    "apps/api/journey_api/submission_routes.py",
     "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
-    "apps/web/scripts/p0-learner-one-page-contract.test.mjs",
-    "apps/web/scripts/submission-feedback-contract.test.mjs",
-    "apps/web/scripts/wp27-journey-map-contract.test.mjs",
-    "apps/web/src/app/app/journey-map.tsx",
+    "apps/web/src/app/actions.ts",
+    "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
     "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
     "apps/web/src/app/globals.css",
     "contracts/openapi.json",
@@ -43,7 +41,6 @@ def verify(candidate):
         raise ValueError("A new exact candidate SHA is required")
     if git("rev-parse", "HEAD") != candidate or git("status", "--porcelain", "--untracked-files=all"):
         raise ValueError("Candidate checkout must be exact and clean")
-    git("merge-base", "--is-ancestor", BASE, candidate)
     git("merge-base", "--is-ancestor", SOURCE_BASE, candidate)
     # Compare against the deployed application revision, not the earlier release
     # that preceded the invitation upgrade. Packaging and rollback share this BASE.

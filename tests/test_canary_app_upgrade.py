@@ -168,7 +168,8 @@ def test_manifest_hash_and_digest_are_mandatory(tmp_path):
 
 def test_package_and_rollback_use_the_same_deployed_base():
     from scripts.canary_app_compatibility import BASE, SOURCE_BASE
-    assert BASE == SOURCE_BASE == mod.BASE
+    assert BASE == mod.BASE == "a00b18dc077c128597bb50cd4a1e20699aedb6fa"
+    assert SOURCE_BASE == "a81392ea42d6d2ccd47bb62438fdf887b87c3887"
     assert mod.OLD == mod.ROOT / "releases" / (BASE + "-app-upgrade")
 
 
