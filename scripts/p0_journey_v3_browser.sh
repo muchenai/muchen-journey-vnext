@@ -203,6 +203,25 @@ pw_learner run-code "async (page) => {
 }"
 pw_learner screenshot --filename "$evidence_dir/01-first-station.png" --full-page
 
+# A valid Learner session must receive a clear Operator-role denial without seeing ops data.
+pw_learner goto "$base_url/ops"
+pw_learner run-code "async (page) => {
+  await page.waitForURL('**/ops/login?auth_error=FORBIDDEN');
+  await page.waitForLoadState('networkidle');
+  const body = await page.locator('body').innerText();
+  if (!body.includes('当前会话没有 Operator 权限')) {
+    throw new Error('learner ops denial does not explain the missing Operator role');
+  }
+  for (const sensitiveMarker of ['正式旅程', '身份访问', 'Enrollment', '审计']) {
+    if (body.includes(sensitiveMarker)) {
+      throw new Error('learner ops denial exposes operator data: ' + sensitiveMarker);
+    }
+  }
+}"
+pw_learner screenshot --filename "$evidence_dir/01-learner-ops-denied.png" --full-page
+pw_learner goto "$base_url/app"
+pw_learner run-code "async (page) => { await page.waitForLoadState('networkidle'); }"
+
 # A missing assignment exercises the bounded service-failure surface without changing business facts.
 pw_learner goto "$base_url/app/tasks/00000000-0000-0000-0000-000000000000"
 pw_learner run-code "async (page) => {
@@ -652,6 +671,18 @@ complete_review() {
     pw_reviewer goto "$base_url/review"
     pw_reviewer run-code "async (page) => {
       await page.waitForLoadState('networkidle');
+      if (await page.locator('.queue-item').count() < 1) {
+        throw new Error('formal assessment is missing from the assigned reviewer queue');
+      }
+      const body = await page.locator('body').innerText();
+      const expectedMinutes = [0, -60000].map((offset) => new Intl.DateTimeFormat('zh-CN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Shanghai',
+      }).format(new Date(Date.now() + offset)));
+      if (!body.includes('最近检查') || !expectedMinutes.some((value) => body.includes(value))) {
+        throw new Error('reviewer queue does not show the latest check in Beijing time');
+      }
       const detail = page.waitForURL(/\/review\/[^/?]+$/);
       await page.locator('.queue-item').first().evaluate((element) => element.click());
       await detail;
@@ -679,6 +710,26 @@ complete_review() {
 
 # Day 0 and four treasures progress on learner evidence.
 complete_stage 1
+pw_reviewer goto "$base_url/review"
+pw_reviewer run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  const body = await page.locator('body').innerText();
+  if (await page.locator('.queue-item').count()) {
+    throw new Error('Day 0 learner evidence incorrectly created a reviewer queue item');
+  }
+  if (!body.includes('当前没有新提交') || !body.includes('自证站提交后直接完成，不进入人工评审队列')) {
+    throw new Error('reviewer empty state does not explain the self-evidence boundary');
+  }
+  const expectedMinutes = [0, -60000].map((offset) => new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Shanghai',
+  }).format(new Date(Date.now() + offset)));
+  if (!expectedMinutes.some((value) => body.includes(value))) {
+    throw new Error('reviewer empty state does not show the latest check in Beijing time');
+  }
+}"
+pw_reviewer screenshot --filename "$evidence_dir/02-day-zero-reviewer-empty.png" --full-page
 complete_stage 2
 retest_completed_evidence
 complete_stage 3
@@ -841,4 +892,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9]
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"

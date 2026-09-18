@@ -802,6 +802,13 @@ export async function identityPageRequest<T>(
     ) {
       redirect("/review/login?auth_error=FORBIDDEN");
     }
+    if (
+      role === "OPERATOR"
+      && error instanceof ApiRequestError
+      && error.status === 403
+    ) {
+      redirect("/ops/login?auth_error=FORBIDDEN");
+    }
     if (error instanceof ApiRequestError && error.status === 401) {
       if (role === "REVIEWER") {
         redirect("/review/login?auth_error=SESSION_EXPIRED");
