@@ -1,9 +1,9 @@
 # Canary application-only upgrade and rollback
 
-Scope: current Canary application candidate `a00b18dc077c128597bb50cd4a1e20699aedb6fa`
-from switch run 35210878855, database `journey_next_canary_20260901_c72fea5`.
-Mainline commit `a81392ea42d6d2ccd47bb62438fdf887b87c3887` is the protected-runtime
-tree-equivalent ancestry anchor for this branch-packaged deployed candidate.
+Scope: current Canary application candidate `86e3b85f99599646bd5f343ba288f98e8c5bbed9`
+from switch run 35301963091, database `journey_next_canary_20260901_c72fea5`.
+The application-only package run `35309519448` upgrades this exact deployed
+candidate to `61e49463aca50b36a9d4a54f6087bcd4659be61c`.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
 bindings, signing secrets, sessions, allowlist, disabled workers/notifications and edge
@@ -11,14 +11,14 @@ route are retained. No database or volume deletion, restore, migration, grant or
 
 ## Preparation and compatibility gate
 
-1. Review the Learner evidence retest changes and updated upgrade baseline. Merge through
+1. Review the draft-save feedback, durable resubmission receipt, task-layout changes and updated upgrade baseline. Merge through
    repository gates.
 2. Package an exact new commit with `Canary Application-only Package`; it has no ECS/RDS
    credentials and does not deploy. Require successful machine gates and verify the
    downloaded artifact provenance (repository, workflow, run, candidate, attempt).
 3. Compare the artifact checksums against the trusted workflow artifact, not an arbitrary
    file delivered beside the script. Record exact new API/Web digests and candidate.
-4. The compatibility checker permits only the reviewed Learner evidence retest surface
+4. The compatibility checker permits only the reviewed Learner evidence retest UI surface
    to change from the currently deployed application candidate.
    Models, migrations, signing/session/auth core, dependencies, images' Dockerfiles and
    worker code cannot change. This is not approval for a later arbitrary candidate.

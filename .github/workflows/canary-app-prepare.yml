@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type PREPARE_ONLY_86E3B85_NO_SWITCH
+        description: Type PREPARE_ONLY_61E4946_NO_SWITCH
         required: true
         type: string
 
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: inputs.confirmation == 'PREPARE_ONLY_86E3B85_NO_SWITCH' && startsWith(github.ref, 'refs/tags/canary-app-prepare-')
+    if: inputs.confirmation == 'PREPARE_ONLY_61E4946_NO_SWITCH' && startsWith(github.ref, 'refs/tags/canary-app-prepare-')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     environment: production-canary-uat
@@ -39,17 +39,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/35300670121" > "$RUNNER_TEMP/package-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/35309519448" > "$RUNNER_TEMP/package-run.json"
           python3 - <<'PY'
           import json, os
           from pathlib import Path
           r=json.loads((Path(os.environ['RUNNER_TEMP'])/'package-run.json').read_text())
           assert r['repository']['full_name']=='muchenai/muchen-journey-vnext'
           assert r['path']=='.github/workflows/canary-app-package.yml'
-          assert r['event']=='workflow_dispatch' and r['head_sha']=='86e3b85f99599646bd5f343ba288f98e8c5bbed9'
+          assert r['event']=='workflow_dispatch' and r['head_sha']=='61e49463aca50b36a9d4a54f6087bcd4659be61c'
           assert r['status']=='completed' and r['conclusion']=='success' and r['run_attempt']==1
           PY
-          gh run download 35300670121 --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-86e3b85f99599646bd5f343ba288f98e8c5bbed9 --dir "$RUNNER_TEMP/prepare-package"
+          gh run download 35309519448 --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-61e49463aca50b36a9d4a54f6087bcd4659be61c --dir "$RUNNER_TEMP/prepare-package"
           python3 - <<'PY'
           import os
           from pathlib import Path

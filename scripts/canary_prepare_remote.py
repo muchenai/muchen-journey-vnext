@@ -16,12 +16,12 @@ import subprocess
 import sys
 import tempfile
 
-CANDIDATE = "86e3b85f99599646bd5f343ba288f98e8c5bbed9"
-PACKAGE_RUN = 35300670121
+CANDIDATE = "61e49463aca50b36a9d4a54f6087bcd4659be61c"
+PACKAGE_RUN = 35309519448
 HASHES = {
-    "canary_app_upgrade.py": "db7599cd3dade386b09100eba53c994970f955fd5c160b103c6589865ba76c5d",
-    "manifest.json": "f368c086ddda47faa38084d0b9e44ddd237e0f2d1d2501c86d46815f9b1038db",
-    "compatibility.json": "fb988281ffde85ef62da3143f1be5926bae0fcd83856c904656dd52a85ad1a4d"
+    "canary_app_upgrade.py": "4bf815779f386c22bd491b9d42776b4b016973273b9760140ce5eb2742855a74",
+    "manifest.json": "a78d77e1a6e9cae77ea7a11171a958ba21e08c7c5432124f7d5a4241997b10e3",
+    "compatibility.json": "8f3557d792701511c79ab58f4985663856e11f86901b9c06d60f3dd58e020eea"
 }
 
 
