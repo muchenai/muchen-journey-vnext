@@ -70,6 +70,7 @@ export function SubmissionComposer({
   visibility,
   expectsExternalDocument,
   taskActionUrl,
+  nextVersionNo,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -89,9 +90,11 @@ export function SubmissionComposer({
   visibility: string;
   expectsExternalDocument: boolean;
   taskActionUrl: string | null;
+  nextVersionNo: number;
 }) {
   const initial = splitInitialBody(initialBody);
-  const isRevision = command === "submit_revision";
+  const isRevision = ["submit_revision", "submit_evidence_revision"].includes(command);
+  const isEvidenceRetest = command === "submit_evidence_revision";
   const documentLaunchUrl = isRevision && initial.evidenceUrl
     ? initial.evidenceUrl
     : taskActionUrl;
@@ -219,11 +222,27 @@ export function SubmissionComposer({
     window.requestAnimationFrame(() => bodyRef.current?.focus());
   }
 
+  if (submitState.success && isEvidenceRetest) {
+    return (
+      <section className="inline-success evidence-retest-receipt" role="status" aria-live="polite">
+        <strong>{submitState.success}</strong>
+        <p>原版本保持只读；这一站已经恢复“已完成”。</p>
+        <div className="button-row">
+          <a className="button primary compact" href={`/app/tasks/${assignmentId}?submitted=retest#submission-history`}>
+            查看提交历史
+          </a>
+          <a className="button secondary compact" href="/app">回到旅程地图</a>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <form ref={formRef} action={submitAction} className="submission-composer">
       <input type="hidden" name="assignment_id" value={assignmentId} />
       <input type="hidden" name="revision" value={assignmentRevision} />
       <input type="hidden" name="submission_idempotency_key" value={submissionIdempotencyKey} />
+      <input type="hidden" name="submission_command" value={command} />
       <input type="hidden" name="learner_ai_used" value={learnerAiUsed ? "on" : ""} />
       <input type="hidden" name="learner_ai_purpose" value={learnerAiPurpose} />
       <input type="hidden" name="learner_ai_model_version" value={learnerAiModelVersion} />
@@ -273,8 +292,12 @@ export function SubmissionComposer({
             <div className="revision-edit-ready" role="status">
               <span aria-hidden="true">✓</span>
               <div>
-                <strong>上次提交已经为你载入</strong>
-                <small>保留正确的部分，只修改 Reviewer 指出的内容。</small>
+                <strong>{isEvidenceRetest ? "最近一次提交已经为你载入" : "上次提交已经为你载入"}</strong>
+                <small>
+                  {isEvidenceRetest
+                    ? `保存后将生成 Version ${nextVersionNo}；原版本保持只读。`
+                    : "保留正确的部分，只修改 Reviewer 指出的内容。"}
+                </small>
               </div>
             </div>
           ) : null}
@@ -364,7 +387,13 @@ export function SubmissionComposer({
           <FactLabel kind="system" />
           <p className="section-label">最终确认</p>
           <h3 ref={confirmationHeadingRef} id="submission-confirmation-title" tabIndex={-1}>确认提交的是固定版本</h3>
-          <p>{requiresReview ? "提交后进入人工审核，等待具名 Reviewer 结论。" : "提交后形成本阶段的完成事实，不产生人才结论。"}</p>
+          <p>
+            {isEvidenceRetest
+              ? `确认后新增 Version ${nextVersionNo}，本站恢复“已完成”；原版本不会被覆盖。`
+              : requiresReview
+                ? "提交后进入人工审核，等待具名 Reviewer 结论。"
+                : "提交后形成本阶段的完成事实，不产生人才结论。"}
+          </p>
           <dl>
             <div><dt>任务版本</dt><dd>v{taskVersion}</dd></div>
             <div><dt>Rubric 版本</dt><dd>v{rubricVersion}</dd></div>
@@ -391,6 +420,9 @@ export function SubmissionComposer({
       {submitState.success ? (
         <div className="inline-success" role="status" aria-live="polite">
           <strong>{submitState.success}</strong>
+          {isEvidenceRetest ? (
+            <a href={`/app/tasks/${assignmentId}?submitted=retest#submission-history`}>刷新并查看提交历史</a>
+          ) : null}
           <a href="/app">返回旅程地图</a>
         </div>
       ) : null}
@@ -403,7 +435,7 @@ export function SubmissionComposer({
         {!isOnline ? <span className="sticky-action-status" aria-hidden="true">离线 · 正式提交已暂停</span> : null}
         {confirming ? (
           <>
-            <button className="button primary" type="submit" disabled={submitPending || draftPending || !isOnline}>{submitPending ? "正在提交…" : "确认正式提交"}</button>
+            <button className="button primary" type="submit" disabled={submitPending || draftPending || !isOnline}>{submitPending ? "正在提交…" : isEvidenceRetest ? "确认重新提交" : "确认正式提交"}</button>
             <button className="button secondary" type="button" onClick={returnToEditing} disabled={submitPending}>返回修改</button>
           </>
         ) : (
@@ -418,13 +450,13 @@ export function SubmissionComposer({
               }}
               disabled={submitPending || draftPending}
             >
-              检查并提交
+              {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
             </button>
             <button className="button secondary" type="button" onClick={saveDraft} disabled={submitPending || draftPending || !isOnline || currentSnapshot === savedSnapshot}>{draftPending ? "正在保存…" : "保存草稿"}</button>
           </>
         )}
       </div>
-      <p className="status-meta">{command === "submit_revision" ? "本次会追加修订版本；旧版本保持只读。" : "正式提交会创建不可变 SubmissionVersion。"}</p>
+      <p className="status-meta">{isRevision ? "本次会追加修订版本；旧版本保持只读。" : "正式提交会创建不可变 SubmissionVersion。"}</p>
     </form>
   );
 }

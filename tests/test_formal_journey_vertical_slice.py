@@ -21,6 +21,9 @@ from journey_api.appeal_continuity import (
 from journey_api.fixtures import OPERATOR_ID, REVIEWER_ID
 from journey_api.main import app
 from journey_api.models import (
+    Attachment,
+    AttachmentScanStatus,
+    AttachmentStatus,
     Assignment,
     Enrollment,
     EnrollmentStatus,
@@ -232,6 +235,58 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert len(day_zero_experience["learning_blocks"]) >= 2
     assert len(day_zero_experience["knowledge_checks"]) >= 2
     assert day_zero_experience["response_sections"]
+    premature_retest = learner.post(
+        f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/start",
+        headers={
+            "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_revision": day_zero["revision"]},
+    )
+    assert premature_retest.status_code == 409
+    assert premature_retest.json()["error"]["code"] == "INVALID_STATE_TRANSITION"
+
+    intruder_invite = post(
+        operator,
+        "/api/v1/ops/invites",
+        json={
+            "purpose": "验证 Learner 不能修改他人的自证站点",
+            "expires_in_hours": 24,
+            "role": "LEARNER",
+            "reviewer_id": str(REVIEWER_ID),
+            "journey_version_id": published["id"],
+            "target_user_id": None,
+        },
+        role_headers=OPERATOR_HEADERS,
+    )
+    intruder = client_for("formal-intruder")
+    intruder_exchange = ok(
+        intruder.post(
+            "/api/v1/join/exchange",
+            json={"token": intruder_invite["invite_token"], "return_to": "/app"},
+        )
+    )
+    ok(
+        intruder.post(
+            "/api/v1/identity/confirm",
+            headers={"X-CSRF-Token": intruder_exchange["csrf_token"]},
+            json={
+                "display_name": "Other Formal Journey Learner",
+                "accepted_purpose": True,
+                "return_to": "/app",
+            },
+        )
+    )
+    foreign_retest = intruder.post(
+        f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/start",
+        headers={
+            "X-CSRF-Token": intruder.cookies["journey_next_csrf"],
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_revision": day_zero["revision"]},
+    )
+    assert foreign_retest.status_code == 404
+    assert foreign_retest.json()["error"]["code"] == "NOT_FOUND"
     locked_id = action["journey"]["nodes"][1]["assignment_id"]
     locked = learner.post(
         f"/api/v1/me/assignments/{locked_id}/start",
@@ -245,6 +300,8 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert locked.json()["error"]["code"] == "JOURNEY_STAGE_LOCKED"
 
     revised_once = False
+    evidence_retest_verified = False
+    formal_retest_rejection_verified = False
     while action["action_type"] != "VIEW_RESULT_OR_HANDOFF":
         assignment_id = action["resource_id"]
         detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
@@ -281,6 +338,194 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                         Review.assignment_id == uuid.UUID(assignment_id)
                     )
                 ) == 0
+            if not evidence_retest_verified:
+                evidence_retest_verified = True
+                completed = ok(
+                    learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                )
+                assert completed["allowed_commands"] == ["start_evidence_revision"]
+                assert completed["submission"]["current_version_no"] == 1
+                original_body = completed["submission"]["versions"][0]["body"]
+                with SessionLocal() as session:
+                    later_before = session.execute(
+                        select(Assignment.status, Assignment.revision).where(
+                            Assignment.id == uuid.UUID(locked_id)
+                        )
+                    ).one()
+
+                start_key = str(uuid.uuid4())
+                start_headers = {
+                    "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                    "Idempotency-Key": start_key,
+                }
+                started_response = learner.post(
+                    f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                    headers=start_headers,
+                    json={"expected_revision": completed["revision"]},
+                )
+                started = ok(started_response)
+                replayed_start = ok(
+                    learner.post(
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                        headers=start_headers,
+                        json={"expected_revision": completed["revision"]},
+                    )
+                )
+                assert replayed_start["idempotency_replay"] is True
+                assert replayed_start["revision"] == started["revision"]
+                stale_start = learner.post(
+                    f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                    headers={
+                        "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                        "Idempotency-Key": str(uuid.uuid4()),
+                    },
+                    json={"expected_revision": completed["revision"]},
+                )
+                assert stale_start.status_code == 409
+                assert stale_start.json()["error"]["code"] == "VERSION_CONFLICT"
+
+                reopened = ok(
+                    learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                )
+                assert reopened["status"] == "IN_PROGRESS"
+                assert reopened["allowed_commands"] == [
+                    "submit_evidence_revision",
+                    "cancel_evidence_revision",
+                ]
+                assert reopened["draft"]["body"] == original_body
+                assert reopened["draft"]["attachment_ids"] == []
+                focused = ok(learner.get("/api/v1/me/current-action"))
+                assert focused["resource_id"] == assignment_id
+
+                unbound_attachment_id = uuid.uuid4()
+                with SessionLocal() as session:
+                    retest_assignment = session.get(
+                        Assignment, uuid.UUID(assignment_id)
+                    )
+                    assert retest_assignment is not None
+                    session.add(
+                        Attachment(
+                            id=unbound_attachment_id,
+                            organization_id=retest_assignment.organization_id,
+                            owner_id=uuid.UUID(confirmed["user_id"]),
+                            assignment_id=retest_assignment.id,
+                            purpose="SUBMISSION_EVIDENCE",
+                            original_filename="retest-note.txt",
+                            storage_key=f"test/{unbound_attachment_id}.txt",
+                            content_type="text/plain",
+                            size_bytes=12,
+                            sha256="0" * 64,
+                            status=AttachmentStatus.READY,
+                            scan_status=AttachmentScanStatus.CLEAN,
+                            uploaded_at=datetime.now(UTC),
+                            scan_completed_at=datetime.now(UTC),
+                            completed_at=datetime.now(UTC),
+                        )
+                    )
+                    session.commit()
+
+                cancel_key = str(uuid.uuid4())
+                cancel_headers = {
+                    "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                    "Idempotency-Key": cancel_key,
+                }
+                stale_cancel = learner.post(
+                    f"/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel",
+                    headers={
+                        "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                        "Idempotency-Key": str(uuid.uuid4()),
+                    },
+                    json={"expected_revision": reopened["revision"] - 1},
+                )
+                assert stale_cancel.status_code == 409
+                assert stale_cancel.json()["error"]["code"] == "VERSION_CONFLICT"
+                cancelled = ok(
+                    learner.post(
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel",
+                        headers=cancel_headers,
+                        json={"expected_revision": reopened["revision"]},
+                    )
+                )
+                replayed_cancel = ok(
+                    learner.post(
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel",
+                        headers=cancel_headers,
+                        json={"expected_revision": reopened["revision"]},
+                    )
+                )
+                assert replayed_cancel["idempotency_replay"] is True
+                assert replayed_cancel["revision"] == cancelled["revision"]
+                after_cancel = ok(
+                    learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                )
+                assert after_cancel["status"] == "COMPLETED"
+                assert after_cancel["draft"] is None
+                assert after_cancel["submission"]["current_version_no"] == 1
+                with SessionLocal() as session:
+                    assert session.get(Attachment, unbound_attachment_id) is not None
+
+                for expected_version in (2, 3):
+                    reopened_again = post(
+                        learner,
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                        json={"expected_revision": after_cancel["revision"]},
+                    )
+                    assert reopened_again["status"] == "IN_PROGRESS"
+                    revision_body = (
+                        f"这是主动重测后形成的 Version {expected_version}。我保留原结论，"
+                        "补充可核对事实、规则边界和遇到不确定性时的暂停条件。"
+                    )
+                    version_key = str(uuid.uuid4())
+                    version_headers = {
+                        "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                        "Idempotency-Key": version_key,
+                    }
+                    version_response = ok(
+                        learner.post(
+                            f"/api/v1/me/assignments/{assignment_id}/submissions",
+                            headers=version_headers,
+                            json={
+                                "expected_revision": reopened_again["revision"],
+                                "body": revision_body,
+                            },
+                        )
+                    )
+                    replayed_version = ok(
+                        learner.post(
+                            f"/api/v1/me/assignments/{assignment_id}/submissions",
+                            headers=version_headers,
+                            json={
+                                "expected_revision": reopened_again["revision"],
+                                "body": revision_body,
+                            },
+                        )
+                    )
+                    assert version_response["version_no"] == expected_version
+                    assert replayed_version["idempotency_replay"] is True
+                    after_cancel = ok(
+                        learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                    )
+
+                history = ok(
+                    learner.get(
+                        f"/api/v1/me/submissions/{after_cancel['submission']['id']}"
+                    )
+                )
+                assert history["current_version_no"] == 3
+                assert [item["version_no"] for item in history["versions"]] == [1, 2, 3]
+                assert history["versions"][0]["body"] == original_body
+                with SessionLocal() as session:
+                    later_after = session.execute(
+                        select(Assignment.status, Assignment.revision).where(
+                            Assignment.id == uuid.UUID(locked_id)
+                        )
+                    ).one()
+                    assert session.scalar(
+                        select(func.count(Review.id)).where(
+                            Review.assignment_id == uuid.UUID(assignment_id)
+                        )
+                    ) == 0
+                assert later_after == later_before
         else:
             requested_revision = stage["stable_key"] == "ASM-001-RULE-BREAKDOWN" and not revised_once
             finalized = finalize_current_review(
@@ -293,6 +538,27 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                 assert finalized["assignment_status"] == "NEEDS_REVISION"
             else:
                 assert finalized["assignment_status"] == "PASSED"
+                if (
+                    not formal_retest_rejection_verified
+                    and stage["stable_key"] == "ASM-002-MODEL-JUDGEMENT"
+                ):
+                    formal_retest_rejection_verified = True
+                    formal_detail = ok(
+                        learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                    )
+                    rejected_retest = learner.post(
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                        headers={
+                            "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                            "Idempotency-Key": str(uuid.uuid4()),
+                        },
+                        json={"expected_revision": formal_detail["revision"]},
+                    )
+                    assert rejected_retest.status_code == 409
+                    assert (
+                        rejected_retest.json()["error"]["code"]
+                        == "INVALID_STATE_TRANSITION"
+                    )
                 if stage["stable_key"] != "ASM-003-DATA-CONSTRUCTION":
                     # Intermediate formal stages must not expose a final result.
                     assert learner.get("/api/v1/me/result").status_code == 404
@@ -347,6 +613,16 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     )
     assert completed_mutation.status_code == 404
     assert completed_mutation.json()["error"]["code"] == "NOT_FOUND"
+    completed_retest = learner.post(
+        f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/start",
+        headers={
+            "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_revision": completed_day_zero["revision"]},
+    )
+    assert completed_retest.status_code == 404
+    assert completed_retest.json()["error"]["code"] == "NOT_FOUND"
     with SessionLocal() as session:
         enrollment = session.scalar(
             select(Enrollment).where(

@@ -61,7 +61,10 @@ test("revision gives the learner an immediate route back to their own work", () 
   assert.match(taskPage, /查看反馈并修改/);
   assert.match(taskPage, /Reviewer 希望你调整这里/);
   assert.match(taskPage, /只改反馈指出的部分/);
-  assert.match(submissionComposer, /const isRevision = command === "submit_revision"/);
+  assert.match(
+    submissionComposer,
+    /const isRevision = \["submit_revision", "submit_evidence_revision"\]\.includes\(command\)/,
+  );
   assert.match(submissionComposer, /isRevision && initial\.evidenceUrl/);
   assert.match(submissionComposer, /打开我上次提交的文档/);
   assert.match(submissionComposer, /上次提交已经为你载入/);
@@ -163,6 +166,32 @@ test("the learner sees a single current focus and visible response map", () => {
   assert.match(styles, /\.task-next-unlock/);
   assert.match(submissionComposer, /<section className="response-map"/);
   assert.doesNotMatch(submissionComposer, /<details className="response-map"/);
+});
+
+test("completed evidence stations can be retested without mixing in reviewer revision", () => {
+  assert.match(taskPage, /allowed_commands\.includes\("start_evidence_revision"\)/);
+  assert.match(taskPage, /allowed_commands\.includes\("cancel_evidence_revision"\)/);
+  assert.match(taskPage, /修改并重新测试/);
+  assert.match(taskPage, /正在重新测试，原版本不会被覆盖/);
+  assert.match(taskPage, /本次提交将生成 Version/);
+  assert.match(taskPage, /取消重新测试/);
+  assert.match(actions, /evidence-revision\/start/);
+  assert.match(actions, /evidence-revision\/cancel/);
+  assert.match(actions, /submission_command/);
+  assert.match(actions, /重新提交成功，Version \$\{result\.version_no\} 已保存/);
+  assert.match(submissionComposer, /command === "submit_evidence_revision"/);
+  assert.match(submissionComposer, /检查并重新提交/);
+  assert.match(submissionComposer, /查看提交历史/);
+  assert.match(taskPage, /open=\{query\.submitted === "retest"\}/);
+});
+
+test("the current-mission card overlaps only the hero, never the task contract", () => {
+  const heroIndex = taskPage.indexOf('className="task-hero-card"');
+  const missionIndex = taskPage.indexOf('className="mission-now"');
+  const governanceIndex = taskPage.indexOf('className="task-governance"');
+  assert.ok(heroIndex >= 0 && heroIndex < missionIndex);
+  assert.ok(missionIndex < governanceIndex);
+  assert.match(styles, /\.mission-now\s*\{[\s\S]*?margin: -64px/);
 });
 
 test("formal model-judgement materials ask concrete questions that match the task", () => {
