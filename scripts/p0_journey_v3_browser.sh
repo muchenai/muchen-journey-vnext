@@ -502,6 +502,85 @@ complete_stage() {
     }"
 }
 
+retest_completed_evidence() {
+    pw_learner run-code "async (page) => {
+      const completedTreasure = page.locator('.journey-route-map-wide .route-node-link.route-node-visual-completed').nth(1);
+      if (await completedTreasure.count() !== 1) throw new Error('completed treasure is not available for retest');
+      await completedTreasure.locator('.route-node-orb').click();
+      await page.waitForURL('**/app/tasks/**');
+      await page.waitForLoadState('networkidle');
+
+      for (const viewport of [
+        {name: 'wide', width: 3059, height: 1691},
+        {name: 'wide-short', width: 2035, height: 525},
+        {name: 'mobile', width: 390, height: 844},
+      ]) {
+        await page.setViewportSize({width: viewport.width, height: viewport.height});
+        const geometry = await page.evaluate(() => {
+          const bounds = (selector) => {
+            const element = document.querySelector(selector);
+            if (!element) return null;
+            const box = element.getBoundingClientRect();
+            return {top: box.top, bottom: box.bottom, left: box.left, right: box.right};
+          };
+          return {
+            hero: bounds('.task-hero-card'),
+            governance: bounds('.task-governance'),
+            mission: bounds('.mission-now'),
+            flow: bounds('.task-flow'),
+            overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+          };
+        });
+        if (!geometry.hero || !geometry.governance || !geometry.mission || !geometry.flow) {
+          throw new Error(viewport.name + ': task layout section missing: ' + JSON.stringify(geometry));
+        }
+        if (geometry.hero.bottom > geometry.governance.top + 1
+            || geometry.governance.bottom > geometry.mission.top + 1
+            || geometry.mission.bottom > geometry.flow.top + 1) {
+          throw new Error(viewport.name + ': task sections overlap: ' + JSON.stringify(geometry));
+        }
+        if (geometry.overflow) throw new Error(viewport.name + ': retest task page has horizontal overflow');
+        await page.screenshot({
+          path: '$evidence_dir/04-evidence-retest-layout-' + viewport.name + '.png',
+          fullPage: true,
+        });
+      }
+
+      await page.setViewportSize({width: 1280, height: 900});
+      await page.getByRole('button', {name: '修改并重新测试'}).click();
+      await page.waitForURL('**?revision=retest*');
+      await page.waitForLoadState('networkidle');
+      const input = page.locator('#submission-body');
+      const original = await input.inputValue();
+      await input.fill(original + ' 重新测试补充：手动保存反馈与不可变版本验证。');
+      await page.getByRole('button', {name: '保存草稿'}).click();
+      await page.getByText(/草稿保存成功/).waitFor({state: 'visible'});
+      await page.getByRole('button', {name: '保存草稿'}).click();
+      await page.getByText('当前内容已经保存。', {exact: true}).waitFor({state: 'visible'});
+
+      await page.getByRole('button', {name: '检查并重新提交'}).click();
+      await page.getByRole('button', {name: '确认重新提交'}).click();
+      await page.waitForURL('**?submitted=retest&version=2#retest-success');
+      await page.waitForLoadState('networkidle');
+      const receipt = page.locator('#retest-success');
+      const receiptText = await receipt.innerText();
+      if (!receiptText.includes('重新提交成功，Version 2 已保存')
+          || !receiptText.includes('原版本未被覆盖')) {
+        throw new Error('evidence retest persistent receipt is incomplete: ' + receiptText);
+      }
+      const history = page.locator('#submission-history');
+      if (await history.getAttribute('open') === null) throw new Error('evidence retest history is not expanded');
+      const historyText = await history.innerText();
+      if (!historyText.includes('Version 1') || !historyText.includes('Version 2')) {
+        throw new Error('evidence retest did not retain both immutable versions');
+      }
+      await page.screenshot({path: '$evidence_dir/04-evidence-retest-success.png', fullPage: true});
+      await receipt.getByRole('link', {name: '回到旅程地图'}).click();
+      await page.waitForURL('**/app');
+      await page.waitForLoadState('networkidle');
+    }"
+}
+
 complete_revision() {
     pw_learner run-code "async (page) => {
       const body = await page.locator('body').innerText();
@@ -601,6 +680,7 @@ complete_review() {
 # Day 0 and four treasures progress on learner evidence.
 complete_stage 1
 complete_stage 2
+retest_completed_evidence
 complete_stage 3
 complete_stage 4
 complete_stage 5
@@ -761,4 +841,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9]
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"

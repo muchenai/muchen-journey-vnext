@@ -104,6 +104,7 @@ export function SubmissionComposer({
   const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const pendingSnapshot = useRef<string | null>(null);
+  const pendingSaveSource = useRef<"auto" | "manual" | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot(initial.notes, initial.evidenceUrl, initialAttachmentIds));
   const [body, setBody] = useState(initial.notes);
   const [evidenceUrl, setEvidenceUrl] = useState(initial.evidenceUrl);
@@ -112,6 +113,7 @@ export function SubmissionComposer({
   const [confirming, setConfirming] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState<LocalDraft | null>(null);
+  const [draftFeedback, setDraftFeedback] = useState<"auto-saved" | "manual-saved" | "current" | null>(null);
   const [storageReady, setStorageReady] = useState(false);
   const isOnline = useSyncExternalStore(subscribeToNetworkState, onlineSnapshot, serverOnlineSnapshot);
   const [learnerAiUsed, setLearnerAiUsed] = useState(false);
@@ -123,6 +125,9 @@ export function SubmissionComposer({
   const currentSnapshot = snapshot(body, evidenceUrl, selectedAttachmentIds);
   const errorState = submitState.error ? submitState : draftState;
   const firstWin = firstWinKey ? FIRST_WIN_DIAGNOSTICS[firstWinKey] : null;
+  const draftSavedTime = draftState.savedAt
+    ? new Date(draftState.savedAt).toLocaleString("zh-CN")
+    : null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -151,8 +156,12 @@ export function SubmissionComposer({
     }
   }, [body, currentSnapshot, evidenceUrl, savedSnapshot, selectedAttachmentIds, storageKey, storageReady]);
 
-  const saveDraft = useCallback(() => {
-    if (!formRef.current || !isOnline || draftPending || currentSnapshot === savedSnapshot) return;
+  const saveDraft = useCallback((source: "auto" | "manual" = "manual") => {
+    if (!formRef.current || !isOnline || draftPending) return;
+    if (currentSnapshot === savedSnapshot) {
+      if (source === "manual") setDraftFeedback("current");
+      return;
+    }
     const data = new FormData(formRef.current);
     data.set("body", body);
     data.set("evidence_url", evidenceUrl);
@@ -160,12 +169,14 @@ export function SubmissionComposer({
     data.delete("attachment_ids");
     selectedAttachmentIds.forEach((id) => data.append("attachment_ids", id));
     pendingSnapshot.current = currentSnapshot;
+    pendingSaveSource.current = source;
+    setDraftFeedback(null);
     startTransition(() => draftAction(data));
   }, [body, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, savedSnapshot, selectedAttachmentIds]);
 
   useEffect(() => {
     if (!storageReady || !isOnline || confirming || currentSnapshot === savedSnapshot) return;
-    const timer = window.setTimeout(saveDraft, 1_200);
+    const timer = window.setTimeout(() => saveDraft("auto"), 1_200);
     return () => window.clearTimeout(timer);
   }, [confirming, currentSnapshot, isOnline, saveDraft, savedSnapshot, storageReady]);
 
@@ -173,7 +184,9 @@ export function SubmissionComposer({
     if (!draftState.savedAt || !pendingSnapshot.current) return;
     const committedSnapshot = pendingSnapshot.current;
     setSavedSnapshot(committedSnapshot);
+    setDraftFeedback(pendingSaveSource.current === "manual" ? "manual-saved" : "auto-saved");
     pendingSnapshot.current = null;
+    pendingSaveSource.current = null;
     if (currentSnapshot === committedSnapshot) {
       try {
         window.localStorage.removeItem(storageKey);
@@ -220,21 +233,6 @@ export function SubmissionComposer({
   function returnToEditing() {
     setConfirming(false);
     window.requestAnimationFrame(() => bodyRef.current?.focus());
-  }
-
-  if (submitState.success && isEvidenceRetest) {
-    return (
-      <section className="inline-success evidence-retest-receipt" role="status" aria-live="polite">
-        <strong>{submitState.success}</strong>
-        <p>原版本保持只读；这一站已经恢复“已完成”。</p>
-        <div className="button-row">
-          <a className="button primary compact" href={`/app/tasks/${assignmentId}?submitted=retest#submission-history`}>
-            查看提交历史
-          </a>
-          <a className="button secondary compact" href="/app">回到旅程地图</a>
-        </div>
-      </section>
-    );
   }
 
   return (
@@ -428,7 +426,23 @@ export function SubmissionComposer({
       ) : null}
 
       <p id="submission-save-status" className="draft-save-status" role="status" aria-live="polite">
-        {!isOnline ? "当前离线：修改已保留为本浏览器未同步副本；恢复网络后再保存或正式提交。" : draftPending ? "正在自动保存到服务器…" : draftState.savedAt ? `已自动保存到服务器 · 草稿 revision ${draftState.draftRevision} · ${new Date(draftState.savedAt).toLocaleString("zh-CN")}` : initialDraftUpdatedAt ? `服务器草稿 revision ${initialDraftRevision} · ${new Date(initialDraftUpdatedAt).toLocaleString("zh-CN")}` : "尚未保存；编辑后会自动保存到服务器，并保留本地恢复副本。"}
+        {!isOnline
+          ? "当前离线：修改已保留为本浏览器未同步副本；恢复网络后再保存或正式提交。"
+          : draftPending
+            ? "正在保存草稿……"
+            : draftState.error
+              ? "保存失败，修改仍保留在本机。"
+              : currentSnapshot !== savedSnapshot
+                ? "有修改尚未保存。"
+                : draftFeedback === "current"
+                  ? "当前内容已经保存。"
+                  : draftFeedback === "manual-saved"
+                    ? `草稿保存成功${draftSavedTime ? ` · ${draftSavedTime}` : ""}`
+                    : draftFeedback === "auto-saved"
+                      ? `草稿已保存${draftSavedTime ? ` · ${draftSavedTime}` : ""}`
+                      : initialDraftUpdatedAt
+                        ? `草稿已保存 · ${new Date(initialDraftUpdatedAt).toLocaleString("zh-CN")}${initialDraftRevision ? ` · revision ${initialDraftRevision}` : ""}`
+                        : "尚未保存；编辑后会自动保存，也可以点击“保存草稿”。"}
       </p>
 
       <div className="action-row">
@@ -452,7 +466,7 @@ export function SubmissionComposer({
             >
               {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
             </button>
-            <button className="button secondary" type="button" onClick={saveDraft} disabled={submitPending || draftPending || !isOnline || currentSnapshot === savedSnapshot}>{draftPending ? "正在保存…" : "保存草稿"}</button>
+            <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submitPending || draftPending || !isOnline}>{draftPending ? "正在保存……" : "保存草稿"}</button>
           </>
         )}
       </div>

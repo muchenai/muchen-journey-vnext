@@ -35,7 +35,7 @@ test("revision keeps old evidence and displays structured human rubric feedback"
 test("workspace keeps a local recovery copy, server receipts, and a two-step formal submit", () => {
   assert.match(composer, /localStorage/);
   assert.match(composer, /本浏览器有一份未同步副本/);
-  assert.match(composer, /自动保存到服务器/);
+  assert.match(composer, /草稿已保存/);
   assert.match(actions, /savedAt/);
   assert.match(composer, /检查并提交/);
   assert.match(composer, /event\.preventDefault\(\)/);
