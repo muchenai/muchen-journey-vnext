@@ -2,7 +2,7 @@
 
 Scope: current Canary application candidate `61e49463aca50b36a9d4a54f6087bcd4659be61c`
 from switch run 35315136752, database `journey_next_canary_20260901_c72fea5`.
-The application-only package run `35322502103` upgrades this exact deployed
+The application-only package run `35325044330` upgrades this exact deployed
 candidate to `94f56617829a8a5e3435131e03f3c30c7fd5e11b`.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
