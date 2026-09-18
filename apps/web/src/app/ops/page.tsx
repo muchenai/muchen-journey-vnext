@@ -29,15 +29,13 @@ import { InviteManagementPanel } from "@/app/ops/invite-management-panel";
 import { LearnerReentryPanel } from "@/app/ops/learner-reentry-panel";
 import { ContentDraftPublicationPanel } from "@/app/ops/content-draft-publication-panel";
 import { JourneyV3AssemblyPanel } from "@/app/ops/journey-v3-assembly-panel";
+import { formatProductDateTime } from "@/lib/date-time";
 
 export const dynamic = "force-dynamic";
 
 function formatTime(value: string | null): string {
   if (!value) return "尚无心跳";
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(value));
+  return formatProductDateTime(value, "medium");
 }
 
 export default async function OpsPage({

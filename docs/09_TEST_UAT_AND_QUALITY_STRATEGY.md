@@ -132,6 +132,17 @@
 
 WP-24 正式内容另加：`AT-WP24-001..008`。真人不得只验证“页面能打开”：必须从 Day 0 完成四个学习宝藏，独立作答三项题面，至少验证一次 Reviewer 修订，核对数值 Rubric，并由 Operator 在看见建议分档后作出一次人工准入决定。系统自动化只能证明状态、分数和权限合同，不能替代内容理解度、Reviewer 校准或人工准入判断。
 
+正式探索营的角色与入口按下列用例验收，禁止把自证站完成误记为待人工评审：
+
+| 用例 | 前置条件 | 操作入口与关键检查 | 预期结果 |
+| --- | --- | --- | --- |
+| Day 0／宝藏自证完成 | Learner 已提交 `LEARNER_EVIDENCE` 站点 | Learner 在任务页核对完成状态和提交历史；Reviewer 打开 `/review` | 自证站直接完成、历史可见且 Reviewer 队列不新增记录 |
+| Reviewer 审核正式评测 | Learner 已提交 `REVIEW_REQUIRED` 正式评测，且 Enrollment 已明确绑定当前 Reviewer | Reviewer 在 `/review` 核对 Learner、旅程、任务、北京时间、固定 SubmissionVersion 和 Rubric，依据实际提交填写证据与理由并定稿 | 仅被分配的 Reviewer 可见；刷新后保持 `FINALIZED` 及实际结论 |
+| Learner 查看评审结果 | 上一用例已定稿 | Learner 重新打开对应任务页，核对状态、Rubric 与反馈 | 只显示本人的固定版本和反馈，不显示其他 Learner 信息 |
+| Learner 访问运营入口 | Learner 持有有效 Learner 会话 | 直接访问 `/ops` | 跳转到明确的 Operator 权限拒绝提示，不渲染 Enrollment、审核、身份或审计数据 |
+
+Reviewer 的工作入口固定为 `/review`；`/ops` 只供 Operator 使用。“三句出发卡”等 Day 0 自证内容不能作为正式评测的审核对象或审核理由，正式评测必须依据对应固定 Rubric 和实际提交完成判断。
+
 ### 记录字段
 
 release revision、环境、角色/账号标识（最小化）、场景、开始/结束时间、实际步骤、结果、截图/录像引用、request id、是否需要帮助、困惑、缺陷 ID、签署人。

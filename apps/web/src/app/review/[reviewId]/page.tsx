@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 
 import { FactLabel } from "@/app/human-experience";
+import { formatProductDateTime } from "@/lib/date-time";
 import { identityPageRequest, ReviewDetail } from "@/lib/server/api";
 import { ReviewWorkbench } from "./review-workbench";
 
@@ -11,14 +12,6 @@ const RATING_LABELS = { MEETS: "达标", NEEDS_WORK: "待改进" } as const;
 const DECISION_LABELS = { APPROVE: "通过", REQUEST_REVISION: "要求修订" } as const;
 const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
 const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 function submissionWithSafeLinks(value: string) {
   return value.split(HTTPS_URL).map((part, index) => {
@@ -67,7 +60,7 @@ export default async function ReviewPage({
       <div className="review-status-row">
         <span className="badge">{review.status === "IN_REVIEW" ? "评审中" : review.status === "FINALIZED" ? "已定稿" : "待开始"}</span>
         <span>{review.priority_reason}</span>
-        <span>分配于 {formatDate(review.assigned_at)}</span>
+        <span>分配于 {formatProductDateTime(review.assigned_at)}</span>
       </div>
       <p className="status-meta">
         固定 SubmissionVersion <code>{review.submission_version_id}</code> · Rubric V{review.rubric.version} · 冲突检查 {review.conflict_status}
@@ -150,7 +143,7 @@ export default async function ReviewPage({
           <p className="eyebrow">只读结论历史</p>
           <h2 id="evaluation-title">{DECISION_LABELS[review.evaluation.overall_decision]}</h2>
           <p className="status-meta">
-            定稿于 {formatDate(review.evaluation.created_at)} · Review revision {review.evaluation.review_revision}
+            定稿于 {formatProductDateTime(review.evaluation.created_at)} · Review revision {review.evaluation.review_revision}
           </p>
           <div className="feedback-callout">
             <strong>总体反馈</strong>
