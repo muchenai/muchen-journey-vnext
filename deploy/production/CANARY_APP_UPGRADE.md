@@ -1,6 +1,9 @@
 # Canary application-only upgrade and rollback
 
-Scope: current Canary from run 34560076583, database `journey_next_canary_20260901_c72fea5`.
+Scope: current Canary application candidate `a00b18dc077c128597bb50cd4a1e20699aedb6fa`
+from switch run 35210878855, database `journey_next_canary_20260901_c72fea5`.
+Mainline commit `a81392ea42d6d2ccd47bb62438fdf887b87c3887` is the protected-runtime
+tree-equivalent ancestry anchor for this branch-packaged deployed candidate.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
 bindings, signing secrets, sessions, allowlist, disabled workers/notifications and edge
@@ -8,13 +11,15 @@ route are retained. No database or volume deletion, restore, migration, grant or
 
 ## Preparation and compatibility gate
 
-1. Review invitation changes and the new upgrade runner. Merge through repository gates.
+1. Review the Learner evidence retest changes and updated upgrade baseline. Merge through
+   repository gates.
 2. Package an exact new commit with `Canary Application-only Package`; it has no ECS/RDS
    credentials and does not deploy. Require successful machine gates and verify the
    downloaded artifact provenance (repository, workflow, run, candidate, attempt).
 3. Compare the artifact checksums against the trusted workflow artifact, not an arbitrary
    file delivered beside the script. Record exact new API/Web digests and candidate.
-4. The compatibility checker permits only this reviewed invitation surface to change.
+4. The compatibility checker permits only the reviewed Learner evidence retest surface
+   to change from the currently deployed application candidate.
    Models, migrations, signing/session/auth core, dependencies, images' Dockerfiles and
    worker code cannot change. This is not approval for a later arbitrary candidate.
 5. Run the runner's `prepare` phase in the ECS root console with manifest path and exact
