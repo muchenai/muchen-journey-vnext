@@ -1,4 +1,4 @@
-"""Narrow allowlist for the Learner evidence retest upgrade; unchanged schema/auth core.
+"""Narrow allowlist for the draft-feedback and task-layout fix; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,19 +9,16 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "a00b18dc077c128597bb50cd4a1e20699aedb6fa"
-# The deployed candidate was packaged from a pre-merge branch. This mainline squash
-# commit has the same protected runtime tree and is the ancestry anchor for new work.
-SOURCE_BASE = "a81392ea42d6d2ccd47bb62438fdf887b87c3887"
+BASE = "86e3b85f99599646bd5f343ba288f98e8c5bbed9"
+SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
-    "apps/api/journey_api/routes.py",
-    "apps/api/journey_api/submission_routes.py",
+    "apps/web/scripts/learner-loop-contract.test.mjs",
     "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
+    "apps/web/scripts/submission-feedback-contract.test.mjs",
     "apps/web/src/app/actions.ts",
     "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
     "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
     "apps/web/src/app/globals.css",
-    "contracts/openapi.json",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
 
@@ -42,10 +39,6 @@ def verify(candidate):
     if git("rev-parse", "HEAD") != candidate or git("status", "--porcelain", "--untracked-files=all"):
         raise ValueError("Candidate checkout must be exact and clean")
     git("merge-base", "--is-ancestor", SOURCE_BASE, candidate)
-    # Compare against the deployed application revision, not the earlier release
-    # that preceded the invitation upgrade. Packaging and rollback share this BASE.
-    if git("diff", "--name-only", BASE, SOURCE_BASE, "apps", "migrations", "requirements.lock", "requirements-build.lock", "pyproject.toml", "alembic.ini"):
-        raise ValueError("Reviewed operations baseline changed runtime sources")
     paths = git("diff", "--name-only", SOURCE_BASE, candidate).splitlines()
     validate_changes(paths)
     return {"base_candidate": BASE, "source_base": SOURCE_BASE, "candidate": candidate,

@@ -168,14 +168,18 @@ def test_manifest_hash_and_digest_are_mandatory(tmp_path):
 
 def test_package_and_rollback_use_the_same_deployed_base():
     from scripts.canary_app_compatibility import BASE, SOURCE_BASE
-    assert BASE == mod.BASE == "a00b18dc077c128597bb50cd4a1e20699aedb6fa"
-    assert SOURCE_BASE == "a81392ea42d6d2ccd47bb62438fdf887b87c3887"
+    assert BASE == mod.BASE == "86e3b85f99599646bd5f343ba288f98e8c5bbed9"
+    assert SOURCE_BASE == BASE
     assert mod.OLD == mod.ROOT / "releases" / (BASE + "-app-upgrade")
+    assert mod.OLD_IMAGES == {
+        "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:cbc88b2f2178a4333a123d7a047e67885e2cfaced17600c28494f20a3f2fbbff",
+        "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:58482bcb7d5a30df446472c67bd47838c6bb2c4ec4ed57fc0cb590042cd7c1b3",
+    }
 
 
 def test_manifest_for_previous_upgrade_is_rejected(tmp_path):
     m = manifest()
-    m["base_candidate"] = "8f1b7e81dca9755c07babe10e1c270744a3d5717"
+    m["base_candidate"] = "a00b18dc077c128597bb50cd4a1e20699aedb6fa"
     m["candidate"] = mod.BASE
     raw = json.dumps(m).encode()
     p = tmp_path / "manifest.json"

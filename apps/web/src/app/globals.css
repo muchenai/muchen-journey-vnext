@@ -515,7 +515,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .task-moves > ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 22px 0 0; padding: 0; counter-reset: task-move; list-style: none; }
 .task-moves > ol li { min-height: 144px; padding: 20px; background: #f4f8f7; border-radius: 16px; counter-increment: task-move; }
 .task-moves > ol li::before { display: block; margin-bottom: 22px; color: #20877f; content: "0" counter(task-move); font-size: 13px; font-weight: 800; }
-.mission-now { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 32px; margin: -64px 28px 0; padding: 22px 26px; color: #fff; background: linear-gradient(120deg, #2854d7, #147b78); border: 1px solid rgba(255,255,255,.24); border-radius: 22px; box-shadow: 0 18px 42px rgba(27, 55, 120, .24); }
+.mission-now { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin: 8px 0; padding: 22px 26px; color: #fff; background: linear-gradient(120deg, #2854d7, #147b78); border: 1px solid rgba(255,255,255,.24); border-radius: 22px; box-shadow: 0 18px 42px rgba(27, 55, 120, .18); }
 .mission-now .section-label { margin: 0; color: #cfe1ff; }
 .mission-now h2 { max-width: 28ch; margin: 4px 0 0; font-size: clamp(22px, 3vw, 30px); }
 .mission-now > .button { flex: 0 0 auto; color: #173e5c; background: #f5d777; }
@@ -793,7 +793,10 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .submission-confirmation h3 { margin: 6px 0 8px; }
 .submission-preview { margin-top: 16px; padding: 16px; background: #fff; border-radius: 12px; }
 .submission-preview p { margin: 7px 0 0; white-space: pre-wrap; }
-.draft-save-status { margin: 0; color: var(--text-muted); font-size: 13px; }
+.draft-save-status { margin: 0; padding: 11px 13px; color: #174d4a; background: #edf8f4; border: 1px solid #b9ddd2; border-radius: 10px; font-size: 13px; font-weight: 700; }
+.evidence-retest-receipt { display: grid; justify-items: start; gap: 10px; scroll-margin-top: 24px; padding: 20px 22px; color: #174d4a; background: #edf8f4; border-color: #9ed2c3; border-radius: 18px; }
+.evidence-retest-receipt p { margin: 0; color: #315f5a; }
+.evidence-retest-receipt .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .completion-orbit { position: absolute; top: 24px; right: 24px; width: 110px; height: 110px; }
 .completion-orbit i { position: absolute; width: 13px; height: 13px; background: #efb43e; border-radius: 50%; }
@@ -938,7 +941,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .task-hero-card h1 { max-width: 100%; margin-top: 12px; font-size: clamp(32px, 9vw, 40px); line-height: 1.08; }
   .task-hero-card .task-hero-label { margin-top: 24px; }
   .task-time { right: 24px; bottom: 22px; }
-  .mission-now { align-items: stretch; flex-direction: column; gap: 18px; margin: -54px 14px 0; }
+  .mission-now { align-items: stretch; flex-direction: column; gap: 18px; margin: 4px 0; }
   .mission-now > .button { width: 100%; }
   .mission-progress { flex-basis: auto; width: 100%; }
   .evidence-retest-state { grid-template-columns: 1fr; }
