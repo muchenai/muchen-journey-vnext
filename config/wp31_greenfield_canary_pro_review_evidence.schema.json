@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "application_candidate_sha": {"const": "8f1b7e81dca9755c07babe10e1c270744a3d5717"},
+    "application_candidate_sha": {"const": "1bcb1bd9ad071440238948fcf0f5dd600e633220"},
     "evidence_scope": {"const": "PRO_GREENFIELD_CANARY_ENTRYPOINT_REVIEW"},
     "ops_manifest_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
-    "package_manifest_sha256": {"const": "d387d632a9869e81686c2652ad81115d79e86f779bc8cf95dd9db529aae79181"},
+    "package_manifest_sha256": {"const": "93ba692c5c12f5df5b05b94cd48468b6e1583b03e0cb63c84d53a3bcc1a0de07"},
     "production_mutation": {"const": false},
     "review_status": {"const": "PASS"},
     "reviewed_at_utc": {"format": "date-time", "type": "string"},
