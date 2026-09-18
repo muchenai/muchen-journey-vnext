@@ -628,8 +628,9 @@ export async function submitAssignment(
   const idempotencyKey = requiredIdempotencyKey(data, "submission_idempotency_key");
   const body = submissionBody(data, true);
   if (typeof body !== "string") return body;
+  let result: { version_no: number };
   try {
-    const result = await apiRequest<{ version_no: number }>(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
+    result = await apiRequest<{ version_no: number }>(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
@@ -639,17 +640,19 @@ export async function submitAssignment(
         ai_use: aiUseDisclosure(data, "learner_ai"),
       }),
     });
-    const evidenceRetest = data.get("submission_command") === "submit_evidence_revision";
-    if (!evidenceRetest) {
-      revalidatePath(`/app/tasks/${assignmentId}`);
-      revalidatePath("/app");
-    }
-    return evidenceRetest
-      ? { success: `重新提交成功，Version ${result.version_no} 已保存。` }
-      : { success: "本阶段已提交，正在等待审核。" };
   } catch (error) {
     return submissionError(error);
   }
+
+  const evidenceRetest = data.get("submission_command") === "submit_evidence_revision";
+  revalidatePath(`/app/tasks/${assignmentId}`);
+  revalidatePath("/app");
+  if (evidenceRetest) {
+    redirect(
+      `/app/tasks/${assignmentId}?submitted=retest&version=${result.version_no}#retest-success`,
+    );
+  }
+  return { success: "本阶段已提交，正在等待审核。" };
 }
 
 export async function saveSubmissionDraft(

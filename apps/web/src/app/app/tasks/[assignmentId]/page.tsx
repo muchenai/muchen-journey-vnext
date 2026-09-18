@@ -153,6 +153,7 @@ export default async function TaskPage({
     material?: string;
     revision?: string;
     submitted?: string;
+    version?: string;
   }>;
 }) {
   const { assignmentId } = await params;
@@ -171,6 +172,13 @@ export default async function TaskPage({
   const canCancelEvidenceRevision = assignment.allowed_commands.includes("cancel_evidence_revision");
   const evidenceRetest = submitCommand === "submit_evidence_revision";
   const latestVersion = assignment.submission?.versions.at(-1);
+  const submittedVersionNo = Number(query.version);
+  const validRetestReceipt = query.submitted === "retest"
+    && Number.isSafeInteger(submittedVersionNo)
+    && submittedVersionNo > 0
+    && assignment.status === "COMPLETED"
+    && assignment.journey_stage?.stage_kind !== "ASSESSMENT"
+    && latestVersion?.version_no === submittedVersionNo;
   const initialBody = assignment.draft?.body
     ?? (["submit_revision", "submit_evidence_revision"].includes(submitCommand ?? "")
       ? latestVersion?.body ?? ""
@@ -286,29 +294,6 @@ export default async function TaskPage({
           <i aria-hidden="true" /> {taskTimeLabel}
         </div>
       </header>
-
-      <section className="mission-now" aria-labelledby="mission-now-title">
-        <div>
-          <p className="section-label">现在只做这一步</p>
-          <h2 id="mission-now-title">{currentFocus}</h2>
-        </div>
-        {needsRevision ? (
-          <a className="button primary compact" href="#task-workspace">
-            查看反馈并修改 <span aria-hidden="true">↓</span>
-          </a>
-        ) : !materialsReady && !isFirstTreasure ? (
-          <a
-            className="button primary compact"
-            href={isDayZero ? "#day-zero-choice" : "#learning-materials-title"}
-          >
-            {isDayZero ? "选一个出发问题" : "打开当前线索"} <span aria-hidden="true">↓</span>
-          </a>
-        ) : null}
-        <div className="mission-progress" aria-label={`已完成 ${completedRequiredMaterials} / ${requiredMaterials.length} 份学习材料`}>
-          <span style={{ "--mission-progress": `${requiredMaterials.length === 0 ? 100 : completedRequiredMaterials / requiredMaterials.length * 100}%` } as CSSProperties} />
-          <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
-        </div>
-      </section>
 
       <section className="task-governance" aria-labelledby="task-governance-title">
         <FactLabel kind="system" />
@@ -478,6 +463,40 @@ export default async function TaskPage({
           </a>
         </section>
       ) : null}
+
+      {validRetestReceipt ? (
+        <section id="retest-success" className="inline-success evidence-retest-receipt" role="status" aria-live="polite">
+          <strong>重新提交成功，Version {submittedVersionNo} 已保存。</strong>
+          <p>这一站已恢复为“已完成”；原版本未被覆盖，仍可在提交历史中查看。</p>
+          <div className="button-row">
+            <a className="button primary compact" href="#submission-history">查看提交历史</a>
+            <a className="button secondary compact" href="/app">回到旅程地图</a>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mission-now" aria-labelledby="mission-now-title">
+        <div>
+          <p className="section-label">现在只做这一步</p>
+          <h2 id="mission-now-title">{currentFocus}</h2>
+        </div>
+        {needsRevision ? (
+          <a className="button primary compact" href="#task-workspace">
+            查看反馈并修改 <span aria-hidden="true">↓</span>
+          </a>
+        ) : !materialsReady && !isFirstTreasure ? (
+          <a
+            className="button primary compact"
+            href={isDayZero ? "#day-zero-choice" : "#learning-materials-title"}
+          >
+            {isDayZero ? "选一个出发问题" : "打开当前线索"} <span aria-hidden="true">↓</span>
+          </a>
+        ) : null}
+        <div className="mission-progress" aria-label={`已完成 ${completedRequiredMaterials} / ${requiredMaterials.length} 份学习材料`}>
+          <span style={{ "--mission-progress": `${requiredMaterials.length === 0 ? 100 : completedRequiredMaterials / requiredMaterials.length * 100}%` } as CSSProperties} />
+          <small>{materialsReady ? "输入已就绪" : `${completedRequiredMaterials}/${requiredMaterials.length} 份线索`}</small>
+        </div>
+      </section>
 
       {!isDayZero ? <nav className="task-flow" aria-label="这一站的完成路径">
         <ol>
@@ -937,7 +956,7 @@ export default async function TaskPage({
           id="submission-history"
           className="submission-history"
           aria-label="查看已提交版本"
-          open={query.submitted === "retest"}
+          open={validRetestReceipt}
         >
           <summary>查看提交历史</summary>
           <p className="status-meta">

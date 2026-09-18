@@ -178,20 +178,30 @@ test("completed evidence stations can be retested without mixing in reviewer rev
   assert.match(actions, /evidence-revision\/start/);
   assert.match(actions, /evidence-revision\/cancel/);
   assert.match(actions, /submission_command/);
-  assert.match(actions, /重新提交成功，Version \$\{result\.version_no\} 已保存/);
+  assert.match(actions, /submitted=retest&version=\$\{result\.version_no\}#retest-success/);
   assert.match(submissionComposer, /command === "submit_evidence_revision"/);
   assert.match(submissionComposer, /检查并重新提交/);
-  assert.match(submissionComposer, /查看提交历史/);
-  assert.match(taskPage, /open=\{query\.submitted === "retest"\}/);
+  assert.match(taskPage, /重新提交成功，Version \{submittedVersionNo\} 已保存/);
+  assert.match(taskPage, /open=\{validRetestReceipt\}/);
 });
 
-test("the current-mission card overlaps only the hero, never the task contract", () => {
-  const heroIndex = taskPage.indexOf('className="task-hero-card"');
-  const missionIndex = taskPage.indexOf('className="mission-now"');
+test("the current-mission card occupies normal space immediately before the three-step path", () => {
   const governanceIndex = taskPage.indexOf('className="task-governance"');
-  assert.ok(heroIndex >= 0 && heroIndex < missionIndex);
-  assert.ok(missionIndex < governanceIndex);
-  assert.match(styles, /\.mission-now\s*\{[\s\S]*?margin: -64px/);
+  const missionIndex = taskPage.indexOf('className="mission-now"');
+  const flowIndex = taskPage.indexOf('className="task-flow"');
+  assert.ok(governanceIndex >= 0 && governanceIndex < missionIndex);
+  assert.ok(missionIndex < flowIndex);
+  assert.doesNotMatch(styles, /\.mission-now\s*\{[^}]*margin:\s*-\d/);
+  assert.doesNotMatch(styles, /\.mission-now\s*\{[^}]*z-index/);
+});
+
+test("draft saving always gives a visible result and remains manually actionable", () => {
+  assert.match(submissionComposer, /有修改尚未保存/);
+  assert.match(submissionComposer, /正在保存草稿……/);
+  assert.match(submissionComposer, /草稿保存成功/);
+  assert.match(submissionComposer, /当前内容已经保存/);
+  assert.match(submissionComposer, /保存失败，修改仍保留在本机/);
+  assert.doesNotMatch(submissionComposer, /disabled=\{submitPending \|\| draftPending \|\| !isOnline \|\| currentSnapshot === savedSnapshot\}/);
 });
 
 test("formal model-judgement materials ask concrete questions that match the task", () => {

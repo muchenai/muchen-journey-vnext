@@ -13,8 +13,11 @@ test("successful submission stays on the task and exposes an accessible receipt"
   assert.match(composer, /role="status" aria-live="polite"/);
 });
 
-test("draft feedback distinguishes server save from automatic save", () => {
-  assert.match(composer, /正在自动保存到服务器/);
-  assert.match(composer, /已自动保存到服务器/);
+test("draft feedback distinguishes pending, automatic, manual, and already-saved states", () => {
+  assert.match(composer, /有修改尚未保存/);
+  assert.match(composer, /正在保存草稿/);
+  assert.match(composer, /草稿已保存/);
+  assert.match(composer, /草稿保存成功/);
+  assert.match(composer, /当前内容已经保存/);
   assert.match(composer, /保存草稿/);
 });
