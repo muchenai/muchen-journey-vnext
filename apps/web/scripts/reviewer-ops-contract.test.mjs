@@ -39,4 +39,7 @@ test("successful empty queue is distinct from unavailable data", () => {
   assert.match(queue, /查询已成功/);
   assert.match(queue, /不是数据未加载/);
   assert.match(queue, /最近检查/);
+  assert.match(queue, /自证站提交后直接完成，不进入人工评审队列/);
+  assert.match(queue, /正式能力评测/);
+  assert.match(queue, /运营工作台检查 Enrollment/);
 });

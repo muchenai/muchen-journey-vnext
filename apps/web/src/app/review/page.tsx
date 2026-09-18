@@ -3,15 +3,9 @@ import Link from "next/link";
 import { FactLabel } from "@/app/human-experience";
 import { identityPageRequest, ReviewItem } from "@/lib/server/api";
 import { LiveStatusSignal } from "@/app/live-status-signal";
+import { formatProductDateTime } from "@/lib/date-time";
 
 export const dynamic = "force-dynamic";
-
-function formatWait(value: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 export default async function ReviewQueuePage({
   searchParams,
@@ -54,14 +48,16 @@ export default async function ReviewQueuePage({
         <div className="notice">
           <strong>查询已成功：当前没有待处理评审</strong>
           <p>这不是数据未加载，也不表示其他 Reviewer 或模块的队列为 0。</p>
-          <small>最近检查：{formatWait(checkedAt.toISOString())} · 范围：当前组织、当前 Reviewer、ASSIGNED/IN_REVIEW</small>
+          <p>Day 0、宝藏等自证站提交后直接完成，不进入人工评审队列。</p>
+          <p>这里只显示当前组织内明确分配给你的正式能力评测；如需核对 Reviewer 绑定，请由 Operator 在运营工作台检查 Enrollment。</p>
+          <small>最近检查：{formatProductDateTime(checkedAt)} · 范围：当前组织、当前 Reviewer、ASSIGNED/IN_REVIEW</small>
         </div>
       ) : (
         <>
           <Link className="button primary" href={`/review/${queue.items[0].id}`}>
             打开最高优先级待审提交
           </Link>
-          <p className="status-meta">最近检查：{formatWait(checkedAt.toISOString())} · 排序来自服务端队列</p>
+          <p className="status-meta">最近检查：{formatProductDateTime(checkedAt)} · 排序来自服务端队列</p>
           <ol className="queue">
           {queue.items.map((item, index) => (
             <li key={item.id}>
@@ -75,10 +71,10 @@ export default async function ReviewQueuePage({
                 <strong className="queue-title">{item.learner_name} · {item.task_title}</strong>
                 <span>{item.priority_reason}</span>
                 <span className="queue-meta">
-                  任务 V{item.task_version} · 提交 V{item.submission_version_no} · 返工 {item.revision_count} 次 · 提交于 {formatWait(item.submitted_at)}
+                  任务 V{item.task_version} · 提交 V{item.submission_version_no} · 返工 {item.revision_count} 次 · 提交于 {formatProductDateTime(item.submitted_at)}
                 </span>
                 <span className="queue-meta">首次反馈配置 {item.feedback_sla_business_days} 个工作日；未绑定营业日历，不计算逾期 · {item.sensitivity} · {item.audience}</span>
-                <span className="queue-meta">冲突检查 {item.conflict_status} · 分配于 {formatWait(item.assigned_at)}</span>
+                <span className="queue-meta">冲突检查 {item.conflict_status} · 分配于 {formatProductDateTime(item.assigned_at)}</span>
               </Link>
             </li>
           ))}

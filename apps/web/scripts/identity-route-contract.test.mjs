@@ -43,6 +43,8 @@ test("anonymous ops browser entry recovers without weakening JSON denial", () =>
   assert.match(opsLoginSource, />\s*进入运营工作台\s*</);
   assert.match(opsLoginSource, />\s*使用飞书进入\s*</);
   assert.match(opsLoginSource, /href="\/auth\/feishu\?return_to=%2Fops"/);
+  assert.match(apiSource, /redirect\("\/ops\/login\?auth_error=FORBIDDEN"\)/);
+  assert.match(opsLoginSource, /当前会话没有 Operator 权限/);
 });
 
 test("anonymous and wrong-role review entry recover through a dedicated login page", () => {

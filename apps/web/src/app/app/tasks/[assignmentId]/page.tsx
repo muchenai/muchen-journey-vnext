@@ -10,6 +10,7 @@ import {
 } from "@/app/actions";
 import { ExperienceState, FactLabel } from "@/app/human-experience";
 import { Assignment, learnerPageRequest } from "@/lib/server/api";
+import { formatProductDateTime } from "@/lib/date-time";
 import { AttachmentUploader } from "./attachment-uploader";
 import { SubmissionComposer } from "./submission-composer";
 
@@ -966,7 +967,7 @@ export default async function TaskPage({
             <article className="history-version" key={version.id}>
               <h3>Version {version.version_no}</h3>
               <p className="status-meta">
-                {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.created_at))}
+                {formatProductDateTime(version.created_at)}
                 {version.review_status ? ` · 评审 ${version.review_status}` : ""}
               </p>
               <div className="submission">{version.body}</div>
