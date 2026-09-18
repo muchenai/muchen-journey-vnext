@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/35322502103" > "$RUNNER_TEMP/package-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/35325044330" > "$RUNNER_TEMP/package-run.json"
           python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -49,7 +49,7 @@ jobs:
           assert r['event']=='workflow_dispatch' and r['head_sha']=='94f56617829a8a5e3435131e03f3c30c7fd5e11b'
           assert r['status']=='completed' and r['conclusion']=='success' and r['run_attempt']==1
           PY
-          gh run download 35322502103 --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-94f56617829a8a5e3435131e03f3c30c7fd5e11b --dir "$RUNNER_TEMP/prepare-package"
+          gh run download 35325044330 --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-94f56617829a8a5e3435131e03f3c30c7fd5e11b --dir "$RUNNER_TEMP/prepare-package"
           python3 - <<'PY'
           import os
           from pathlib import Path

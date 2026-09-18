@@ -17,10 +17,10 @@ import sys
 import tempfile
 
 CANDIDATE = "94f56617829a8a5e3435131e03f3c30c7fd5e11b"
-PACKAGE_RUN = 35322502103
+PACKAGE_RUN = 35325044330
 HASHES = {
     "canary_app_upgrade.py": "91233c84341070607ff63c881e96f37efdd3eb5969ca6e30443241e8bbc8f484",
-    "manifest.json": "333923bd4f2ed30557e097730be1da7e75aa3917fc7c12ed63ef4ff28d1de2d4",
+    "manifest.json": "9f931a93ff673e0ea0d9df9adbc6f1c9a18897f22135a2b53ed34034358220c6",
     "compatibility.json": "ee20abb3d25979fd08a9b4943142ebb112731ab77f78f7f2985a2c4a7579e15f"
 }
 
