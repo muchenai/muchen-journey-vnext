@@ -2,19 +2,20 @@ import pytest
 from scripts.canary_app_compatibility import validate_changes, ALLOWED_RUNTIME_CHANGES
 
 
-def test_reviewed_invitation_surface_is_allowed():
+def test_reviewed_evidence_retest_surface_is_allowed():
     validate_changes(list(ALLOWED_RUNTIME_CHANGES))
 
 
-def test_reviewed_learner_uat_surface_is_allowed():
+def test_reviewed_evidence_retest_files_are_explicitly_allowed():
     validate_changes([
+        "apps/api/journey_api/routes.py",
+        "apps/api/journey_api/submission_routes.py",
         "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
-        "apps/web/scripts/p0-learner-one-page-contract.test.mjs",
-        "apps/web/scripts/submission-feedback-contract.test.mjs",
-        "apps/web/scripts/wp27-journey-map-contract.test.mjs",
-        "apps/web/src/app/app/journey-map.tsx",
+        "apps/web/src/app/actions.ts",
+        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
         "apps/web/src/app/globals.css",
+        "contracts/openapi.json",
     ])
 
 
