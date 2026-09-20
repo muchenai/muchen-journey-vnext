@@ -90,6 +90,7 @@ def test_browser_result_cannot_be_misreported_as_real_journey_uat() -> None:
         "completed_material_reopen=PASS",
         "ai_self_check_skip=PASS",
         "visible_task_brief=3_viewports",
+        "evidence_retest=triple_click_one_post+version_2+explicit_retest_version_3",
         "fixture=synthetic",
         "external_access=not_proven",
         "human_uat=not_run",
@@ -102,3 +103,12 @@ def test_browser_gate_rejects_playwright_console_error_output() -> None:
 
     assert "^Error:" in script
     assert "Errors: [1-9][0-9]*" in script
+
+
+def test_evidence_retest_triple_click_emits_one_post_and_explicit_retry_is_new() -> None:
+    script = (ROOT / "scripts/p0_journey_v3_browser.sh").read_text(encoding="utf-8")
+
+    assert script.count("button.click();") >= 3
+    assert "submissionPostCount !== 1" in script
+    assert "submitted=retest&version=2" in script
+    assert "submitted=retest&version=3" in script

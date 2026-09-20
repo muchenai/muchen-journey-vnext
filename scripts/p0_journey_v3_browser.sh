@@ -596,10 +596,29 @@ retest_completed_evidence() {
       await page.getByRole('button', {name: '保存草稿'}).click();
       await page.getByText('当前内容已经保存。', {exact: true}).waitFor({state: 'visible'});
 
+      let countSubmissionPosts = false;
+      let submissionPostCount = 0;
+      page.on('request', (request) => {
+        if (countSubmissionPosts
+            && request.method() === 'POST'
+            && request.url().includes('/app/tasks/')) {
+          submissionPostCount += 1;
+        }
+      });
       await page.getByRole('button', {name: '检查并重新提交'}).click();
-      await page.getByRole('button', {name: '确认重新提交'}).click();
+      const confirmationButton = page.getByRole('button', {name: '确认重新提交'});
+      countSubmissionPosts = true;
+      await confirmationButton.evaluate((button) => {
+        button.click();
+        button.click();
+        button.click();
+      });
       await page.waitForURL('**?submitted=retest&version=2#retest-success');
+      countSubmissionPosts = false;
       await page.waitForLoadState('networkidle');
+      if (submissionPostCount !== 1) {
+        throw new Error('triple confirmation emitted ' + submissionPostCount + ' submission POSTs');
+      }
       const receipt = page.locator('#retest-success');
       const receiptText = await receipt.innerText();
       if (!receiptText.includes('重新提交成功，Version 2 已保存')
@@ -613,6 +632,28 @@ retest_completed_evidence() {
         throw new Error('evidence retest did not retain both immutable versions');
       }
       await page.screenshot({path: '$evidence_dir/04-evidence-retest-success.png', fullPage: true});
+
+      await page.getByRole('button', {name: '修改并重新测试'}).click();
+      await page.waitForURL('**?revision=retest*');
+      await page.waitForLoadState('networkidle');
+      const secondInput = page.locator('#submission-body');
+      await secondInput.fill((await secondInput.inputValue()) + ' 第二轮明确重测仍应生成新版本。');
+      await page.getByRole('button', {name: '检查并重新提交'}).click();
+      submissionPostCount = 0;
+      countSubmissionPosts = true;
+      await page.getByRole('button', {name: '确认重新提交'}).click();
+      await page.waitForURL('**?submitted=retest&version=3#retest-success');
+      countSubmissionPosts = false;
+      await page.waitForLoadState('networkidle');
+      if (submissionPostCount !== 1) {
+        throw new Error('a new explicit retest did not emit exactly one submission POST');
+      }
+      const secondHistoryText = await page.locator('#submission-history').innerText();
+      if (!secondHistoryText.includes('Version 1')
+          || !secondHistoryText.includes('Version 2')
+          || !secondHistoryText.includes('Version 3')) {
+        throw new Error('explicit second retest did not create exactly the next immutable version');
+      }
       await receipt.getByRole('link', {name: '回到旅程地图'}).click();
       await page.waitForURL('**/app');
       await page.waitForLoadState('networkidle');
@@ -911,4 +952,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9]
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 completed_material_reopen=PASS ai_self_check_skip=PASS visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 completed_material_reopen=PASS ai_self_check_skip=PASS visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=triple_click_one_post+version_2+explicit_retest_version_3+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"

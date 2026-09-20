@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { saveSubmissionDraft, submitAssignment, type SubmissionActionState } from "@/app/actions";
 import { FactLabel } from "@/app/human-experience";
@@ -106,6 +106,8 @@ export function SubmissionComposer({
   const errorRef = useRef<HTMLDivElement>(null);
   const pendingSnapshot = useRef<string | null>(null);
   const pendingSaveSource = useRef<"auto" | "manual" | null>(null);
+  const submissionLockedRef = useRef(false);
+  const [stableSubmissionIdempotencyKey] = useState(() => submissionIdempotencyKey);
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot(initial.notes, initial.evidenceUrl, initialAttachmentIds));
   const [body, setBody] = useState(initial.notes);
   const [evidenceUrl, setEvidenceUrl] = useState(initial.evidenceUrl);
@@ -116,6 +118,7 @@ export function SubmissionComposer({
   const [recovery, setRecovery] = useState<LocalDraft | null>(null);
   const [draftFeedback, setDraftFeedback] = useState<"auto-saved" | "manual-saved" | "current" | null>(null);
   const [aiSelfCheckSkipped, setAiSelfCheckSkipped] = useState(false);
+  const [submissionLocked, setSubmissionLocked] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
   const isOnline = useSyncExternalStore(subscribeToNetworkState, onlineSnapshot, serverOnlineSnapshot);
   const [learnerAiUsed, setLearnerAiUsed] = useState(false);
@@ -130,6 +133,7 @@ export function SubmissionComposer({
   const draftSavedTime = draftState.savedAt
     ? new Date(draftState.savedAt).toLocaleString("zh-CN")
     : null;
+  const submissionBusy = submitPending || (submissionLocked && !submitState.error);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -206,6 +210,21 @@ export function SubmissionComposer({
     if (localError || errorState.error) errorRef.current?.focus();
   }, [errorState.error, localError]);
 
+  useEffect(() => {
+    if (submitState.error) submissionLockedRef.current = false;
+  }, [submitState]);
+
+  function lockSubmission(event: FormEvent<HTMLFormElement>) {
+    if (submissionLockedRef.current || draftPending || !isOnline) {
+      event.preventDefault();
+      return;
+    }
+    submissionLockedRef.current = true;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    if (submitter instanceof HTMLButtonElement) submitter.disabled = true;
+    setSubmissionLocked(true);
+  }
+
   function beginConfirmation() {
     if ((!expectsExternalDocument && body.trim().length < 40) || body.length > 8_000) {
       setLocalError("提交内容需为 40–8000 个字符；当前内容仍保留。");
@@ -246,10 +265,10 @@ export function SubmissionComposer({
   }
 
   return (
-    <form ref={formRef} action={submitAction} className="submission-composer">
+    <form ref={formRef} action={submitAction} onSubmit={lockSubmission} className="submission-composer">
       <input type="hidden" name="assignment_id" value={assignmentId} />
       <input type="hidden" name="revision" value={assignmentRevision} />
-      <input type="hidden" name="submission_idempotency_key" value={submissionIdempotencyKey} />
+      <input type="hidden" name="submission_idempotency_key" value={stableSubmissionIdempotencyKey} />
       <input type="hidden" name="submission_command" value={command} />
       <input type="hidden" name="learner_ai_used" value={learnerAiUsed ? "on" : ""} />
       <input type="hidden" name="learner_ai_purpose" value={learnerAiPurpose} />
@@ -471,8 +490,8 @@ export function SubmissionComposer({
         {!isOnline ? <span className="sticky-action-status" aria-hidden="true">离线 · 正式提交已暂停</span> : null}
         {confirming ? (
           <>
-            <button className="button primary" type="submit" disabled={submitPending || draftPending || !isOnline}>{submitPending ? "正在提交…" : isEvidenceRetest ? "确认重新提交" : "确认正式提交"}</button>
-            <button className="button secondary" type="button" onClick={returnToEditing} disabled={submitPending}>返回修改</button>
+            <button className="button primary" type="submit" disabled={submissionBusy || draftPending || !isOnline}>{submissionBusy ? "正在提交…" : isEvidenceRetest ? "确认重新提交" : "确认正式提交"}</button>
+            <button className="button secondary" type="button" onClick={returnToEditing} disabled={submissionBusy}>返回修改</button>
           </>
         ) : (
           <>
@@ -485,11 +504,11 @@ export function SubmissionComposer({
                 event.preventDefault();
                 beginConfirmation();
               }}
-              disabled={submitPending || draftPending}
+              disabled={submissionBusy || draftPending}
             >
               {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
             </button>
-            <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submitPending || draftPending || !isOnline}>{draftPending ? "正在保存……" : "保存草稿"}</button>
+            <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submissionBusy || draftPending || !isOnline}>{draftPending ? "正在保存……" : "保存草稿"}</button>
           </>
         )}
       </div>

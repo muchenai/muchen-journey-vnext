@@ -14,7 +14,17 @@ test("weak-network draft flow retains a local copy and blocks duplicate-risk mut
   assert.match(composer, /当前离线/);
   assert.match(composer, /未同步/);
   assert.match(composer, /!isOnline/);
-  assert.match(composer, /submissionIdempotencyKey/);
+  assert.match(composer, /stableSubmissionIdempotencyKey/);
+});
+
+test("submission locks synchronously and only unlocks after a confirmed failure", () => {
+  assert.match(composer, /onSubmit=\{lockSubmission\}/);
+  assert.match(composer, /submissionLockedRef\.current/);
+  assert.match(composer, /event\.preventDefault\(\)/);
+  assert.match(composer, /submitter instanceof HTMLButtonElement/);
+  assert.match(composer, /if \(submitState\.error\) submissionLockedRef\.current = false/);
+  assert.match(composer, /submissionLocked && !submitState\.error/);
+  assert.match(composer, /submissionBusy \? "正在提交…"/);
 });
 
 test("formal confirmation and errors receive programmatic focus with described fields", () => {
