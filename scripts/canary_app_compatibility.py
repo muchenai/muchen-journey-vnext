@@ -1,4 +1,4 @@
-"""Narrow allowlist for AI-skip feedback and completed material access; unchanged schema/auth core.
+"""Narrow allowlist for submission duplicate prevention; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,9 +9,10 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "94f56617829a8a5e3435131e03f3c30c7fd5e11b"
+BASE = "629a075a0261d20ff727bed84e2b9fbacdf4900b"
 SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
+    "apps/web/scripts/resilience-a11y-contract.test.mjs",
     "apps/web/scripts/learner-experience-contract.test.mjs",
     "apps/web/scripts/learner-loop-contract.test.mjs",
     "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
