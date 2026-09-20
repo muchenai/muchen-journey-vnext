@@ -1,4 +1,4 @@
-"""Narrow allowlist for reviewer time, queue guidance and role denial; unchanged schema/auth core.
+"""Narrow allowlist for AI-skip feedback and completed material access; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,19 +9,14 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "61e49463aca50b36a9d4a54f6087bcd4659be61c"
+BASE = "94f56617829a8a5e3435131e03f3c30c7fd5e11b"
 SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
-    "apps/web/scripts/identity-route-contract.test.mjs",
-    "apps/web/scripts/ops-timezone.test.mjs",
-    "apps/web/scripts/reviewer-ops-contract.test.mjs",
+    "apps/web/scripts/learner-experience-contract.test.mjs",
+    "apps/web/scripts/learner-loop-contract.test.mjs",
     "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
-    "apps/web/src/app/ops/login/page.tsx",
-    "apps/web/src/app/ops/page.tsx",
-    "apps/web/src/app/review/[reviewId]/page.tsx",
-    "apps/web/src/app/review/page.tsx",
-    "apps/web/src/lib/date-time.ts",
-    "apps/web/src/lib/server/api.ts",
+    "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+    "apps/web/src/app/globals.css",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
 

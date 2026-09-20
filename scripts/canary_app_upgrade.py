@@ -17,12 +17,12 @@ import subprocess
 import sys
 
 ROOT = Path("/srv/journey-next-production/canary")
-BASE = "61e49463aca50b36a9d4a54f6087bcd4659be61c"
+BASE = "94f56617829a8a5e3435131e03f3c30c7fd5e11b"
 OLD = ROOT / "releases" / (BASE + "-app-upgrade")
 PROJECT = "journey-next-greenfield-canary"
 OLD_IMAGES = {
-    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:75299694972a20625cfe3aac9992354914a3a48726b49e0a5c529fc50390ebb7",
-    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:d608ec8b50bd4cdf486229e6ba556bb7a662ee0b244ee9c756875c000f59ccb9",
+    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:941beb5e1c58b3b1cb9e35b7ef113c3f3a1c95e590488f34fd32c5b193dee4c9",
+    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:46533ca5ff3dfa96d654f2db1db4715c2d78e92dc24f95f867ac8139247e157d",
 }
 COPY_FILES = ("compose.canary.yaml", "compose.sh", "wp31_exec_env.py", "secrets/volcengine-rds-ca.pem")
 ENV_FILES = (".deployment.env", "secrets/api.env", "secrets/web.env")
