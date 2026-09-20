@@ -13,11 +13,7 @@ BASE = "629a075a0261d20ff727bed84e2b9fbacdf4900b"
 SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
     "apps/web/scripts/resilience-a11y-contract.test.mjs",
-    "apps/web/scripts/learner-experience-contract.test.mjs",
-    "apps/web/scripts/learner-loop-contract.test.mjs",
-    "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
     "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-    "apps/web/src/app/globals.css",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
 

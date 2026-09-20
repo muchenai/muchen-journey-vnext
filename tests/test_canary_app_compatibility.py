@@ -2,17 +2,14 @@ import pytest
 from scripts.canary_app_compatibility import validate_changes, ALLOWED_RUNTIME_CHANGES
 
 
-def test_reviewed_ai_skip_and_material_access_surface_is_allowed():
+def test_reviewed_submission_lock_surface_is_allowed():
     validate_changes(list(ALLOWED_RUNTIME_CHANGES))
 
 
-def test_reviewed_ai_skip_and_material_access_files_are_explicitly_allowed():
+def test_reviewed_submission_lock_files_are_explicitly_allowed():
     validate_changes([
-        "apps/web/scripts/learner-experience-contract.test.mjs",
-        "apps/web/scripts/learner-loop-contract.test.mjs",
-        "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
+        "apps/web/scripts/resilience-a11y-contract.test.mjs",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-        "apps/web/src/app/globals.css",
     ])
 
 
