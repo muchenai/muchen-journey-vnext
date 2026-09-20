@@ -653,18 +653,21 @@ def test_concurrent_submit_retry_and_duplicate_command_create_one_version():
         )
         return response.status_code, response.json()
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         same_key_results = list(
-            executor.map(lambda label: submit(label, key), ["same-key-a", "same-key-b"])
+            executor.map(
+                lambda label: submit(label, key),
+                ["same-key-a", "same-key-b", "same-key-c"],
+            )
         )
-    assert [status for status, _ in same_key_results] == [200, 200]
+    assert [status for status, _ in same_key_results] == [200, 200, 200]
     result_ids = {
         result["data"]["submission_version_id"] for _, result in same_key_results
     }
     assert len(result_ids) == 1
     assert sorted(
         result["data"]["idempotency_replay"] for _, result in same_key_results
-    ) == [False, True]
+    ) == [False, True, True]
 
     learner_two, csrf_two, assignment_two, started_two = new_attachment_learner(
         "concurrent-conflict"
@@ -688,9 +691,9 @@ def test_concurrent_submit_retry_and_duplicate_command_create_one_version():
             json=payload_two,
         ).status_code
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        statuses = sorted(executor.map(submit_different, ["key-a", "key-b"]))
-    assert statuses == [200, 409]
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        statuses = sorted(executor.map(submit_different, ["key-a", "key-b", "key-c"]))
+    assert statuses == [200, 409, 409]
     with SessionLocal() as session:
         submission = session.scalar(
             select(Submission).where(Submission.assignment_id == uuid.UUID(assignment_two))
