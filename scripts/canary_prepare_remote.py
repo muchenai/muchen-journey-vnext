@@ -19,9 +19,9 @@ import tempfile
 CANDIDATE = "629a075a0261d20ff727bed84e2b9fbacdf4900b"
 PACKAGE_RUN = 35485684860
 HASHES = {
-    "canary_app_upgrade.py": "91233c84341070607ff63c881e96f37efdd3eb5969ca6e30443241e8bbc8f484",
+    "canary_app_upgrade.py": "f59f06de7556f38c6e6d1cb24e4b63b5b16dcd236dc8e7bc15cef81245467486",
     "manifest.json": "646b66c76cb63ae8cd9b66e5d9562b1a7a7bc7a35ff95a56c3a8b8e2ef2a95fc",
-    "compatibility.json": "ee20abb3d25979fd08a9b4943142ebb112731ab77f78f7f2985a2c4a7579e15f"
+    "compatibility.json": "8989d109a5f038d92fa689ffeabfc1685c6ad59279be287536ff36bf1a34031a"
 }
 
 
