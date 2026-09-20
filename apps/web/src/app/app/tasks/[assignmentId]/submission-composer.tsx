@@ -101,6 +101,7 @@ export function SubmissionComposer({
   const storageKey = `muchen-journey:draft:${assignmentId}:${assignmentRevision}`;
   const formRef = useRef<HTMLFormElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const reviewSubmissionRef = useRef<HTMLButtonElement>(null);
   const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const pendingSnapshot = useRef<string | null>(null);
@@ -114,6 +115,7 @@ export function SubmissionComposer({
   const [localError, setLocalError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState<LocalDraft | null>(null);
   const [draftFeedback, setDraftFeedback] = useState<"auto-saved" | "manual-saved" | "current" | null>(null);
+  const [aiSelfCheckSkipped, setAiSelfCheckSkipped] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
   const isOnline = useSyncExternalStore(subscribeToNetworkState, onlineSnapshot, serverOnlineSnapshot);
   const [learnerAiUsed, setLearnerAiUsed] = useState(false);
@@ -233,6 +235,14 @@ export function SubmissionComposer({
   function returnToEditing() {
     setConfirming(false);
     window.requestAnimationFrame(() => bodyRef.current?.focus());
+  }
+
+  function skipAiSelfCheck() {
+    setAiSelfCheckSkipped(true);
+    window.requestAnimationFrame(() => {
+      reviewSubmissionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      reviewSubmissionRef.current?.focus({ preventScroll: true });
+    });
   }
 
   return (
@@ -356,7 +366,19 @@ export function SubmissionComposer({
               <div><dt>模型版本</dt><dd>模型版本：未绑定</dd></div>
               <div><dt>Prompt 版本</dt><dd>Prompt 版本：未绑定</dd></div>
             </dl>
-            <button className="button secondary" type="button" onClick={() => document.querySelector<HTMLButtonElement>("#review-submission")?.focus()}>跳过 AI 自查</button>
+            <button
+              className="button secondary"
+              type="button"
+              aria-pressed={aiSelfCheckSkipped}
+              onClick={skipAiSelfCheck}
+            >
+              {aiSelfCheckSkipped ? "已跳过 AI 自查" : "跳过 AI 自查"}
+            </button>
+            {aiSelfCheckSkipped ? (
+              <p className="ai-self-check-skip-status" role="status" aria-live="polite">
+                已跳过 AI 自查。没有生成 AI 评价，任务状态未改变；你可以继续检查并提交。
+              </p>
+            ) : null}
           </section>
 
           <details className="fixed-references">
@@ -455,6 +477,7 @@ export function SubmissionComposer({
         ) : (
           <>
             <button
+              ref={reviewSubmissionRef}
               id="review-submission"
               className="button primary"
               type="button"

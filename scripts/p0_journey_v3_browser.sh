@@ -362,6 +362,14 @@ complete_stage() {
           throw new Error('stage $stage_no material completion exposed the keyboard-only skip link');
         }
       }
+      const completedMaterialCards = page.locator('.learning-material-card');
+      const completedMaterialCount = await completedMaterialCards.count();
+      if (completedMaterialCount < 1 || await page.locator('.learning-material-card[open]').count() !== completedMaterialCount) {
+        throw new Error('stage $stage_no completed materials do not keep their source links visible');
+      }
+      if (await page.locator('.learning-material-card[open] .material-open-link:visible').count() !== completedMaterialCount) {
+        throw new Error('stage $stage_no completed material source cannot be reopened');
+      }
       if ($stage_no === 1) {
         for (const viewport of [
           {name: 'desktop', width: 1280, height: 900},
@@ -433,6 +441,17 @@ complete_stage() {
         if (workspacePosition.top < -1 || workspacePosition.top >= workspacePosition.viewport) {
           throw new Error('stage $stage_no start action lost the learner position: ' + JSON.stringify(workspacePosition));
         }
+      }
+      if ($stage_no === 1) {
+        const skipAiSelfCheck = page.getByRole('button', {name: '跳过 AI 自查', exact: true});
+        if (await skipAiSelfCheck.count() !== 1) throw new Error('AI self-check skip action missing');
+        await skipAiSelfCheck.click();
+        const skipReceipt = page.getByText('已跳过 AI 自查。没有生成 AI 评价，任务状态未改变；你可以继续检查并提交。', {exact: true});
+        await skipReceipt.waitFor({state: 'visible'});
+        if (await page.evaluate(() => document.activeElement?.id) !== 'review-submission') {
+          throw new Error('AI self-check skip did not move focus to the next submit action');
+        }
+        await page.screenshot({path: '$evidence_dir/04-ai-self-check-skipped.png', fullPage: false});
       }
       if ($stage_no >= 6) {
         const evidence = page.locator('#evidence-url');
@@ -892,4 +911,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9]
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 completed_material_reopen=PASS ai_self_check_skip=PASS visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=version_2+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
