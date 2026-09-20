@@ -87,6 +87,8 @@ def test_browser_result_cannot_be_misreported_as_real_journey_uat() -> None:
         "reentry=new_browser",
         "old_session=revoked",
         "material_links=8",
+        "completed_material_reopen=PASS",
+        "ai_self_check_skip=PASS",
         "visible_task_brief=3_viewports",
         "fixture=synthetic",
         "external_access=not_proven",

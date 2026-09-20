@@ -789,6 +789,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .ai-self-check-gated dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
 .ai-self-check-gated dd { margin: 0; }
 .ai-self-check-gated .button { width: fit-content; }
+.ai-self-check-skip-status { color: #17665f; font-weight: 700; }
 .submission-confirmation { background: #f4f8f7; border: 1px solid #82bdb6; }
 .submission-confirmation h3 { margin: 6px 0 8px; }
 .submission-preview { margin-top: 16px; padding: 16px; background: #fff; border-radius: 12px; }

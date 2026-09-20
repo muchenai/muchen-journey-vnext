@@ -40,12 +40,14 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /const activeMaterialIndex =/);
   assert.match(taskPage, /const isActive = index === activeMaterialIndex/);
   assert.match(taskPage, /const isLocked = !isComplete && !isActive/);
-  assert.match(taskPage, /className="learning-material-card" open=\{isActive\}/);
+  assert.match(taskPage, /className="learning-material-card" open=\{isActive \|\| isComplete\}/);
   assert.match(taskPage, /完成上一项后解锁/);
   assert.match(taskPage, /我找到 1 条线索，开始\$\{practiceNoun\}/);
   assert.match(taskPage, /<summary>查看材料说明<\/summary>/);
   assert.match(taskPage, /function MaterialOpenLink/);
   assert.match(taskPage, /用企业飞书打开/);
+  assert.match(taskPage, /用企业飞书打开视频/);
+  assert.match(taskPage, /已完成 · 仍可重新打开材料/);
   assert.match(taskPage, /首次打开需登录/);
   assert.match(taskPage, /<summary>打不开？<\/summary>/);
   assert.match(taskPage, /const taskActionUrl = instructionLinks\.find\(isFeishuMaterial\)/);

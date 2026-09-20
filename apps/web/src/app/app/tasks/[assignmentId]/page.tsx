@@ -94,7 +94,15 @@ function explorationMinutes(estimatedMinutes: number, isDayZero: boolean) {
   return Math.min(estimatedMinutes, isDayZero ? 8 : 12);
 }
 
-function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string; label?: string }) {
+function MaterialOpenLink({
+  href,
+  label = "打开学习材料",
+  isVideo = false,
+}: {
+  href: string;
+  label?: string;
+  isVideo?: boolean;
+}) {
   const requiresFeishu = isFeishuMaterial(href);
   return (
     <div className="material-open-action">
@@ -105,7 +113,7 @@ function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string
         rel="noreferrer"
         aria-label={label}
       >
-        <span>{requiresFeishu ? "用企业飞书打开" : label}</span>
+        <span>{requiresFeishu ? (isVideo ? "用企业飞书打开视频" : "用企业飞书打开") : label}</span>
         <small>
           {requiresFeishu ? "首次打开需登录" : new URL(href).hostname}
         </small>
@@ -123,7 +131,7 @@ function MaterialOpenLink({ href, label = "打开学习材料" }: { href: string
   );
 }
 
-function LearningMaterialBody({ value }: { value: string | null }) {
+function LearningMaterialBody({ value, isVideo = false }: { value: string | null; isVideo?: boolean }) {
   const links = materialLinks(value);
   if (links.length === 0) {
     return <div className="material-body">{textWithSafeLinks(value)}</div>;
@@ -132,7 +140,7 @@ function LearningMaterialBody({ value }: { value: string | null }) {
     <>
       <div className="material-link-actions">
         {links.map((href) => (
-          <MaterialOpenLink href={href} key={href} />
+          <MaterialOpenLink href={href} isVideo={isVideo} key={href} />
         ))}
       </div>
       <details className="material-notes">
@@ -554,6 +562,7 @@ export default async function TaskPage({
                 material.title,
                 index,
               );
+              const isVideo = /视频/u.test(material.title);
               const heading = (
                 <>
                   <span>
@@ -581,7 +590,7 @@ export default async function TaskPage({
                       <small>完成上一份后开放（完成上一项后解锁）</small>
                     </div>
                   ) : (
-                    <details className="learning-material-card" open={isActive}>
+                    <details className="learning-material-card" open={isActive || isComplete}>
                       <summary>{heading}</summary>
                       <div className="learning-material-content">
                         <div className="material-focus-prompt">
@@ -599,15 +608,16 @@ export default async function TaskPage({
                           <span><b>3</b> 立即返回</span>
                         </div>
                         {material.kind === "TEXT" ? (
-                          <LearningMaterialBody value={material.body} />
+                          <LearningMaterialBody value={material.body} isVideo={isVideo} />
                         ) : (
                           <MaterialOpenLink
                             href={material.url ?? "https://invalid.example"}
-                            label="打开材料，找 1 条线索"
+                            label={isVideo ? "打开视频材料，找 1 条线索" : "打开材料，找 1 条线索"}
+                            isVideo={isVideo}
                           />
                         )}
                         {isComplete ? (
-                          <span className="material-complete-label">已完成</span>
+                          <span className="material-complete-label">已完成 · 仍可重新打开材料</span>
                         ) : (
                           <form action={completeLearningMaterial}>
                             <input type="hidden" name="assignment_id" value={assignment.id} />

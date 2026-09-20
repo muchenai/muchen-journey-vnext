@@ -50,6 +50,11 @@ test("AI self-check fails closed without invented provenance or formal mutation"
   assert.match(composer, /模型版本：未绑定/);
   assert.match(composer, /Prompt 版本：未绑定/);
   assert.match(composer, /跳过 AI 自查/);
+  assert.match(composer, /function skipAiSelfCheck\(\)/);
+  assert.match(composer, /setAiSelfCheckSkipped\(true\)/);
+  assert.match(composer, /已跳过 AI 自查。没有生成 AI 评价，任务状态未改变/);
+  assert.match(composer, /reviewSubmissionRef\.current\?\.scrollIntoView/);
+  assert.match(composer, /aria-pressed=\{aiSelfCheckSkipped\}/);
   assert.doesNotMatch(composer, /ai.*(submitAssignment|saveSubmissionDraft)/i);
 });
 

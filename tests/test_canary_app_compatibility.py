@@ -2,22 +2,17 @@ import pytest
 from scripts.canary_app_compatibility import validate_changes, ALLOWED_RUNTIME_CHANGES
 
 
-def test_reviewed_reviewer_time_and_role_surface_is_allowed():
+def test_reviewed_ai_skip_and_material_access_surface_is_allowed():
     validate_changes(list(ALLOWED_RUNTIME_CHANGES))
 
 
-def test_reviewed_reviewer_time_and_role_files_are_explicitly_allowed():
+def test_reviewed_ai_skip_and_material_access_files_are_explicitly_allowed():
     validate_changes([
-        "apps/web/scripts/identity-route-contract.test.mjs",
-        "apps/web/scripts/ops-timezone.test.mjs",
-        "apps/web/scripts/reviewer-ops-contract.test.mjs",
+        "apps/web/scripts/learner-experience-contract.test.mjs",
+        "apps/web/scripts/learner-loop-contract.test.mjs",
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
-        "apps/web/src/app/ops/login/page.tsx",
-        "apps/web/src/app/ops/page.tsx",
-        "apps/web/src/app/review/[reviewId]/page.tsx",
-        "apps/web/src/app/review/page.tsx",
-        "apps/web/src/lib/date-time.ts",
-        "apps/web/src/lib/server/api.ts",
+        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/web/src/app/globals.css",
     ])
 
 
