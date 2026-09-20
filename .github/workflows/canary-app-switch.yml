@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type SWITCH_629A075_ACK_30S
+        description: Type SWITCH_35755A3_ACK_30S
         required: true
         type: string
 
@@ -25,9 +25,9 @@ jobs:
       actions: read
       packages: read
     env:
-      PACKAGE_RUN: '35485684860'
-      CANDIDATE: '629a075a0261d20ff727bed84e2b9fbacdf4900b'
-      MANIFEST_SHA256: '646b66c76cb63ae8cd9b66e5d9562b1a7a7bc7a35ff95a56c3a8b8e2ef2a95fc'
+      PACKAGE_RUN: '35505868688'
+      CANDIDATE: '35755a3286607ffd7c0699529d570c67c59ef067'
+      MANIFEST_SHA256: '1040c7cfe1df4b61f1cd062a3b42cd0f919dae33b599bb2f2224461e4848c0f6'
       SWITCH_CONFIRMATION: ${{ inputs.confirmation }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -36,7 +36,7 @@ jobs:
       - name: Verify switch authorization and exact tag
         run: |
           set -euo pipefail
-          test "$SWITCH_CONFIRMATION" = 'SWITCH_629A075_ACK_30S'
+          test "$SWITCH_CONFIRMATION" = 'SWITCH_35755A3_ACK_30S'
           test "$GITHUB_REF" = "refs/tags/canary-app-switch-$GITHUB_SHA"
       - name: Verify exact switch tag
         run: |
