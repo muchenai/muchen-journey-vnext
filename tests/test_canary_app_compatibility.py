@@ -2,14 +2,24 @@ import pytest
 from scripts.canary_app_compatibility import validate_changes, ALLOWED_RUNTIME_CHANGES
 
 
-def test_reviewed_submission_lock_surface_is_allowed():
+def test_reviewed_post_completion_retest_surface_is_allowed():
     validate_changes(list(ALLOWED_RUNTIME_CHANGES))
 
 
-def test_reviewed_submission_lock_files_are_explicitly_allowed():
+def test_reviewed_post_completion_retest_files_are_explicitly_allowed():
     validate_changes([
-        "apps/web/scripts/resilience-a11y-contract.test.mjs",
-        "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+        "apps/api/journey_api/identity_routes.py",
+        "apps/api/journey_api/journey_service.py",
+        "apps/api/journey_api/ops_routes.py",
+        "apps/api/journey_api/outcome_routes.py",
+        "apps/api/journey_api/routes.py",
+        "apps/api/journey_api/schemas.py",
+        "apps/api/journey_api/submission_routes.py",
+        "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
+        "apps/web/src/app/app/result/page.tsx",
+        "apps/web/src/app/ops/page.tsx",
+        "apps/web/src/lib/server/api.ts",
+        "contracts/openapi.json",
     ])
 
 

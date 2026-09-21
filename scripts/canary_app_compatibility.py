@@ -1,4 +1,4 @@
-"""Narrow allowlist for submission duplicate prevention; unchanged schema/auth core.
+"""Narrow allowlist for post-completion evidence retests; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,11 +9,21 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "629a075a0261d20ff727bed84e2b9fbacdf4900b"
+BASE = "35755a3286607ffd7c0699529d570c67c59ef067"
 SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
-    "apps/web/scripts/resilience-a11y-contract.test.mjs",
-    "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
+    "apps/api/journey_api/identity_routes.py",
+    "apps/api/journey_api/journey_service.py",
+    "apps/api/journey_api/ops_routes.py",
+    "apps/api/journey_api/outcome_routes.py",
+    "apps/api/journey_api/routes.py",
+    "apps/api/journey_api/schemas.py",
+    "apps/api/journey_api/submission_routes.py",
+    "apps/web/scripts/p0-learner-flow-repair-contract.test.mjs",
+    "apps/web/src/app/app/result/page.tsx",
+    "apps/web/src/app/ops/page.tsx",
+    "apps/web/src/lib/server/api.ts",
+    "contracts/openapi.json",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
 
