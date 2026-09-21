@@ -50,14 +50,17 @@ jobs:
           set -euo pipefail
           gh run download "$PACKAGE_RUN" --repo "$GITHUB_REPOSITORY" --name canary-app-upgrade-$CANDIDATE --dir "$RUNNER_TEMP/package"
           python3 - <<'PY'
+          import importlib.util
           import os
-          from scripts.canary_app_upgrade import load_manifest
           from scripts.canary_prepare_remote import verify_package
           from pathlib import Path
           directory=Path(os.environ['RUNNER_TEMP'])/'package'
           verify_package(directory)
+          spec=importlib.util.spec_from_file_location('pinned_app_upgrade', directory/'canary_app_upgrade.py')
+          pinned=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(pinned)
           p=directory/'manifest.json'
-          manifest=load_manifest(p.resolve(), os.environ['MANIFEST_SHA256'])
+          manifest=pinned.load_manifest(p.resolve(), os.environ['MANIFEST_SHA256'])
           assert manifest['candidate']==os.environ['CANDIDATE']
           print('PINNED_MANIFEST=PASS')
           PY
