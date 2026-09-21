@@ -1,9 +1,9 @@
 # Canary application-only upgrade and rollback
 
-Scope: current Canary application candidate `629a075a0261d20ff727bed84e2b9fbacdf4900b`
-from switch run 35487804040, database `journey_next_canary_20260901_c72fea5`.
-The application-only package run `35505868688` upgrades this exact deployed
-candidate to `35755a3286607ffd7c0699529d570c67c59ef067`.
+Scope: current Canary application candidate `35755a3286607ffd7c0699529d570c67c59ef067`
+from switch run 35508513778, database `journey_next_canary_20260901_c72fea5`.
+The application-only package run `35559179511` upgrades this exact deployed
+candidate to `9d1ce3d897a6b409dc621fe305ec428e0039f367`.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
 bindings, signing secrets, sessions, allowlist, disabled workers/notifications and edge
@@ -11,15 +11,15 @@ route are retained. No database or volume deletion, restore, migration, grant or
 
 ## Preparation and compatibility gate
 
-1. Review the synchronous submission lock, stable per-attempt idempotency key and updated
-   rollback baseline. Merge through repository gates.
+1. Review the post-completion Learner evidence retest, fixed-result continuity, bounded
+   Operator controls and updated rollback baseline. Merge through repository gates.
 2. Package an exact new commit with `Canary Application-only Package`; it has no ECS/RDS
    credentials and does not deploy. Require successful machine gates and verify the
    downloaded artifact provenance (repository, workflow, run, candidate, attempt).
 3. Compare the artifact checksums against the trusted workflow artifact, not an arbitrary
    file delivered beside the script. Record exact new API/Web digests and candidate.
-4. The compatibility checker permits only the reviewed submission duplicate-prevention
-   web surface to change from the currently deployed application candidate.
+4. The compatibility checker permits only the reviewed post-completion evidence retest
+   API, result and Operator surfaces to change from the deployed application candidate.
    Models, migrations, signing/session/auth core, dependencies, images' Dockerfiles and
    worker code cannot change. This is not approval for a later arbitrary candidate.
 5. Run the runner's `prepare` phase in the ECS root console with manifest path and exact
