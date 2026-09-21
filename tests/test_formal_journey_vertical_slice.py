@@ -596,13 +596,18 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         "ASM-002-MODEL-JUDGEMENT",
         "ASM-003-DATA-CONSTRUCTION",
     ]
-    # Completed route nodes remain readable for reflection even though every
-    # mutation still requires an ACTIVE enrollment through the lock helper.
+    # A fixed result remains available while one learner-evidence station is
+    # temporarily reopened after completion.
+    completed_action = ok(learner.get("/api/v1/me/current-action"))
+    with SessionLocal() as session:
+        completed_enrollment_id = str(
+            session.get(Outcome, uuid.UUID(result["outcome_id"])).enrollment_id
+        )
     completed_day_zero = ok(
         learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
     )
     assert completed_day_zero["status"] == "COMPLETED"
-    assert completed_day_zero["allowed_commands"] == []
+    assert completed_day_zero["allowed_commands"] == ["start_evidence_revision"]
     completed_mutation = learner.post(
         f"/api/v1/me/assignments/{day_zero['id']}/start",
         headers={
@@ -613,16 +618,140 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     )
     assert completed_mutation.status_code == 404
     assert completed_mutation.json()["error"]["code"] == "NOT_FOUND"
-    completed_retest = learner.post(
+    original_version_no = completed_day_zero["submission"]["current_version_no"]
+    completed_retest = ok(learner.post(
         f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/start",
         headers={
             "X-CSRF-Token": learner.cookies["journey_next_csrf"],
             "Idempotency-Key": str(uuid.uuid4()),
         },
         json={"expected_revision": completed_day_zero["revision"]},
+    ))
+    assert completed_retest["status"] == "IN_PROGRESS"
+    reopened_after_completion = ok(
+        learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
     )
-    assert completed_retest.status_code == 404
-    assert completed_retest.json()["error"]["code"] == "NOT_FOUND"
+    assert reopened_after_completion["allowed_commands"] == [
+        "submit_evidence_revision",
+        "cancel_evidence_revision",
+    ]
+    assert ok(learner.get("/api/v1/me/current-action"))["resource_id"] == day_zero["id"]
+    result_during_retest = ok(learner.get("/api/v1/me/result"))
+    assert result_during_retest["outcome_id"] == result["outcome_id"]
+    assert result_during_retest["learning_completion"] == {
+        "status": "COMPLETED",
+        "completed_stages": 8,
+        "total_stages": 8,
+    }
+    assert result_during_retest["active_evidence_retest"] == {
+        "assignment_id": day_zero["id"],
+        "stage_key": "DAY-0",
+    }
+    another_evidence_node = next(
+        node
+        for node in completed_action["journey"]["nodes"]
+        if node["completion_policy"] == "LEARNER_EVIDENCE"
+        and node["assignment_id"] != day_zero["id"]
+    )
+    another_evidence = ok(
+        learner.get(
+            f"/api/v1/me/assignments/{another_evidence_node['assignment_id']}"
+        )
+    )
+    assert another_evidence["allowed_commands"] == []
+    blocked_second_retest = learner.post(
+        f"/api/v1/me/assignments/{another_evidence_node['assignment_id']}/evidence-revision/start",
+        headers={
+            "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_revision": another_evidence["revision"]},
+    )
+    assert blocked_second_retest.status_code == 409
+    assert blocked_second_retest.json()["error"]["code"] == "INVALID_STATE_TRANSITION"
+    ops_during_retest = ok(
+        operator.get("/api/v1/ops/enrollments", headers=OPERATOR_HEADERS)
+    )
+    retest_enrollment = next(
+        item
+        for item in ops_during_retest["items"]
+        if item["id"] == completed_enrollment_id
+    )
+    assert retest_enrollment["status"] == "ACTIVE"
+    assert retest_enrollment["evidence_retest_in_progress"] is True
+    assert retest_enrollment["evidence_retest_assignment_id"] == day_zero["id"]
+    assert retest_enrollment["allowed_commands"] == []
+    blocked_ops_cancel = operator.post(
+        f"/api/v1/ops/enrollments/{completed_enrollment_id}/cancel",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={
+            "expected_revision": retest_enrollment["revision"],
+            "reason": "结营后重测期间不得取消 Enrollment",
+        },
+    )
+    assert blocked_ops_cancel.status_code == 409
+    blocked_reentry = operator.post(
+        f"/api/v1/ops/enrollments/{completed_enrollment_id}/learner-reentry",
+        headers={
+            **OPERATOR_HEADERS,
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={
+            "expected_revision": retest_enrollment["revision"],
+            "expires_in_minutes": 30,
+            "reason": "结营后重测期间不得创建重新进入链接",
+        },
+    )
+    assert blocked_reentry.status_code == 409
+
+    cancelled_after_completion = ok(
+        learner.post(
+            f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/cancel",
+            headers={
+                "X-CSRF-Token": learner.cookies["journey_next_csrf"],
+                "Idempotency-Key": str(uuid.uuid4()),
+            },
+            json={"expected_revision": reopened_after_completion["revision"]},
+        )
+    )
+    assert cancelled_after_completion["status"] == "COMPLETED"
+    restored_after_cancel = ok(
+        learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
+    )
+    assert restored_after_cancel["submission"]["current_version_no"] == original_version_no
+    assert restored_after_cancel["allowed_commands"] == ["start_evidence_revision"]
+    assert ok(learner.get("/api/v1/me/result"))["active_evidence_retest"] is None
+
+    reopened_for_submission = post(
+        learner,
+        f"/api/v1/me/assignments/{day_zero['id']}/evidence-revision/start",
+        json={"expected_revision": restored_after_cancel["revision"]},
+    )
+    post_completion_body = (
+        "这是结营后重新测试形成的新版本；原正式评测结论保持不变，"
+        "本次只补充自证站的最新观察与下一步行动。"
+    )
+    submitted_after_completion = post(
+        learner,
+        f"/api/v1/me/assignments/{day_zero['id']}/submissions",
+        json={
+            "expected_revision": reopened_for_submission["revision"],
+            "body": post_completion_body,
+        },
+    )
+    assert submitted_after_completion["version_no"] == original_version_no + 1
+    final_day_zero = ok(
+        learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
+    )
+    assert final_day_zero["status"] == "COMPLETED"
+    assert final_day_zero["allowed_commands"] == ["start_evidence_revision"]
+    final_result = ok(learner.get("/api/v1/me/result"))
+    assert final_result["outcome_id"] == result["outcome_id"]
+    assert final_result["reviewer_conclusion"] == result["reviewer_conclusion"]
+    assert final_result["active_evidence_retest"] is None
     with SessionLocal() as session:
         enrollment = session.scalar(
             select(Enrollment).where(

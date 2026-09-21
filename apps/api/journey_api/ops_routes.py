@@ -18,6 +18,7 @@ from journey_api.formal_assignment_workflow import (
     transition_formal_assignment,
 )
 from journey_api.idempotency import find_replay, store_result
+from journey_api.journey_service import active_post_completion_evidence_retest
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -567,13 +568,21 @@ def list_enrollments(
             .order_by(Assignment.position)
         ).all()
         open_review = open_review_for_enrollment(session, enrollment, for_update=False)
+        evidence_retest = active_post_completion_evidence_retest(session, enrollment)
         allowed: list[str] = []
-        if enrollment.status in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
+        if (
+            evidence_retest is None
+            and enrollment.status
+            in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}
+        ):
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
             elif open_review.status == ReviewStatus.ASSIGNED:
                 allowed = ["handoff_assigned_review"]
-        if enrollment.status == EnrollmentStatus.ACTIVE:
+        if (
+            evidence_retest is None
+            and enrollment.status == EnrollmentStatus.ACTIVE
+        ):
             allowed.append("create_learner_reentry")
         items.append(
             EnrollmentOpsOut(
@@ -588,6 +597,13 @@ def list_enrollments(
                 assignment_statuses=[item.status.value for item in assignments],
                 open_review_status=open_review.status.value if open_review else None,
                 open_review_revision=open_review.revision if open_review else None,
+                evidence_retest_in_progress=evidence_retest is not None,
+                evidence_retest_assignment_id=(
+                    evidence_retest.assignment_id if evidence_retest else None
+                ),
+                evidence_retest_stage_key=(
+                    evidence_retest.stage_key if evidence_retest else None
+                ),
                 allowed_commands=allowed,
             )
         )
@@ -620,6 +636,8 @@ def assign_reviewer(
         return envelope(request, EnrollmentMutationOut(**replay))
     enrollment = scoped_enrollment(session, actor, enrollment_id, for_update=True)
     ensure_revision(enrollment.revision, command.expected_revision)
+    if active_post_completion_evidence_retest(session, enrollment) is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "结营后重测期间不能更换主管。")
     if enrollment.status not in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前 Enrollment 不能更换主管。")
     if enrollment.reviewer_id == command.reviewer_id:
@@ -791,6 +809,8 @@ def handoff_assigned_review(
         return envelope(request, EnrollmentMutationOut(**replay))
     enrollment = scoped_enrollment(session, actor, enrollment_id, for_update=True)
     ensure_revision(enrollment.revision, command.expected_revision)
+    if active_post_completion_evidence_retest(session, enrollment) is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "结营后重测期间不能移交评审。")
     review = open_review_for_enrollment(session, enrollment, for_update=True)
     if review is None or review.status != ReviewStatus.ASSIGNED:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "仅允许移交尚未开始的待评审记录。")
@@ -881,6 +901,8 @@ def cancel_enrollment(
         return envelope(request, EnrollmentMutationOut(**replay))
     enrollment = scoped_enrollment(session, actor, enrollment_id, for_update=True)
     ensure_revision(enrollment.revision, command.expected_revision)
+    if active_post_completion_evidence_retest(session, enrollment) is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "结营后重测期间不能取消 Enrollment。")
     if enrollment.status not in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前 Enrollment 不能取消。")
     open_review = open_review_for_enrollment(session, enrollment, for_update=True)

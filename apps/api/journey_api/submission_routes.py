@@ -30,7 +30,14 @@ from journey_api.formal_assignment_workflow import (
 )
 from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import ensure_required_materials_completed
-from journey_api.journey_service import assignment_stage, lock_active_learner_assignment
+from journey_api.journey_service import (
+    active_post_completion_evidence_retest,
+    assignment_stage,
+    enrollment_has_outcome,
+    formal_journey_is_complete,
+    lock_active_learner_assignment,
+    restore_completed_enrollment_after_evidence_retest,
+)
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -113,10 +120,10 @@ def lock_learner_assignment(
     return assignment
 
 
-def lock_active_owned_assignment(
+def lock_owned_assignment_for_evidence_revision(
     session: Session, actor: Actor, assignment_id: uuid.UUID
 ) -> tuple[Assignment, Enrollment]:
-    """Lock an assignment in an active enrollment without requiring it to be current."""
+    """Lock a learner-owned assignment in an active or completed enrollment."""
     enrollment = session.scalar(
         select(Enrollment)
         .join(Assignment, Assignment.enrollment_id == Enrollment.id)
@@ -125,7 +132,9 @@ def lock_active_owned_assignment(
             Assignment.organization_id == actor.organization_id,
             Enrollment.organization_id == actor.organization_id,
             Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
+            Enrollment.status.in_(
+                (EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+            ),
         )
         .with_for_update(of=Enrollment)
     )
@@ -689,7 +698,7 @@ def start_evidence_revision(
     )
     if replay is not None:
         return envelope(request, CommandOut(**replay))
-    assignment, _enrollment = lock_active_owned_assignment(
+    assignment, enrollment = lock_owned_assignment_for_evidence_revision(
         session, actor, assignment_id
     )
     replay = find_replay(
@@ -731,6 +740,25 @@ def start_evidence_revision(
     )
     if existing_draft is not None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点已有未完成草稿。")
+    if enrollment.status == EnrollmentStatus.COMPLETED:
+        if not enrollment_has_outcome(session, enrollment) or not formal_journey_is_complete(
+            session, enrollment
+        ):
+            raise ApiError(
+                409,
+                "INVALID_STATE_TRANSITION",
+                "只有已生成固定结果的完整旅程可以在结营后重新测试。",
+            )
+        enrollment.status = EnrollmentStatus.ACTIVE
+        enrollment.revision += 1
+    elif enrollment_has_outcome(session, enrollment):
+        active_retest = active_post_completion_evidence_retest(session, enrollment)
+        if active_retest is not None:
+            raise ApiError(
+                409,
+                "INVALID_STATE_TRANSITION",
+                "结营后一次只能重新测试一个自证站点。",
+            )
     session.add(
         SubmissionDraft(
             id=uuid.uuid4(),
@@ -770,7 +798,10 @@ def start_evidence_revision(
         action="journey_stage.evidence_revision_started",
         resource_type="assignment",
         resource_id=assignment.id,
-        details={"source_version_no": submission.current_version_no},
+        details={
+            "source_version_no": submission.current_version_no,
+            "post_completion_retest": enrollment_has_outcome(session, enrollment),
+        },
     )
     session.commit()
     return envelope(request, CommandOut(**result))
@@ -822,11 +853,24 @@ def cancel_evidence_revision(
         or submission.current_version_no < 1
     ):
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点没有可取消的重新测试。")
+    enrollment = session.get(Enrollment, assignment.enrollment_id)
+    if enrollment is None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
+    post_completion_retest = active_post_completion_evidence_retest(
+        session, enrollment
+    )
+    if (
+        post_completion_retest is not None
+        and post_completion_retest.assignment_id != assignment.id
+    ):
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点不是正在进行的结营后重测。")
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
     )
     assignment.status = AssignmentStatus.COMPLETED
     assignment.revision += 1
+    if post_completion_retest is not None:
+        restore_completed_enrollment_after_evidence_retest(session, enrollment)
     result = {
         "resource_id": str(assignment.id),
         "status": assignment.status.value,
@@ -954,6 +998,16 @@ def submit_assignment(
         stage is not None
         and stage.completion_policy == JourneyCompletionPolicy.LEARNER_EVIDENCE
     )
+    post_completion_retest = (
+        active_post_completion_evidence_retest(session, enrollment)
+        if learner_evidence
+        else None
+    )
+    if (
+        post_completion_retest is not None
+        and post_completion_retest.assignment_id != assignment.id
+    ):
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点不是正在进行的结营后重测。")
     if learner_evidence and assignment.status == AssignmentStatus.NEEDS_REVISION:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "认知证据阶段不进入评审修订。")
     if not learner_evidence:
@@ -993,6 +1047,8 @@ def submit_assignment(
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
     )
+    if post_completion_retest is not None:
+        restore_completed_enrollment_after_evidence_retest(session, enrollment)
     result = SubmissionMutationOut(
         assignment_id=assignment.id,
         assignment_status=public_assignment_status(

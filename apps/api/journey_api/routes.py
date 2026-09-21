@@ -25,7 +25,10 @@ from journey_api.learning_materials import (
     reviewable_material_links,
 )
 from journey_api.journey_service import (
+    active_post_completion_evidence_retest,
+    enrollment_has_outcome,
     formal_admission_scorecard,
+    formal_journey_is_complete,
     journey_stages,
     lock_active_learner_assignment,
     publish_catalog_journey,
@@ -1157,18 +1160,42 @@ def assignment_detail(
     submission, draft, available_attachments, latest_feedback = assignment_workspace(
         session, actor, assignment.id
     )
+    post_completion_retest = active_post_completion_evidence_retest(
+        session, enrollment
+    )
+    completed_enrollment_can_retest = (
+        enrollment.status == EnrollmentStatus.COMPLETED
+        and enrollment_has_outcome(session, enrollment)
+        and formal_journey_is_complete(session, enrollment)
+    )
     if assignment.status == AssignmentStatus.CANCELLED:
         commands: tuple[str, ...] = ()
     elif (
-        enrollment.status == EnrollmentStatus.ACTIVE
+        enrollment.status in {EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED}
         and journey_stage is not None
         and journey_stage.completion_policy is JourneyCompletionPolicy.LEARNER_EVIDENCE
         and submission is not None
     ):
         if assignment.status == AssignmentStatus.COMPLETED:
-            commands = ("start_evidence_revision",)
+            commands = (
+                ("start_evidence_revision",)
+                if post_completion_retest is None
+                and (
+                    enrollment.status == EnrollmentStatus.ACTIVE
+                    or completed_enrollment_can_retest
+                )
+                else ()
+            )
         elif assignment.status == AssignmentStatus.IN_PROGRESS:
-            commands = ("submit_evidence_revision", "cancel_evidence_revision")
+            commands = (
+                ("submit_evidence_revision", "cancel_evidence_revision")
+                if enrollment.status == EnrollmentStatus.ACTIVE
+                and (
+                    post_completion_retest is None
+                    or post_completion_retest.assignment_id == assignment.id
+                )
+                else ()
+            )
         else:
             commands = assignment_action(assignment.status)[4]
     else:

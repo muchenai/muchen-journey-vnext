@@ -91,6 +91,7 @@ def test_browser_result_cannot_be_misreported_as_real_journey_uat() -> None:
         "ai_self_check_skip=PASS",
         "visible_task_brief=3_viewports",
         "evidence_retest=triple_click_one_post+version_2+explicit_retest_version_3",
+        "post_completion_evidence_retest=result_preserved+ops_blocked+cancel_restored+version_2",
         "fixture=synthetic",
         "external_access=not_proven",
         "human_uat=not_run",
@@ -112,3 +113,13 @@ def test_evidence_retest_triple_click_emits_one_post_and_explicit_retry_is_new()
     assert "submissionPostCount !== 1" in script
     assert "submitted=retest&version=2" in script
     assert "submitted=retest&version=3" in script
+
+
+def test_completed_journey_browser_flow_preserves_result_and_restores_completion() -> None:
+    script = (ROOT / "scripts/p0_journey_v3_browser.sh").read_text(encoding="utf-8")
+
+    assert "一项自证站正在重新测试" in script
+    assert "当前结果基于上一次完整完成记录" in script
+    assert "本轮结束前暂停 Enrollment 运营命令" in script
+    assert "确认取消并丢弃草稿" in script
+    assert "07-post-completion-retest-restored.png" in script

@@ -32,6 +32,7 @@ from journey_api.models import (
     ModuleContentPackageBinding,
     Review,
     Outcome,
+    SubmissionDraft,
     TaskDefinition,
     TaskDefinitionStatus,
     TaskVersion,
@@ -42,6 +43,12 @@ from journey_api.models import (
 class FormalEvaluationEvidence:
     stage: JourneyStageVersion
     evaluation: Evaluation
+
+
+@dataclass(frozen=True)
+class ActiveEvidenceRetest:
+    assignment_id: uuid.UUID
+    stage_key: str
 
 
 FORMAL_V3_STAGE_KEYS = (
@@ -577,6 +584,63 @@ def formal_journey_is_complete(session: Session, enrollment: Enrollment) -> bool
     return expected == 8 and completed == expected and len(
         formal_evaluation_evidence(session, enrollment)
     ) == 3
+
+
+def enrollment_has_outcome(session: Session, enrollment: Enrollment) -> bool:
+    return session.scalar(
+        select(Outcome.id).where(
+            Outcome.enrollment_id == enrollment.id,
+            Outcome.organization_id == enrollment.organization_id,
+            Outcome.learner_id == enrollment.learner_id,
+        )
+    ) is not None
+
+
+def active_post_completion_evidence_retest(
+    session: Session, enrollment: Enrollment
+) -> ActiveEvidenceRetest | None:
+    if enrollment.status != EnrollmentStatus.ACTIVE or not enrollment_has_outcome(
+        session, enrollment
+    ):
+        return None
+    row = session.execute(
+        select(Assignment.id, JourneyStageVersion.stable_key)
+        .join(
+            JourneyStageVersion,
+            JourneyStageVersion.id == Assignment.journey_stage_version_id,
+        )
+        .join(SubmissionDraft, SubmissionDraft.assignment_id == Assignment.id)
+        .where(
+            Assignment.enrollment_id == enrollment.id,
+            Assignment.organization_id == enrollment.organization_id,
+            Assignment.status == AssignmentStatus.IN_PROGRESS,
+            JourneyStageVersion.organization_id == enrollment.organization_id,
+            JourneyStageVersion.completion_policy
+            == JourneyCompletionPolicy.LEARNER_EVIDENCE,
+        )
+        .order_by(Assignment.position, Assignment.id)
+    ).first()
+    if row is None:
+        return None
+    assignment_id, stage_key = row
+    return ActiveEvidenceRetest(assignment_id=assignment_id, stage_key=stage_key)
+
+
+def restore_completed_enrollment_after_evidence_retest(
+    session: Session, enrollment: Enrollment
+) -> bool:
+    if not enrollment_has_outcome(session, enrollment):
+        return False
+    session.flush()
+    if not formal_journey_is_complete(session, enrollment):
+        raise ApiError(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "重新测试结束后未能恢复完整旅程状态。",
+        )
+    enrollment.status = EnrollmentStatus.COMPLETED
+    enrollment.revision += 1
+    return True
 
 
 def formal_admission_scorecard(

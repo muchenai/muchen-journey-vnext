@@ -17,6 +17,7 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import canonical_hash, find_replay, store_result
 from journey_api.journey_service import (
+    active_post_completion_evidence_retest,
     create_journey_assignments,
     invitable_journey_stages,
 )
@@ -599,6 +600,12 @@ def create_learner_reentry(
     if enrollment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的 Enrollment。")
     ensure_revision(enrollment.revision, command.expected_revision)
+    if active_post_completion_evidence_retest(session, enrollment) is not None:
+        raise ApiError(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "结营后重测期间不能创建重新进入链接。",
+        )
     if enrollment.status != EnrollmentStatus.ACTIVE:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "只有进行中的 Enrollment 可以重新进入。")
     learner = session.scalar(

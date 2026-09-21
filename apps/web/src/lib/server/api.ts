@@ -287,6 +287,10 @@ export type Result = {
     completed_stages: number;
     total_stages: number;
   };
+  active_evidence_retest: {
+    assignment_id: string;
+    stage_key: string;
+  } | null;
   reviewer_conclusion: {
     status: "FINALIZED";
     decision: "PASS";
@@ -562,6 +566,9 @@ export type OpsEnrollment = {
   assignment_statuses: string[];
   open_review_status: string | null;
   open_review_revision: number | null;
+  evidence_retest_in_progress: boolean;
+  evidence_retest_assignment_id: string | null;
+  evidence_retest_stage_key: string | null;
   allowed_commands: string[];
 };
 
