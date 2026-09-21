@@ -261,6 +261,11 @@ export default async function OpsPage({
                   已有 {enrollment.open_review_status} Review；仅尚未开始的 ASSIGNED 评审允许受控移交，其他状态继续阻断。
                 </p>
               ) : null}
+              {enrollment.evidence_retest_in_progress ? (
+                <p className="notice" role="status">
+                  结营后重测中 · {enrollment.evidence_retest_stage_key ?? "自证站点"}。原正式结果保持只读；本轮结束前暂停 Enrollment 运营命令。
+                </p>
+              ) : null}
               {enrollment.status === "COMPLETED" ? (
                 <p>下一训练阶段决定尚未启用；当前运营页不提供该高影响决定入口。</p>
               ) : null}

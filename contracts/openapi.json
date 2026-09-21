@@ -8663,6 +8663,34 @@
             ],
             "title": "Open Review Revision"
           },
+          "evidence_retest_in_progress": {
+            "type": "boolean",
+            "title": "Evidence Retest In Progress",
+            "default": false
+          },
+          "evidence_retest_assignment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Retest Assignment Id"
+          },
+          "evidence_retest_stage_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Retest Stage Key"
+          },
           "allowed_commands": {
             "items": {
               "type": "string"
@@ -12739,6 +12767,16 @@
           "learning_completion": {
             "$ref": "#/components/schemas/ResultLearningCompletionOut"
           },
+          "active_evidence_retest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveEvidenceRetestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reviewer_conclusion": {
             "$ref": "#/components/schemas/ResultReviewerConclusionOut"
           },
@@ -15486,6 +15524,26 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ActiveEvidenceRetestOut": {
+        "properties": {
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "stage_key": {
+            "type": "string",
+            "title": "Stage Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "stage_key"
+        ],
+        "title": "ActiveEvidenceRetestOut"
       }
     }
   }

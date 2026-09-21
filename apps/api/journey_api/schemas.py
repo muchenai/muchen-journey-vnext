@@ -1060,6 +1060,9 @@ class EnrollmentOpsOut(StrictModel):
     assignment_statuses: list[str]
     open_review_status: str | None
     open_review_revision: int | None
+    evidence_retest_in_progress: bool = False
+    evidence_retest_assignment_id: UUID | None = None
+    evidence_retest_stage_key: str | None = None
     allowed_commands: list[str]
 
 
@@ -1755,6 +1758,11 @@ class ResultLearningCompletionOut(StrictModel):
     total_stages: int = Field(ge=1)
 
 
+class ActiveEvidenceRetestOut(StrictModel):
+    assignment_id: UUID
+    stage_key: str
+
+
 class ResultReviewerConclusionOut(StrictModel):
     status: Literal["FINALIZED"] = "FINALIZED"
     decision: Literal["PASS"] = "PASS"
@@ -1908,6 +1916,7 @@ class ResultOut(StrictModel):
     status: str
     summary: str
     learning_completion: ResultLearningCompletionOut
+    active_evidence_retest: ActiveEvidenceRetestOut | None = None
     reviewer_conclusion: ResultReviewerConclusionOut
     next_training_stage: ResultNextTrainingStageOut
     evaluation: ResultEvaluationOut

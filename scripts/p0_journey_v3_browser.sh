@@ -944,6 +944,74 @@ pw_learner run-code "async (page) => {
 }"
 pw_learner screenshot --filename "$evidence_dir/03-journey-details.png" --full-page
 
+# A completed journey keeps its fixed result while one learner-evidence stage is
+# temporarily reopened, then returns to COMPLETED after cancel or submission.
+pw_learner run-code "async (page) => {
+  await page.getByRole('link', {name: '回看启程'}).click();
+  await page.waitForURL('**/app/tasks/**');
+  await page.waitForLoadState('networkidle');
+  if (await page.getByRole('button', {name: '修改并重新测试'}).count() !== 1) {
+    throw new Error('completed journey no longer exposes learner-evidence retest');
+  }
+  await page.getByRole('button', {name: '修改并重新测试'}).click();
+  await page.waitForURL('**?revision=retest*');
+  await page.goto('$base_url/app/result');
+  await page.waitForLoadState('networkidle');
+  const body = await page.locator('body').innerText();
+  if (!body.includes('一项自证站正在重新测试')
+      || !body.includes('当前结果基于上一次完整完成记录')
+      || !body.toUpperCase().includes('JOURNEY 8 / 8')) {
+    throw new Error('fixed result is unavailable or unlabelled during post-completion retest');
+  }
+  await page.screenshot({path: '$evidence_dir/07-post-completion-retest-result.png', fullPage: true});
+}"
+
+pw_operator goto "$base_url/ops"
+pw_operator run-code "async (page) => {
+  await page.waitForLoadState('networkidle');
+  const enrollment = page.locator('.ops-enrollment').filter({hasText: 'P0 Browser Learner'}).first();
+  const text = await enrollment.innerText();
+  if (!text.includes('结营后重测中') || !text.includes('本轮结束前暂停 Enrollment 运营命令')) {
+    throw new Error('operator page does not expose the post-completion retest state');
+  }
+  if (await enrollment.locator('.ops-command-form').count()) {
+    throw new Error('operator commands remain available during post-completion retest');
+  }
+}"
+
+pw_learner run-code "async (page) => {
+  await page.getByRole('link', {name: '返回正在重测的站点'}).click();
+  await page.waitForURL('**/app/tasks/**');
+  await page.getByText('取消重新测试', {exact: true}).click();
+  await page.getByRole('button', {name: '确认取消并丢弃草稿'}).click();
+  await page.waitForURL('**?revision=cancelled*');
+  await page.waitForLoadState('networkidle');
+  if (await page.getByRole('button', {name: '修改并重新测试'}).count() !== 1) {
+    throw new Error('cancel did not restore the completed learner-evidence stage');
+  }
+  await page.getByRole('button', {name: '修改并重新测试'}).click();
+  await page.waitForURL('**?revision=retest*');
+  const input = page.locator('#submission-body');
+  await input.fill((await input.inputValue()) + ' 结营后重测补充：保留原结果，只更新本自证站证据。');
+  await page.getByRole('button', {name: '检查并重新提交'}).click();
+  await page.getByRole('button', {name: '确认重新提交'}).click();
+  await page.waitForURL('**?submitted=retest&version=2#retest-success');
+  await page.waitForLoadState('networkidle');
+  const receipt = await page.locator('#retest-success').innerText();
+  if (!receipt.includes('重新提交成功，Version 2 已保存')) {
+    throw new Error('post-completion retest did not create the next immutable version');
+  }
+  await page.goto('$base_url/app/result');
+  await page.waitForLoadState('networkidle');
+  const restored = await page.locator('body').innerText();
+  if (restored.includes('一项自证站正在重新测试')
+      || !restored.toUpperCase().includes('JOURNEY 8 / 8')
+      || !restored.includes('探索营通过')) {
+    throw new Error('post-completion submission did not restore the fixed completed result');
+  }
+  await page.screenshot({path: '$evidence_dir/07-post-completion-retest-restored.png', fullPage: true});
+}"
+
 pw_learner console error
 pw_reviewer console error
 pw_operator console error
@@ -952,4 +1020,4 @@ if grep -Eiq '(\[error\]|console\.error|uncaught|pageerror|^Error:|Errors: [1-9]
     exit 2
 fi
 
-printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 completed_material_reopen=PASS ai_self_check_skip=PASS visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=triple_click_one_post+version_2+explicit_retest_version_3+draft_feedback+3_viewports stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
+printf '%s\n' "P0_JOURNEY_V3_BROWSER=PASS fixture=synthetic invite=one_step invite_statuses=3 recovery=invalid_invite+service_failure+expired_session reentry=new_browser old_session=revoked learner_ops_denied=PASS day_zero_review_queue=EMPTY timezone=Asia/Shanghai formal_review_route=/review material_links=8 completed_material_reopen=PASS ai_self_check_skip=PASS visible_task_brief=3_viewports visible_task_brief_stages=8 route_geometry=3_viewports evidence_retest=triple_click_one_post+version_2+explicit_retest_version_3+draft_feedback+3_viewports post_completion_evidence_retest=result_preserved+ops_blocked+cancel_restored+version_2 stages=8 revision=resubmitted reviewer=complete external_access=not_proven human_uat=not_run"
