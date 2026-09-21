@@ -5884,6 +5884,81 @@
           }
         }
       }
+    },
+    "/api/v1/reviews/history": {
+      "get": {
+        "summary": "Review History",
+        "operationId": "review_history_api_v1_reviews_history_get",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15544,6 +15619,116 @@
           "stage_key"
         ],
         "title": "ActiveEvidenceRetestOut"
+      },
+      "ReviewHistoryItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "learner_name": {
+            "type": "string",
+            "title": "Learner Name"
+          },
+          "journey_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Title"
+          },
+          "task_title": {
+            "type": "string",
+            "title": "Task Title"
+          },
+          "submission_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Submission Version Id"
+          },
+          "submission_version_no": {
+            "type": "integer",
+            "title": "Submission Version No"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED"
+            ],
+            "title": "Decision"
+          },
+          "finalized_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Finalized At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "learner_name",
+          "journey_title",
+          "task_title",
+          "submission_version_id",
+          "submission_version_no",
+          "decision",
+          "finalized_at"
+        ],
+        "title": "ReviewHistoryItemOut"
+      },
+      "ReviewHistoryOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewHistoryItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ReviewHistoryOut"
+      },
+      "ReviewHistoryResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReviewHistoryOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ReviewHistoryResponse"
       }
     }
   }

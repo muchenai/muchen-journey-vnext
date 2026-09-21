@@ -5,6 +5,7 @@ import test from "node:test";
 const queue = await readFile(new URL("../src/app/review/page.tsx", import.meta.url), "utf8");
 const detail = await readFile(new URL("../src/app/review/[reviewId]/page.tsx", import.meta.url), "utf8");
 const workbench = await readFile(new URL("../src/app/review/[reviewId]/review-workbench.tsx", import.meta.url), "utf8");
+const characterProgress = await readFile(new URL("../src/app/character-progress.tsx", import.meta.url), "utf8");
 const ops = await readFile(new URL("../src/app/ops/page.tsx", import.meta.url), "utf8");
 const types = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
 
@@ -42,4 +43,23 @@ test("successful empty queue is distinct from unavailable data", () => {
   assert.match(queue, /自证站提交后直接完成，不进入人工评审队列/);
   assert.match(queue, /正式能力评测/);
   assert.match(queue, /运营工作台检查 Enrollment/);
+});
+
+test("finalized reviews remain visible after the active queue is refreshed", () => {
+  assert.match(queue, /\/api\/v1\/reviews\/history/);
+  assert.match(queue, /已完成评审/);
+  assert.match(queue, /已通过/);
+  assert.match(detail, /审核结果提交成功/);
+  assert.match(detail, /刷新后仍会保留/);
+});
+
+test("reviewer feedback shows live bounded character progress", () => {
+  assert.match(workbench, /<CharacterProgress/);
+  assert.match(workbench, /minimum=\{5\}/);
+  assert.match(workbench, /maximum=\{500\}/);
+  assert.match(workbench, /minimum=\{10\}/);
+  assert.match(workbench, /maximum=\{2000\}/);
+  assert.match(characterProgress, /已输入 \{count\} 个有效字符/);
+  assert.match(characterProgress, /还差/);
+  assert.match(characterProgress, /已超出/);
 });

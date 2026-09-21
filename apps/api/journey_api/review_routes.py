@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy import and_, case, or_, select
 from sqlalchemy.orm import Session
 
@@ -35,6 +38,7 @@ from journey_api.models import (
     EnrollmentStatus,
     Evaluation,
     JourneyStageVersion,
+    JourneyVersion,
     OutboxEvent,
     OutboxStatus,
     Review,
@@ -55,6 +59,9 @@ from journey_api.schemas import (
     ReviewAttachmentOut,
     ReviewDetailOut,
     ReviewDetailResponse,
+    ReviewHistoryItemOut,
+    ReviewHistoryOut,
+    ReviewHistoryResponse,
     ReviewMaterialOut,
     ReviewMutationOut,
     ReviewMutationResponse,
@@ -352,6 +359,34 @@ def add_audit(
     )
 
 
+def encode_history_cursor(finalized_at: datetime, review_id: uuid.UUID) -> str:
+    payload = json.dumps(
+        {"finalized_at": finalized_at.isoformat(), "review_id": str(review_id)},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def decode_history_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+        finalized_at = datetime.fromisoformat(payload["finalized_at"])
+        review_id = uuid.UUID(payload["review_id"])
+        if finalized_at.tzinfo is None:
+            raise ValueError("cursor timestamp must include a timezone")
+        return finalized_at, review_id
+    except (
+        binascii.Error,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
+        raise ApiError(400, "INVALID_CURSOR", "评审历史分页标识无效，请重新打开评审页。") from None
+
+
 @router.get("/reviews", response_model=ReviewQueueResponse)
 def review_queue(
     request: Request,
@@ -407,6 +442,81 @@ def review_queue(
         context = ReviewContext(*row, None)
         items.append(queue_item(session, context))
     return envelope(request, ReviewQueueOut(items=items))
+
+
+@router.get("/reviews/history", response_model=ReviewHistoryResponse)
+def review_history(
+    request: Request,
+    cursor: str | None = Query(default=None, max_length=512),
+    limit: int = Query(default=20, ge=1, le=50),
+    actor: Actor = Depends(get_actor),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_role(actor, Role.REVIEWER)
+    statement = (
+        select(Review, Evaluation, SubmissionVersion, Enrollment, User, TaskVersion, JourneyVersion)
+        .join(Evaluation, Evaluation.review_id == Review.id)
+        .join(Assignment, Assignment.id == Review.assignment_id)
+        .join(Submission, Submission.id == Review.submission_id)
+        .join(SubmissionVersion, SubmissionVersion.id == Review.submission_version_id)
+        .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
+        .join(User, User.id == Enrollment.learner_id)
+        .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
+        .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .outerjoin(
+            JourneyStageVersion,
+            and_(
+                JourneyStageVersion.id == Assignment.journey_stage_version_id,
+                JourneyStageVersion.organization_id == Assignment.organization_id,
+            ),
+        )
+        .outerjoin(
+            JourneyVersion,
+            and_(
+                JourneyVersion.id == Enrollment.journey_version_id,
+                JourneyVersion.organization_id == actor.organization_id,
+            ),
+        )
+        .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
+        .where(
+            Review.organization_id == actor.organization_id,
+            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
+            Review.status == ReviewStatus.FINALIZED,
+            Review.finalized_at.is_not(None),
+            *scoped_review_lineage(actor),
+        )
+    )
+    if cursor is not None:
+        cursor_time, cursor_id = decode_history_cursor(cursor)
+        statement = statement.where(
+            or_(
+                Review.finalized_at < cursor_time,
+                and_(Review.finalized_at == cursor_time, Review.id < cursor_id),
+            )
+        )
+    rows = session.execute(
+        statement.order_by(Review.finalized_at.desc(), Review.id.desc()).limit(limit + 1)
+    ).all()
+    has_more = len(rows) > limit
+    visible_rows = rows[:limit]
+    items = [
+        ReviewHistoryItemOut(
+            id=review.id,
+            learner_name=learner.display_name,
+            journey_title=journey.title if journey is not None else None,
+            task_title=task.title,
+            submission_version_id=version.id,
+            submission_version_no=version.version_no,
+            decision=evaluation.decision.value,
+            finalized_at=review.finalized_at,
+        )
+        for review, evaluation, version, _enrollment, learner, task, journey in visible_rows
+    ]
+    next_cursor = None
+    if has_more and visible_rows:
+        last_review = visible_rows[-1][0]
+        next_cursor = encode_history_cursor(last_review.finalized_at, last_review.id)
+    return envelope(request, ReviewHistoryOut(items=items, next_cursor=next_cursor))
 
 
 @router.get("/reviews/{review_id}", response_model=ReviewDetailResponse)

@@ -27,6 +27,11 @@ class SubmissionCommand(RevisionCommand):
         default_factory=lambda: AiUseDisclosure(used=False)
     )
 
+    @field_validator("body", mode="before")
+    @classmethod
+    def normalize_submission_body(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("attachment_ids")
     @classmethod
     def unique_submission_attachments(cls, values: list[UUID]) -> list[UUID]:
@@ -38,6 +43,11 @@ class SubmissionCommand(RevisionCommand):
 class SaveSubmissionDraftCommand(RevisionCommand):
     body: str = Field(default="", max_length=8_000)
     attachment_ids: list[UUID] = Field(default_factory=list, max_length=5)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def normalize_draft_body(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("attachment_ids")
     @classmethod
@@ -78,10 +88,10 @@ class RubricEvaluationCommand(StrictModel):
     score: int | None = Field(default=None, ge=0, le=15)
     feedback: str = Field(min_length=5, max_length=500)
 
-    @field_validator("feedback")
+    @field_validator("feedback", mode="before")
     @classmethod
-    def normalize_feedback(cls, value: str) -> str:
-        return value.strip()
+    def normalize_feedback(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class FinalizeReviewCommand(RevisionCommand):
@@ -94,10 +104,10 @@ class FinalizeReviewCommand(RevisionCommand):
         default_factory=lambda: AiUseDisclosure(used=False)
     )
 
-    @field_validator("overall_feedback")
+    @field_validator("overall_feedback", mode="before")
     @classmethod
-    def normalize_overall_feedback(cls, value: str) -> str:
-        return value.strip()
+    def normalize_overall_feedback(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def validate_rubric_dimensions(self) -> "FinalizeReviewCommand":
@@ -1367,6 +1377,27 @@ class ReviewQueueOut(StrictModel):
 
 class ReviewQueueResponse(StrictModel):
     data: ReviewQueueOut
+    request_id: str
+
+
+class ReviewHistoryItemOut(StrictModel):
+    id: UUID
+    learner_name: str
+    journey_title: str | None
+    task_title: str
+    submission_version_id: UUID
+    submission_version_no: int
+    decision: Literal["PASS", "REVISION_REQUIRED"]
+    finalized_at: datetime
+
+
+class ReviewHistoryOut(StrictModel):
+    items: list[ReviewHistoryItemOut]
+    next_cursor: str | None
+
+
+class ReviewHistoryResponse(StrictModel):
+    data: ReviewHistoryOut
     request_id: str
 
 

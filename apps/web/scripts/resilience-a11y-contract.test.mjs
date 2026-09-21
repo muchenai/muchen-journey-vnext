@@ -30,7 +30,7 @@ test("submission locks synchronously and only unlocks after a confirmed failure"
 test("formal confirmation and errors receive programmatic focus with described fields", () => {
   assert.match(composer, /confirmationHeadingRef/);
   assert.match(composer, /errorRef/);
-  assert.match(composer, /aria-describedby="submission-body-help submission-save-status"/);
+  assert.match(composer, /aria-describedby="submission-body-help submission-body-progress submission-save-status"/);
   assert.match(composer, /tabIndex=\{-1\}/);
   assert.match(globalError, /errorHeadingRef/);
   assert.match(workbench, /errorRef/);

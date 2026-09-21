@@ -38,7 +38,7 @@ export default async function ReviewPage({
   searchParams,
 }: {
   params: Promise<{ reviewId: string }>;
-  searchParams: Promise<{ started?: string }>;
+  searchParams: Promise<{ started?: string; finalized?: string }>;
 }) {
   const { reviewId } = await params;
   const query = await searchParams;
@@ -67,6 +67,13 @@ export default async function ReviewPage({
       </p>
       {query.started === "yes" ? (
         <p className="success-text" role="status">评审已开始，任务状态已同步为评审中。</p>
+      ) : null}
+      {query.finalized && review.evaluation ? (
+        <p className="success-text" role="status">
+          {query.finalized === "approved"
+            ? "审核结果提交成功：通过结论已定稿，刷新后仍会保留。"
+            : "审核结果提交成功：修订结论已定稿，刷新后仍会保留。"}
+        </p>
       ) : null}
 
       <section className="review-section" aria-labelledby="task-context-title">

@@ -1,12 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   finalizeReview,
   ReviewActionState,
   startReview,
 } from "@/app/actions";
+import { CharacterProgress } from "@/app/character-progress";
+import { textLengthIsValid } from "@/lib/text-length";
 
 const INITIAL_STATE: ReviewActionState = {};
 
@@ -65,6 +67,13 @@ export function ReviewWorkbench({
   const canStart = allowedCommands.includes("start");
   const canFinalize = allowedCommands.includes("approve")
     && allowedCommands.includes("request_revision");
+  const [dimensionFeedback, setDimensionFeedback] = useState<Record<string, string>>(
+    () => Object.fromEntries(dimensions.map((dimension) => [dimension.dimension_key, ""])),
+  );
+  const [overallFeedback, setOverallFeedback] = useState("");
+  const feedbackIsInvalid = dimensions.some(
+    (dimension) => !textLengthIsValid(dimensionFeedback[dimension.dimension_key] ?? "", 5, 500),
+  ) || !textLengthIsValid(overallFeedback, 10, 2_000);
 
   if (canStart) {
     return (
@@ -162,8 +171,20 @@ export function ReviewWorkbench({
               id={`${dimension.dimension_key}-feedback`}
               name={`${dimension.dimension_key}_feedback`}
               minLength={5}
-              maxLength={500}
+              value={dimensionFeedback[dimension.dimension_key] ?? ""}
+              onChange={(event) => setDimensionFeedback((current) => ({
+                ...current,
+                [dimension.dimension_key]: event.target.value,
+              }))}
+              aria-invalid={!textLengthIsValid(dimensionFeedback[dimension.dimension_key] ?? "", 5, 500)}
+              aria-describedby={`${dimension.dimension_key}-feedback-progress`}
               required
+            />
+            <CharacterProgress
+              id={`${dimension.dimension_key}-feedback-progress`}
+              value={dimensionFeedback[dimension.dimension_key] ?? ""}
+              minimum={5}
+              maximum={500}
             />
           </fieldset>
         ))}
@@ -173,8 +194,17 @@ export function ReviewWorkbench({
           id="overall-feedback"
           name="overall_feedback"
           minLength={10}
-          maxLength={2000}
+          value={overallFeedback}
+          onChange={(event) => setOverallFeedback(event.target.value)}
+          aria-invalid={!textLengthIsValid(overallFeedback, 10, 2_000)}
+          aria-describedby="overall-feedback-progress"
           required
+        />
+        <CharacterProgress
+          id="overall-feedback-progress"
+          value={overallFeedback}
+          minimum={10}
+          maximum={2000}
         />
         <details className="fixed-references">
           <summary>Reviewer AI 使用披露</summary>
@@ -207,7 +237,7 @@ export function ReviewWorkbench({
         <button
           className="button primary"
           type="submit"
-          disabled={finalPending || materialStatus === "INCOMPLETE"}
+          disabled={finalPending || materialStatus === "INCOMPLETE" || feedbackIsInvalid}
         >
           {finalPending ? "正在提交结论…" : "提交真人结论"}
         </button>
