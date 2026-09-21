@@ -13,6 +13,7 @@ from journey_api.auth import Actor, get_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
+from journey_api.journey_service import active_post_completion_evidence_retest
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -52,6 +53,7 @@ from journey_api.models import (
 )
 from journey_api.outcome_service import add_scoped_outbox_event
 from journey_api.schemas import (
+    ActiveEvidenceRetestOut,
     AiSummaryOut,
     HandoffOut,
     IncentiveLedgerEntryOut,
@@ -1042,13 +1044,24 @@ def result(
     ).one()
     completed_count = int(completed_stages or 0)
     total_count = int(total_stages or 0)
+    enrollment = session.get(Enrollment, outcome.enrollment_id)
+    active_evidence_retest = (
+        active_post_completion_evidence_retest(session, enrollment)
+        if enrollment is not None
+        else None
+    )
     if total_count == 0:
         # Historical single-task Alpha outcomes predate JourneyStageVersion.
         # Preserve their result contract without pretending they completed V3.
         completed_count = 1
         total_count = 1
     elif completed_count != total_count:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少完整旅程证据。")
+        if (
+            active_evidence_retest is None
+            or completed_count + 1 != total_count
+        ):
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "最终结果缺少完整旅程证据。")
+        completed_count = total_count
     review_request = (
         session.scalar(
             select(NextTrainingStageReviewRequest).where(
@@ -1110,6 +1123,14 @@ def result(
             learning_completion=ResultLearningCompletionOut(
                 completed_stages=completed_count,
                 total_stages=total_count,
+            ),
+            active_evidence_retest=(
+                ActiveEvidenceRetestOut(
+                    assignment_id=active_evidence_retest.assignment_id,
+                    stage_key=active_evidence_retest.stage_key,
+                )
+                if active_evidence_retest is not None
+                else None
             ),
             reviewer_conclusion=ResultReviewerConclusionOut(
                 reviewer_id=evaluation.reviewer_id,

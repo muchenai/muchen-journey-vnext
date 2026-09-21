@@ -136,6 +136,18 @@ export default async function ResultPage({
         </div>
       </header>
 
+      {result.active_evidence_retest ? (
+        <section className="notice" role="status" aria-label="结营后自证重测状态">
+          <strong>一项自证站正在重新测试</strong>
+          <p>
+            当前结果基于上一次完整完成记录；本次自证重测不会改写正式评测结论。
+          </p>
+          <Link href={`/app/tasks/${result.active_evidence_retest.assignment_id}`}>
+            返回正在重测的站点 →
+          </Link>
+        </section>
+      ) : null}
+
       <section className="panel result-section result-collection" aria-labelledby="collection-title">
         <div className="result-section-heading">
           <div>

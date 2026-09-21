@@ -28,6 +28,8 @@ const journeyMap = await readFile(
   new URL("../src/app/app/journey-map.tsx", import.meta.url),
   "utf8",
 );
+const resultPage = await readFile(new URL("../src/app/app/result/page.tsx", import.meta.url), "utf8");
+const opsPage = await readFile(new URL("../src/app/ops/page.tsx", import.meta.url), "utf8");
 const reviewDetail = await readFile(
   new URL("../src/app/review/[reviewId]/page.tsx", import.meta.url),
   "utf8",
@@ -183,6 +185,12 @@ test("completed evidence stations can be retested without mixing in reviewer rev
   assert.match(submissionComposer, /检查并重新提交/);
   assert.match(taskPage, /重新提交成功，Version \{submittedVersionNo\} 已保存/);
   assert.match(taskPage, /open=\{validRetestReceipt\}/);
+  assert.match(resultPage, /result\.active_evidence_retest/);
+  assert.match(resultPage, /当前结果基于上一次完整完成记录/);
+  assert.match(resultPage, /本次自证重测不会改写正式评测结论/);
+  assert.match(opsPage, /enrollment\.evidence_retest_in_progress/);
+  assert.match(opsPage, /结营后重测中/);
+  assert.match(opsPage, /本轮结束前暂停 Enrollment 运营命令/);
 });
 
 test("the current-mission card occupies normal space immediately before the three-step path", () => {
