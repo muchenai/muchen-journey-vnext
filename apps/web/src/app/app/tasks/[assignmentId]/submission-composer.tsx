@@ -3,8 +3,10 @@
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { saveSubmissionDraft, submitAssignment, type SubmissionActionState } from "@/app/actions";
+import { CharacterProgress } from "@/app/character-progress";
 import { FactLabel } from "@/app/human-experience";
 import type { Attachment } from "@/lib/server/api";
+import { effectiveCharacterCount } from "@/lib/text-length";
 
 const INITIAL_STATE: SubmissionActionState = {};
 const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
@@ -134,6 +136,9 @@ export function SubmissionComposer({
     ? new Date(draftState.savedAt).toLocaleString("zh-CN")
     : null;
   const submissionBusy = submitPending || (submissionLocked && !submitState.error);
+  const bodyCharacterCount = effectiveCharacterCount(body);
+  const bodyOverLimit = bodyCharacterCount > 8_000;
+  const bodyBelowMinimum = !expectsExternalDocument && bodyCharacterCount < 40;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -164,6 +169,12 @@ export function SubmissionComposer({
 
   const saveDraft = useCallback((source: "auto" | "manual" = "manual") => {
     if (!formRef.current || !isOnline || draftPending) return;
+    if (bodyOverLimit) {
+      if (source === "manual") {
+        setLocalError("提交内容不能超过 8000 个有效字符；当前内容仍保留在本机。");
+      }
+      return;
+    }
     if (currentSnapshot === savedSnapshot) {
       if (source === "manual") setDraftFeedback("current");
       return;
@@ -178,13 +189,13 @@ export function SubmissionComposer({
     pendingSaveSource.current = source;
     setDraftFeedback(null);
     startTransition(() => draftAction(data));
-  }, [body, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, savedSnapshot, selectedAttachmentIds]);
+  }, [body, bodyOverLimit, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, savedSnapshot, selectedAttachmentIds]);
 
   useEffect(() => {
-    if (!storageReady || !isOnline || confirming || currentSnapshot === savedSnapshot) return;
+    if (!storageReady || !isOnline || confirming || bodyOverLimit || currentSnapshot === savedSnapshot) return;
     const timer = window.setTimeout(() => saveDraft("auto"), 1_200);
     return () => window.clearTimeout(timer);
-  }, [confirming, currentSnapshot, isOnline, saveDraft, savedSnapshot, storageReady]);
+  }, [bodyOverLimit, confirming, currentSnapshot, isOnline, saveDraft, savedSnapshot, storageReady]);
 
   useEffect(() => {
     if (!draftState.savedAt || !pendingSnapshot.current) return;
@@ -226,8 +237,12 @@ export function SubmissionComposer({
   }
 
   function beginConfirmation() {
-    if ((!expectsExternalDocument && body.trim().length < 40) || body.length > 8_000) {
-      setLocalError("提交内容需为 40–8000 个字符；当前内容仍保留。");
+    if (bodyBelowMinimum || bodyOverLimit) {
+      setLocalError(
+        bodyOverLimit
+          ? "提交内容不能超过 8000 个有效字符；当前内容仍保留。"
+          : "提交内容需为 40–8000 个有效字符；当前内容仍保留。",
+      );
       return;
     }
     if (expectsExternalDocument && !evidenceUrl.trim()) {
@@ -374,8 +389,9 @@ export function SubmissionComposer({
           ) : null}
 
           <label htmlFor="submission-body">{expectsExternalDocument ? "补充说明（可选）" : requiresReview ? "你的作答" : "你的学习记录"}</label>
-          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} maxLength={8000} required={!expectsExternalDocument} aria-describedby="submission-body-help submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
-          <p id="submission-body-help" className="status-meta">40–8000 字符。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
+          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} required={!expectsExternalDocument} aria-invalid={bodyBelowMinimum || bodyOverLimit} aria-describedby="submission-body-help submission-body-progress submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          <CharacterProgress id="submission-body-progress" value={body} minimum={expectsExternalDocument ? 0 : 40} maximum={8000} optional={expectsExternalDocument} />
+          <p id="submission-body-help" className="status-meta">按首尾空白裁剪后的有效字符计算。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
 
           <section className="ai-self-check-gated" aria-labelledby="ai-self-check-title">
             <FactLabel kind="ai" />
