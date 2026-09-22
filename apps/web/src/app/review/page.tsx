@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { FactLabel } from "@/app/human-experience";
-import { identityPageRequest, ReviewItem } from "@/lib/server/api";
+import { identityPageRequest, ReviewHistory, ReviewItem } from "@/lib/server/api";
 import { LiveStatusSignal } from "@/app/live-status-signal";
 import { formatProductDateTime } from "@/lib/date-time";
 
@@ -10,13 +10,16 @@ export const dynamic = "force-dynamic";
 export default async function ReviewQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ finalized?: string }>;
+  searchParams: Promise<{ finalized?: string; history_cursor?: string }>;
 }) {
   const query = await searchParams;
-  const queue = await identityPageRequest<{ items: ReviewItem[] }>(
-    "/api/v1/reviews",
-    "REVIEWER",
-  );
+  const historyPath = query.history_cursor
+    ? `/api/v1/reviews/history?cursor=${encodeURIComponent(query.history_cursor)}`
+    : "/api/v1/reviews/history";
+  const [queue, history] = await Promise.all([
+    identityPageRequest<{ items: ReviewItem[] }>("/api/v1/reviews", "REVIEWER"),
+    identityPageRequest<ReviewHistory>(historyPath, "REVIEWER"),
+  ]);
   const checkedAt = new Date();
   const queueStatusKey = queue.items
     .map((item) => `${item.id}:${item.status}:${item.submission_version_no}`)
@@ -81,6 +84,45 @@ export default async function ReviewQueuePage({
           </ol>
         </>
       )}
+      <section className="review-history" aria-labelledby="review-history-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="eyebrow">只读记录</p>
+            <h2 id="review-history-title">已完成评审</h2>
+          </div>
+          <span className="badge">本页 {history.items.length} 条</span>
+        </div>
+        {history.items.length === 0 ? (
+          <p className="status-meta">当前页没有已完成评审。</p>
+        ) : (
+          <ol className="queue">
+            {history.items.map((item) => (
+              <li key={item.id}>
+                <Link className="queue-item" href={`/review/${item.id}`}>
+                  <div className="section-heading-row">
+                    <strong className="queue-title">{item.learner_name} · {item.task_title}</strong>
+                    <span className={`history-decision ${item.decision === "PASS" ? "pass" : "revision"}`}>
+                      {item.decision === "PASS" ? "已通过" : "要求修订"}
+                    </span>
+                  </div>
+                  <span>{item.journey_title ?? "固定任务"}</span>
+                  <span className="queue-meta">
+                    固定提交 V{item.submission_version_no} · 定稿于 {formatProductDateTime(item.finalized_at)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+        {history.next_cursor ? (
+          <Link
+            className="button secondary"
+            href={`/review?history_cursor=${encodeURIComponent(history.next_cursor)}`}
+          >
+            查看更早记录
+          </Link>
+        ) : null}
+      </section>
     </section>
   );
 }

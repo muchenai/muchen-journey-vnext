@@ -2,7 +2,9 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import DBAPIError
@@ -45,6 +47,7 @@ from journey_api.models import (
 )
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash, utc_now
 from journey_api.review_routes import locked_scoped_context_query
+from journey_api.schemas import FinalizeReviewCommand, SubmissionCommand
 
 
 REVIEWER_HEADERS = {"X-Fixture-Role": "REVIEWER"}
@@ -103,6 +106,113 @@ def submission_body(label: str) -> str:
         "事实一是入口说明可核对，事实二是责任人反馈可以核对。"
         "行动不超过三步并明确第一步责任人；两周内用理解率验证，"
         "若低于百分之九十就停止扩量并调整。"
+    )
+
+
+def test_text_contracts_trim_before_enforcing_unicode_character_boundaries():
+    with pytest.raises(ValidationError):
+        SubmissionCommand(expected_revision=1, body=f" {'字' * 39} ")
+    accepted = SubmissionCommand(expected_revision=1, body=f" {'字' * 40} ")
+    assert accepted.body == "字" * 40
+    assert len(SubmissionCommand(expected_revision=1, body="😀" * 40).body) == 40
+    with pytest.raises(ValidationError):
+        SubmissionCommand(expected_revision=1, body="字" * 8_001)
+
+    payload = finalize_payload(2, decision="APPROVE")
+    payload["overall_feedback"] = f" {'总' * 9} "
+    with pytest.raises(ValidationError):
+        FinalizeReviewCommand(**payload)
+    payload["overall_feedback"] = f" {'总' * 10} "
+    payload["rubric_evaluations"][0]["feedback"] = f" {'评' * 4} "
+    with pytest.raises(ValidationError):
+        FinalizeReviewCommand(**payload)
+
+
+def test_finalized_reviews_leave_queue_but_remain_in_paginated_history():
+    first_flow = create_submission("history-pass")
+    second_flow = create_submission("history-revision")
+    reviewer = client_for("reviewer-history")
+
+    for flow, decision in ((first_flow, "APPROVE"), (second_flow, "REQUEST_REVISION")):
+        detail = assert_ok(
+            reviewer.get(f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS)
+        )
+        started = assert_ok(
+            reviewer.post(
+                f"/api/v1/reviews/{flow['review_id']}/start",
+                headers={
+                    **REVIEWER_HEADERS,
+                    "Idempotency-Key": f"history-start-{uuid.uuid4()}",
+                },
+                json={"expected_revision": detail["revision"]},
+            )
+        )
+        payload = finalize_payload(
+            started["review_revision"],
+            decision=decision,
+            needs_work_key="evidence_quality" if decision == "REQUEST_REVISION" else None,
+        )
+        assert_ok(
+            reviewer.post(
+                f"/api/v1/reviews/{flow['review_id']}/finalize",
+                headers={
+                    **REVIEWER_HEADERS,
+                    "Idempotency-Key": f"history-finalize-{uuid.uuid4()}",
+                },
+                json=payload,
+            )
+        )
+
+    queue = assert_ok(reviewer.get("/api/v1/reviews", headers=REVIEWER_HEADERS))
+    queue_ids = {item["id"] for item in queue["items"]}
+    assert str(first_flow["review_id"]) not in queue_ids
+    assert str(second_flow["review_id"]) not in queue_ids
+
+    with SessionLocal() as session:
+        read_only_counts = (
+            session.scalar(select(func.count(Evaluation.id))),
+            session.scalar(select(func.count(AuditEntry.id))),
+            session.scalar(select(func.count(OutboxEvent.id))),
+        )
+    first_page = assert_ok(
+        reviewer.get("/api/v1/reviews/history?limit=1", headers=REVIEWER_HEADERS)
+    )
+    assert len(first_page["items"]) == 1
+    assert first_page["next_cursor"]
+    second_page = assert_ok(
+        reviewer.get(
+            "/api/v1/reviews/history",
+            params={"limit": 1, "cursor": first_page["next_cursor"]},
+            headers=REVIEWER_HEADERS,
+        )
+    )
+    history_items = first_page["items"] + second_page["items"]
+    matching = {
+        item["id"]: item
+        for item in history_items
+        if item["id"] in {str(first_flow["review_id"]), str(second_flow["review_id"])}
+    }
+    assert matching[str(first_flow["review_id"])]["decision"] == "PASS"
+    assert matching[str(second_flow["review_id"])]["decision"] == "REVISION_REQUIRED"
+    assert all(item["submission_version_id"] for item in matching.values())
+    assert all(item["finalized_at"] for item in matching.values())
+    with SessionLocal() as session:
+        assert (
+            session.scalar(select(func.count(Evaluation.id))),
+            session.scalar(select(func.count(AuditEntry.id))),
+            session.scalar(select(func.count(OutboxEvent.id))),
+        ) == read_only_counts
+
+    refreshed = assert_ok(
+        reviewer.get(f"/api/v1/reviews/{first_flow['review_id']}", headers=REVIEWER_HEADERS)
+    )
+    assert refreshed["status"] == "FINALIZED"
+    assert refreshed["evaluation"]["decision"] == "PASS"
+    assert (
+        reviewer.get(
+            "/api/v1/reviews/history?cursor=invalid", headers=REVIEWER_HEADERS
+        ).status_code
+        == 400
     )
 
 
@@ -456,6 +566,10 @@ def test_operator_can_handoff_only_unstarted_assigned_review_with_audit_history(
         )
     )
     assert finalized["review_status"] == "FINALIZED"
+    delegated_history = assert_ok(delegated_reviewer.get("/api/v1/reviews/history"))
+    assert str(flow["review_id"]) in {
+        item["id"] for item in delegated_history["items"]
+    }
     with SessionLocal() as session:
         evaluation = session.scalar(
             select(Evaluation).where(Evaluation.review_id == flow["review_id"])
@@ -944,6 +1058,7 @@ def test_non_reviewer_roles_cannot_read_or_sign_the_business_review_gate():
         (flow["learner"], {"X-CSRF-Token": flow["csrf"]}),
     )
     for actor, role_headers in actors:
+        assert actor.get("/api/v1/reviews/history", headers=role_headers).status_code == 403
         assert (
             actor.get(
                 f"/api/v1/reviews/{flow['review_id']}", headers=role_headers

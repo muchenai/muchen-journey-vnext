@@ -34,6 +34,9 @@ function setup(policy) {
   const exports = {};
   vm.runInNewContext(compiled, { exports, require: (name) => {
     if (name === "@/lib/server/api") return api;
+    if (name === "@/lib/text-length") {
+      return { effectiveCharacterCount: (value) => Array.from(value.trim()).length };
+    }
     if (name === "node:crypto") return { randomUUID };
     if (name === "next/cache") return { revalidatePath: () => {} };
     if (name === "next/headers" || name === "next/navigation") return {};

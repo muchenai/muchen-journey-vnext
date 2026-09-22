@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { effectiveCharacterCount } from "@/lib/text-length";
+
 import {
   anonymousApiRequest,
   ApiRequestError,
@@ -207,10 +209,10 @@ function submissionBody(data: FormData, requireComplete: boolean): SubmissionAct
   const composed = evidenceUrl
     ? `${FEISHU_EVIDENCE_PREFIX}${evidenceUrl}${body ? `\n\n补充说明：\n${body}` : ""}`
     : body;
-  if (composed.length > 8_000) {
+  if (effectiveCharacterCount(composed) > 8_000) {
     return { error: "提交内容不能超过 8000 个字符；草稿仍保留在当前页面。" };
   }
-  if (requireComplete && composed.length < 40) {
+  if (requireComplete && effectiveCharacterCount(composed) < 40) {
     return { error: "提交内容需为 40–8000 个字符。草稿仍保留在当前页面。" };
   }
   return composed;
@@ -849,8 +851,8 @@ export async function finalizeReview(
     const overallFeedback = data.get("overall_feedback");
     if (
       typeof overallFeedback !== "string"
-      || overallFeedback.trim().length < 10
-      || overallFeedback.length > 2_000
+      || effectiveCharacterCount(overallFeedback) < 10
+      || effectiveCharacterCount(overallFeedback) > 2_000
     ) {
       throw new Error("总体反馈需为 10–2000 个字符。");
     }
@@ -872,7 +874,11 @@ export async function finalizeReview(
       if (rating !== "MEETS" && rating !== "NEEDS_WORK") {
         throw new Error("请完成全部 Rubric 评分。");
       }
-      if (typeof feedback !== "string" || feedback.trim().length < 5 || feedback.length > 500) {
+      if (
+        typeof feedback !== "string"
+        || effectiveCharacterCount(feedback) < 5
+        || effectiveCharacterCount(feedback) > 500
+      ) {
         throw new Error("每个 Rubric 维度需填写 5–500 个字符的具体反馈。");
       }
       const score = typeof scoreValue === "string" && scoreValue !== ""
@@ -903,7 +909,10 @@ export async function finalizeReview(
     return reviewError(error);
   }
   revalidatePath("/review");
-  redirect(`/review?finalized=${overallDecision === "APPROVE" ? "approved" : "revision"}`);
+  revalidatePath(`/review/${reviewId}`);
+  redirect(
+    `/review/${reviewId}?finalized=${overallDecision === "APPROVE" ? "approved" : "revision"}`,
+  );
 }
 
 function requiredReason(data: FormData): string {

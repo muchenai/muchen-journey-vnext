@@ -225,6 +225,20 @@ export type ReviewItem = {
   conflict_status: "NOT_EVALUATED";
 };
 
+export type ReviewHistory = {
+  items: Array<{
+    id: string;
+    learner_name: string;
+    journey_title: string | null;
+    task_title: string;
+    submission_version_id: string;
+    submission_version_no: number;
+    decision: "PASS" | "REVISION_REQUIRED";
+    finalized_at: string;
+  }>;
+  next_cursor: string | null;
+};
+
 export type ReviewDetail = ReviewItem & {
   submission_body: string;
   submission_ai_use: AiUseDisclosure;
