@@ -1,9 +1,9 @@
 # Canary application-only upgrade and rollback
 
-Scope: current Canary application candidate `29c0473c488dd9f2d35ca40aec32e505169d4a72`
-from switch run 35687074463, database `journey_next_canary_20260901_c72fea5`.
-The successful application-only package run `35703762542` upgrades this exact deployed
-candidate to `0e49004294763adfabae0130b13d4878b964c8c3`.
+Scope: current Canary application candidate `0e49004294763adfabae0130b13d4878b964c8c3`
+from switch run 35709064443, database `journey_next_canary_20260901_c72fea5`.
+The successful application-only package run `35717058575` upgrades this exact deployed
+candidate to `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
 bindings, signing secrets, sessions, allowlist, disabled workers/notifications and edge
@@ -11,15 +11,15 @@ route are retained. No database or volume deletion, restore, migration, grant or
 
 ## Preparation and compatibility gate
 
-1. Review Learner draft/submission rate limits, recoverable cooldowns and the updated
-   rollback baseline. Application PR #404 passed its gates and merged.
+1. Review the vNext logout feedback, recoverable failure handling and the updated
+   rollback baseline. Application PR #406 passed its gates and merged.
 2. Package an exact new commit with `Canary Application-only Package`; it has no ECS/RDS
    credentials and does not deploy. Require successful machine gates and verify the
    downloaded artifact provenance (repository, workflow, run, candidate, attempt).
 3. Compare the artifact checksums against the trusted workflow artifact, not an arbitrary
    file delivered beside the script. Record exact new API/Web digests and candidate.
-4. The compatibility checker permits only the reviewed Learner write-limit API/Web
-   surfaces and OpenAPI contract to change from the deployed application candidate.
+4. The compatibility checker permits only the reviewed vNext logout Web surfaces and
+   their tests to change from the deployed application candidate.
    Models, migrations, signing/session/auth core, dependencies, images' Dockerfiles and
    worker code cannot change. This is not approval for a later arbitrary candidate.
 5. Run the runner's `prepare` phase in the ECS root console with manifest path and exact
