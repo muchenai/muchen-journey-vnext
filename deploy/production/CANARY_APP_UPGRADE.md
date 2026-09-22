@@ -1,9 +1,9 @@
 # Canary application-only upgrade and rollback
 
-Scope: current Canary application candidate `9d1ce3d897a6b409dc621fe305ec428e0039f367`
-from switch run 35564313954, database `journey_next_canary_20260901_c72fea5`.
-The application-only package run `35683015531` upgrades this exact deployed
-candidate to `29c0473c488dd9f2d35ca40aec32e505169d4a72`.
+Scope: current Canary application candidate `29c0473c488dd9f2d35ca40aec32e505169d4a72`
+from switch run 35687074463, database `journey_next_canary_20260901_c72fea5`.
+The successful application-only package run `35703762542` upgrades this exact deployed
+candidate to `0e49004294763adfabae0130b13d4878b964c8c3`.
 Never run Greenfield restore/deploy/bootstrap or its edge rollback for this operation.
 Only API/Web containers are recreated. Existing database, account IDs, roles, Feishu
 bindings, signing secrets, sessions, allowlist, disabled workers/notifications and edge
@@ -11,15 +11,15 @@ route are retained. No database or volume deletion, restore, migration, grant or
 
 ## Preparation and compatibility gate
 
-1. Review finalized Reviewer history visibility, Unicode-aware text limits, live character
-   progress and the updated rollback baseline. Merge through repository gates.
+1. Review Learner draft/submission rate limits, recoverable cooldowns and the updated
+   rollback baseline. Application PR #404 passed its gates and merged.
 2. Package an exact new commit with `Canary Application-only Package`; it has no ECS/RDS
    credentials and does not deploy. Require successful machine gates and verify the
    downloaded artifact provenance (repository, workflow, run, candidate, attempt).
 3. Compare the artifact checksums against the trusted workflow artifact, not an arbitrary
    file delivered beside the script. Record exact new API/Web digests and candidate.
-4. The compatibility checker permits only the reviewed Reviewer history and Learner/
-   Reviewer text-validation surfaces to change from the deployed application candidate.
+4. The compatibility checker permits only the reviewed Learner write-limit API/Web
+   surfaces and OpenAPI contract to change from the deployed application candidate.
    Models, migrations, signing/session/auth core, dependencies, images' Dockerfiles and
    worker code cannot change. This is not approval for a later arbitrary candidate.
 5. Run the runner's `prepare` phase in the ECS root console with manifest path and exact
@@ -67,9 +67,10 @@ Record candidate/image refs, verified artifact hashes, preparation, switch or ro
 result, actual interruption, and current public readiness. Do not record raw envs,
 credentials, cookies, identity link tokens or invitation tokens in public artifacts.
 
-Then ask Xu Hanwen to refresh `/ops`, select the team lead's existing allowlisted identity,
-choose Xu as reviewer and create one targeted invitation. Deliver it only to the lead.
-The lead must personally complete login/consent, task and submission; Xu must personally
-review it. Verify corresponding UI/API facts after each action. Never manufacture a real
-human task response, approve on Xu's behalf, reuse the operator link, or mark UAT complete
-from container health or synthetic browser tests alone.
+Do not create another invitation or Enrollment for the team lead as part of this repair.
+Use only an explicitly identified dedicated synthetic account for production business
+smoke; if none is available, report that evidence as pending rather than borrow a real
+Learner identity. High-frequency tests remain isolated/local only. The operator can later
+ask the Learner to continue regression in her existing new Enrollment. Never manufacture
+a human task response, approve on a Reviewer's behalf, reuse an operator link, or mark UAT
+complete from container health or synthetic browser tests alone.
