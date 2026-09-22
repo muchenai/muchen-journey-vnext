@@ -83,7 +83,10 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
-        if self.path != "/api/v1/reviews":
+        # The review page loads the active queue and finalized history in parallel.
+        # Both endpoints must exercise the same role/session boundary; leaving one
+        # unimplemented makes the check depend on which concurrent request finishes first.
+        if self.path not in {"/api/v1/reviews", "/api/v1/reviews/history"}:
             self.send_error(404)
             return
         wrong_role = "journey_next_session=wrong-role-runtime-only" in self.headers.get(
