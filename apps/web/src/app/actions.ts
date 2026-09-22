@@ -481,12 +481,38 @@ export async function confirmIdentity(data: FormData) {
   redirect("/app");
 }
 
-export async function logoutSession() {
-  await apiRequest("/api/v1/session/logout", "LEARNER", { method: "POST" });
+export type LogoutActionState = {
+  error?: string;
+  requestId?: string;
+};
+
+export async function logoutSession(
+  _previousState: LogoutActionState,
+): Promise<LogoutActionState> {
+  void _previousState;
+  try {
+    await apiRequest("/api/v1/session/logout", "LEARNER", { method: "POST" });
+  } catch (error) {
+    const isAlreadyLoggedOut = error instanceof ApiRequestError
+      && error.status === 401
+      && error.code === "UNAUTHENTICATED";
+    if (!isAlreadyLoggedOut) {
+      return {
+        error: "退出没有完成，当前会话仍然有效。请稍后重试。",
+        requestId: error instanceof ApiRequestError ? error.requestId : undefined,
+      };
+    }
+  }
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
   cookieStore.delete(CSRF_COOKIE);
-  redirect("/");
+  redirect("/?session=logged_out");
+}
+
+export async function logoutSessionFromForm(_data: FormData): Promise<void> {
+  void _data;
+  const state = await logoutSession({});
+  if (state.error) throw new Error(state.error);
 }
 
 export async function requestNextTrainingStageReview(data: FormData) {

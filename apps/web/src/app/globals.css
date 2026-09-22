@@ -385,6 +385,7 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .home-state-description { margin-bottom: 18px; color: var(--text-secondary); font-size: 14px; }
 .home-state-error { width: 100%; margin: -2px 0 16px; padding: 10px 12px; color: #8a1c13; background: #fff0ee; border-left: 3px solid #b42318; border-radius: 6px; font-size: 12px; }
 .home-state-error-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; padding: 0; border: 0; clip-path: inset(50%); white-space: nowrap; }
+.home-state-success { width: 100%; margin: 0 0 12px; padding: 10px 12px; color: #155d59; background: #e6f5f1; border-left: 3px solid #20877f; border-radius: 6px; font-size: 13px; font-weight: 800; }
 .home-primary-action { width: 100%; min-height: 52px; justify-content: space-between; gap: 24px; padding: 12px 18px; border-radius: 14px; box-shadow: 0 12px 26px rgba(40, 84, 215, .2); }
 .home-state-note { margin: 10px 0 0; color: var(--text-muted); font-size: 11px; }
 .home-invite-form { width: 100%; margin-top: auto; }
@@ -501,7 +502,14 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
 .journey-support { margin: -10px 18px 0; color: var(--text-muted); font-size: 13px; }
 .journey-support summary { width: max-content; cursor: pointer; color: #20877f; font-weight: 700; }
 .journey-support p { max-width: 64ch; margin: 10px 0 0; }
-.quiet-exit { margin-top: 18px; opacity: .7; }
+.quiet-exit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 24px; align-items: center; margin-top: 18px; padding: 20px 22px; background: #fff; border: 1px solid #d8e3df; border-radius: 18px; }
+.quiet-exit h2 { margin: 0 0 5px; font-size: 18px; }
+.quiet-exit p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+.quiet-exit form { grid-column: 2; grid-row: 1; }
+.quiet-exit button:disabled { cursor: wait; opacity: .68; }
+.quiet-exit .logout-progress { grid-column: 1 / -1; min-height: 1.3em; color: #176d70; }
+.quiet-exit .logout-error { grid-column: 1 / -1; margin: 0; }
+.logout-error span { overflow-wrap: anywhere; font-size: 12px; }
 
 .learner-task-page { display: grid; gap: 24px; max-width: 960px; margin: 0 auto; }
 .task-hero-card { position: relative; overflow: hidden; min-height: 360px; padding: clamp(28px, 6vw, 52px); color: #fff; background: linear-gradient(145deg, #147b78, #19445e); border-radius: 36px; box-shadow: 0 28px 74px rgba(23, 75, 92, .22); }
@@ -918,6 +926,9 @@ td code, td small { display: block; max-width: 300px; overflow-wrap: anywhere; w
   .home-state-description { margin-bottom: 10px; font-size: 12px; }
   .home-primary-action { min-height: 50px; }
   .home-governance-note { text-align: left; }
+  .quiet-exit { grid-template-columns: 1fr; padding: 18px; }
+  .quiet-exit form { grid-column: 1; grid-row: auto; }
+  .quiet-exit form .button { width: 100%; }
   .page-shell:has(> .learner-join) { width: min(100% - 24px, 1080px); padding-top: 24px; }
   .learner-join { min-height: 0; grid-template-columns: 1fr; border-radius: 28px; }
   .join-intro { padding: 26px 22px 18px; }

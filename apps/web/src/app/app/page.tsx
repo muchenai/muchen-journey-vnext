@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { logoutSession } from "@/app/actions";
 import { ExperienceState, FactLegend } from "@/app/human-experience";
 import { LiveStatusSignal } from "@/app/live-status-signal";
 import {
@@ -11,6 +10,7 @@ import {
   learnerPageRequest,
 } from "@/lib/server/api";
 import { JourneyMap } from "./journey-map";
+import { LogoutControl } from "./logout-control";
 import { JourneyProgramOverview } from "./program-overview";
 
 export const dynamic = "force-dynamic";
@@ -174,11 +174,7 @@ export default async function LearnerHome({
         </details>
       )}
       <FactLegend />
-      {hasSession ? (
-        <form action={logoutSession} className="quiet-exit">
-          <button className="button secondary" type="submit">退出 vNext 会话</button>
-        </form>
-      ) : null}
+      {hasSession ? <LogoutControl /> : null}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-"""Narrow allowlist for Learner write limits; unchanged schema/auth core.
+"""Narrow allowlist for explicit Learner logout feedback; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,24 +9,32 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "29c0473c488dd9f2d35ca40aec32e505169d4a72"
+BASE = "0e49004294763adfabae0130b13d4878b964c8c3"
 SOURCE_BASE = BASE
-ALLOWED_RUNTIME_CHANGES = {
-    "apps/api/journey_api/main.py",
-    "apps/api/journey_api/submission_routes.py",
-    "apps/api/journey_api/learner_write_limits.py",
-    "apps/web/scripts/learner-loop-contract.test.mjs",
+ALLOWED_CHANGES = {
+    "apps/web/scripts/logout-session-feedback-contract.test.mjs",
     "apps/web/src/app/actions.ts",
-    "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-    "apps/web/src/lib/server/api.ts",
-    "apps/web/src/lib/use-write-cooldown.ts",
-    "contracts/openapi.json",
+    "apps/web/src/app/app/logout-control.tsx",
+    "apps/web/src/app/app/page.tsx",
+    "apps/web/src/app/content/page.tsx",
+    "apps/web/src/app/globals.css",
+    "apps/web/src/app/page.tsx",
+    "scripts/canary_app_compatibility.py",
+    "scripts/logout_feedback_browser.cjs",
+    "tests/test_identity_invites.py",
 }
-PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")
+ALLOWED_RUNTIME_CHANGES = {
+    "apps/web/src/app/actions.ts",
+    "apps/web/src/app/app/logout-control.tsx",
+    "apps/web/src/app/app/page.tsx",
+    "apps/web/src/app/content/page.tsx",
+    "apps/web/src/app/globals.css",
+    "apps/web/src/app/page.tsx",
+}
 
 
 def validate_changes(paths):
-    denied = [p for p in paths if p.startswith(PROTECTED_ROOTS) and p not in ALLOWED_RUNTIME_CHANGES]
+    denied = [path for path in paths if path not in ALLOWED_CHANGES]
     if denied:
         raise ValueError("Application-only compatibility rejected: " + ", ".join(denied))
 
@@ -43,18 +51,22 @@ def verify(candidate):
     git("merge-base", "--is-ancestor", SOURCE_BASE, candidate)
     paths = git("diff", "--name-only", SOURCE_BASE, candidate).splitlines()
     validate_changes(paths)
-    return {"base_candidate": BASE, "source_base": SOURCE_BASE, "candidate": candidate,
-            "compatibility": "NO_SCHEMA_OR_IDENTITY_CHANGE",
-            "schema_tree": git("rev-parse", candidate + ":migrations"),
-            "changed_runtime_files": [p for p in paths if p in ALLOWED_RUNTIME_CHANGES]}
+    return {
+        "base_candidate": BASE,
+        "source_base": SOURCE_BASE,
+        "candidate": candidate,
+        "compatibility": "NO_SCHEMA_OR_IDENTITY_CHANGE",
+        "schema_tree": git("rev-parse", candidate + ":migrations"),
+        "changed_runtime_files": [path for path in paths if path in ALLOWED_RUNTIME_CHANGES],
+    }
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument("--candidate", required=True)
-    p.add_argument("--output", type=Path, required=True)
-    args = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--candidate", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
     result = verify(args.candidate)
-    with args.output.open("x", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
+    with args.output.open("x", encoding="utf-8") as output:
+        json.dump(result, output, indent=2)
     print("APP_UPGRADE_COMPATIBILITY=PASS")
