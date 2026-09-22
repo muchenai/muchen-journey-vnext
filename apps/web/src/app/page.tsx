@@ -123,7 +123,9 @@ function InvitationAction({ expired = false }: { expired?: boolean }) {
   );
 }
 
-function StateAction({ state }: { state: HomeState }) {
+function StateAction({ state, loggedOut }: { state: HomeState; loggedOut: boolean }) {
+  if (loggedOut) return <InvitationAction expired />;
+
   if (state === "visitor" || state === "expired") {
     return <InvitationAction expired={state === "expired"} />;
   }
@@ -153,10 +155,13 @@ function StateAction({ state }: { state: HomeState }) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ auth_error?: string }>;
+  searchParams: Promise<{ auth_error?: string; session?: string }>;
 }) {
   const [query, session] = await Promise.all([searchParams, resolveLearnerSessionState()]);
   const context = await resolveHomeContext(session, query.auth_error);
+  const isLoggedOut = query.session === "logged_out"
+    && session.status !== "VALID"
+    && session.status !== "UNAVAILABLE";
   const currentMap = JOURNEY_MAPS[context.currentMapIndex] ?? JOURNEY_MAPS[0];
   const completedMap = context.currentMapIndex > 0
     ? JOURNEY_MAPS[context.currentMapIndex - 1]
@@ -164,7 +169,9 @@ export default async function Home({
   const isExpired = context.state === "expired";
   const isUnlocked = context.state === "unlocked";
   const isUnavailable = context.state === "unavailable";
-  const stateTitle = isUnavailable
+  const stateTitle = isLoggedOut
+    ? "已安全退出 vNext 会话"
+    : isUnavailable
     ? "状态暂时无法确认"
     : isExpired
     ? "你的进度还在，重新验证即可继续"
@@ -173,7 +180,9 @@ export default async function Home({
       : context.state === "active"
         ? `你正在 ${currentMap.name}`
         : `你的起点是 ${currentMap.name}`;
-  const stateDescription = isUnavailable
+  const stateDescription = isLoggedOut
+    ? "旅程进度、历史提交和评审记录均已保留。"
+    : isUnavailable
     ? "未能取得服务端权威状态；页面不会猜测进度、解锁模块或显示成功。"
     : isExpired
     ? "已完成的地图、能力与成长证据不会因会话失效而丢失。"
@@ -184,7 +193,7 @@ export default async function Home({
         : "Muchen Journey 采用专属邀请制。验证邀请后，从探索营建立第一份成长基线。";
 
   return (
-    <section className="shared-home" data-home-state={context.state}>
+    <section className="shared-home" data-home-state={isLoggedOut ? "logged_out" : context.state}>
       <header className="home-world-intro">
         <p className="journey-whisper">It&apos;s a long game.</p>
         <p className="home-world-kicker">Muchen Journey · People AI 成长系统</p>
@@ -245,10 +254,15 @@ export default async function Home({
         <aside className="home-state-card" aria-labelledby="home-state-heading">
           <div className="home-state-location">
             <span aria-hidden="true" />
-            <p>{isUnavailable ? "权威状态读取失败" : isExpired ? "会话需要恢复" : isUnlocked ? "下一地图已解锁" : "你现在的位置"}</p>
+            <p>{isLoggedOut ? "当前浏览器已退出" : isUnavailable ? "权威状态读取失败" : isExpired ? "会话需要恢复" : isUnlocked ? "下一地图已解锁" : "你现在的位置"}</p>
           </div>
           <FactLabel kind="system" />
           <h2 id="home-state-heading">{stateTitle}</h2>
+          {isLoggedOut ? (
+            <p className="home-state-success" role="status" aria-live="polite">
+              服务端已确认：当前浏览器会话已撤销
+            </p>
+          ) : null}
           <p className="home-state-description">{stateDescription}</p>
           {context.action ? (
             <dl className="home-action-facts">
@@ -257,7 +271,7 @@ export default async function Home({
               <div><dt>责任与反馈</dt><dd>{context.action.responsible_party} · {context.action.feedback_expectation}</dd></div>
             </dl>
           ) : null}
-          <StateAction state={context.state} />
+          <StateAction state={context.state} loggedOut={isLoggedOut} />
           {query.auth_error ? (
             <div
               className={isExpired ? "home-state-error home-state-error-sr" : "home-state-error"}
@@ -267,7 +281,9 @@ export default async function Home({
             </div>
           ) : null}
           <p className="home-state-note">
-            {isUnlocked && completedMap
+            {isLoggedOut
+              ? "需要继续时，请使用运营提供的当前有效重新进入链接。"
+              : isUnlocked && completedMap
               ? `${completedMap.name} → ${currentMap.name} · 证据连续`
               : isUnavailable
                 ? "未确认的状态不会写入或覆盖成长事实"

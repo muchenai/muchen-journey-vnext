@@ -12,6 +12,7 @@ from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_VERSION_ID
 from journey_api.identity import SESSION_COOKIE, utc_now
 from journey_api.main import app
 from journey_api.models import (
+    Assignment,
     AuditEntry,
     Enrollment,
     EnrollmentStatus,
@@ -24,6 +25,10 @@ from journey_api.models import (
     OutboxEvent,
     Role,
     RoleAssignment,
+    Review,
+    Submission,
+    SubmissionDraft,
+    SubmissionVersion,
     User,
     UserStatus,
 )
@@ -289,6 +294,16 @@ def test_real_invite_creates_internal_identity_session_and_csrf_protected_assign
     )
     assert consumed_again.status_code == 410
 
+    with SessionLocal() as session:
+        protected_business_state = {
+            "enrollments": session.scalar(select(func.count(Enrollment.id))),
+            "assignments": session.scalar(select(func.count(Assignment.id))),
+            "drafts": session.scalar(select(func.count(SubmissionDraft.id))),
+            "submissions": session.scalar(select(func.count(Submission.id))),
+            "versions": session.scalar(select(func.count(SubmissionVersion.id))),
+            "reviews": session.scalar(select(func.count(Review.id))),
+        }
+
     logged_out = assert_ok(
         learner.post(
             "/api/v1/session/logout",
@@ -297,6 +312,21 @@ def test_real_invite_creates_internal_identity_session_and_csrf_protected_assign
     )
     assert logged_out["status"] == "LOGGED_OUT"
     assert learner.get("/api/v1/session").status_code == 401
+    with SessionLocal() as session:
+        assert session.scalar(
+            select(AuditEntry.id).where(
+                AuditEntry.action == "session.logged_out",
+                AuditEntry.actor_id == uuid.UUID(str(confirmed["user_id"])),
+            )
+        )
+        assert protected_business_state == {
+            "enrollments": session.scalar(select(func.count(Enrollment.id))),
+            "assignments": session.scalar(select(func.count(Assignment.id))),
+            "drafts": session.scalar(select(func.count(SubmissionDraft.id))),
+            "submissions": session.scalar(select(func.count(Submission.id))),
+            "versions": session.scalar(select(func.count(SubmissionVersion.id))),
+            "reviews": session.scalar(select(func.count(Review.id))),
+        }
 
 
 def test_invalid_expired_and_revoked_invites_create_no_active_enrollment():
