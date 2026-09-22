@@ -1,4 +1,4 @@
-"""Narrow allowlist for review history and text limits; unchanged schema/auth core.
+"""Narrow allowlist for Learner write limits; unchanged schema/auth core.
 
 This is not a general-purpose migration compatibility claim. Any other application,
 dependency, configuration or Dockerfile change requires a new reviewed policy.
@@ -9,24 +9,17 @@ import re
 import subprocess
 from pathlib import Path
 
-BASE = "9d1ce3d897a6b409dc621fe305ec428e0039f367"
+BASE = "29c0473c488dd9f2d35ca40aec32e505169d4a72"
 SOURCE_BASE = BASE
 ALLOWED_RUNTIME_CHANGES = {
-    "apps/api/journey_api/review_routes.py",
-    "apps/api/journey_api/schemas.py",
-    "apps/web/scripts/canary-invite-action.test.mjs",
-    "apps/web/scripts/resilience-a11y-contract.test.mjs",
-    "apps/web/scripts/reviewer-ops-contract.test.mjs",
-    "apps/web/scripts/submission-feedback-contract.test.mjs",
+    "apps/api/journey_api/main.py",
+    "apps/api/journey_api/submission_routes.py",
+    "apps/api/journey_api/learner_write_limits.py",
+    "apps/web/scripts/learner-loop-contract.test.mjs",
     "apps/web/src/app/actions.ts",
     "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
-    "apps/web/src/app/character-progress.tsx",
-    "apps/web/src/app/globals.css",
-    "apps/web/src/app/review/[reviewId]/page.tsx",
-    "apps/web/src/app/review/[reviewId]/review-workbench.tsx",
-    "apps/web/src/app/review/page.tsx",
     "apps/web/src/lib/server/api.ts",
-    "apps/web/src/lib/text-length.ts",
+    "apps/web/src/lib/use-write-cooldown.ts",
     "contracts/openapi.json",
 }
 PROTECTED_ROOTS = ("apps/", "migrations/", "contracts/", "config/", "requirements", "pyproject.toml", "alembic.ini")

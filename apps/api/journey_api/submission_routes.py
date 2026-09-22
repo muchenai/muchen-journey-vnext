@@ -29,6 +29,7 @@ from journey_api.formal_assignment_workflow import (
     transition_formal_assignment,
 )
 from journey_api.idempotency import find_replay, store_result
+from journey_api.learner_write_limits import enforce_learner_write_limit
 from journey_api.learning_materials import ensure_required_materials_completed
 from journey_api.journey_service import (
     active_post_completion_evidence_retest,
@@ -594,7 +595,10 @@ def download_attachment(
 
 
 @api.put(
-    "/me/assignments/{assignment_id}/draft", response_model=SubmissionDraftResponse
+    "/me/assignments/{assignment_id}/draft", response_model=SubmissionDraftResponse,
+    responses={429: {"description": "RATE_LIMITED: 20 requests/10s and 90/minute per organization/Learner; error.details.retry_after_seconds specifies the wait.",
+                     "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}},
+               503: {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."}},
 )
 def save_submission_draft(
     assignment_id: uuid.UUID,
@@ -605,6 +609,7 @@ def save_submission_draft(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
+    enforce_learner_write_limit(actor, "draft")
     payload = {**command.model_dump(mode="json"), "assignment_id": str(assignment_id)}
     replay = find_replay(
         session,
@@ -906,6 +911,9 @@ def cancel_evidence_revision(
 @api.post(
     "/me/assignments/{assignment_id}/submissions",
     response_model=SubmissionMutationResponse,
+    responses={429: {"description": "RATE_LIMITED: 5 requests/10s and 20/minute per organization/Learner; includes idempotent replays; error.details.retry_after_seconds specifies the wait.",
+                     "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}},
+               503: {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."}},
 )
 def submit_assignment(
     assignment_id: uuid.UUID,
@@ -916,6 +924,7 @@ def submit_assignment(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
+    enforce_learner_write_limit(actor, "submit")
     payload = {**command.model_dump(mode="json"), "assignment_id": str(assignment_id)}
     replay = find_replay(
         session,
