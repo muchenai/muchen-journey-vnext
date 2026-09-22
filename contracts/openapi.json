@@ -1172,6 +1172,11 @@
               }
             }
           },
+          "429": {
+            "description": "RATE_LIMITED: 20 requests/10s and 90/minute per organization/Learner; error.details.retry_after_seconds specifies the wait.",
+            "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}
+          },
+          "503": {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."},
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1247,6 +1252,11 @@
               }
             }
           },
+          "429": {
+            "description": "RATE_LIMITED: 5 requests/10s and 20/minute per organization/Learner; includes idempotent replays; error.details.retry_after_seconds specifies the wait.",
+            "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}
+          },
+          "503": {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."},
           "422": {
             "description": "Validation Error",
             "content": {

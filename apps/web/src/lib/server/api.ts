@@ -755,6 +755,7 @@ export class ApiRequestError extends Error {
     message: string,
     readonly requestId: string,
     readonly status: number,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -804,7 +805,10 @@ export async function apiRequest<T>(
   if (!response.ok || "error" in payload) {
     const code = "error" in payload ? payload.error.code : "INVALID_RESPONSE";
     const message = "error" in payload ? payload.error.message : "请求失败";
-    throw new ApiRequestError(code, message, payload.request_id, response.status);
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    throw new ApiRequestError(code, message, payload.request_id, response.status,
+      response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.ceil(retryAfter) : undefined);
   }
   return payload.data;
 }

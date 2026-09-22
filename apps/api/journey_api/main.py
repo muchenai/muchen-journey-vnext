@@ -77,8 +77,12 @@ async def request_context(request: Request, call_next):
 
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
+    retry_after = exc.details.get("retry_after_seconds")
     return JSONResponse(
         status_code=exc.status_code,
+        headers={"Retry-After": str(retry_after)}
+        if exc.status_code == 429 and isinstance(retry_after, int) and retry_after > 0
+        else None,
         content={
             "error": {
                 "code": exc.code,
