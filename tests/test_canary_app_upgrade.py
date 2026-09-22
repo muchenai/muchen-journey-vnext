@@ -168,12 +168,12 @@ def test_manifest_hash_and_digest_are_mandatory(tmp_path):
 
 def test_package_and_rollback_use_the_same_deployed_base():
     from scripts.canary_app_compatibility import BASE, SOURCE_BASE
-    assert BASE == mod.BASE == "29c0473c488dd9f2d35ca40aec32e505169d4a72"
+    assert BASE == mod.BASE == "0e49004294763adfabae0130b13d4878b964c8c3"
     assert SOURCE_BASE == BASE
     assert mod.OLD == mod.ROOT / "releases" / (BASE + "-app-upgrade")
     assert mod.OLD_IMAGES == {
-        "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:bb8d3d127821286a78b3d30458340aec95b6f654c8d63872df9ca46cf747e7d5",
-        "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:5dbea3966c7ac2ce033002cf71313b6c40076080b081736ab1207800f952a77c",
+        "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:41df2448e070e139380865bc16935270a5ff1ad48ec314d6895057d9327f0685",
+        "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:f0b60af9075696ed0809ab14d7fdafca9c9cf87bb110769266c01c1340a37cf0",
     }
 
 

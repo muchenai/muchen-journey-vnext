@@ -20,7 +20,10 @@ ALLOWED_CHANGES = {
     "apps/web/src/app/globals.css",
     "apps/web/src/app/page.tsx",
     "scripts/canary_app_compatibility.py",
+    "scripts/canary_app_upgrade.py",
     "scripts/logout_feedback_browser.cjs",
+    "tests/test_canary_app_compatibility.py",
+    "tests/test_canary_app_upgrade.py",
     "tests/test_identity_invites.py",
 }
 ALLOWED_RUNTIME_CHANGES = {
