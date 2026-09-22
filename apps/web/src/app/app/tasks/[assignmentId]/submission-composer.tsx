@@ -7,6 +7,7 @@ import { CharacterProgress } from "@/app/character-progress";
 import { FactLabel } from "@/app/human-experience";
 import type { Attachment } from "@/lib/server/api";
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { useWriteCooldown } from "@/lib/use-write-cooldown";
 
 const INITIAL_STATE: SubmissionActionState = {};
 const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
@@ -127,8 +128,18 @@ export function SubmissionComposer({
   const [learnerAiPurpose, setLearnerAiPurpose] = useState("");
   const [learnerAiModelVersion, setLearnerAiModelVersion] = useState("");
   const [learnerAiPromptVersion, setLearnerAiPromptVersion] = useState("");
-  const [submitState, submitAction, submitPending] = useActionState(submitAssignment, INITIAL_STATE);
-  const [draftState, draftAction, draftPending] = useActionState(saveSubmissionDraft, INITIAL_STATE);
+  const { remaining: draftWait, wait: waitForDraft, isWaiting: isDraftWaiting } = useWriteCooldown();
+  const { remaining: submitWait, wait: waitForSubmit, isWaiting: isSubmitWaiting } = useWriteCooldown();
+  const [submitState, submitAction, submitPending] = useActionState(async (previous: SubmissionActionState, data: FormData) => {
+    const result = await submitAssignment(previous, data);
+    if (result.errorCode === "RATE_LIMITED") waitForSubmit(result.retryAfterSeconds ?? 60);
+    return result;
+  }, INITIAL_STATE);
+  const [draftState, draftAction, draftPending] = useActionState(async (previous: SubmissionActionState, data: FormData) => {
+    const result = await saveSubmissionDraft(previous, data);
+    if (result.errorCode === "RATE_LIMITED") waitForDraft(result.retryAfterSeconds ?? 60);
+    return result;
+  }, INITIAL_STATE);
   const currentSnapshot = snapshot(body, evidenceUrl, selectedAttachmentIds);
   const errorState = submitState.error ? submitState : draftState;
   const firstWin = firstWinKey ? FIRST_WIN_DIAGNOSTICS[firstWinKey] : null;
@@ -168,7 +179,7 @@ export function SubmissionComposer({
   }, [body, currentSnapshot, evidenceUrl, savedSnapshot, selectedAttachmentIds, storageKey, storageReady]);
 
   const saveDraft = useCallback((source: "auto" | "manual" = "manual") => {
-    if (!formRef.current || !isOnline || draftPending) return;
+    if (!formRef.current || !isOnline || draftPending || isDraftWaiting()) return;
     if (bodyOverLimit) {
       if (source === "manual") {
         setLocalError("提交内容不能超过 8000 个有效字符；当前内容仍保留在本机。");
@@ -189,13 +200,13 @@ export function SubmissionComposer({
     pendingSaveSource.current = source;
     setDraftFeedback(null);
     startTransition(() => draftAction(data));
-  }, [body, bodyOverLimit, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, savedSnapshot, selectedAttachmentIds]);
+  }, [body, bodyOverLimit, currentSnapshot, draftAction, draftPending, evidenceUrl, isOnline, isDraftWaiting, savedSnapshot, selectedAttachmentIds]);
 
   useEffect(() => {
-    if (!storageReady || !isOnline || confirming || bodyOverLimit || currentSnapshot === savedSnapshot) return;
+    if (!storageReady || !isOnline || confirming || bodyOverLimit || draftWait > 0 || currentSnapshot === savedSnapshot) return;
     const timer = window.setTimeout(() => saveDraft("auto"), 1_200);
     return () => window.clearTimeout(timer);
-  }, [bodyOverLimit, confirming, currentSnapshot, isOnline, saveDraft, savedSnapshot, storageReady]);
+  }, [bodyOverLimit, confirming, currentSnapshot, draftWait, isOnline, saveDraft, savedSnapshot, storageReady]);
 
   useEffect(() => {
     if (!draftState.savedAt || !pendingSnapshot.current) return;
@@ -226,7 +237,7 @@ export function SubmissionComposer({
   }, [submitState]);
 
   function lockSubmission(event: FormEvent<HTMLFormElement>) {
-    if (submissionLockedRef.current || draftPending || !isOnline) {
+    if (submissionLockedRef.current || draftPending || !isOnline || isSubmitWaiting()) {
       event.preventDefault();
       return;
     }
@@ -503,10 +514,12 @@ export function SubmissionComposer({
       </p>
 
       <div className="action-row">
+        {draftWait > 0 ? <span role="status">保存过于频繁，请等待 {draftWait} 秒；当前输入已保留。</span> : null}
+        {submitWait > 0 ? <span role="status">提交过于频繁，请等待 {submitWait} 秒后再次确认；当前输入已保留。</span> : null}
         {!isOnline ? <span className="sticky-action-status" aria-hidden="true">离线 · 正式提交已暂停</span> : null}
         {confirming ? (
           <>
-            <button className="button primary" type="submit" disabled={submissionBusy || draftPending || !isOnline}>{submissionBusy ? "正在提交…" : isEvidenceRetest ? "确认重新提交" : "确认正式提交"}</button>
+            <button className="button primary" type="submit" disabled={submissionBusy || draftPending || !isOnline || submitWait > 0}>{submissionBusy ? "正在提交…" : isEvidenceRetest ? "确认重新提交" : "确认正式提交"}</button>
             <button className="button secondary" type="button" onClick={returnToEditing} disabled={submissionBusy}>返回修改</button>
           </>
         ) : (
@@ -524,7 +537,7 @@ export function SubmissionComposer({
             >
               {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
             </button>
-            <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submissionBusy || draftPending || !isOnline}>{draftPending ? "正在保存……" : "保存草稿"}</button>
+            <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submissionBusy || draftPending || !isOnline || draftWait > 0}>{draftPending ? "正在保存……" : "保存草稿"}</button>
           </>
         )}
       </div>

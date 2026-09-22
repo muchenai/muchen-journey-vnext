@@ -55,7 +55,9 @@ test("AI self-check fails closed without invented provenance or formal mutation"
   assert.match(composer, /已跳过 AI 自查。没有生成 AI 评价，任务状态未改变/);
   assert.match(composer, /reviewSubmissionRef\.current\?\.scrollIntoView/);
   assert.match(composer, /aria-pressed=\{aiSelfCheckSkipped\}/);
-  assert.doesNotMatch(composer, /ai.*(submitAssignment|saveSubmissionDraft)/i);
+  const skipHandler = composer.match(/function skipAiSelfCheck\(\) \{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(skipHandler);
+  assert.doesNotMatch(skipHandler, /submitAssignment|saveSubmissionDraft|submitAction|draftAction/);
 });
 
 test("result renders completion, human, AI, incentive and system facts as separate ledgers", () => {

@@ -220,6 +220,8 @@ function submissionBody(data: FormData, requireComplete: boolean): SubmissionAct
 
 export type SubmissionActionState = {
   error?: string;
+  errorCode?: string;
+  retryAfterSeconds?: number;
   requestId?: string;
   savedAt?: string;
   draftRevision?: number;
@@ -255,7 +257,8 @@ function aiUseDisclosure(data: FormData, prefix: "learner_ai" | "reviewer_ai") {
 
 function submissionError(error: unknown): SubmissionActionState {
   if (error instanceof ApiRequestError) {
-    return { error: error.message, requestId: error.requestId };
+    return { error: error.message, requestId: error.requestId,
+      errorCode: error.code, retryAfterSeconds: error.retryAfterSeconds };
   }
   return { error: error instanceof Error ? error.message : "操作没有完成，请重试。" };
 }
