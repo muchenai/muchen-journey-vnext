@@ -80,7 +80,7 @@ jobs:
           mkdir -p "$out"
           cp scripts/canary_schema_upgrade.py scripts/canary_schema_facts_entry.py "$out/"
           cp deploy/production/db_facts.py "$out/"
-          cp deploy/staging/grant_runtime.py "$out/"
+          cp deploy/production/greenfield_canary_grant_runtime.py "$out/grant_runtime.py"
           python3 - <<'PY'
           import json, os
           from pathlib import Path

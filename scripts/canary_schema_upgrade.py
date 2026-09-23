@@ -257,7 +257,8 @@ class Upgrade:
         )
         write_new(self.new / "secrets/migration.env", migration_raw)
         for name in PACKAGE_FILES:
-            write_new(self.new / name, read_file(self.package / name), 0o600)
+            # These are non-secret scripts mounted into the unprivileged API image.
+            write_new(self.new / name, read_file(self.package / name), 0o644)
         before = json.loads(compose(self.base, "config", "--format", "json"))
         after = json.loads(compose(self.new, "config", "--format", "json"))
         normalized = json.loads(json.dumps(after).replace(str(self.new), str(self.base)))
@@ -411,12 +412,17 @@ class Upgrade:
 
     def probe_old_api(self) -> None:
         name = "journey-schema-old-probe-" + str(self.manifest["candidate"])[:12]
+        require(subprocess.run(["docker", "container", "inspect", name], capture_output=True).returncode != 0, "OLD_PROBE_CONTAINER_EXISTS")
+        created = False
         try:
             run([
                 "docker", "run", "-d", "--name", name, "--network", "host",
-                "--env-file", str(self.base / "secrets/api.env"), self.old_images["api"],
+                "--env-file", str(self.base / "secrets/api.env"),
+                "-v", f"{self.base / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
+                self.old_images["api"],
                 "uvicorn", "journey_api.main:app", "--host", "127.0.0.1", "--port", "18081",
             ], timeout=120)
+            created = True
             deadline = time.monotonic() + 120
             while time.monotonic() < deadline:
                 result = subprocess.run(["curl", "-fsS", "--connect-timeout", "2", "--max-time", "3", "http://127.0.0.1:18081/health/ready"], capture_output=True)
@@ -427,7 +433,8 @@ class Upgrade:
                 time.sleep(1)
             raise UpgradeError("OLD_APPLICATION_INCOMPATIBLE")
         finally:
-            subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+            if created:
+                subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
     def pointer(self, path: Path) -> None:
         temporary = ROOT / (".current-schema-upgrade-" + str(self.manifest["candidate"]))
