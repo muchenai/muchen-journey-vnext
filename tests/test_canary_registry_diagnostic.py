@@ -1,4 +1,5 @@
 import subprocess
+import json
 from unittest.mock import Mock
 
 from scripts import canary_registry_diagnostic as mod
@@ -24,3 +25,24 @@ def test_no_pull_or_mutating_commands_in_source():
     assert '"docker", "pull"' not in source
     assert '"docker", "run"' not in source
     assert '"docker", "restart"' not in source
+
+
+def test_prepare_process_inventory_never_emits_arbitrary_arguments(tmp_path):
+    for pid, argv in [("1", ["docker", "pull", mod.API, "synthetic-secret"]),
+                      ("2", ["python3", "/private/canary_schema_upgrade.py", "prepare", "synthetic-secret"]),
+                      ("3", ["unrelated", "synthetic-secret"])]:
+        (tmp_path / pid).mkdir()
+        (tmp_path / pid / "cmdline").write_bytes("\0".join(argv).encode())
+    rows = mod.prepare_processes(tmp_path)
+    assert {row["operation"] for row in rows} == {"docker_image_download", "schema_upgrade"}
+    assert "synthetic-secret" not in json.dumps(rows)
+    assert "/private" not in json.dumps(rows)
+
+
+def test_content_progress_drops_sensitive_urls(monkeypatch):
+    digest = "sha256:" + "a" * 64
+    output = f"REF SIZE AGE\nlayer-{digest} 32MiB 10m https://example.invalid/?token=synthetic-secret\n"
+    monkeypatch.setattr(mod.subprocess, "run", Mock(return_value=subprocess.CompletedProcess([], 0, output, "")))
+    result = mod.active_content()
+    assert result["downloads"] == [{"digest": digest, "size": "32MiB", "age": "10m"}]
+    assert "synthetic-secret" not in json.dumps(result)
