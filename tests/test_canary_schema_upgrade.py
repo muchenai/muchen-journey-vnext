@@ -118,7 +118,8 @@ def test_release_workflow_separates_irreversible_backfill():
         assert f'"$package/{name}"' in source
     assert 'scripts/canary_schema_upgrade.py root@"$PUBLIC_IP":"$remote/canary_schema_upgrade_control.py"' in source
     assert 'scripts/wp31_database_snapshot.py root@"$PUBLIC_IP":"$remote/wp31_database_snapshot.py"' in source
-    assert 'if [[ "$PHASE" == backup-migrate ]]' in source
+    assert 'if [[ "$PHASE" == backup-migrate || "$PHASE" == backup-diagnose ]]' in source
+    assert 'backup-diagnose) expected="BACKUP_DIAGNOSE_$short"' in source
 
 
 def test_package_workflow_pins_restore_image_and_migration_range():
@@ -173,6 +174,15 @@ def test_backup_uses_one_exported_snapshot_for_dump_and_facts():
     assert '"WP31_DATABASE_SNAPSHOT=" + snapshot_id' in source
     assert "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT" in source
     assert '"docker", "rm", "-f", holder' in source
+
+
+def test_backup_diagnostic_reports_only_safe_differences():
+    source = Path("scripts/canary_schema_upgrade.py").read_text()
+    assert '"count_differences": count_differences' in source
+    assert '"fingerprint_difference_tables": fingerprint_differences' in source
+    assert '"current_source_facts_equal": current == before' in source
+    assert '"source_fingerprints"' not in source
+    assert '"restored_fingerprints"' not in source
 
 
 def test_old_api_probe_mounts_ca_and_cleans_only_its_container(tmp_path, monkeypatch):
