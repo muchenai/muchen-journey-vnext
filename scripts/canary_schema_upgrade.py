@@ -317,6 +317,48 @@ class Upgrade:
             entry.unlink()
         self.backup.rmdir()
 
+    def backup_diagnose(self) -> None:
+        self.verify_base()
+        self.verify_prepared()
+        require(
+            self.backup.is_dir() and not self.backup.is_symlink(),
+            "INCOMPLETE_BACKUP_MISSING",
+        )
+        require(
+            not (self.backup / "migration-receipt.json").exists()
+            and not (self.backup / "canary.dump.enc").exists(),
+            "BACKUP_DIAGNOSE_REFUSES_COMPLETED_STATE",
+        )
+        before = json.loads(read_file(self.backup / "before.json"))
+        restored = json.loads(read_file(self.backup / "restored.json"))
+        current_path = self.package / "current-diagnostic.json"
+        current = self.facts(current_path)
+        tables = sorted(set(before["counts"]) | set(restored["counts"]))
+        count_differences = {
+            table: {
+                "source": before["counts"].get(table),
+                "restored": restored["counts"].get(table),
+            }
+            for table in tables
+            if before["counts"].get(table) != restored["counts"].get(table)
+        }
+        fingerprint_differences = sorted(
+            table
+            for table in set(before["content_fingerprints"]) | set(restored["content_fingerprints"])
+            if before["content_fingerprints"].get(table)
+            != restored["content_fingerprints"].get(table)
+        )
+        print(json.dumps({
+            "source_migration": before["migration"],
+            "restored_migration": restored["migration"],
+            "schema_equal": before["schema_sha256"] == restored["schema_sha256"],
+            "active_notification_recipients_equal": before["active_notification_recipients"]
+            == restored["active_notification_recipients"],
+            "count_differences": count_differences,
+            "fingerprint_difference_tables": fingerprint_differences,
+            "current_source_facts_equal": current == before,
+        }, sort_keys=True))
+
     def snapshot_dump(self, dump: Path, pg_env: dict[str, str]) -> dict[str, object]:
         snapshot_script = self.package / "wp31_database_snapshot.py"
         read_file(snapshot_script)
@@ -646,7 +688,7 @@ class Upgrade:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("prepare", "backup-migrate", "switch", "backfill", "rollback-pre-backfill", "inspect"))
+    parser.add_argument("phase", choices=("prepare", "backup-migrate", "backup-diagnose", "switch", "backfill", "rollback-pre-backfill", "inspect"))
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--actor")
