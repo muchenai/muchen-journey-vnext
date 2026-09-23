@@ -31,6 +31,7 @@ DATABASE = "journey_next_canary_20260901_c72fea5"
 PACKAGE_FILES = ("manifest.json", "db_facts.py", "grant_runtime.py")
 COPY_FILES = ("compose.canary.yaml", "compose.sh", "wp31_exec_env.py", "secrets/volcengine-rds-ca.pem")
 ENV_FILES = (".deployment.env", "secrets/api.env", "secrets/web.env")
+SNAPSHOT_ID = re.compile(r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]+$")
 
 
 class UpgradeError(RuntimeError):
@@ -296,15 +297,117 @@ class Upgrade:
         output.chmod(0o600)
         return json.loads(raw)
 
+    def recover_incomplete_backup(self) -> None:
+        if not self.backup.exists() and not self.backup.is_symlink():
+            return
+        require(
+            self.backup.is_dir()
+            and not self.backup.is_symlink()
+            and self.backup.resolve() == self.backup,
+            "BACKUP_PATH_UNSAFE",
+        )
+        allowed = {"before.json", "restored.json", "canary.dump"}
+        entries = list(self.backup.iterdir())
+        require(
+            {entry.name for entry in entries} <= allowed
+            and all(entry.is_file() and not entry.is_symlink() for entry in entries),
+            "INCOMPLETE_BACKUP_REQUIRES_MANUAL_RECOVERY",
+        )
+        for entry in entries:
+            entry.unlink()
+        self.backup.rmdir()
+
+    def snapshot_dump(self, dump: Path, pg_env: dict[str, str]) -> dict[str, object]:
+        snapshot_script = self.package / "wp31_database_snapshot.py"
+        read_file(snapshot_script)
+        exchange = self.backup / "snapshot-exchange"
+        exchange.mkdir(mode=0o700)
+        snapshot_id_path = exchange / "snapshot-id"
+        release_path = exchange / "snapshot-release"
+        holder = "journey-schema-snapshot-" + str(self.manifest["candidate"])[:12]
+        created = False
+        try:
+            require(
+                subprocess.run(
+                    ["docker", "container", "inspect", holder], capture_output=True
+                ).returncode != 0,
+                "SNAPSHOT_CONTAINER_EXISTS",
+            )
+            run([
+                "docker", "run", "-d", "--name", holder, "--user", "0:0",
+                "--network", "host", "--env-file", str(self.new / "secrets/migration.env"),
+                "-e", "PGOPTIONS=-c default_transaction_read_only=on",
+                "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
+                "-v", f"{snapshot_script}:/tmp/wp31_database_snapshot.py:ro",
+                "-v", f"{exchange}:/exchange", self.images["api"],
+                "python", "/tmp/wp31_database_snapshot.py",
+                "--exchange-dir", "/exchange", "--timeout-seconds", "900",
+            ], timeout=120)
+            created = True
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                if snapshot_id_path.is_file() and not snapshot_id_path.is_symlink():
+                    break
+                running = subprocess.run(
+                    ["docker", "inspect", "-f", "{{.State.Running}}", holder],
+                    capture_output=True,
+                )
+                require(
+                    running.returncode == 0 and running.stdout.strip() == b"true",
+                    "SNAPSHOT_HOLDER_EXITED",
+                )
+                time.sleep(1)
+            else:
+                raise UpgradeError("SNAPSHOT_NOT_READY")
+            require(stat.S_IMODE(snapshot_id_path.stat().st_mode) == 0o600, "SNAPSHOT_ID_MODE")
+            snapshot_id = read_file(snapshot_id_path, maximum=256).decode().strip()
+            require(SNAPSHOT_ID.fullmatch(snapshot_id), "SNAPSHOT_ID_INVALID")
+            run([
+                "docker", "run", "--rm", "--network", "host",
+                "-e", "PGPASSWORD", "-e", "PGSSLMODE", "-e", "PGSSLROOTCERT",
+                "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
+                "-v", f"{self.backup}:/backup", self.images["dbrestore"],
+                "pg_dump", "-h", pg_env["PGHOST"], "-p", pg_env["PGPORT"],
+                "-U", pg_env["PGUSER"], "-d", DATABASE, "--format=custom",
+                "--compress=9", "--no-owner", "--no-acl", "--snapshot=" + snapshot_id,
+                "--file=/backup/canary.dump",
+            ], timeout=900, env=pg_env)
+            raw = run([
+                "docker", "run", "--rm", "--network", "host",
+                "--env-file", str(self.new / "secrets/migration.env"),
+                "-e", "PGOPTIONS=-c default_transaction_read_only=on",
+                "-e", "REQUIRE_READ_ONLY=true", "-e", "WP31_DATABASE_SNAPSHOT=" + snapshot_id,
+                "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
+                "-v", f"{self.new / 'db_facts.py'}:/tmp/db_facts.py:ro",
+                "-v", f"{snapshot_script}:/tmp/wp31_database_snapshot.py:ro",
+                self.images["api"], "python", "/tmp/db_facts.py",
+            ], timeout=600)
+            before = json.loads(raw)
+            (self.backup / "before.json").write_bytes(raw)
+            (self.backup / "before.json").chmod(0o600)
+            write_new(release_path, b"")
+            status = run(["docker", "wait", holder], timeout=30).decode().strip()
+            require(status == "0", "SNAPSHOT_RELEASE_FAILED")
+            run(["docker", "rm", holder], timeout=30)
+            created = False
+            return before
+        finally:
+            if created:
+                subprocess.run(["docker", "rm", "-f", holder], capture_output=True)
+            for path in (snapshot_id_path, exchange / ".snapshot-id.pending", release_path):
+                if path.is_file() and not path.is_symlink():
+                    path.unlink()
+            if exchange.is_dir() and not exchange.is_symlink():
+                exchange.rmdir()
+
     def backup_migrate(self, backup_key: str) -> None:
         self.verify_base()
         self.verify_prepared()
-        require(not self.backup.exists() and not self.backup.is_symlink(), "BACKUP_EXISTS")
         require(len(backup_key) >= 32 and "\n" not in backup_key and "\r" not in backup_key, "BACKUP_SECRET_INVALID")
+        self.recover_incomplete_backup()
+        require(not self.backup.exists() and not self.backup.is_symlink(), "BACKUP_EXISTS")
         self.backup.mkdir(parents=True, mode=0o700)
         before_path = self.backup / "before.json"
-        before = self.facts(before_path)
-        require(before["migration"] == self.manifest["migrations"]["from"], "SOURCE_MIGRATION")
         dump = self.backup / "canary.dump"
         encrypted = self.backup / "canary.dump.enc"
         migration = env_values(read_file(self.new / "secrets/migration.env"))
@@ -313,16 +416,28 @@ class Upgrade:
         pg_env.update({
             "PGPASSWORD": unquote(parsed.password or ""), "PGSSLMODE": "verify-full",
             "PGSSLROOTCERT": "/run/secrets/volcengine-rds-ca.pem",
+            "PGHOST": parsed.hostname or "", "PGPORT": str(parsed.port or 5432),
+            "PGUSER": unquote(parsed.username or ""),
         })
-        run([
-            "docker", "run", "--rm", "--network", "host",
-            "-e", "PGPASSWORD", "-e", "PGSSLMODE", "-e", "PGSSLROOTCERT",
-            "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
-            "-v", f"{self.backup}:/backup", self.images["dbrestore"],
-            "pg_dump", "-h", parsed.hostname or "", "-p", str(parsed.port or 5432),
-            "-U", unquote(parsed.username or ""), "-d", DATABASE, "--format=custom", "--compress=9",
-            "--no-owner", "--no-acl", "--file=/backup/canary.dump",
-        ], timeout=900, env=pg_env)
+        require(pg_env["PGHOST"] and pg_env["PGUSER"], "DATABASE_URL")
+        before = self.snapshot_dump(dump, pg_env)
+        require(before_path.is_file() and before["migration"] == self.manifest["migrations"]["from"], "SOURCE_MIGRATION")
+        verify = self.backup / "verify.dump"
+        try:
+            self.restore_encrypt_migrate(before, dump, encrypted, verify, backup_key)
+        finally:
+            for path in (dump, verify):
+                if path.is_file() and not path.is_symlink():
+                    path.unlink()
+
+    def restore_encrypt_migrate(
+        self,
+        before: dict[str, object],
+        dump: Path,
+        encrypted: Path,
+        verify: Path,
+        backup_key: str,
+    ) -> None:
         restore_name = "journey-schema-restore-" + str(self.manifest["candidate"])[:12]
         restore_password = hashlib.sha256((backup_key + str(self.manifest["candidate"])).encode()).hexdigest()
         network = restore_name
@@ -367,7 +482,7 @@ class Upgrade:
             restored = json.loads(restored_raw_json)
             (self.backup / "restored.json").write_bytes(restored_raw_json)
             (self.backup / "restored.json").chmod(0o600)
-            require(restored == before, "RESTORED_FACTS_DIFFER")
+            require(restored == before, "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT")
         finally:
             if container_created:
                 subprocess.run(["docker", "rm", "-f", restore_name], capture_output=True)
@@ -382,13 +497,11 @@ class Upgrade:
             "openssl", "enc", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-salt",
             "-in", str(dump), "-out", str(encrypted), "-pass", "env:CANARY_SCHEMA_BACKUP_KEY",
         ], timeout=900, env=encryption_env)
-        verify = self.backup / "verify.dump"
         run([
             "openssl", "enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "600000",
             "-in", str(encrypted), "-out", str(verify), "-pass", "env:CANARY_SCHEMA_BACKUP_KEY",
         ], timeout=900, env=encryption_env)
         require(digest(read_file(verify, maximum=2_000_000_000)) == digest(read_file(dump, maximum=2_000_000_000)), "BACKUP_DECRYPT_VERIFY")
-        verify.unlink(); dump.unlink()
         self.docker_api("secrets/migration.env", "alembic", "upgrade", "head", timeout=900)
         current = self.docker_api("secrets/migration.env", "alembic", "current", timeout=300).decode()
         require(str(self.manifest["migrations"]["to"]) in current, "TARGET_MIGRATION")

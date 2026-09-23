@@ -116,6 +116,9 @@ def test_release_workflow_separates_irreversible_backfill():
         "SHA256SUMS",
     ):
         assert f'"$package/{name}"' in source
+    assert 'scripts/canary_schema_upgrade.py root@"$PUBLIC_IP":"$remote/canary_schema_upgrade_control.py"' in source
+    assert 'scripts/wp31_database_snapshot.py root@"$PUBLIC_IP":"$remote/wp31_database_snapshot.py"' in source
+    assert 'if [[ "$PHASE" == backup-migrate ]]' in source
 
 
 def test_package_workflow_pins_restore_image_and_migration_range():
@@ -141,6 +144,35 @@ def test_fact_probe_never_exports_raw_rows():
     assert "to_jsonb" in source
     assert "print(" in source
     assert "SELECT *" not in source.upper()
+
+
+def test_incomplete_pre_migration_backup_is_recoverable(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    upgrade = mod.Upgrade(manifest(), tmp_path)
+    upgrade.backup.mkdir(parents=True)
+    for name in ("before.json", "restored.json", "canary.dump"):
+        (upgrade.backup / name).write_bytes(b"synthetic")
+    upgrade.recover_incomplete_backup()
+    assert not upgrade.backup.exists()
+
+
+@pytest.mark.parametrize("name", ["canary.dump.enc", "migration-receipt.json", "unexpected"])
+def test_incomplete_backup_recovery_refuses_ambiguous_state(tmp_path, monkeypatch, name):
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    upgrade = mod.Upgrade(manifest(), tmp_path)
+    upgrade.backup.mkdir(parents=True)
+    (upgrade.backup / name).write_bytes(b"synthetic")
+    with pytest.raises(mod.UpgradeError, match="INCOMPLETE_BACKUP_REQUIRES_MANUAL_RECOVERY"):
+        upgrade.recover_incomplete_backup()
+    assert (upgrade.backup / name).exists()
+
+
+def test_backup_uses_one_exported_snapshot_for_dump_and_facts():
+    source = Path("scripts/canary_schema_upgrade.py").read_text()
+    assert '"--snapshot=" + snapshot_id' in source
+    assert '"WP31_DATABASE_SNAPSHOT=" + snapshot_id' in source
+    assert "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT" in source
+    assert '"docker", "rm", "-f", holder' in source
 
 
 def test_old_api_probe_mounts_ca_and_cleans_only_its_container(tmp_path, monkeypatch):

@@ -201,7 +201,13 @@ jobs:
             "$package/grant_runtime.py" \
             "$package/SHA256SUMS" \
             root@"$PUBLIC_IP":"$remote/"
-          command="python3 '$remote/canary_schema_upgrade.py' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"
+          upgrade_script="$remote/canary_schema_upgrade.py"
+          if [[ "$PHASE" == backup-migrate ]]; then
+            scp "${opts[@]}" scripts/canary_schema_upgrade.py root@"$PUBLIC_IP":"$remote/canary_schema_upgrade_control.py"
+            scp "${opts[@]}" scripts/wp31_database_snapshot.py root@"$PUBLIC_IP":"$remote/wp31_database_snapshot.py"
+            upgrade_script="$remote/canary_schema_upgrade_control.py"
+          fi
+          command="python3 '$upgrade_script' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"
           if [[ "$PHASE" == cache-images ]]; then
             chunks="$RUNNER_TEMP/schema-image-cache-chunks"
             chunks_manifest="$chunks/chunks.json"

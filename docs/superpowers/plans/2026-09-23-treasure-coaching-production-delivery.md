@@ -4,7 +4,7 @@
 
 **Goal:** Safely deliver the already-completed four-treasure non-blocking coaching feature, preserve identity and immutable history, backfill only the intended latest treasure submissions, and hand the verified production release to human UAT.
 
-**Current status:** Feature development and the immutable application package are complete. Production remains on `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. Candidate `9a35f45053e903aa8e4d113aadbf7168d9ae9d0d` is blocked in release preparation because the production host could not download the pinned dbrestore image within the existing 1800-second per-image timeout. No schema migration, switch, or backfill has run.
+**Current status (2026-09-24):** Feature development, the immutable application package, bounded image-cache transfer, and immutable Prepare are complete. Diagnostic Run `35899094632` proved the retained archive, gzip stream, cache image tags, platforms, and API/Web revisions; it also proved that cache work did not change containers, the database, or the current release. Prepare Run `35899373542` then returned `PASS` for candidate `9a35f45053e903aa8e4d113aadbf7168d9ae9d0d`. Public production remains healthy on `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. No schema migration, switch, or backfill has run. Phase 1 is complete; execution is stopped before Phase 2 pending a fresh user-approved write-pause window.
 
 **2026-09-23 Phase 1 amendment:** The first immutable-cache run (`35857068059`) exported all three exact images but its uncompressed `docker save` archive did not finish the GitHub Runner-to-Beijing SCP transfer before the 65-minute job boundary. The import never started, no phase receipt was produced, and the temporary SSH rule was closed successfully. With user approval, Phase 1 now compresses the archive before transfer, records raw/compressed byte counts and SHA-256, bounds the individual SCP operation to 50 minutes, verifies the complete gzip and SHA-256 before import, and otherwise preserves the same fail-closed boundaries. This is a transport correction only; it does not relax digest, revision, base-release, lock, database, container, or history protections.
 
@@ -22,7 +22,13 @@ Run `35893852269` validated the transport capacity but exposed an implementation
 
 Run `35896309692` scheduled and verified all 16 chunks in about ten minutes, resolving the transfer blocker. Import then stopped with the generic `IMAGE_CACHE_COMMAND_FAILED` category after archive assembly. Because the existing wrapper suppresses the failing command identity and stderr, retrying the load would be blind. A read-only `cache-diagnose` phase therefore validates the retained archive SHA/gzip stream and reports only whether the original digest references and deterministic cache tags are present with the expected platform/revision. It performs no Docker load, container operation, database access, release-pointer change, or cleanup.
 
-**Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
+Diagnostic Run `35899094632` completed successfully. It proved the archive SHA-256 and gzip stream, confirmed the deterministic API/Web/dbrestore cache tags with their expected platform and application revisions, and recorded that containers, the database, and the current release were unchanged. It also isolated the prior post-load failure: Docker archive import restored the image content and deterministic cache tags, but did not restore the original Web and dbrestore digest-reference aliases. This was not another transfer failure. The original Prepare path remained authoritative and successfully bound/checked the exact manifest references from the cached layers.
+
+Prepare Run `35899373542` completed in 55 seconds on control revision `e0b26b22958b2d6957bbd2095212a163adafc41f`. Its retained receipt is `{\"candidate\": \"9a35f45053e903aa8e4d113aadbf7168d9ae9d0d\", \"phase\": \"prepare\", \"result\": \"PASS\"}`. The temporary SSH rule closed successfully, and the public readiness endpoint still reported the old release `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. This satisfies Phase 1 without a database or application switch.
+
+**2026-09-24 Phase 2 stop:** Preflight Inspect Run `35900307987` confirmed the old release was current, the candidate was prepared, and migration/backfill had not run. Backup-migrate Run `35900470774` then stopped before migration with `RESTORED_FACTS_DIFFER`. The old application stayed healthy and no switch/backfill occurred. Root cause is a release-script defect: source facts were read before `pg_dump` instead of importing the same exported PostgreSQL snapshot used by the dump. The bounded correction reuses the existing snapshot holder, passes the same snapshot ID to both `pg_dump` and the facts probe, removes only the precisely recognized incomplete pre-migration backup, and refuses automatic recovery if an encrypted backup or migration receipt exists. The comparison remains mandatory; it is not weakened or skipped.
+
+**Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; the initial Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; cache diagnostic Run `35899094632` passed; final Prepare Run `35899373542` passed; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries
 
@@ -58,7 +64,7 @@ Run `35896309692` scheduled and verified all 16 chunks in about ten minutes, res
 
 ## Phase 1 — Unblock immutable image preparation
 
-**Status:** CURRENT; implementation may begin only from this confirmed plan.
+**Status:** COMPLETE. Accepted from Run `35899094632`, Prepare receipt Run `35899373542`, and the unchanged healthy production release. Do not repeat cache transfer or Prepare unless a later preflight proves the candidate or manifest has changed.
 
 **Objective:** Preload only the three pinned candidate images without changing containers, configuration, database, or the current release; then make the original immutable Prepare phase succeed.
 
