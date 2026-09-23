@@ -4,7 +4,7 @@
 
 **Goal:** Safely deliver the already-completed four-treasure non-blocking coaching feature, preserve identity and immutable history, backfill only the intended latest treasure submissions, and hand the verified production release to human UAT.
 
-**Current status (2026-09-24):** Feature development, the immutable application package, bounded image-cache transfer, and immutable Prepare are complete. Diagnostic Run `35899094632` proved the retained archive, gzip stream, cache image tags, platforms, and API/Web revisions; it also proved that cache work did not change containers, the database, or the current release. Prepare Run `35899373542` then returned `PASS` for candidate `9a35f45053e903aa8e4d113aadbf7168d9ae9d0d`. Public production remains healthy on `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. No schema migration, switch, or backfill has run. Phase 1 is complete; execution is stopped before Phase 2 pending a fresh user-approved write-pause window.
+**Current status (2026-09-24):** Production is healthy on candidate `9a35f45053e903aa8e4d113aadbf7168d9ae9d0d`. Prepare, encrypted backup plus isolated restore proof, migration `0028 → 0029`, reversible switch, and forward-only historical backfill are complete. Backfill created exactly 9 coaching Reviews for 3 Enrollments; Evaluation, SubmissionVersion, Assignment, Enrollment, and Outcome deltas were zero, with zero remaining candidates. Final Inspect Run `35906517341` proved `prepared=true`, `migration_complete=true`, `backfill_complete=true`, and the candidate release is current. The write pause may be released; Phase 4 human UAT is now current.
 
 **2026-09-23 Phase 1 amendment:** The first immutable-cache run (`35857068059`) exported all three exact images but its uncompressed `docker save` archive did not finish the GitHub Runner-to-Beijing SCP transfer before the 65-minute job boundary. The import never started, no phase receipt was produced, and the temporary SSH rule was closed successfully. With user approval, Phase 1 now compresses the archive before transfer, records raw/compressed byte counts and SHA-256, bounds the individual SCP operation to 50 minutes, verifies the complete gzip and SHA-256 before import, and otherwise preserves the same fail-closed boundaries. This is a transport correction only; it does not relax digest, revision, base-release, lock, database, container, or history protections.
 
@@ -27,6 +27,8 @@ Diagnostic Run `35899094632` completed successfully. It proved the archive SHA-2
 Prepare Run `35899373542` completed in 55 seconds on control revision `e0b26b22958b2d6957bbd2095212a163adafc41f`. Its retained receipt is `{\"candidate\": \"9a35f45053e903aa8e4d113aadbf7168d9ae9d0d\", \"phase\": \"prepare\", \"result\": \"PASS\"}`. The temporary SSH rule closed successfully, and the public readiness endpoint still reported the old release `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. This satisfies Phase 1 without a database or application switch.
 
 **2026-09-24 Phase 2 stop:** Preflight Inspect Run `35900307987` confirmed the old release was current, the candidate was prepared, and migration/backfill had not run. Backup-migrate Run `35900470774` then stopped before migration with `RESTORED_FACTS_DIFFER`. The old application stayed healthy and no switch/backfill occurred. Root cause is a release-script defect: source facts were read before `pg_dump` instead of importing the same exported PostgreSQL snapshot used by the dump. The bounded correction reuses the existing snapshot holder, passes the same snapshot ID to both `pg_dump` and the facts probe, removes only the precisely recognized incomplete pre-migration backup, and refuses automatic recovery if an encrypted backup or migration receipt exists. The comparison remains mandatory; it is not weakened or skipped.
+
+Backup-migrate Run `35902597477` proved the shared snapshot worked but exposed a second comparison defect: source and restore had identical migration, schema, table counts, and active-recipient count, while every timestamp-bearing table had a different content fingerprint. Read-only diagnostic Run `35903586694` proved current source facts still equaled the captured source facts. The cause was session-time-zone-dependent `timestamptz` rendering inside `to_jsonb`; the fact probe now sets transaction-local UTC after snapshot import. Run `35905286034` then passed backup, decrypt verification, isolated restore equality, migration, protected counts, grants, and old-application compatibility. Switch Run `35905636900`, Backfill Run `35905840871`, and final Inspect Run `35906517341` all passed.
 
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; the initial Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; cache diagnostic Run `35899094632` passed; final Prepare Run `35899373542` passed; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
@@ -107,6 +109,8 @@ Prepare Run `35899373542` completed in 55 seconds on control revision `e0b26b229
 
 ## Phase 2 — Backup, migrate, and reversible switch
 
+**Status:** COMPLETE. Backup-migrate Run `35905286034` and Switch Run `35905636900` passed.
+
 **Objective:** Prove a recoverable migration, upgrade schema `0028 → 0029`, and switch to the candidate while the old application remains a valid pre-backfill rollback target.
 
 **Necessary execution:** Recheck old production health/current pointer/no parallel release; obtain a fresh user-approved pause window; create and decrypt-verify the encrypted backup; restore it in isolation and compare facts; migrate; prove protected business counts unchanged and new fact tables empty; grant exact runtime permissions; run old-API compatibility probe; switch API/Web; verify internal and public health.
@@ -123,6 +127,8 @@ Prepare Run `35899373542` completed in 55 seconds on control revision `e0b26b229
 
 ## Phase 3 — Forward-only historical backfill and release closure
 
+**Status:** COMPLETE. Backfill Run `35905840871` created 9 expected coaching Reviews with zero protected-fact deltas; final Inspect Run `35906517341` passed.
+
 **Objective:** Add only the expected coaching Review records for eligible existing treasure submissions and prove all protected facts remain unchanged.
 
 **Necessary execution:** Generate and retain the private plan; report only non-sensitive scope/counts; apply idempotently; verify Review delta equals the plan, remaining is zero, and Evaluation/SubmissionVersion/Enrollment/Outcome deltas are zero; run synthetic authorization and UI smoke checks; retain receipts; release the write pause.
@@ -138,6 +144,8 @@ Prepare Run `35899373542` completed in 55 seconds on control revision `e0b26b229
 **User action:** None beyond maintaining the agreed pause; resume only after explicit release notice.
 
 ## Phase 4 — Human UAT
+
+**Status:** CURRENT. Technical production verification is complete; authenticated Learner/Reviewer behavior remains human UAT because no approved production synthetic identity is available.
 
 **Objective:** Have the actual Learner and Reviewer validate the production workflow after technical release verification.
 
