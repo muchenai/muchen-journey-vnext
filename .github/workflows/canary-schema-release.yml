@@ -253,7 +253,12 @@ jobs:
                 fi
                 printf '{"cache_chunk":"START","name":"%s","bytes":%s,"offset":%s,"attempt":%s}\n' "$chunk_name" "$chunk_bytes" "$partial_bytes" "$attempt"
                 set +e
-                printf 'reput "%s" "%s"\n' "$local_chunk" "$remote/chunks/$chunk_name.partial" | timeout --signal=TERM --kill-after=15s "${attempt_timeout}s" sftp "${opts[@]}" -b - root@"$PUBLIC_IP"
+                if [[ "$partial_bytes" -eq 0 ]]; then
+                  sftp_command=put
+                else
+                  sftp_command=reput
+                fi
+                printf '%s "%s" "%s"\n' "$sftp_command" "$local_chunk" "$remote/chunks/$chunk_name.partial" | timeout --signal=TERM --kill-after=15s "${attempt_timeout}s" sftp "${opts[@]}" -b - root@"$PUBLIC_IP"
                 transfer_status=$?
                 if [[ "$transfer_status" -eq 0 ]]; then
                   ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -e '$remote/chunks/$chunk_name'; then test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'; else test ! -L '$remote/chunks/$chunk_name.partial' && test -f '$remote/chunks/$chunk_name.partial' && test \"\$(stat -c %s '$remote/chunks/$chunk_name.partial')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'; fi"
