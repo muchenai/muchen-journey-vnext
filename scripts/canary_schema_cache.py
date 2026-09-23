@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -29,6 +31,29 @@ def archive_digest(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def compress_archive(source: Path, destination: Path) -> tuple[int, int]:
+    """Compress a docker-save archive without overwriting an existing target."""
+    require(source.is_file() and not source.is_symlink(), "RAW_ARCHIVE_UNSAFE_FILE")
+    require(not destination.exists() and not destination.is_symlink(), "ARCHIVE_EXISTS")
+    raw_bytes = source.stat().st_size
+    try:
+        with source.open("rb") as incoming, destination.open("xb") as outgoing:
+            with gzip.GzipFile(
+                filename="",
+                mode="wb",
+                compresslevel=1,
+                fileobj=outgoing,
+                mtime=0,
+            ) as compressed:
+                shutil.copyfileobj(incoming, compressed, length=1024 * 1024)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        source.unlink(missing_ok=True)
+    return raw_bytes, destination.stat().st_size
+
+
 def candidate_images(manifest: dict[str, object]) -> list[tuple[str, str]]:
     images = manifest["images"]
     require(isinstance(images, dict), "IMAGE_FIELDS")
@@ -48,6 +73,8 @@ def check_image(name: str, reference: str, candidate: str) -> None:
 
 def export_images(manifest: dict[str, object], path: Path) -> None:
     require(not path.exists() and not path.is_symlink(), "ARCHIVE_EXISTS")
+    raw_path = path.with_name(path.name + ".raw")
+    require(not raw_path.exists() and not raw_path.is_symlink(), "RAW_ARCHIVE_EXISTS")
     candidate = str(manifest["candidate"])
     tags: list[str] = []
     for name, reference in candidate_images(manifest):
@@ -56,12 +83,19 @@ def export_images(manifest: dict[str, object], path: Path) -> None:
         tag = reference.split("@", 1)[0] + ":schema-cache-" + candidate + "-" + name
         execute(["docker", "tag", reference, tag], timeout=60)
         tags.append(tag)
-    execute(["docker", "save", "--output", str(path), *tags])
+    try:
+        execute(["docker", "save", "--output", str(raw_path), *tags])
+        raw_bytes, archive_bytes = compress_archive(raw_path, path)
+    finally:
+        raw_path.unlink(missing_ok=True)
     print(
         json.dumps(
             {
                 "cache_export": "PASS",
                 "archive_sha256": archive_digest(path),
+                "archive_format": "gzip",
+                "archive_bytes": archive_bytes,
+                "raw_archive_bytes": raw_bytes,
                 "image_count": len(tags),
             },
             sort_keys=True,
@@ -79,6 +113,7 @@ def import_images(manifest: dict[str, object], path: Path, expected_sha: str) ->
         and archive_digest(path) == expected_sha,
         "ARCHIVE_HASH",
     )
+    execute(["gzip", "-t", str(path)], timeout=300)
     upgrade = Upgrade(manifest, Path(__file__).resolve().parent)
     os.umask(0o077)
     import fcntl
