@@ -2,9 +2,11 @@
 
 import gzip
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
+import subprocess
 from unittest.mock import Mock
 
 import pytest
@@ -284,11 +286,85 @@ def test_source_has_no_runtime_or_database_mutation_commands():
         assert forbidden not in source
 
 
+def test_diagnose_import_reports_loaded_cache_tags_without_mutating(tmp_path, monkeypatch, capsys):
+    candidate = "a" * 40
+    manifest_sha = "b" * 64
+    runs_dir = tmp_path / "schema-upgrade-runs"
+    source_dir = runs_dir / "123456-1-cache-images"
+    source_dir.mkdir(parents=True)
+    archive = source_dir / "schema-image-cache.tar.gz"
+    with gzip.open(archive, "wb") as output:
+        output.write(b"verified archive")
+    chunks_manifest = source_dir / "chunks.json"
+    chunks_manifest.write_text(
+        json.dumps(
+            {
+                "release_manifest_sha256": manifest_sha,
+                "candidate": candidate,
+                "archive_sha256": cache.archive_digest(archive),
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = {
+        "candidate": candidate,
+        "images": {
+            "api": "ghcr.io/example/api@sha256:" + "1" * 64,
+            "web": "ghcr.io/example/web@sha256:" + "2" * 64,
+            "dbrestore": "ghcr.io/example/dbrestore@sha256:" + "3" * 64,
+        },
+    }
+    monkeypatch.setattr(cache.schema, "ROOT", tmp_path)
+    monkeypatch.setattr(cache.sys, "platform", "linux")
+    monkeypatch.setattr(cache.os, "geteuid", lambda: 0, raising=False)
+
+    def fake_run(command, **_kwargs):
+        if command[:2] == ["gzip", "-t"]:
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+        reference = command[-1]
+        if "@sha256:" in reference:
+            return subprocess.CompletedProcess(command, 1, b"", b"missing")
+        name = next(name for name in ("api", "web", "dbrestore") if reference.endswith("-" + name))
+        labels = {} if name == "dbrestore" else {"org.opencontainers.image.revision": candidate}
+        body = json.dumps([{"Os": "linux", "Architecture": "amd64", "Config": {"Labels": labels}}]).encode()
+        return subprocess.CompletedProcess(command, 0, body, b"")
+
+    monkeypatch.setattr(cache.subprocess, "run", fake_run)
+    cache.diagnose_import(manifest, chunks_manifest, archive, manifest_sha)
+    result = json.loads(capsys.readouterr().out)
+    assert result["cache_diagnostic"] == "PASS"
+    assert result["gzip_valid"] is True
+    assert all(not row["original_reference_present"] for row in result["images"])
+    assert all(row["cache_tag_present"] for row in result["images"])
+    assert all(row["cache_platform_ok"] for row in result["images"])
+    assert all(row["cache_revision_ok"] for row in result["images"])
+    assert result["containers_changed"] is False
+    assert result["database_changed"] is False
+    assert result["release_changed"] is False
+
+
+def test_cache_diagnostic_source_has_no_mutation_commands():
+    source = inspect.getsource(cache.inspect_cached_image) + inspect.getsource(cache.diagnose_import)
+    for forbidden in (
+        '"docker", "load"',
+        '"docker", "tag"',
+        '"docker", "pull"',
+        ".unlink(",
+        ".mkdir(",
+        "os.replace",
+        "shutil.",
+    ):
+        assert forbidden not in source
+
+
 def test_workflow_serializes_cache_with_every_release_phase():
     source = Path(".github/workflows/canary-schema-release.yml").read_text()
     assert "group: canary-schema-upgrade-release" in source
     assert "canary-schema-image-cache" not in source
     assert "CACHE_IMAGES_$short" in source
+    assert "CACHE_DIAGNOSE_$short" in source
+    assert "cache_source_run" in source
+    assert "diagnose-import" in source
     assert "scripts/canary_schema_cache.py export" in source
     assert "canary_schema_cache.py' import-chunks" in source
     assert "schema-image-cache.tar.gz" in source

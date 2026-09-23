@@ -20,6 +20,8 @@ The user approved the bounded parallel path on 2026-09-24. The existing 16 indep
 
 Run `35893852269` validated the transport capacity but exposed an implementation defect: the first eight chunks all passed in about ten minutes, while background SSH checks consumed the process-substitution input that was feeding the foreground manifest loop, so chunks 8–15 were never scheduled. The importer correctly stopped with `CHUNKS_DIRECTORY_CONTENTS` before archive assembly or Docker load; SSH ingress closed and production remained healthy on the base release. The bounded fix materializes and count-checks all manifest rows before starting workers and redirects every background SSH check from `/dev/null`, while leaving parallelism, retry limits, deadline, hashes, and non-mutation boundaries unchanged.
 
+Run `35896309692` scheduled and verified all 16 chunks in about ten minutes, resolving the transfer blocker. Import then stopped with the generic `IMAGE_CACHE_COMMAND_FAILED` category after archive assembly. Because the existing wrapper suppresses the failing command identity and stderr, retrying the load would be blind. A read-only `cache-diagnose` phase therefore validates the retained archive SHA/gzip stream and reports only whether the original digest references and deterministic cache tags are present with the expected platform/revision. It performs no Docker load, container operation, database access, release-pointer change, or cleanup.
+
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries
