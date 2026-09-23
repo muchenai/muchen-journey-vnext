@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import canary_schema_upgrade as schema
 from canary_schema_upgrade import Upgrade, UpgradeError, load_manifest, require
 
+CHUNK_BYTES = 16 * 1024 * 1024
+
 
 def execute(command: list[str], timeout: int = 1800) -> bytes:
     try:
@@ -52,6 +54,136 @@ def compress_archive(source: Path, destination: Path) -> tuple[int, int]:
     finally:
         source.unlink(missing_ok=True)
     return raw_bytes, destination.stat().st_size
+
+
+def split_archive(
+    path: Path,
+    chunks_dir: Path,
+    manifest_sha256: str,
+    candidate: str,
+    chunk_bytes: int = CHUNK_BYTES,
+) -> Path:
+    """Split one verified compressed archive into independently verifiable chunks."""
+    require(path.is_file() and not path.is_symlink(), "ARCHIVE_UNSAFE_FILE")
+    require(0 < chunk_bytes <= CHUNK_BYTES, "CHUNK_SIZE")
+    require(not chunks_dir.exists() and not chunks_dir.is_symlink(), "CHUNKS_DIRECTORY_EXISTS")
+    chunks_dir.mkdir(mode=0o700)
+    chunks: list[dict[str, object]] = []
+    with path.open("rb") as source:
+        index = 0
+        while data := source.read(chunk_bytes):
+            name = f"chunk-{index:04d}.bin"
+            chunk_path = chunks_dir / name
+            with chunk_path.open("xb") as output:
+                output.write(data)
+            chunks.append(
+                {
+                    "name": name,
+                    "bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                }
+            )
+            index += 1
+    require(bool(chunks), "CHUNKS_EMPTY")
+    chunks_manifest = chunks_dir / "chunks.json"
+    value = {
+        "schema_version": 1,
+        "release_manifest_sha256": manifest_sha256,
+        "candidate": candidate,
+        "archive_name": path.name,
+        "archive_sha256": archive_digest(path),
+        "archive_bytes": path.stat().st_size,
+        "chunk_bytes": chunk_bytes,
+        "chunks": chunks,
+    }
+    with chunks_manifest.open("x", encoding="utf-8", newline="\n") as output:
+        json.dump(value, output, sort_keys=True, separators=(",", ":"))
+        output.write("\n")
+    path.unlink()
+    print(
+        json.dumps(
+            {
+                "cache_split": "PASS",
+                "archive_sha256": value["archive_sha256"],
+                "archive_bytes": value["archive_bytes"],
+                "chunk_bytes": chunk_bytes,
+                "chunk_count": len(chunks),
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    return chunks_manifest
+
+
+def assemble_archive(
+    chunks_manifest: Path,
+    chunks_dir: Path,
+    destination: Path,
+    manifest_sha256: str,
+    candidate: str,
+) -> tuple[str, list[Path]]:
+    """Validate every chunk and assemble the exact original compressed archive."""
+    require(chunks_manifest.is_file() and not chunks_manifest.is_symlink(), "CHUNKS_MANIFEST_FILE")
+    require(chunks_dir.is_dir() and not chunks_dir.is_symlink(), "CHUNKS_DIRECTORY")
+    require(not destination.exists() and not destination.is_symlink(), "ARCHIVE_EXISTS")
+    value = json.loads(chunks_manifest.read_text(encoding="utf-8"))
+    require(isinstance(value, dict), "CHUNKS_SCHEMA")
+    require(value.get("schema_version") == 1, "CHUNKS_SCHEMA")
+    require(value.get("release_manifest_sha256") == manifest_sha256, "CHUNKS_RELEASE_MANIFEST")
+    require(value.get("candidate") == candidate, "CHUNKS_CANDIDATE")
+    require(value.get("archive_name") == destination.name, "CHUNKS_ARCHIVE_NAME")
+    expected_sha = value.get("archive_sha256")
+    expected_bytes = value.get("archive_bytes")
+    chunk_size = value.get("chunk_bytes")
+    rows = value.get("chunks")
+    require(
+        isinstance(expected_sha, str)
+        and len(expected_sha) == 64
+        and all(character in "0123456789abcdef" for character in expected_sha),
+        "CHUNKS_ARCHIVE_HASH",
+    )
+    require(isinstance(expected_bytes, int) and expected_bytes > 0, "CHUNKS_ARCHIVE_BYTES")
+    require(isinstance(chunk_size, int) and 0 < chunk_size <= CHUNK_BYTES, "CHUNK_SIZE")
+    require(isinstance(rows, list) and 0 < len(rows) <= 4096, "CHUNKS_LIST")
+    expected_names = {f"chunk-{index:04d}.bin" for index in range(len(rows))}
+    allowed_names = set(expected_names)
+    if chunks_manifest.resolve().parent == chunks_dir.resolve():
+        allowed_names.add(chunks_manifest.name)
+    require({entry.name for entry in chunks_dir.iterdir()} == allowed_names, "CHUNKS_DIRECTORY_CONTENTS")
+    chunk_paths: list[Path] = []
+    written = 0
+    digest = hashlib.sha256()
+    try:
+        with destination.open("xb") as output:
+            for index, row in enumerate(rows):
+                require(isinstance(row, dict), "CHUNK_ROW")
+                name = row.get("name")
+                size = row.get("bytes")
+                chunk_sha = row.get("sha256")
+                require(name == f"chunk-{index:04d}.bin", "CHUNK_NAME")
+                require(isinstance(size, int) and 0 < size <= chunk_size, "CHUNK_BYTES")
+                require(
+                    isinstance(chunk_sha, str)
+                    and len(chunk_sha) == 64
+                    and all(character in "0123456789abcdef" for character in chunk_sha),
+                    "CHUNK_HASH",
+                )
+                chunk_path = chunks_dir / name
+                require(chunk_path.is_file() and not chunk_path.is_symlink(), "CHUNK_FILE")
+                require(chunk_path.stat().st_size == size, "CHUNK_BYTES")
+                require(archive_digest(chunk_path) == chunk_sha, "CHUNK_HASH")
+                data = chunk_path.read_bytes()
+                output.write(data)
+                digest.update(data)
+                written += len(data)
+                chunk_paths.append(chunk_path)
+        require(written == expected_bytes, "CHUNKS_ARCHIVE_BYTES")
+        require(digest.hexdigest() == expected_sha, "CHUNKS_ARCHIVE_HASH")
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    return expected_sha, chunk_paths
 
 
 def candidate_images(manifest: dict[str, object]) -> list[tuple[str, str]]:
@@ -152,17 +284,64 @@ def import_images(manifest: dict[str, object], path: Path, expected_sha: str) ->
     )
 
 
+def import_chunked_images(
+    manifest: dict[str, object],
+    chunks_manifest: Path,
+    chunks_dir: Path,
+    archive: Path,
+    manifest_sha256: str,
+) -> None:
+    require(sys.platform == "linux" and os.geteuid() == 0, "LINUX_ROOT_REQUIRED")
+    script_dir = Path(__file__).resolve().parent
+    require(chunks_manifest.resolve().parent == script_dir, "CHUNKS_MANIFEST_DIRECTORY")
+    require(chunks_dir.resolve().parent == script_dir, "CHUNKS_WRONG_DIRECTORY")
+    expected_sha, chunk_paths = assemble_archive(
+        chunks_manifest,
+        chunks_dir,
+        archive,
+        manifest_sha256,
+        str(manifest["candidate"]),
+    )
+    import_images(manifest, archive, expected_sha)
+    for chunk_path in chunk_paths:
+        chunk_path.unlink()
+    chunks_dir.rmdir()
+    chunks_manifest.unlink()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("export", "import"))
+    parser.add_argument("mode", choices=("export", "split", "import", "import-chunks"))
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--archive-sha256")
+    parser.add_argument("--chunks-dir", type=Path)
+    parser.add_argument("--chunks-manifest", type=Path)
+    parser.add_argument("--chunk-bytes", type=int, default=CHUNK_BYTES)
     args = parser.parse_args()
     manifest = load_manifest(args.manifest.resolve(), args.manifest_sha256)
     if args.mode == "export":
         export_images(manifest, args.archive)
+    elif args.mode == "split":
+        require(args.chunks_dir is not None, "CHUNKS_DIRECTORY_REQUIRED")
+        split_archive(
+            args.archive,
+            args.chunks_dir,
+            args.manifest_sha256,
+            str(manifest["candidate"]),
+            args.chunk_bytes,
+        )
+    elif args.mode == "import-chunks":
+        require(args.chunks_dir is not None, "CHUNKS_DIRECTORY_REQUIRED")
+        require(args.chunks_manifest is not None, "CHUNKS_MANIFEST_REQUIRED")
+        import_chunked_images(
+            manifest,
+            args.chunks_manifest,
+            args.chunks_dir,
+            args.archive,
+            args.manifest_sha256,
+        )
     else:
         import_images(manifest, args.archive, args.archive_sha256 or "")
 

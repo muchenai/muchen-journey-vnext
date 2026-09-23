@@ -117,7 +117,10 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          python3 scripts/canary_schema_cache.py export --manifest "$RUNNER_TEMP/schema-package/manifest.json" --manifest-sha256 "$MANIFEST_SHA256" --archive "$RUNNER_TEMP/schema-image-cache.tar.gz"
+          archive="$RUNNER_TEMP/schema-image-cache.tar.gz"
+          chunks="$RUNNER_TEMP/schema-image-cache-chunks"
+          python3 scripts/canary_schema_cache.py export --manifest "$RUNNER_TEMP/schema-package/manifest.json" --manifest-sha256 "$MANIFEST_SHA256" --archive "$archive"
+          python3 scripts/canary_schema_cache.py split --manifest "$RUNNER_TEMP/schema-package/manifest.json" --manifest-sha256 "$MANIFEST_SHA256" --archive "$archive" --chunks-dir "$chunks"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.15.8
@@ -187,23 +190,72 @@ jobs:
             root@"$PUBLIC_IP":"$remote/"
           command="python3 '$remote/canary_schema_upgrade.py' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"
           if [[ "$PHASE" == cache-images ]]; then
-            archive="$RUNNER_TEMP/schema-image-cache.tar.gz"
-            archive_sha=$(sha256sum "$archive" | cut -d' ' -f1)
-            archive_bytes=$(stat -c %s "$archive")
-            printf '{"cache_transfer":"START","archive_bytes":%s,"archive_sha256":"%s"}\n' "$archive_bytes" "$archive_sha"
-            set +e
-            timeout --signal=TERM --kill-after=30s 50m scp "${opts[@]}" scripts/canary_schema_cache.py "$archive" root@"$PUBLIC_IP":"$remote/"
-            transfer_status=$?
-            set -e
-            if [[ "$transfer_status" -ne 0 ]]; then
-              category=IMAGE_CACHE_TRANSFER_FAILED
-              if [[ "$transfer_status" -eq 124 || "$transfer_status" -eq 137 ]]; then
-                category=IMAGE_CACHE_TRANSFER_TIMEOUT
+            chunks="$RUNNER_TEMP/schema-image-cache-chunks"
+            chunks_manifest="$chunks/chunks.json"
+            archive_sha=$(jq -r '.archive_sha256' "$chunks_manifest")
+            archive_bytes=$(jq -r '.archive_bytes' "$chunks_manifest")
+            chunk_count=$(jq -r '.chunks | length' "$chunks_manifest")
+            [[ "$archive_sha" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$archive_bytes" =~ ^[1-9][0-9]*$ ]]
+            [[ "$chunk_count" =~ ^[1-9][0-9]*$ ]]
+            printf '{"cache_transfer":"START","archive_bytes":%s,"archive_sha256":"%s","chunk_count":%s}\n' "$archive_bytes" "$archive_sha" "$chunk_count"
+            timeout --signal=TERM --kill-after=15s 2m scp "${opts[@]}" scripts/canary_schema_cache.py "$chunks_manifest" root@"$PUBLIC_IP":"$remote/"
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote/chunks' && install -d -m 0700 '$remote/chunks'"
+            transfer_deadline=$((SECONDS + 3000))
+            while IFS=$'\t' read -r chunk_name chunk_sha chunk_bytes; do
+              [[ "$chunk_name" =~ ^chunk-[0-9]{4}\.bin$ ]]
+              [[ "$chunk_sha" =~ ^[0-9a-f]{64}$ ]]
+              [[ "$chunk_bytes" =~ ^[1-9][0-9]*$ ]]
+              local_chunk="$chunks/$chunk_name"
+              test "$(stat -c %s "$local_chunk")" = "$chunk_bytes"
+              test "$(sha256sum "$local_chunk" | cut -d' ' -f1)" = "$chunk_sha"
+              chunk_ok=0
+              deadline_exhausted=0
+              for attempt in 1 2 3; do
+                remaining=$((transfer_deadline - SECONDS))
+                if [[ "$remaining" -le 0 ]]; then
+                  deadline_exhausted=1
+                  break
+                fi
+                attempt_timeout=$remaining
+                if [[ "$attempt_timeout" -gt 300 ]]; then
+                  attempt_timeout=300
+                fi
+                set +e
+                ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'"
+                existing_status=$?
+                set -e
+                if [[ "$existing_status" -eq 0 ]]; then
+                  chunk_ok=1
+                  printf '{"cache_chunk":"PASS","name":"%s","bytes":%s,"attempt":%s,"source":"existing"}\n' "$chunk_name" "$chunk_bytes" "$attempt"
+                  break
+                fi
+                printf '{"cache_chunk":"START","name":"%s","bytes":%s,"attempt":%s}\n' "$chunk_name" "$chunk_bytes" "$attempt"
+                set +e
+                timeout --signal=TERM --kill-after=15s "${attempt_timeout}s" scp "${opts[@]}" "$local_chunk" root@"$PUBLIC_IP":"$remote/chunks/$chunk_name.partial"
+                transfer_status=$?
+                if [[ "$transfer_status" -eq 0 ]]; then
+                  ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -e '$remote/chunks/$chunk_name'; then test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'; else test ! -L '$remote/chunks/$chunk_name.partial' && test -f '$remote/chunks/$chunk_name.partial' && test \"\$(stat -c %s '$remote/chunks/$chunk_name.partial')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'; fi"
+                  transfer_status=$?
+                fi
+                set -e
+                if [[ "$transfer_status" -eq 0 ]]; then
+                  chunk_ok=1
+                  printf '{"cache_chunk":"PASS","name":"%s","bytes":%s,"attempt":%s}\n' "$chunk_name" "$chunk_bytes" "$attempt"
+                  break
+                fi
+                printf '{"cache_chunk":"RETRY","name":"%s","attempt":%s,"status":%s}\n' "$chunk_name" "$attempt" "$transfer_status"
+              done
+              if [[ "$chunk_ok" -ne 1 ]]; then
+                category=IMAGE_CACHE_CHUNK_TRANSFER_FAILED
+                if [[ "$deadline_exhausted" -eq 1 ]]; then
+                  category=IMAGE_CACHE_TRANSFER_TIMEOUT
+                fi
+                printf '{"cache_result":"STOP","category":"%s","chunk":"%s","archive_bytes":%s,"archive_sha256":"%s","do_not_retry_blindly":true}\n' "$category" "$chunk_name" "$archive_bytes" "$archive_sha" | tee "$RUNNER_TEMP/phase-result.jsonl"
+                exit 1
               fi
-              printf '{"cache_result":"STOP","category":"%s","transfer_status":%s,"archive_bytes":%s,"archive_sha256":"%s","do_not_retry_blindly":true}\n' "$category" "$transfer_status" "$archive_bytes" "$archive_sha" | tee "$RUNNER_TEMP/phase-result.jsonl"
-              exit "$transfer_status"
-            fi
-            ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar.gz' --archive-sha256 '$archive_sha'" | tee "$RUNNER_TEMP/phase-result.jsonl"
+            done < <(jq -r '.chunks[] | [.name, .sha256, (.bytes | tostring)] | @tsv' "$chunks_manifest")
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import-chunks --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar.gz' --chunks-manifest '$remote/chunks.json' --chunks-dir '$remote/chunks'" | tee "$RUNNER_TEMP/phase-result.jsonl"
           elif [[ "$PHASE" == prepare ]]; then
             PAYLOAD="$RUNNER_TEMP/prepare-input.json" python3 - <<'PY'
           import json, os
