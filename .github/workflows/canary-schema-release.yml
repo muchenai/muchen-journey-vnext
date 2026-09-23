@@ -117,7 +117,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          python3 scripts/canary_schema_cache.py export --manifest "$RUNNER_TEMP/schema-package/manifest.json" --manifest-sha256 "$MANIFEST_SHA256" --archive "$RUNNER_TEMP/schema-image-cache.tar"
+          python3 scripts/canary_schema_cache.py export --manifest "$RUNNER_TEMP/schema-package/manifest.json" --manifest-sha256 "$MANIFEST_SHA256" --archive "$RUNNER_TEMP/schema-image-cache.tar.gz"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.15.8
@@ -187,9 +187,23 @@ jobs:
             root@"$PUBLIC_IP":"$remote/"
           command="python3 '$remote/canary_schema_upgrade.py' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"
           if [[ "$PHASE" == cache-images ]]; then
-            scp "${opts[@]}" scripts/canary_schema_cache.py "$RUNNER_TEMP/schema-image-cache.tar" root@"$PUBLIC_IP":"$remote/"
-            archive_sha=$(sha256sum "$RUNNER_TEMP/schema-image-cache.tar" | cut -d' ' -f1)
-            ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar' --archive-sha256 '$archive_sha'" | tee "$RUNNER_TEMP/phase-result.jsonl"
+            archive="$RUNNER_TEMP/schema-image-cache.tar.gz"
+            archive_sha=$(sha256sum "$archive" | cut -d' ' -f1)
+            archive_bytes=$(stat -c %s "$archive")
+            printf '{"cache_transfer":"START","archive_bytes":%s,"archive_sha256":"%s"}\n' "$archive_bytes" "$archive_sha"
+            set +e
+            timeout --signal=TERM --kill-after=30s 50m scp "${opts[@]}" scripts/canary_schema_cache.py "$archive" root@"$PUBLIC_IP":"$remote/"
+            transfer_status=$?
+            set -e
+            if [[ "$transfer_status" -ne 0 ]]; then
+              category=IMAGE_CACHE_TRANSFER_FAILED
+              if [[ "$transfer_status" -eq 124 || "$transfer_status" -eq 137 ]]; then
+                category=IMAGE_CACHE_TRANSFER_TIMEOUT
+              fi
+              printf '{"cache_result":"STOP","category":"%s","transfer_status":%s,"archive_bytes":%s,"archive_sha256":"%s","do_not_retry_blindly":true}\n' "$category" "$transfer_status" "$archive_bytes" "$archive_sha" | tee "$RUNNER_TEMP/phase-result.jsonl"
+              exit "$transfer_status"
+            fi
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar.gz' --archive-sha256 '$archive_sha'" | tee "$RUNNER_TEMP/phase-result.jsonl"
           elif [[ "$PHASE" == prepare ]]; then
             PAYLOAD="$RUNNER_TEMP/prepare-input.json" python3 - <<'PY'
           import json, os

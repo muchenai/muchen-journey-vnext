@@ -1,5 +1,6 @@
 """Safety tests for the bounded candidate-image preload phase."""
 
+import gzip
 import hashlib
 import json
 import os
@@ -46,7 +47,7 @@ def inspect_row(reference: str, candidate: str) -> bytes:
     ).encode()
 
 
-def test_export_uses_only_three_candidate_images(tmp_path, monkeypatch):
+def test_export_uses_only_three_candidate_images(tmp_path, monkeypatch, capsys):
     value = manifest()
     commands: list[list[str]] = []
 
@@ -59,13 +60,20 @@ def test_export_uses_only_three_candidate_images(tmp_path, monkeypatch):
         return b""
 
     monkeypatch.setattr(cache, "execute", execute)
-    cache.export_images(value, tmp_path / "images.tar")
+    archive = tmp_path / "images.tar.gz"
+    cache.export_images(value, archive)
 
     expected = [reference for _name, reference in cache.candidate_images(value)]
     assert [command[2] for command in commands if command[:2] == ["docker", "pull"]] == expected
     assert all(reference not in str(commands) for reference in value["old_images"].values())
     assert len([command for command in commands if command[:2] == ["docker", "tag"]]) == 3
     assert len([command for command in commands if command[:2] == ["docker", "save"]]) == 1
+    assert gzip.open(archive, "rb").read() == b"synthetic archive"
+    result = json.loads(capsys.readouterr().out)
+    assert result["archive_format"] == "gzip"
+    assert result["raw_archive_bytes"] == len(b"synthetic archive")
+    assert result["archive_bytes"] == archive.stat().st_size
+    assert not (tmp_path / "images.tar.gz.raw").exists()
 
 
 def test_check_image_rejects_wrong_revision(monkeypatch):
@@ -76,8 +84,21 @@ def test_check_image_rejects_wrong_revision(monkeypatch):
         cache.check_image("api", reference, str(value["candidate"]))
 
 
+def test_compression_failure_leaves_no_partial_or_raw_archive(tmp_path, monkeypatch):
+    source = tmp_path / "images.tar.gz.raw"
+    destination = tmp_path / "images.tar.gz"
+    source.write_bytes(b"synthetic archive")
+    monkeypatch.setattr(cache.gzip, "GzipFile", Mock(side_effect=RuntimeError("compress failed")))
+
+    with pytest.raises(RuntimeError, match="compress failed"):
+        cache.compress_archive(source, destination)
+
+    assert not source.exists()
+    assert not destination.exists()
+
+
 def test_import_rejects_archive_hash_before_runtime_checks(tmp_path, monkeypatch):
-    archive = tmp_path / "images.tar"
+    archive = tmp_path / "images.tar.gz"
     archive.write_bytes(b"synthetic archive")
     upgrade = Mock()
     monkeypatch.setattr(cache, "Upgrade", Mock(return_value=upgrade))
@@ -92,7 +113,7 @@ def test_import_rejects_archive_hash_before_runtime_checks(tmp_path, monkeypatch
 @pytest.mark.skipif(os.name != "posix", reason="release locking requires POSIX flock")
 def test_import_loads_exact_images_under_release_lock(tmp_path, monkeypatch):
     value = manifest()
-    archive = tmp_path / "images.tar"
+    archive = tmp_path / "images.tar.gz"
     archive.write_bytes(b"synthetic archive")
     expected_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
     upgrade = Mock(new=tmp_path / "not-prepared")
@@ -112,8 +133,9 @@ def test_import_loads_exact_images_under_release_lock(tmp_path, monkeypatch):
     cache.import_images(value, archive, expected_sha)
 
     assert upgrade.verify_base.call_count == 2
-    assert commands[0] == ["docker", "load", "--input", str(archive)]
-    assert [command[3] for command in commands[1:]] == [
+    assert commands[0] == ["gzip", "-t", str(archive)]
+    assert commands[1] == ["docker", "load", "--input", str(archive)]
+    assert [command[3] for command in commands[2:]] == [
         reference for _name, reference in cache.candidate_images(value)
     ]
     assert not archive.exists()
@@ -124,7 +146,7 @@ def test_import_refuses_an_active_release_phase(tmp_path, monkeypatch):
     import fcntl
 
     value = manifest()
-    archive = tmp_path / "images.tar"
+    archive = tmp_path / "images.tar.gz"
     archive.write_bytes(b"synthetic archive")
     expected_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
     lock_path = tmp_path / ".schema-upgrade.lock"
@@ -168,3 +190,7 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "CACHE_IMAGES_$short" in source
     assert "scripts/canary_schema_cache.py export" in source
     assert "canary_schema_cache.py' import" in source
+    assert "schema-image-cache.tar.gz" in source
+    assert "timeout --signal=TERM --kill-after=30s 50m scp" in source
+    assert "IMAGE_CACHE_TRANSFER_TIMEOUT" in source
+    assert 'archive_bytes=$(stat -c %s "$archive")' in source

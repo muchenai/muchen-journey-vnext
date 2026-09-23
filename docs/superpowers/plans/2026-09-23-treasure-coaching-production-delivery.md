@@ -6,6 +6,8 @@
 
 **Current status:** Feature development and the immutable application package are complete. Production remains on `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. Candidate `9a35f45053e903aa8e4d113aadbf7168d9ae9d0d` is blocked in release preparation because the production host could not download the pinned dbrestore image within the existing 1800-second per-image timeout. No schema migration, switch, or backfill has run.
 
+**2026-09-23 Phase 1 amendment:** The first immutable-cache run (`35857068059`) exported all three exact images but its uncompressed `docker save` archive did not finish the GitHub Runner-to-Beijing SCP transfer before the 65-minute job boundary. The import never started, no phase receipt was produced, and the temporary SSH rule was closed successfully. With user approval, Phase 1 now compresses the archive before transfer, records raw/compressed byte counts and SHA-256, bounds the individual SCP operation to 50 minutes, verifies the complete gzip and SHA-256 before import, and otherwise preserves the same fail-closed boundaries. This is a transport correction only; it does not relax digest, revision, base-release, lock, database, container, or history protections.
+
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries
