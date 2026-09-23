@@ -202,16 +202,21 @@ jobs:
             timeout --signal=TERM --kill-after=15s 2m scp "${opts[@]}" scripts/canary_schema_cache.py "$chunks_manifest" root@"$PUBLIC_IP":"$remote/"
             ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote/chunks' && install -d -m 0700 '$remote/chunks'"
             transfer_deadline=$((SECONDS + 3000))
-            while IFS=$'\t' read -r chunk_name chunk_sha chunk_bytes; do
-              [[ "$chunk_name" =~ ^chunk-[0-9]{4}\.bin$ ]]
-              [[ "$chunk_sha" =~ ^[0-9a-f]{64}$ ]]
-              [[ "$chunk_bytes" =~ ^[1-9][0-9]*$ ]]
-              local_chunk="$chunks/$chunk_name"
-              test "$(stat -c %s "$local_chunk")" = "$chunk_bytes"
-              test "$(sha256sum "$local_chunk" | cut -d' ' -f1)" = "$chunk_sha"
-              chunk_ok=0
-              deadline_exhausted=0
-              for attempt in 1 2 3; do
+            transfer_status_dir="$RUNNER_TEMP/schema-cache-transfer-status"
+            install -d -m 0700 "$transfer_status_dir"
+            max_parallel=8
+            transfer_failed=0
+
+            transfer_chunk() {
+              local chunk_name="$1"
+              local chunk_sha="$2"
+              local chunk_bytes="$3"
+              local local_chunk="$chunks/$chunk_name"
+              local chunk_ok=0
+              local deadline_exhausted=0
+              local category=IMAGE_CACHE_CHUNK_TRANSFER_FAILED
+              local attempt remaining attempt_timeout existing_status partial_bytes partial_status transfer_status sftp_command
+              for attempt in 1 2 3 4; do
                 remaining=$((transfer_deadline - SECONDS))
                 if [[ "$remaining" -le 0 ]]; then
                   deadline_exhausted=1
@@ -235,8 +240,8 @@ jobs:
                 partial_status=$?
                 set -e
                 if [[ "$partial_status" -ne 0 || ! "$partial_bytes" =~ ^[0-9]+$ || "$partial_bytes" -gt "$chunk_bytes" ]]; then
-                  printf '{"cache_result":"STOP","category":"IMAGE_CACHE_PARTIAL_INVALID","chunk":"%s","attempt":%s,"do_not_retry_blindly":true}\n' "$chunk_name" "$attempt" | tee "$RUNNER_TEMP/phase-result.jsonl"
-                  exit 1
+                  category=IMAGE_CACHE_PARTIAL_INVALID
+                  break
                 fi
                 if [[ "$partial_bytes" -eq "$chunk_bytes" ]]; then
                   set +e
@@ -248,8 +253,8 @@ jobs:
                     printf '{"cache_chunk":"PASS","name":"%s","bytes":%s,"attempt":%s,"source":"completed-partial"}\n' "$chunk_name" "$chunk_bytes" "$attempt"
                     break
                   fi
-                  printf '{"cache_result":"STOP","category":"IMAGE_CACHE_PARTIAL_HASH_MISMATCH","chunk":"%s","attempt":%s,"do_not_retry_blindly":true}\n' "$chunk_name" "$attempt" | tee "$RUNNER_TEMP/phase-result.jsonl"
-                  exit 1
+                  category=IMAGE_CACHE_PARTIAL_HASH_MISMATCH
+                  break
                 fi
                 printf '{"cache_chunk":"START","name":"%s","bytes":%s,"offset":%s,"attempt":%s}\n' "$chunk_name" "$chunk_bytes" "$partial_bytes" "$attempt"
                 set +e
@@ -272,15 +277,50 @@ jobs:
                 fi
                 printf '{"cache_chunk":"RETRY","name":"%s","attempt":%s,"status":%s}\n' "$chunk_name" "$attempt" "$transfer_status"
               done
-              if [[ "$chunk_ok" -ne 1 ]]; then
-                category=IMAGE_CACHE_CHUNK_TRANSFER_FAILED
-                if [[ "$deadline_exhausted" -eq 1 ]]; then
-                  category=IMAGE_CACHE_TRANSFER_TIMEOUT
+              if [[ "$chunk_ok" -eq 1 ]]; then
+                return 0
+              fi
+              if [[ "$deadline_exhausted" -eq 1 ]]; then
+                category=IMAGE_CACHE_TRANSFER_TIMEOUT
+              fi
+              printf '%s\t%s\n' "$chunk_name" "$category" > "$transfer_status_dir/$chunk_name.failed"
+              printf '{"cache_chunk":"STOP","category":"%s","name":"%s"}\n' "$category" "$chunk_name"
+              return 1
+            }
+
+            wait_cache_batch() {
+              local pid
+              for pid in "${cache_pids[@]}"; do
+                if ! wait "$pid"; then
+                  transfer_failed=1
                 fi
-                printf '{"cache_result":"STOP","category":"%s","chunk":"%s","archive_bytes":%s,"archive_sha256":"%s","do_not_retry_blindly":true}\n' "$category" "$chunk_name" "$archive_bytes" "$archive_sha" | tee "$RUNNER_TEMP/phase-result.jsonl"
-                exit 1
+              done
+              cache_pids=()
+            }
+
+            cache_pids=()
+            while IFS=$'\t' read -r chunk_name chunk_sha chunk_bytes; do
+              [[ "$chunk_name" =~ ^chunk-[0-9]{4}\.bin$ ]]
+              [[ "$chunk_sha" =~ ^[0-9a-f]{64}$ ]]
+              [[ "$chunk_bytes" =~ ^[1-9][0-9]*$ ]]
+              local_chunk="$chunks/$chunk_name"
+              test "$(stat -c %s "$local_chunk")" = "$chunk_bytes"
+              test "$(sha256sum "$local_chunk" | cut -d' ' -f1)" = "$chunk_sha"
+              transfer_chunk "$chunk_name" "$chunk_sha" "$chunk_bytes" &
+              cache_pids+=("$!")
+              if [[ "${#cache_pids[@]}" -ge "$max_parallel" ]]; then
+                wait_cache_batch
               fi
             done < <(jq -r '.chunks[] | [.name, .sha256, (.bytes | tostring)] | @tsv' "$chunks_manifest")
+            wait_cache_batch
+            if [[ "$transfer_failed" -ne 0 ]]; then
+              failed_files=("$transfer_status_dir"/*.failed)
+              failed_file="${failed_files[0]}"
+              test -f "$failed_file"
+              IFS=$'\t' read -r failed_chunk category < "$failed_file"
+              printf '{"cache_result":"STOP","category":"%s","chunk":"%s","archive_bytes":%s,"archive_sha256":"%s","parallelism":%s,"do_not_retry_blindly":true}\n' "$category" "$failed_chunk" "$archive_bytes" "$archive_sha" "$max_parallel" | tee "$RUNNER_TEMP/phase-result.jsonl"
+              exit 1
+            fi
             ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import-chunks --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar.gz' --chunks-manifest '$remote/chunks.json' --chunks-dir '$remote/chunks'" | tee "$RUNNER_TEMP/phase-result.jsonl"
           elif [[ "$PHASE" == prepare ]]; then
             PAYLOAD="$RUNNER_TEMP/prepare-input.json" python3 - <<'PY'

@@ -14,6 +14,10 @@
 
 Run `35885196380` then exposed a bounded implementation error before any image bytes were uploaded: SFTP `reput` requires the remote partial to exist. The corrected loop uses `put` only when the verified offset is zero and `reput` only when a non-empty partial exists. The run again stopped before import, closed temporary SSH ingress, and left public production healthy on the base release.
 
+Run `35886588963` proved that the corrected resume path preserves progress (`0` to `4439040` to `9661440` bytes), but also proved that serial transfer cannot meet the release budget: one connection moved only about 4.4–5.2 MB per five-minute attempt, so the complete 254 MB archive would require roughly 4–5 hours before import. The run stopped on the first chunk, closed temporary SSH ingress, and left public production healthy on the base release. Further serial retries or longer jobs are prohibited. Phase 1 is paused at a transport decision: the minimal proposed path is bounded parallel transfer of the existing independently hashed chunks, retaining resume, exact verification, the 3000-second overall deadline, and all production non-mutation guarantees.
+
+The user approved the bounded parallel path on 2026-09-24. The existing 16 independently hashed chunks are transferred in batches of at most eight concurrent SSH/SFTP connections. Each chunk retains zero-offset `put`, non-zero-offset `reput`, at most four five-minute attempts, exact size/SHA-256 verification, and atomic acceptance. A shared 3000-second deadline remains authoritative; any failed chunk prevents archive assembly and image import. This introduces no storage service and does not change the candidate package or any production application/database state.
+
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries

@@ -293,7 +293,13 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "canary_schema_cache.py' import-chunks" in source
     assert "schema-image-cache.tar.gz" in source
     assert "transfer_deadline=$((SECONDS + 3000))" in source
-    assert "for attempt in 1 2 3" in source
+    assert "max_parallel=8" in source
+    assert "for attempt in 1 2 3 4" in source
+    assert "transfer_chunk()" in source
+    assert "wait_cache_batch()" in source
+    assert 'cache_pids+=("$!")' in source
+    assert 'if [[ "${#cache_pids[@]}" -ge "$max_parallel" ]]' in source
+    assert "wait_cache_batch\n            if [[ \"$transfer_failed\" -ne 0 ]]" in source
     assert "chunk_name.partial" in source
     assert "partial_bytes=$(ssh" in source
     assert "sftp_command=put" in source
@@ -308,4 +314,9 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "IMAGE_CACHE_PARTIAL_HASH_MISMATCH" in source
     assert "IMAGE_CACHE_TRANSFER_TIMEOUT" in source
     assert "IMAGE_CACHE_CHUNK_TRANSFER_FAILED" in source
+    assert '"parallelism":%s' in source
     assert 'scp "${opts[@]}" "$local_chunk"' not in source
+    assert source.count("transfer_deadline=$((SECONDS + 3000))") == 1
+    assert source.index('if [[ "$transfer_failed" -ne 0 ]]') < source.index(
+        "canary_schema_cache.py' import-chunks"
+    )
