@@ -24,6 +24,10 @@ with engine.connect() as connection:
             import_snapshot(connection, snapshot_id)
         except Exception:
             raise SystemExit("WP31_DATABASE_SNAPSHOT_IMPORT=FAIL") from None
+    # Canonicalize timestamptz rendering after the optional snapshot import,
+    # which starts a new transaction. Source RDS and isolated restore containers
+    # may otherwise hash different text representations of the same instant.
+    connection.execute(text("SET LOCAL TIME ZONE 'UTC'"))
     if os.getenv("REQUIRE_READ_ONLY") == "true":
         read_only = connection.execute(text("SHOW transaction_read_only")).scalar_one()
         if read_only != "on":

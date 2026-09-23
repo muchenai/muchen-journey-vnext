@@ -288,11 +288,29 @@ class Upgrade:
             command += ["-e", "PGOPTIONS=-c default_transaction_read_only=on", "-e", "REQUIRE_READ_ONLY=true"]
         return run(command + [self.images["api"], *args], timeout=timeout)
 
-    def facts(self, output: Path, env_file: str = "secrets/migration.env") -> dict[str, object]:
-        raw = self.docker_api(
-            env_file, "python", "/app/scripts/canary_schema_facts_entry.py",
-            read_only=True, timeout=600,
-        )
+    def facts(
+        self,
+        output: Path,
+        env_file: str = "secrets/migration.env",
+        script: Path | None = None,
+    ) -> dict[str, object]:
+        facts_script = script or (self.new / "db_facts.py")
+        read_file(facts_script)
+        if script is None:
+            raw = self.docker_api(
+                env_file, "python", "/app/scripts/canary_schema_facts_entry.py",
+                read_only=True, timeout=600,
+            )
+        else:
+            raw = run([
+                "docker", "run", "--rm", "--network", "host",
+                "--env-file", str(self.new / env_file),
+                "-e", "PGOPTIONS=-c default_transaction_read_only=on",
+                "-e", "REQUIRE_READ_ONLY=true",
+                "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
+                "-v", f"{facts_script}:/tmp/db_facts.py:ro",
+                self.images["api"], "python", "/tmp/db_facts.py",
+            ], timeout=600)
         output.write_bytes(raw)
         output.chmod(0o600)
         return json.loads(raw)
@@ -361,7 +379,9 @@ class Upgrade:
 
     def snapshot_dump(self, dump: Path, pg_env: dict[str, str]) -> dict[str, object]:
         snapshot_script = self.package / "wp31_database_snapshot.py"
+        facts_script = self.package / "db_facts_control.py"
         read_file(snapshot_script)
+        read_file(facts_script)
         exchange = self.backup / "snapshot-exchange"
         exchange.mkdir(mode=0o700)
         snapshot_id_path = exchange / "snapshot-id"
@@ -420,7 +440,7 @@ class Upgrade:
                 "-e", "PGOPTIONS=-c default_transaction_read_only=on",
                 "-e", "REQUIRE_READ_ONLY=true", "-e", "WP31_DATABASE_SNAPSHOT=" + snapshot_id,
                 "-v", f"{self.new / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro",
-                "-v", f"{self.new / 'db_facts.py'}:/tmp/db_facts.py:ro",
+                "-v", f"{facts_script}:/tmp/db_facts.py:ro",
                 "-v", f"{snapshot_script}:/tmp/wp31_database_snapshot.py:ro",
                 self.images["api"], "python", "/tmp/db_facts.py",
             ], timeout=600)
@@ -518,7 +538,7 @@ class Upgrade:
             restored_raw_json = run([
                 "docker", "run", "--rm", "--network", network, "--env-file", str(restore_env),
                 "-e", "PGOPTIONS=-c default_transaction_read_only=on", "-e", "REQUIRE_READ_ONLY=true",
-                "-v", f"{self.new / 'db_facts.py'}:/tmp/db_facts.py:ro", self.images["api"],
+                "-v", f"{self.package / 'db_facts_control.py'}:/tmp/db_facts.py:ro", self.images["api"],
                 "python", "/tmp/db_facts.py",
             ], timeout=600)
             restored = json.loads(restored_raw_json)
@@ -550,7 +570,10 @@ class Upgrade:
         self.docker_api(
             "secrets/migration.env", "python", "/tmp/grant_runtime.py", timeout=300
         )
-        after = self.facts(self.backup / "after-migration.json")
+        after = self.facts(
+            self.backup / "after-migration.json",
+            script=self.package / "db_facts_control.py",
+        )
         require(after["migration"] == self.manifest["migrations"]["to"], "TARGET_MIGRATION")
         for table, count in before["counts"].items():
             require(after["counts"].get(table) == count, "BUSINESS_FACT_CHANGED")
