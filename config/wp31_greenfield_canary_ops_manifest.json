@@ -15,7 +15,7 @@
     "deploy/production/Caddyfile.greenfield-canary": "d61d3004076110c9d29cf132b21cac9ff81129bc9981b7bcf753e24b6a20c840",
     "deploy/production/compose.greenfield-canary.migrate.yaml": "929b2694d396a04cab69beb49d3da1a025598ec787d070f4c5eb766ba9251679",
     "deploy/production/compose.greenfield-canary.yaml": "039ecaa6b54295f7a6d8b1cb262d2eca6e30b07e62d58bbb525a0048b7d8902c",
-    "deploy/production/db_facts.py": "4ee59598da3190d87936b2f54418b8f4df8a08d6a05e9058392dafd85535458f",
+    "deploy/production/db_facts.py": "3230684bda017ca99fc50bbfdc1618cbd935df82dce4e0dd46fc900c57bc8dd7",
     "deploy/production/greenfield_canary_backup_restore.sh": "95152654577f228b167bc6e24edd5afa4ec629d9fd95147d5c6dc30ae221a9e9",
     "deploy/production/greenfield_canary_edge.sh": "95895969d8b629ec844baef61df303cd900128f0815e4f8ca1f9662b76d1e4f8",
     "deploy/production/wartime_grant_runtime.py": "aabb0bb9766251631bb76b1ec18866637314773245d9954fb4f48fde1678c481",
