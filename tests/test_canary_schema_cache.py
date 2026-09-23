@@ -299,6 +299,11 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "wait_cache_batch()" in source
     assert 'cache_pids+=("$!")' in source
     assert 'if [[ "${#cache_pids[@]}" -ge "$max_parallel" ]]' in source
+    assert "mapfile -t cache_chunk_rows" in source
+    assert 'test "${#cache_chunk_rows[@]}" -eq "$chunk_count"' in source
+    assert 'for cache_chunk_row in "${cache_chunk_rows[@]}"' in source
+    assert 'done < <(jq -r' not in source
+    assert source.count("< /dev/null") >= 4
     assert "wait_cache_batch\n            if [[ \"$transfer_failed\" -ne 0 ]]" in source
     assert "chunk_name.partial" in source
     assert "partial_bytes=$(ssh" in source
