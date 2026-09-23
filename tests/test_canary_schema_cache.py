@@ -97,6 +97,106 @@ def test_compression_failure_leaves_no_partial_or_raw_archive(tmp_path, monkeypa
     assert not destination.exists()
 
 
+def test_split_and_assemble_preserve_exact_archive(tmp_path, capsys):
+    archive = tmp_path / "images.tar.gz"
+    original = bytes(range(64)) + b"final"
+    archive.write_bytes(original)
+    chunks_dir = tmp_path / "chunks"
+
+    chunks_manifest = cache.split_archive(
+        archive,
+        chunks_dir,
+        "f" * 64,
+        "a" * 40,
+        chunk_bytes=16,
+    )
+
+    assert not archive.exists()
+    value = json.loads(chunks_manifest.read_text())
+    assert value["archive_bytes"] == len(original)
+    assert value["archive_sha256"] == hashlib.sha256(original).hexdigest()
+    assert [row["name"] for row in value["chunks"]] == [
+        "chunk-0000.bin",
+        "chunk-0001.bin",
+        "chunk-0002.bin",
+        "chunk-0003.bin",
+        "chunk-0004.bin",
+    ]
+    expected_sha, chunk_paths = cache.assemble_archive(
+        chunks_manifest,
+        chunks_dir,
+        archive,
+        "f" * 64,
+        "a" * 40,
+    )
+    assert expected_sha == hashlib.sha256(original).hexdigest()
+    assert archive.read_bytes() == original
+    assert len(chunk_paths) == 5
+    assert json.loads(capsys.readouterr().out)["chunk_count"] == 5
+
+
+def test_assemble_rejects_corrupt_chunk_without_partial_archive(tmp_path):
+    archive = tmp_path / "images.tar.gz"
+    archive.write_bytes(b"abcdefghijklmnopqrstuvwxyz")
+    chunks_dir = tmp_path / "chunks"
+    chunks_manifest = cache.split_archive(
+        archive,
+        chunks_dir,
+        "f" * 64,
+        "a" * 40,
+        chunk_bytes=8,
+    )
+    (chunks_dir / "chunk-0001.bin").write_bytes(b"corrupt!")
+
+    with pytest.raises(cache.UpgradeError, match="CHUNK_HASH"):
+        cache.assemble_archive(
+            chunks_manifest,
+            chunks_dir,
+            archive,
+            "f" * 64,
+            "a" * 40,
+        )
+
+    assert not archive.exists()
+
+
+def test_import_chunked_cleans_only_verified_transport_files(tmp_path, monkeypatch):
+    value = manifest()
+    archive = tmp_path / "images.tar.gz"
+    archive.write_bytes(b"abcdefghijklmnopqrstuvwxyz")
+    chunks_dir = tmp_path / "chunks"
+    generated_manifest = cache.split_archive(
+        archive,
+        chunks_dir,
+        "f" * 64,
+        str(value["candidate"]),
+        chunk_bytes=8,
+    )
+    chunks_manifest = tmp_path / "chunks.json"
+    generated_manifest.rename(chunks_manifest)
+
+    def import_images(_manifest, assembled, expected_sha):
+        assert assembled.read_bytes() == b"abcdefghijklmnopqrstuvwxyz"
+        assert expected_sha == hashlib.sha256(assembled.read_bytes()).hexdigest()
+        assembled.unlink()
+
+    monkeypatch.setattr(cache, "import_images", import_images)
+    monkeypatch.setattr(cache, "__file__", str(tmp_path / "canary_schema_cache.py"))
+    monkeypatch.setattr(cache.sys, "platform", "linux")
+    monkeypatch.setattr(cache.os, "geteuid", Mock(return_value=0), raising=False)
+    cache.import_chunked_images(
+        value,
+        chunks_manifest,
+        chunks_dir,
+        archive,
+        "f" * 64,
+    )
+
+    assert not archive.exists()
+    assert not chunks_manifest.exists()
+    assert not chunks_dir.exists()
+
+
 def test_import_rejects_archive_hash_before_runtime_checks(tmp_path, monkeypatch):
     archive = tmp_path / "images.tar.gz"
     archive.write_bytes(b"synthetic archive")
@@ -190,8 +290,12 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "canary-schema-image-cache" not in source
     assert "CACHE_IMAGES_$short" in source
     assert "scripts/canary_schema_cache.py export" in source
-    assert "canary_schema_cache.py' import" in source
+    assert "canary_schema_cache.py' import-chunks" in source
     assert "schema-image-cache.tar.gz" in source
-    assert "timeout --signal=TERM --kill-after=30s 50m scp" in source
+    assert "transfer_deadline=$((SECONDS + 3000))" in source
+    assert "for attempt in 1 2 3" in source
+    assert "chunk_name.partial" in source
+    assert "mv --" in source
+    assert '\"source\":\"existing\"' in source
     assert "IMAGE_CACHE_TRANSFER_TIMEOUT" in source
-    assert 'archive_bytes=$(stat -c %s "$archive")' in source
+    assert "IMAGE_CACHE_CHUNK_TRANSFER_FAILED" in source
