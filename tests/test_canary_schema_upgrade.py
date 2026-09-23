@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from scripts import canary_schema_upgrade as mod
+from scripts.canary_schema_migration_head import migration_heads
 
 
 def manifest():
@@ -112,6 +113,12 @@ def test_package_workflow_pins_restore_image_and_migration_range():
     assert "ADDITIVE_SCHEMA_THEN_IMMUTABLE_BACKFILL" in source
     assert "make ci-main" in source
     assert "merge-base --is-ancestor" not in source
+
+
+def test_migration_head_parser_handles_merge_revision():
+    assert migration_heads(Path("migrations/versions")) == [
+        "0029_treasure_coaching_reviews"
+    ]
 
 
 def test_fact_probe_never_exports_raw_rows():
