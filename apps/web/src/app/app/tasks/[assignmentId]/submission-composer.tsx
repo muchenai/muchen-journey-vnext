@@ -7,6 +7,7 @@ import { CharacterProgress } from "@/app/character-progress";
 import { FactLabel } from "@/app/human-experience";
 import type { Attachment } from "@/lib/server/api";
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { validateFeishuDocumentUrl } from "@/lib/feishu-url";
 import { useWriteCooldown } from "@/lib/use-write-cooldown";
 
 const INITIAL_STATE: SubmissionActionState = {};
@@ -150,6 +151,9 @@ export function SubmissionComposer({
   const bodyCharacterCount = effectiveCharacterCount(body);
   const bodyOverLimit = bodyCharacterCount > 8_000;
   const bodyBelowMinimum = !expectsExternalDocument && bodyCharacterCount < 40;
+  const evidenceUrlError = expectsExternalDocument && evidenceUrl.trim()
+    ? validateFeishuDocumentUrl(evidenceUrl)
+    : null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -258,6 +262,10 @@ export function SubmissionComposer({
     }
     if (expectsExternalDocument && !evidenceUrl.trim()) {
       setLocalError("请先粘贴飞书文档链接，再提交给 Reviewer。");
+      return;
+    }
+    if (evidenceUrlError) {
+      setLocalError(`${evidenceUrlError} 当前输入仍保留。`);
       return;
     }
     if (learnerAiUsed && (!learnerAiPurpose.trim() || !learnerAiModelVersion.trim() || !learnerAiPromptVersion.trim())) {
@@ -394,8 +402,13 @@ export function SubmissionComposer({
                 placeholder="https://…feishu.cn/…"
                 value={evidenceUrl}
                 onChange={(event) => setEvidenceUrl(event.target.value)}
+                aria-invalid={Boolean(evidenceUrlError)}
+                aria-describedby="evidence-url-help"
                 required
               />
+              <small id="evidence-url-help" className={evidenceUrlError ? "field-error" : "status-meta"}>
+                {evidenceUrlError ?? "仅接受 HTTPS 的 feishu.cn、其子域名或 larksuite.com 链接。"}
+              </small>
             </section>
           ) : null}
 

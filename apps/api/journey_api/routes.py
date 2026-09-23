@@ -83,6 +83,7 @@ from journey_api.schemas import (
     LearnerEnrollmentListOut,
     LearnerEnrollmentListResponse,
     LearnerEnrollmentOut,
+    LearnerCoachingOut,
     LearningMaterialCompletionOut,
     LearningMaterialCompletionResponse,
     LearningMaterialOut,
@@ -1201,6 +1202,29 @@ def assignment_detail(
     else:
         commands = assignment_action(assignment.status)[4]
     material_completions = completed_materials(session, assignment)
+    coaching = None
+    if submission is not None and submission.versions:
+        latest_version = submission.versions[-1]
+        if latest_version.review_kind == "LEARNING_COACHING" and latest_version.review_id:
+            coaching_status = (
+                latest_version.decision
+                if latest_version.decision in {"PASS", "REVISION_REQUIRED"}
+                else "SUPERSEDED"
+                if latest_version.review_status == "SUPERSEDED"
+                else "PENDING"
+            )
+            coaching = LearnerCoachingOut(
+                review_id=latest_version.review_id,
+                submission_version_id=latest_version.id,
+                submission_version_no=latest_version.version_no,
+                status=coaching_status,
+                feedback=latest_version.feedback,
+                finalized_at=latest_version.review_finalized_at,
+                can_start_revision=(
+                    coaching_status == "REVISION_REQUIRED"
+                    and "start_evidence_revision" in commands
+                ),
+            )
     data = AssignmentOut(
         id=assignment.id,
         status=public_assignment_status(
@@ -1252,6 +1276,7 @@ def assignment_detail(
         draft=draft,
         available_attachments=available_attachments,
         latest_revision_feedback=latest_feedback,
+        coaching=coaching,
         journey_stage=(
             AssignmentJourneyStageOut(
                 stable_key=journey_stage.stable_key,

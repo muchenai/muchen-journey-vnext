@@ -36,9 +36,13 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0028_canary_main_merge"
+EXPECTED_MIGRATION_HEAD = "0029_treasure_coaching_reviews"
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
-ROLLBACK_OWNED_FACT_TABLES: tuple[str, ...] = ()
+ROLLBACK_OWNED_FACT_TABLES = (
+    "coaching_feedback",
+    "ai_advisory_records",
+    "assignment_bound_reentry_invites",
+)
 CURRENT_FACT_TABLES = (
     "organizations",
     "users",
@@ -67,6 +71,8 @@ CURRENT_FACT_TABLES = (
     "submission_version_attachments",
     "reviews",
     "evaluations",
+    "coaching_feedback",
+    "ai_advisory_records",
     "incentive_ledger_entries",
     "outcomes",
     "journey_admission_decisions",
@@ -263,6 +269,13 @@ def database_facts(service: str, database: str) -> dict[str, Any]:
     counts: dict[str, int] = {}
     for table in CURRENT_FACT_TABLES:
         counts[table] = int(psql(service, database, f'SELECT count(*) FROM "{table}"'))
+    counts["assignment_bound_reentry_invites"] = int(
+        psql(
+            service,
+            database,
+            "SELECT count(*) FROM invites WHERE target_assignment_id IS NOT NULL",
+        )
+    )
     task_fingerprint = psql(
         service,
         database,

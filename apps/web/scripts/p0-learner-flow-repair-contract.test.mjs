@@ -11,6 +11,7 @@ const submissionComposer = await readFile(
   "utf8",
 );
 const actions = await readFile(new URL("../src/app/actions.ts", import.meta.url), "utf8");
+const feishuUrl = await readFile(new URL("../src/lib/feishu-url.ts", import.meta.url), "utf8");
 const learnerHome = await readFile(new URL("../src/app/app/page.tsx", import.meta.url), "utf8");
 const reviewerQueue = await readFile(
   new URL("../src/app/review/page.tsx", import.meta.url),
@@ -90,7 +91,7 @@ test("learner and reviewer status pages refresh while visible and announce chang
   assert.match(learnerHome, /提交成功，已交给主管评审/);
   assert.match(learnerHome, /评分完成，旅程已经更新/);
   assert.match(reviewerQueue, /<LiveStatusSignal/);
-  assert.match(reviewerQueue, /有新的提交或评审状态变化/);
+  assert.match(reviewerQueue, /有新的提交或状态变化/);
   assert.match(liveStatusSignal, /const REFRESH_INTERVAL_MS = 12_000/);
   assert.match(liveStatusSignal, /document\.visibilityState !== "visible"/);
   assert.match(liveStatusSignal, /router\.refresh\(\)/);
@@ -120,8 +121,9 @@ test("Feishu-document work has a visible submission entry and novice guidance", 
   assert.match(submissionComposer, /在飞书中创建自己的副本/);
   assert.match(submissionComposer, /从浏览器地址栏复制完整链接/);
   assert.match(submissionComposer, /name="evidence_url"/);
-  assert.match(actions, /请粘贴 HTTPS 飞书文档链接/);
-  assert.match(actions, /hostname\.endsWith\("\.feishu\.cn"\)/);
+  assert.match(actions, /validateFeishuDocumentUrl/);
+  assert.match(feishuUrl, /请粘贴 HTTPS 飞书文档链接/);
+  assert.match(feishuUrl, /hostname\.endsWith\(`\.\$\{root\}`\)/);
   assert.match(reviewDetail, /打开 Learner 的飞书文档/);
   assert.match(reviewDetail, /target="_blank" rel="noreferrer"/);
   assert.match(reviewDetail, /if \(!isFeishuHost\) return part/);

@@ -949,6 +949,21 @@ export default async function TaskPage({
         </>
       ) : null}
 
+      {assignment.coaching ? (
+        <aside className="notice" role="status" aria-label="宝藏辅导状态">
+          <strong>
+            {assignment.coaching.status === "PASS"
+              ? "Reviewer：已达到学习目标"
+              : assignment.coaching.status === "REVISION_REQUIRED"
+              ? "Reviewer 建议修订"
+              : assignment.coaching.status === "SUPERSEDED"
+              ? "旧辅导评阅已由新版本替代"
+              : "已提交，等待辅导评阅"}
+          </strong>
+          {assignment.coaching.feedback ? <p>{assignment.coaching.feedback}</p> : null}
+          <p>辅导评阅不影响继续旅程、结营或正式准入；如需调整，由你主动发起修改并生成新版本。</p>
+        </aside>
+      ) : null}
       {awaitingReview ? (
         <p className="notice" role="status">
           {assignment.status === "IN_REVIEW"

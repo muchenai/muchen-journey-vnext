@@ -41,6 +41,7 @@ function ActionError({ state }: { state: ReviewActionState }) {
 
 export function ReviewWorkbench({
   reviewId,
+  reviewKind,
   revision,
   allowedCommands,
   materialStatus,
@@ -49,6 +50,7 @@ export function ReviewWorkbench({
   finalizeIdempotencyKey,
 }: {
   reviewId: string;
+  reviewKind: "FORMAL_EVALUATION" | "LEARNING_COACHING";
   revision: number;
   allowedCommands: string[];
   materialStatus: "COMPLETE" | "INCOMPLETE";
@@ -78,8 +80,8 @@ export function ReviewWorkbench({
   if (canStart) {
     return (
       <section className="review-actions" aria-labelledby="review-action-title">
-        <h2 id="review-action-title">开始评审</h2>
-        <p>开始后任务进入“评审中”；当前固定提交版本不会改变。</p>
+        <h2 id="review-action-title">{reviewKind === "LEARNING_COACHING" ? "开始辅导评阅" : "开始评审"}</h2>
+        <p>{reviewKind === "LEARNING_COACHING" ? "开始后只更新辅导记录；Learner 仍可继续旅程。" : "开始后任务进入“评审中”；当前固定提交版本不会改变。"}</p>
         <ActionError state={startState} />
         <form action={startAction}>
           <input type="hidden" name="review_id" value={reviewId} />
@@ -90,7 +92,11 @@ export function ReviewWorkbench({
             value={startIdempotencyKey}
           />
           <button className="button primary" type="submit" disabled={startPending}>
-            {startPending ? "正在开始…" : "开始评审"}
+            {startPending
+              ? "正在开始…"
+              : reviewKind === "LEARNING_COACHING"
+              ? "开始辅导评阅"
+              : "开始评审"}
           </button>
         </form>
       </section>
@@ -101,14 +107,18 @@ export function ReviewWorkbench({
 
   return (
     <section className="review-actions" aria-labelledby="review-action-title">
-      <h2 id="review-action-title">Rubric 与最终结论</h2>
+      <h2 id="review-action-title">{reviewKind === "LEARNING_COACHING" ? "Rubric 与辅导结论" : "Rubric 与最终结论"}</h2>
       {materialStatus === "INCOMPLETE" ? (
         <p className="inline-error" role="alert">
           材料不完整，服务端不会接受最终结论。请先核对上方缺失项。
         </p>
-      ) : (
+      ) : dimensions.length > 0 ? (
         <p className="status-meta">
           每个固定维度都必须评分并写具体反馈；全部达标才能通过，要求修订时至少一项需标为待改进。
+        </p>
+      ) : (
+        <p className="status-meta">
+          本宝藏没有正式评测 Rubric。请对照学习目标、完成标准和固定提交版本给出总体辅导反馈。
         </p>
       )}
       <ActionError state={finalState} />
@@ -221,7 +231,7 @@ export function ReviewWorkbench({
           <div className="decision-grid">
             <label className="decision-choice">
               <input type="radio" name="overall_decision" value="APPROVE" required />
-              <span><strong>通过</strong>全部固定维度达标，本阶段完成。</span>
+              <span><strong>{reviewKind === "LEARNING_COACHING" ? "达到学习目标" : "通过"}</strong>{dimensions.length > 0 ? "全部固定维度达标。" : "当前证据达到本站学习目标。"}</span>
             </label>
             <label className="decision-choice">
               <input
@@ -230,7 +240,7 @@ export function ReviewWorkbench({
                 value="REQUEST_REVISION"
                 required
               />
-              <span><strong>要求修订</strong>新人会看到总体反馈并追加新提交版本。</span>
+              <span><strong>要求修订</strong>新人会看到反馈并可主动追加新版本；不会阻塞旅程。</span>
             </label>
           </div>
         </fieldset>
@@ -239,7 +249,11 @@ export function ReviewWorkbench({
           type="submit"
           disabled={finalPending || materialStatus === "INCOMPLETE" || feedbackIsInvalid}
         >
-          {finalPending ? "正在提交结论…" : "提交真人结论"}
+          {finalPending
+            ? "正在提交结论…"
+            : reviewKind === "LEARNING_COACHING"
+            ? "提交辅导结论"
+            : "提交真人结论"}
         </button>
       </form>
     </section>

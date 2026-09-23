@@ -57,8 +57,13 @@ export default async function ReviewPage({
         固定任务 V{review.task_version} · 固定提交 V{review.submission_version_no}
       </p>
       <h1>{review.learner_name} · {review.task_title}</h1>
+      <p className="status-meta">
+        {review.review_kind === "LEARNING_COACHING"
+          ? "宝藏辅导 · 只形成辅导反馈，不影响旅程推进、结营或准入"
+          : "正式评测 · 结论进入 Evaluation / Human Gate"}
+      </p>
       <div className="review-status-row">
-        <span className="badge">{review.status === "IN_REVIEW" ? "评审中" : review.status === "FINALIZED" ? "已定稿" : "待开始"}</span>
+        <span className="badge">{review.status === "IN_REVIEW" ? "评审中" : review.status === "FINALIZED" ? "已定稿" : review.status === "SUPERSEDED" ? "已被新版本替代" : "待开始"}</span>
         <span>{review.priority_reason}</span>
         <span>分配于 {formatProductDateTime(review.assigned_at)}</span>
       </div>
@@ -66,9 +71,9 @@ export default async function ReviewPage({
         固定 SubmissionVersion <code>{review.submission_version_id}</code> · Rubric V{review.rubric.version} · 冲突检查 {review.conflict_status}
       </p>
       {query.started === "yes" ? (
-        <p className="success-text" role="status">评审已开始，任务状态已同步为评审中。</p>
+        <p className="success-text" role="status">{review.review_kind === "LEARNING_COACHING" ? "辅导评阅已开始；Learner 任务状态未改变。" : "评审已开始，任务状态已同步为评审中。"}</p>
       ) : null}
-      {query.finalized && review.evaluation ? (
+      {query.finalized && (review.evaluation || review.coaching_feedback) ? (
         <p className="success-text" role="status">
           {query.finalized === "approved"
             ? "审核结果提交成功：通过结论已定稿，刷新后仍会保留。"
@@ -135,6 +140,19 @@ export default async function ReviewPage({
         <div className="submission">{submissionWithSafeLinks(review.submission_body)}</div>
       </section>
 
+      <section className="review-section" aria-labelledby="ai-advisory-title">
+        <FactLabel kind="ai" />
+        <h2 id="ai-advisory-title">AI 自查建议</h2>
+        {review.ai_advisory ? (
+          <>
+            <p>已生成不可变建议记录；仅供 Reviewer 参考，不能改变任何正式状态。</p>
+            <p className="status-meta">模型 {review.ai_advisory.model_version} · Prompt {review.ai_advisory.prompt_version} · 策略 {review.ai_advisory.policy_version}</p>
+            <p className="status-meta">输入摘要 SHA-256 <code>{review.ai_advisory.input_sha256}</code> · 生成于 {formatProductDateTime(review.ai_advisory.generated_at)}</p>
+            <pre className="submission">{JSON.stringify(review.ai_advisory.result, null, 2)}</pre>
+          </>
+        ) : <p className="status-meta">AI 自查未运行 / 当前不可用；未生成空记录或评价。</p>}
+      </section>
+
       <details className="fixed-references">
         <summary>查看固定引用</summary>
         <dl>
@@ -144,25 +162,38 @@ export default async function ReviewPage({
         </dl>
       </details>
 
-      {review.evaluation ? (
+      <details className="fixed-references">
+        <summary>查看该任务的旧提交版本（只读）</summary>
+        {review.submission_history.map((version) => (
+          <article className="history-version" key={version.id}>
+            <h3>Version {version.version_no}</h3>
+            <p className="status-meta">{formatProductDateTime(version.created_at)} · {version.review_kind ?? "未创建评阅"} · {version.review_status ?? "仅提交历史"}</p>
+            <div className="submission">{submissionWithSafeLinks(version.body)}</div>
+            {version.feedback ? <p>{version.feedback}</p> : null}
+          </article>
+        ))}
+      </details>
+
+      {review.evaluation || review.coaching_feedback ? (
         <section className="review-section evaluation-history" aria-labelledby="evaluation-title">
           <FactLabel kind="human" />
           <p className="eyebrow">只读结论历史</p>
-          <h2 id="evaluation-title">{DECISION_LABELS[review.evaluation.overall_decision]}</h2>
+          <h2 id="evaluation-title">{DECISION_LABELS[(review.evaluation ?? review.coaching_feedback)!.overall_decision]}</h2>
           <p className="status-meta">
-            定稿于 {formatProductDateTime(review.evaluation.created_at)} · Review revision {review.evaluation.review_revision}
+            定稿于 {formatProductDateTime((review.evaluation ?? review.coaching_feedback)!.created_at)} · Review revision {(review.evaluation ?? review.coaching_feedback)!.review_revision}
           </p>
           <div className="feedback-callout">
             <strong>总体反馈</strong>
-            <p>{review.evaluation.overall_feedback}</p>
+            <p>{(review.evaluation ?? review.coaching_feedback)!.overall_feedback}</p>
           </div>
           <p className="status-meta">
-            Reviewer AI 披露：{review.evaluation.ai_use.used
-              ? `已使用（${review.evaluation.ai_use.purpose}）；不替代真人决定`
+            Reviewer AI 披露：{(review.evaluation ?? review.coaching_feedback)!.ai_use.used
+              ? `已使用（${(review.evaluation ?? review.coaching_feedback)!.ai_use.purpose}）；不替代真人决定`
               : "未使用"}
           </p>
+          {review.coaching_feedback ? <p className="status-meta">此结论为非阻塞辅导反馈，不产生 Evaluation。</p> : null}
           <ol className="evaluation-list">
-            {review.evaluation.rubric_evaluations.map((item) => (
+            {(review.evaluation ?? review.coaching_feedback)!.rubric_evaluations.map((item) => (
               <li key={item.dimension_key}>
                 <div className="section-heading-row">
                   <strong>{rubricTitles.get(item.dimension_key) ?? item.dimension_key}</strong>
@@ -176,6 +207,7 @@ export default async function ReviewPage({
       ) : (
         <ReviewWorkbench
           reviewId={review.id}
+          reviewKind={review.review_kind}
           revision={review.revision}
           allowedCommands={review.allowed_commands}
           materialStatus={review.materials.status}
@@ -186,7 +218,7 @@ export default async function ReviewPage({
       )}
       <aside className="review-governance-note">
         <h2>结论与申诉边界</h2>
-        <p>只有具名 Reviewer 提交完整 Rubric 与理由后，服务端才会追加不可变真人结论；AI 建议不能代签。</p>
+        <p>{review.review_kind === "LEARNING_COACHING" ? "只有具名 Reviewer 对固定版本提交明确结论与理由后，服务端才会追加不可变辅导事实。" : "只有具名 Reviewer 提交完整 Rubric 与理由后，服务端才会追加不可变真人 Evaluation。"} AI 建议不能代签。</p>
         <p>通用高影响申诉政策尚未获批准；本页不承诺申诉入口或 SLA。已批准的下一训练阶段独立复核在学员结果页单独处理。</p>
         <p>若提交结果未知，请保留当前页面与 request ID，重新查询此 Review；不要重复点击或猜测 Evaluation 已写入。</p>
       </aside>

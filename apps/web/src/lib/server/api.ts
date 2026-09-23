@@ -129,6 +129,16 @@ export type Assignment = {
   draft: SubmissionDraft | null;
   available_attachments: Attachment[];
   latest_revision_feedback: string | null;
+  coaching: {
+    review_id: string;
+    submission_version_id: string;
+    submission_version_no: number;
+    status: "PENDING" | "PASS" | "REVISION_REQUIRED" | "SUPERSEDED";
+    feedback: string | null;
+    finalized_at: string | null;
+    non_blocking: true;
+    can_start_revision: boolean;
+  } | null;
   journey_stage: Omit<
     JourneyProgressNode,
     "status" | "assignment_id"
@@ -176,6 +186,8 @@ export type SubmissionVersion = {
   attachments: Attachment[];
   review_id: string | null;
   review_status: string | null;
+  review_kind: "FORMAL_EVALUATION" | "LEARNING_COACHING" | null;
+  review_finalized_at: string | null;
   decision: string | null;
   feedback: string | null;
   rubric_feedback: Array<{
@@ -210,6 +222,7 @@ export type ReviewItem = {
   revision: number;
   allowed_commands: string[];
   learner_name: string;
+  journey_title: string | null;
   task_title: string;
   task_version: number;
   submission_version_no: number;
@@ -223,18 +236,23 @@ export type ReviewItem = {
   sensitivity: string;
   audience: string;
   conflict_status: "NOT_EVALUATED";
+  review_kind: "FORMAL_EVALUATION" | "LEARNING_COACHING";
+  effect: "FORMAL_GATE" | "COACHING_ONLY";
 };
 
 export type ReviewHistory = {
   items: Array<{
     id: string;
+    assignment_id: string;
     learner_name: string;
     journey_title: string | null;
     task_title: string;
     submission_version_id: string;
     submission_version_no: number;
-    decision: "PASS" | "REVISION_REQUIRED";
+    decision: "PASS" | "REVISION_REQUIRED" | "NOT_REVIEWED";
     finalized_at: string;
+    review_kind: "FORMAL_EVALUATION" | "LEARNING_COACHING";
+    effect: "FORMAL_GATE" | "COACHING_ONLY";
   }>;
   next_cursor: string | null;
 };
@@ -289,6 +307,34 @@ export type ReviewDetail = ReviewItem & {
     ai_use: AiUseDisclosure;
     created_at: string;
   } | null;
+  coaching_feedback: {
+    id: string;
+    decision: "PASS" | "REVISION_REQUIRED";
+    overall_decision: "APPROVE" | "REQUEST_REVISION";
+    overall_feedback: string;
+    rubric_evaluations: Array<{
+      dimension_key: string;
+      rating: "MEETS" | "NEEDS_WORK";
+      score: number | null;
+      feedback: string | null;
+    }>;
+    reviewer_id: string;
+    review_revision: number;
+    ai_use: AiUseDisclosure;
+    created_at: string;
+    non_blocking: true;
+  } | null;
+  ai_advisory: {
+    id: string;
+    model_version: string;
+    prompt_version: string;
+    policy_version: string;
+    input_sha256: string;
+    result: Record<string, unknown>;
+    generated_at: string;
+    advisory_only: true;
+  } | null;
+  submission_history: SubmissionVersion[];
 };
 
 export type Result = {

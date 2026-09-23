@@ -19,6 +19,7 @@ from journey_api.formal_journey_catalog import (
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
+    CoachingFeedback,
     Decision,
     Enrollment,
     EnrollmentStatus,
@@ -31,7 +32,11 @@ from journey_api.models import (
     JourneyVersion,
     ModuleContentPackageBinding,
     Review,
+    ReviewKind,
+    ReviewStatus,
     Outcome,
+    Submission,
+    SubmissionVersion,
     SubmissionDraft,
     TaskDefinition,
     TaskDefinitionStatus,
@@ -624,6 +629,33 @@ def active_post_completion_evidence_retest(
         return None
     assignment_id, stage_key = row
     return ActiveEvidenceRetest(assignment_id=assignment_id, stage_key=stage_key)
+
+
+def outstanding_coaching_revision_assignment(
+    session: Session, enrollment: Enrollment
+) -> Assignment | None:
+    """Return the latest still-current coaching revision request, if any."""
+
+    return session.scalar(
+        select(Assignment)
+        .join(Submission, Submission.assignment_id == Assignment.id)
+        .join(
+            SubmissionVersion,
+            (SubmissionVersion.submission_id == Submission.id)
+            & (SubmissionVersion.version_no == Submission.current_version_no),
+        )
+        .join(Review, Review.submission_version_id == SubmissionVersion.id)
+        .join(CoachingFeedback, CoachingFeedback.review_id == Review.id)
+        .where(
+            Assignment.organization_id == enrollment.organization_id,
+            Assignment.enrollment_id == enrollment.id,
+            Assignment.status == AssignmentStatus.COMPLETED,
+            Review.review_kind == ReviewKind.LEARNING_COACHING,
+            Review.status == ReviewStatus.FINALIZED,
+            CoachingFeedback.decision == Decision.REVISION_REQUIRED,
+        )
+        .order_by(Review.finalized_at.desc(), Review.id.desc())
+    )
 
 
 def restore_completed_enrollment_after_evidence_retest(

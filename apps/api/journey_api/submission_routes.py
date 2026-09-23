@@ -50,9 +50,11 @@ from journey_api.models import (
     EnrollmentStatus,
     Evaluation,
     JourneyCompletionPolicy,
+    JourneyStageKind,
     OutboxEvent,
     OutboxStatus,
     Review,
+    ReviewKind,
     ReviewStatus,
     Role,
     Submission,
@@ -1007,6 +1009,11 @@ def submit_assignment(
         stage is not None
         and stage.completion_policy == JourneyCompletionPolicy.LEARNER_EVIDENCE
     )
+    treasure_coaching = bool(
+        learner_evidence
+        and stage is not None
+        and stage.stage_kind == JourneyStageKind.TREASURE
+    )
     post_completion_retest = (
         active_post_completion_evidence_retest(session, enrollment)
         if learner_evidence
@@ -1019,6 +1026,7 @@ def submit_assignment(
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点不是正在进行的结营后重测。")
     if learner_evidence and assignment.status == AssignmentStatus.NEEDS_REVISION:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "认知证据阶段不进入评审修订。")
+    review: Review | None = None
     if not learner_evidence:
         try:
             target_status = transition_formal_assignment(
@@ -1046,6 +1054,35 @@ def submit_assignment(
             submission_id=submission.id,
             submission_version_id=version.id,
             reviewer_id=enrollment.reviewer_id,
+            review_kind=ReviewKind.FORMAL_EVALUATION,
+            status=ReviewStatus.ASSIGNED,
+            revision=1,
+        )
+        session.add(review)
+    elif treasure_coaching:
+        now = datetime.now(UTC)
+        previous_open_reviews = session.scalars(
+            select(Review)
+            .where(
+                Review.organization_id == assignment.organization_id,
+                Review.assignment_id == assignment.id,
+                Review.review_kind == ReviewKind.LEARNING_COACHING,
+                Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
+            )
+            .with_for_update()
+        ).all()
+        for previous in previous_open_reviews:
+            previous.status = ReviewStatus.SUPERSEDED
+            previous.superseded_at = now
+            previous.revision += 1
+        review = Review(
+            id=uuid.uuid4(),
+            organization_id=assignment.organization_id,
+            assignment_id=assignment.id,
+            submission_id=submission.id,
+            submission_version_id=version.id,
+            reviewer_id=enrollment.reviewer_id,
+            review_kind=ReviewKind.LEARNING_COACHING,
             status=ReviewStatus.ASSIGNED,
             revision=1,
         )
@@ -1085,6 +1122,8 @@ def submit_assignment(
         "assignment" if learner_evidence else "submission",
         assignment.id if learner_evidence else submission.id,
     )
+    if review is not None and treasure_coaching:
+        add_event(session, "coaching_review.assigned.v1", "review", review.id)
     add_audit(
         session,
         request=request,

@@ -3,7 +3,7 @@ from datetime import timedelta
 from hmac import compare_digest
 
 from fastapi import APIRouter, Depends, Header, Request, Response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import (
@@ -20,6 +20,7 @@ from journey_api.journey_service import (
     active_post_completion_evidence_retest,
     create_journey_assignments,
     invitable_journey_stages,
+    outstanding_coaching_revision_assignment,
 )
 from journey_api.identity import (
     CSRF_COOKIE,
@@ -171,12 +172,32 @@ def deny_exchange(
 def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrollment]:
     if invite.target_user_id is None:
         return []
+    if invite.target_assignment_id is not None:
+        enrollment = session.scalar(
+            select(Enrollment)
+            .join(Assignment, Assignment.enrollment_id == Enrollment.id)
+            .where(
+                Assignment.id == invite.target_assignment_id,
+                Assignment.organization_id == invite.organization_id,
+                Assignment.task_version_id == invite.task_version_id,
+                Assignment.status != AssignmentStatus.CANCELLED,
+                Enrollment.organization_id == invite.organization_id,
+                Enrollment.learner_id == invite.target_user_id,
+                Enrollment.reviewer_id == invite.reviewer_id,
+                Enrollment.status.in_(
+                    [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED]
+                ),
+            )
+        )
+        return [enrollment] if enrollment is not None else []
     active = list(
         session.scalars(
             select(Enrollment).where(
                 Enrollment.organization_id == invite.organization_id,
                 Enrollment.learner_id == invite.target_user_id,
-                Enrollment.status == EnrollmentStatus.ACTIVE,
+                Enrollment.status.in_(
+                    [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED]
+                ),
             )
         ).all()
     )
@@ -189,7 +210,11 @@ def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrol
         select(Assignment.id).where(
             Assignment.organization_id == invite.organization_id,
             Assignment.enrollment_id == enrollment.id,
-            Assignment.task_version_id == invite.task_version_id,
+            (
+                Assignment.id == invite.target_assignment_id
+                if invite.target_assignment_id is not None
+                else Assignment.task_version_id == invite.task_version_id
+            ),
             Assignment.status != AssignmentStatus.CANCELLED,
         )
     )
@@ -600,14 +625,18 @@ def create_learner_reentry(
     if enrollment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的 Enrollment。")
     ensure_revision(enrollment.revision, command.expected_revision)
-    if active_post_completion_evidence_retest(session, enrollment) is not None:
+    active_retest = active_post_completion_evidence_retest(session, enrollment)
+    coaching_revision = outstanding_coaching_revision_assignment(session, enrollment)
+    if enrollment.status not in {EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED}:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前 Enrollment 不能重新进入。")
+    if enrollment.status == EnrollmentStatus.COMPLETED and not (
+        active_retest or coaching_revision
+    ):
         raise ApiError(
             409,
             "INVALID_STATE_TRANSITION",
-            "结营后重测期间不能创建重新进入链接。",
+            "已结营且没有待处理辅导返工或活动重测，不能创建重新进入链接。",
         )
-    if enrollment.status != EnrollmentStatus.ACTIVE:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有进行中的 Enrollment 可以重新进入。")
     learner = session.scalar(
         select(User)
         .join(RoleAssignment, RoleAssignment.user_id == User.id)
@@ -622,15 +651,29 @@ def create_learner_reentry(
     if learner is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "Learner 身份已停用或角色已移除。")
     enforce_canary_invite_target(learner.id)
-    assignment = session.scalar(
-        select(Assignment)
-        .where(
-            Assignment.organization_id == actor.organization_id,
-            Assignment.enrollment_id == enrollment.id,
-            Assignment.status != AssignmentStatus.CANCELLED,
-        )
-        .order_by(Assignment.position, Assignment.id)
+    assignment = (
+        session.get(Assignment, active_retest.assignment_id)
+        if active_retest is not None
+        else coaching_revision
     )
+    if assignment is None:
+        assignment = session.scalar(
+            select(Assignment)
+            .where(
+                Assignment.organization_id == actor.organization_id,
+                Assignment.enrollment_id == enrollment.id,
+                Assignment.status.in_(
+                    [
+                        AssignmentStatus.IN_PROGRESS,
+                        AssignmentStatus.NEEDS_REVISION,
+                        AssignmentStatus.AVAILABLE,
+                        AssignmentStatus.SUBMITTED,
+                        AssignmentStatus.IN_REVIEW,
+                    ]
+                ),
+            )
+            .order_by(Assignment.position, Assignment.id)
+        )
     if assignment is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "Enrollment 没有可恢复的当前行动。")
     now = utc_now()
@@ -640,6 +683,10 @@ def create_learner_reentry(
             Invite.target_user_id == learner.id,
             Invite.reviewer_id == enrollment.reviewer_id,
             Invite.task_version_id == assignment.task_version_id,
+            or_(
+                Invite.target_assignment_id == assignment.id,
+                Invite.target_assignment_id.is_(None),
+            ),
             Invite.status == InviteStatus.ACTIVE,
             Invite.expires_at > now,
         )
@@ -658,6 +705,7 @@ def create_learner_reentry(
         task_version_id=assignment.task_version_id,
         journey_version_id=enrollment.journey_version_id,
         target_user_id=learner.id,
+        target_assignment_id=assignment.id,
         status=InviteStatus.ACTIVE,
         expires_at=now + timedelta(minutes=command.expires_in_minutes),
         created_by=actor.id,
@@ -674,6 +722,7 @@ def create_learner_reentry(
         "journey_version_id": (
             str(invite.journey_version_id) if invite.journey_version_id is not None else None
         ),
+        "target_assignment_id": str(assignment.id),
     }
     store_result(
         session,
@@ -692,7 +741,13 @@ def create_learner_reentry(
         resource_type="invite",
         resource_id=invite.id,
         result="SUCCESS",
-        details={"role": "LEARNER", "status": "ACTIVE", "reason": command.reason},
+        details={
+            "role": "LEARNER",
+            "status": "ACTIVE",
+            "reason": command.reason,
+            "enrollment_id": str(enrollment.id),
+            "assignment_id": str(assignment.id),
+        },
     )
     session.commit()
     return envelope(request, CreateInviteOut(**result, invite_token=invite_token))
@@ -854,8 +909,12 @@ def exchange_invite(
             ).all()
         )
         matching = matching_reentry_enrollments(session, invite)
-        if active_enrollments:
-            if len(active_enrollments) != 1 or len(matching) != 1:
+        if matching:
+            if len(matching) != 1 or (
+                invite.target_assignment_id is None
+                and active_enrollments
+                and active_enrollments[0].id != matching[0].id
+            ):
                 deny_exchange(
                     session,
                     request,
@@ -865,6 +924,15 @@ def exchange_invite(
                     status_code=409,
                 )
             reentry_enrollment = matching[0]
+        elif active_enrollments:
+            deny_exchange(
+                session,
+                request,
+                invite=invite,
+                message="该身份已有不匹配的进行中 Enrollment。",
+                code="INVALID_STATE_TRANSITION",
+                status_code=409,
+            )
 
     if reentry_enrollment is None:
         enrollment = Enrollment(
@@ -967,7 +1035,7 @@ def confirm_identity(
         and invite.target_user_id == user.id
         and enrollment.organization_id == invite.organization_id
         and enrollment.learner_id == user.id
-        and enrollment.status == EnrollmentStatus.ACTIVE
+        and enrollment.status in {EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED}
     )
     if (
         invite is None
@@ -1050,7 +1118,11 @@ def confirm_identity(
             select(Assignment).where(
                 Assignment.organization_id == invite.organization_id,
                 Assignment.enrollment_id == enrollment.id,
-                Assignment.task_version_id == invite.task_version_id,
+                (
+                    Assignment.id == invite.target_assignment_id
+                    if invite.target_assignment_id is not None
+                    else Assignment.task_version_id == invite.task_version_id
+                ),
                 Assignment.status != AssignmentStatus.CANCELLED,
             )
         )
@@ -1110,6 +1182,8 @@ def confirm_identity(
             "provider": "INVITE",
             "flow": "REENTRY" if is_reentry else "JOIN",
             "rotated_session_count": len(rotated_sessions),
+            "enrollment_id": str(enrollment.id),
+            "assignment_id": str(assignment.id),
         },
     )
     session.commit()
@@ -1125,8 +1199,10 @@ def confirm_identity(
             user_id=user.id,
             organization_id=user.organization_id,
             roles=[Role.LEARNER.value],
-            enrollment_status="ACTIVE",
+            enrollment_status=enrollment.status.value,
             safe_entry="/app",
+            enrollment_id=enrollment.id,
+            target_assignment_id=assignment.id,
             expires_at=expires_at,
             csrf_token=session_csrf_token,
         ),
