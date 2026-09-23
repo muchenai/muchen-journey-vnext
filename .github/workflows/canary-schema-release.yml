@@ -227,7 +227,7 @@ jobs:
                   attempt_timeout=300
                 fi
                 set +e
-                ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'"
+                ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'" < /dev/null
                 existing_status=$?
                 set -e
                 if [[ "$existing_status" -eq 0 ]]; then
@@ -236,7 +236,7 @@ jobs:
                   break
                 fi
                 set +e
-                partial_bytes=$(ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -L '$remote/chunks/$chunk_name.partial'; then exit 2; elif test -f '$remote/chunks/$chunk_name.partial'; then stat -c %s '$remote/chunks/$chunk_name.partial'; else printf 0; fi")
+                partial_bytes=$(ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -L '$remote/chunks/$chunk_name.partial'; then exit 2; elif test -f '$remote/chunks/$chunk_name.partial'; then stat -c %s '$remote/chunks/$chunk_name.partial'; else printf 0; fi" < /dev/null)
                 partial_status=$?
                 set -e
                 if [[ "$partial_status" -ne 0 || ! "$partial_bytes" =~ ^[0-9]+$ || "$partial_bytes" -gt "$chunk_bytes" ]]; then
@@ -245,7 +245,7 @@ jobs:
                 fi
                 if [[ "$partial_bytes" -eq "$chunk_bytes" ]]; then
                   set +e
-                  ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'"
+                  ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'" < /dev/null
                   transfer_status=$?
                   set -e
                   if [[ "$transfer_status" -eq 0 ]]; then
@@ -266,7 +266,7 @@ jobs:
                 printf '%s "%s" "%s"\n' "$sftp_command" "$local_chunk" "$remote/chunks/$chunk_name.partial" | timeout --signal=TERM --kill-after=15s "${attempt_timeout}s" sftp "${opts[@]}" -b - root@"$PUBLIC_IP"
                 transfer_status=$?
                 if [[ "$transfer_status" -eq 0 ]]; then
-                  ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -e '$remote/chunks/$chunk_name'; then test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'; else test ! -L '$remote/chunks/$chunk_name.partial' && test -f '$remote/chunks/$chunk_name.partial' && test \"\$(stat -c %s '$remote/chunks/$chunk_name.partial')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'; fi"
+                  ssh "${opts[@]}" root@"$PUBLIC_IP" "if test -e '$remote/chunks/$chunk_name'; then test ! -L '$remote/chunks/$chunk_name' && test -f '$remote/chunks/$chunk_name' && test \"\$(stat -c %s '$remote/chunks/$chunk_name')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name' | cut -d' ' -f1)\" = '$chunk_sha'; else test ! -L '$remote/chunks/$chunk_name.partial' && test -f '$remote/chunks/$chunk_name.partial' && test \"\$(stat -c %s '$remote/chunks/$chunk_name.partial')\" = '$chunk_bytes' && test \"\$(sha256sum '$remote/chunks/$chunk_name.partial' | cut -d' ' -f1)\" = '$chunk_sha' && mv -- '$remote/chunks/$chunk_name.partial' '$remote/chunks/$chunk_name'; fi" < /dev/null
                   transfer_status=$?
                 fi
                 set -e
@@ -299,7 +299,10 @@ jobs:
             }
 
             cache_pids=()
-            while IFS=$'\t' read -r chunk_name chunk_sha chunk_bytes; do
+            mapfile -t cache_chunk_rows < <(jq -r '.chunks[] | [.name, .sha256, (.bytes | tostring)] | @tsv' "$chunks_manifest")
+            test "${#cache_chunk_rows[@]}" -eq "$chunk_count"
+            for cache_chunk_row in "${cache_chunk_rows[@]}"; do
+              IFS=$'\t' read -r chunk_name chunk_sha chunk_bytes <<< "$cache_chunk_row"
               [[ "$chunk_name" =~ ^chunk-[0-9]{4}\.bin$ ]]
               [[ "$chunk_sha" =~ ^[0-9a-f]{64}$ ]]
               [[ "$chunk_bytes" =~ ^[1-9][0-9]*$ ]]
@@ -311,7 +314,7 @@ jobs:
               if [[ "${#cache_pids[@]}" -ge "$max_parallel" ]]; then
                 wait_cache_batch
               fi
-            done < <(jq -r '.chunks[] | [.name, .sha256, (.bytes | tostring)] | @tsv' "$chunks_manifest")
+            done
             wait_cache_batch
             if [[ "$transfer_failed" -ne 0 ]]; then
               failed_files=("$transfer_status_dir"/*.failed)

@@ -18,6 +18,8 @@ Run `35886588963` proved that the corrected resume path preserves progress (`0` 
 
 The user approved the bounded parallel path on 2026-09-24. The existing 16 independently hashed chunks are transferred in batches of at most eight concurrent SSH/SFTP connections. Each chunk retains zero-offset `put`, non-zero-offset `reput`, at most four five-minute attempts, exact size/SHA-256 verification, and atomic acceptance. A shared 3000-second deadline remains authoritative; any failed chunk prevents archive assembly and image import. This introduces no storage service and does not change the candidate package or any production application/database state.
 
+Run `35893852269` validated the transport capacity but exposed an implementation defect: the first eight chunks all passed in about ten minutes, while background SSH checks consumed the process-substitution input that was feeding the foreground manifest loop, so chunks 8–15 were never scheduled. The importer correctly stopped with `CHUNKS_DIRECTORY_CONTENTS` before archive assembly or Docker load; SSH ingress closed and production remained healthy on the base release. The bounded fix materializes and count-checks all manifest rows before starting workers and redirects every background SSH check from `/dev/null`, while leaving parallelism, retry limits, deadline, hashes, and non-mutation boundaries unchanged.
+
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries
