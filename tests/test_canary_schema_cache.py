@@ -163,7 +163,8 @@ def test_import_refuses_an_active_release_phase(tmp_path, monkeypatch):
             cache.import_images(value, archive, expected_sha)
     finally:
         lock.close()
-    cache.execute.assert_not_called()
+    cache.execute.assert_called_once_with(["gzip", "-t", str(archive)], timeout=300)
+    assert not any(call.args[0][:2] == ["docker", "load"] for call in cache.execute.call_args_list)
     upgrade.verify_base.assert_not_called()
 
 
