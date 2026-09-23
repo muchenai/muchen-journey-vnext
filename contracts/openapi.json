@@ -5,52 +5,6 @@
     "version": "0.2.0-local"
   },
   "paths": {
-    "/api/v1/ops/invite-targets": {
-      "get": {
-        "summary": "List Invite Targets",
-        "operationId": "list_invite_targets_api_v1_ops_invite_targets_get",
-        "parameters": [
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InviteTargetsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/health/live": {
       "get": {
         "summary": "Live",
@@ -1174,9 +1128,168 @@
           },
           "429": {
             "description": "RATE_LIMITED: 20 requests/10s and 90/minute per organization/Learner; error.details.retry_after_seconds specifies the wait.",
-            "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until all exceeded fixed windows reset."
+              }
+            }
           },
-          "503": {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."},
+          "503": {
+            "description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/assignments/{assignment_id}/evidence-revision/start": {
+      "post": {
+        "summary": "Start Evidence Revision",
+        "operationId": "start_evidence_revision_api_v1_me_assignments__assignment_id__evidence_revision_start_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel": {
+      "post": {
+        "summary": "Cancel Evidence Revision",
+        "operationId": "cancel_evidence_revision_api_v1_me_assignments__assignment_id__evidence_revision_cancel_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1254,9 +1367,18 @@
           },
           "429": {
             "description": "RATE_LIMITED: 5 requests/10s and 20/minute per organization/Learner; includes idempotent replays; error.details.retry_after_seconds specifies the wait.",
-            "headers": {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds until all exceeded fixed windows reset."}}
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until all exceeded fixed windows reset."
+              }
+            }
           },
-          "503": {"description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."},
+          "503": {
+            "description": "WRITE_LIMIT_UNAVAILABLE: retryable; no business write performed."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1309,6 +1431,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SubmissionHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/invite-targets": {
+      "get": {
+        "summary": "List Invite Targets",
+        "operationId": "list_invite_targets_api_v1_ops_invite_targets_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteTargetsResponse"
                 }
               }
             }
@@ -2233,6 +2401,15 @@
         "operationId": "review_queue_api_v1_reviews_get",
         "parameters": [
           {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ReviewKind",
+              "default": "FORMAL_EVALUATION"
+            }
+          },
+          {
             "name": "X-Fixture-Role",
             "in": "header",
             "required": false,
@@ -2256,6 +2433,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReviewQueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reviews/history": {
+      "get": {
+        "summary": "Review History",
+        "operationId": "review_history_api_v1_reviews_history_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ReviewKind",
+              "default": "FORMAL_EVALUATION"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewHistoryResponse"
                 }
               }
             }
@@ -5744,295 +6005,10 @@
           }
         }
       }
-    },
-    "/api/v1/me/assignments/{assignment_id}/evidence-revision/start": {
-      "post": {
-        "summary": "Start Evidence Revision",
-        "operationId": "start_evidence_revision_api_v1_me_assignments__assignment_id__evidence_revision_start_post",
-        "parameters": [
-          {
-            "name": "assignment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Assignment Id"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Idempotency-Key"
-            }
-          },
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RevisionCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommandResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel": {
-      "post": {
-        "summary": "Cancel Evidence Revision",
-        "operationId": "cancel_evidence_revision_api_v1_me_assignments__assignment_id__evidence_revision_cancel_post",
-        "parameters": [
-          {
-            "name": "assignment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Assignment Id"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Idempotency-Key"
-            }
-          },
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RevisionCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommandResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/reviews/history": {
-      "get": {
-        "summary": "Review History",
-        "operationId": "review_history_api_v1_reviews_history_get",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 512
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 50,
-              "minimum": 1,
-              "default": 20,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReviewHistoryResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
     "schemas": {
-      "InviteTargetOut": {
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          },
-          "display_name": {
-            "type": "string",
-            "title": "Display Name"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "user_id",
-          "display_name"
-        ],
-        "title": "InviteTargetOut"
-      },
-      "InviteTargetsOut": {
-        "properties": {
-          "target_required": {
-            "type": "boolean",
-            "title": "Target Required"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/InviteTargetOut"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "target_required",
-          "items"
-        ],
-        "title": "InviteTargetsOut"
-      },
-      "InviteTargetsResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/InviteTargetsOut"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "data",
-          "request_id"
-        ],
-        "title": "InviteTargetsResponse"
-      },
       "ActivateControlledTaskAuthorizationCommand": {
         "properties": {
           "expected_revision": {
@@ -6065,6 +6041,79 @@
           "expected_policy_snapshot_sha256"
         ],
         "title": "ActivateControlledTaskAuthorizationCommand"
+      },
+      "ActiveEvidenceRetestOut": {
+        "properties": {
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "stage_key": {
+            "type": "string",
+            "title": "Stage Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "stage_key"
+        ],
+        "title": "ActiveEvidenceRetestOut"
+      },
+      "AiAdvisoryRecordOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "input_sha256": {
+            "type": "string",
+            "title": "Input Sha256"
+          },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "advisory_only": {
+            "type": "boolean",
+            "const": true,
+            "title": "Advisory Only",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "model_version",
+          "prompt_version",
+          "policy_version",
+          "input_sha256",
+          "result",
+          "generated_at"
+        ],
+        "title": "AiAdvisoryRecordOut"
       },
       "AiSummaryOut": {
         "properties": {
@@ -6430,6 +6479,16 @@
             ],
             "title": "Latest Revision Feedback"
           },
+          "coaching": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LearnerCoachingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "journey_stage": {
             "anyOf": [
               {
@@ -6718,6 +6777,79 @@
           "reason"
         ],
         "title": "CancelEnrollmentCommand"
+      },
+      "CoachingFeedbackOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED"
+            ],
+            "title": "Decision"
+          },
+          "overall_decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REQUEST_REVISION"
+            ],
+            "title": "Overall Decision"
+          },
+          "overall_feedback": {
+            "type": "string",
+            "title": "Overall Feedback"
+          },
+          "rubric_evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/RubricEvaluationOut"
+            },
+            "type": "array",
+            "title": "Rubric Evaluations"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Id"
+          },
+          "review_revision": {
+            "type": "integer",
+            "title": "Review Revision"
+          },
+          "ai_use": {
+            "$ref": "#/components/schemas/AiUseDisclosure"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "non_blocking": {
+            "type": "boolean",
+            "const": true,
+            "title": "Non Blocking",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "decision",
+          "overall_decision",
+          "overall_feedback",
+          "rubric_evaluations",
+          "reviewer_id",
+          "review_revision",
+          "ai_use",
+          "created_at"
+        ],
+        "title": "CoachingFeedbackOut"
       },
       "CommandOut": {
         "properties": {
@@ -8197,6 +8329,18 @@
             ],
             "title": "Journey Version Id"
           },
+          "target_assignment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Assignment Id"
+          },
           "invite_token": {
             "type": "string",
             "title": "Invite Token"
@@ -8897,7 +9041,6 @@
             },
             "type": "array",
             "maxItems": 6,
-            "minItems": 1,
             "title": "Rubric Evaluations"
           },
           "ai_use": {
@@ -9819,13 +9962,26 @@
           },
           "enrollment_status": {
             "type": "string",
-            "const": "ACTIVE",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED"
+            ],
             "title": "Enrollment Status"
           },
           "safe_entry": {
             "type": "string",
             "const": "/app",
             "title": "Safe Entry"
+          },
+          "enrollment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Enrollment Id"
+          },
+          "target_assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Assignment Id"
           },
           "expires_at": {
             "type": "string",
@@ -9845,6 +10001,8 @@
           "roles",
           "enrollment_status",
           "safe_entry",
+          "enrollment_id",
+          "target_assignment_id",
           "expires_at",
           "csrf_token"
         ],
@@ -10259,6 +10417,18 @@
               }
             ],
             "title": "Journey Version Id"
+          },
+          "target_assignment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Assignment Id"
           }
         },
         "additionalProperties": false,
@@ -10272,6 +10442,66 @@
           "revision"
         ],
         "title": "InviteOut"
+      },
+      "InviteTargetOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "display_name"
+        ],
+        "title": "InviteTargetOut"
+      },
+      "InviteTargetsOut": {
+        "properties": {
+          "target_required": {
+            "type": "boolean",
+            "title": "Target Required"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InviteTargetOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_required",
+          "items"
+        ],
+        "title": "InviteTargetsOut"
+      },
+      "InviteTargetsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InviteTargetsOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "InviteTargetsResponse"
       },
       "JoinExchangeCommand": {
         "properties": {
@@ -10546,6 +10776,79 @@
           "stage_title"
         ],
         "title": "JourneyResultEvaluationOut"
+      },
+      "LearnerCoachingOut": {
+        "properties": {
+          "review_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Id"
+          },
+          "submission_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Submission Version Id"
+          },
+          "submission_version_no": {
+            "type": "integer",
+            "title": "Submission Version No"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PASS",
+              "REVISION_REQUIRED",
+              "SUPERSEDED"
+            ],
+            "title": "Status"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
+          "finalized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalized At"
+          },
+          "non_blocking": {
+            "type": "boolean",
+            "const": true,
+            "title": "Non Blocking",
+            "default": true
+          },
+          "can_start_revision": {
+            "type": "boolean",
+            "title": "Can Start Revision",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "review_id",
+          "submission_version_id",
+          "submission_version_no",
+          "status",
+          "feedback",
+          "finalized_at"
+        ],
+        "title": "LearnerCoachingOut"
       },
       "LearnerEnrollmentListOut": {
         "properties": {
@@ -13105,6 +13408,17 @@
             "type": "string",
             "title": "Learner Name"
           },
+          "journey_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Title"
+          },
           "task_title": {
             "type": "string",
             "title": "Task Title"
@@ -13173,6 +13487,24 @@
             "title": "Conflict Status",
             "default": "NOT_EVALUATED"
           },
+          "review_kind": {
+            "type": "string",
+            "enum": [
+              "FORMAL_EVALUATION",
+              "LEARNING_COACHING"
+            ],
+            "title": "Review Kind",
+            "default": "FORMAL_EVALUATION"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "FORMAL_GATE",
+              "COACHING_ONLY"
+            ],
+            "title": "Effect",
+            "default": "FORMAL_GATE"
+          },
           "submission_body": {
             "type": "string",
             "title": "Submission Body"
@@ -13227,6 +13559,33 @@
                 "type": "null"
               }
             ]
+          },
+          "coaching_feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachingFeedbackOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ai_advisory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiAdvisoryRecordOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submission_history": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionVersionOut"
+            },
+            "type": "array",
+            "title": "Submission History"
           }
         },
         "additionalProperties": false,
@@ -13240,6 +13599,7 @@
           "revision",
           "allowed_commands",
           "learner_name",
+          "journey_title",
           "task_title",
           "task_version",
           "submission_version_no",
@@ -13281,6 +13641,149 @@
           "request_id"
         ],
         "title": "ReviewDetailResponse"
+      },
+      "ReviewHistoryItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "learner_name": {
+            "type": "string",
+            "title": "Learner Name"
+          },
+          "journey_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Title"
+          },
+          "task_title": {
+            "type": "string",
+            "title": "Task Title"
+          },
+          "submission_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Submission Version Id"
+          },
+          "submission_version_no": {
+            "type": "integer",
+            "title": "Submission Version No"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED",
+              "NOT_REVIEWED"
+            ],
+            "title": "Decision"
+          },
+          "finalized_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Finalized At"
+          },
+          "review_kind": {
+            "type": "string",
+            "enum": [
+              "FORMAL_EVALUATION",
+              "LEARNING_COACHING"
+            ],
+            "title": "Review Kind",
+            "default": "FORMAL_EVALUATION"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "FORMAL_GATE",
+              "COACHING_ONLY"
+            ],
+            "title": "Effect",
+            "default": "FORMAL_GATE"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "assignment_id",
+          "learner_name",
+          "journey_title",
+          "task_title",
+          "submission_version_id",
+          "submission_version_no",
+          "decision",
+          "finalized_at"
+        ],
+        "title": "ReviewHistoryItemOut"
+      },
+      "ReviewHistoryOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewHistoryItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ReviewHistoryOut"
+      },
+      "ReviewHistoryResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReviewHistoryOut"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ReviewHistoryResponse"
+      },
+      "ReviewKind": {
+        "type": "string",
+        "enum": [
+          "FORMAL_EVALUATION",
+          "LEARNING_COACHING"
+        ],
+        "title": "ReviewKind"
       },
       "ReviewMaterialOut": {
         "properties": {
@@ -13375,6 +13878,15 @@
             ],
             "title": "Decision"
           },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "FORMAL_GATE",
+              "COACHING_ONLY"
+            ],
+            "title": "Effect",
+            "default": "FORMAL_GATE"
+          },
           "idempotency_replay": {
             "type": "boolean",
             "title": "Idempotency Replay",
@@ -13452,6 +13964,17 @@
             "type": "string",
             "title": "Learner Name"
           },
+          "journey_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journey Title"
+          },
           "task_title": {
             "type": "string",
             "title": "Task Title"
@@ -13519,6 +14042,24 @@
             "const": "NOT_EVALUATED",
             "title": "Conflict Status",
             "default": "NOT_EVALUATED"
+          },
+          "review_kind": {
+            "type": "string",
+            "enum": [
+              "FORMAL_EVALUATION",
+              "LEARNING_COACHING"
+            ],
+            "title": "Review Kind",
+            "default": "FORMAL_EVALUATION"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "FORMAL_GATE",
+              "COACHING_ONLY"
+            ],
+            "title": "Effect",
+            "default": "FORMAL_GATE"
           }
         },
         "additionalProperties": false,
@@ -13532,6 +14073,7 @@
           "revision",
           "allowed_commands",
           "learner_name",
+          "journey_title",
           "task_title",
           "task_version",
           "submission_version_no",
@@ -14819,6 +15361,33 @@
             ],
             "title": "Review Status"
           },
+          "review_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FORMAL_EVALUATION",
+                  "LEARNING_COACHING"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Kind"
+          },
+          "review_finalized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Finalized At"
+          },
           "decision": {
             "anyOf": [
               {
@@ -15609,136 +16178,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "ActiveEvidenceRetestOut": {
-        "properties": {
-          "assignment_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Assignment Id"
-          },
-          "stage_key": {
-            "type": "string",
-            "title": "Stage Key"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "assignment_id",
-          "stage_key"
-        ],
-        "title": "ActiveEvidenceRetestOut"
-      },
-      "ReviewHistoryItemOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "learner_name": {
-            "type": "string",
-            "title": "Learner Name"
-          },
-          "journey_title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Journey Title"
-          },
-          "task_title": {
-            "type": "string",
-            "title": "Task Title"
-          },
-          "submission_version_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Submission Version Id"
-          },
-          "submission_version_no": {
-            "type": "integer",
-            "title": "Submission Version No"
-          },
-          "decision": {
-            "type": "string",
-            "enum": [
-              "PASS",
-              "REVISION_REQUIRED"
-            ],
-            "title": "Decision"
-          },
-          "finalized_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Finalized At"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "learner_name",
-          "journey_title",
-          "task_title",
-          "submission_version_id",
-          "submission_version_no",
-          "decision",
-          "finalized_at"
-        ],
-        "title": "ReviewHistoryItemOut"
-      },
-      "ReviewHistoryOut": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ReviewHistoryItemOut"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
-        "title": "ReviewHistoryOut"
-      },
-      "ReviewHistoryResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ReviewHistoryOut"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "data",
-          "request_id"
-        ],
-        "title": "ReviewHistoryResponse"
       }
     }
   }

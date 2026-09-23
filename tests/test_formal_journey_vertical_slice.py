@@ -21,6 +21,7 @@ from journey_api.appeal_continuity import (
 from journey_api.fixtures import OPERATOR_ID, REVIEWER_ID
 from journey_api.main import app
 from journey_api.models import (
+    AiAdvisoryRecord,
     Attachment,
     AttachmentScanStatus,
     AttachmentStatus,
@@ -302,6 +303,8 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     revised_once = False
     evidence_retest_verified = False
     formal_retest_rejection_verified = False
+    coaching_revision_verified = False
+    coaching_supersede_verified = False
     while action["action_type"] != "VIEW_RESULT_OR_HANDOFF":
         assignment_id = action["resource_id"]
         detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
@@ -337,7 +340,215 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                     select(func.count(Review.id)).where(
                         Review.assignment_id == uuid.UUID(assignment_id)
                     )
-                ) == 0
+                ) == (1 if stage["stage_kind"] == "TREASURE" else 0)
+            if stage["stage_kind"] == "TREASURE" and not coaching_revision_verified:
+                coaching_revision_verified = True
+                coaching_queue = ok(
+                    reviewer.get(
+                        "/api/v1/reviews?kind=LEARNING_COACHING",
+                        headers=REVIEWER_HEADERS,
+                    )
+                )
+                coaching_review = next(
+                    item
+                    for item in coaching_queue["items"]
+                    if item["assignment_id"] == assignment_id
+                )
+                assert coaching_review["effect"] == "COACHING_ONLY"
+                started_coaching = post(
+                    reviewer,
+                    f"/api/v1/reviews/{coaching_review['id']}/start",
+                    json={"expected_revision": coaching_review["revision"]},
+                    role_headers=REVIEWER_HEADERS,
+                )
+                coaching_detail = ok(
+                    reviewer.get(
+                        f"/api/v1/reviews/{coaching_review['id']}",
+                        headers=REVIEWER_HEADERS,
+                    )
+                )
+                assert coaching_detail["ai_advisory"] is None
+                advisory_id = uuid.uuid4()
+                with SessionLocal() as session:
+                    coaching_review_record = session.get(
+                        Review, uuid.UUID(coaching_review["id"])
+                    )
+                    assert coaching_review_record is not None
+                    session.add(
+                        AiAdvisoryRecord(
+                            id=advisory_id,
+                            organization_id=coaching_review_record.organization_id,
+                            assignment_id=uuid.UUID(assignment_id),
+                            submission_id=uuid.UUID(coaching_detail["submission_id"]),
+                            submission_version_id=uuid.UUID(
+                                coaching_detail["submission_version_id"]
+                            ),
+                            model_version="synthetic-model-v1",
+                            prompt_version="synthetic-prompt-v1",
+                            policy_version="synthetic-policy-v1",
+                            input_sha256="a" * 64,
+                            result={"summary": "仅用于隔离测试的建议"},
+                            advisory_only=True,
+                        )
+                    )
+                    session.commit()
+                coaching_detail = ok(
+                    reviewer.get(
+                        f"/api/v1/reviews/{coaching_review['id']}",
+                        headers=REVIEWER_HEADERS,
+                    )
+                )
+                assert coaching_detail["ai_advisory"] == {
+                    "id": str(advisory_id),
+                    "model_version": "synthetic-model-v1",
+                    "prompt_version": "synthetic-prompt-v1",
+                    "policy_version": "synthetic-policy-v1",
+                    "input_sha256": "a" * 64,
+                    "result": {"summary": "仅用于隔离测试的建议"},
+                    "generated_at": coaching_detail["ai_advisory"]["generated_at"],
+                    "advisory_only": True,
+                }
+                with SessionLocal() as session:
+                    with pytest.raises(DBAPIError):
+                        session.execute(
+                            update(AiAdvisoryRecord)
+                            .where(AiAdvisoryRecord.id == advisory_id)
+                            .values(result={"summary": "不得改写"})
+                        )
+                        session.commit()
+                    session.rollback()
+                with SessionLocal() as session:
+                    with pytest.raises(DBAPIError):
+                        session.execute(
+                            delete(AiAdvisoryRecord).where(
+                                AiAdvisoryRecord.id == advisory_id
+                            )
+                        )
+                        session.commit()
+                    session.rollback()
+                rubric = [
+                    {
+                        "dimension_key": dimension["dimension_key"],
+                        "rating": "NEEDS_WORK" if index == 0 else "MEETS",
+                        "score": (
+                            dimension["meets_threshold"] - 1
+                            if index == 0
+                            else dimension["max_points"]
+                        ),
+                        "feedback": "请补充一条可定位的事实证据。",
+                    }
+                    for index, dimension in enumerate(
+                        coaching_detail["rubric"]["dimensions"]
+                    )
+                ]
+                finalized_coaching = post(
+                    reviewer,
+                    f"/api/v1/reviews/{coaching_review['id']}/finalize",
+                    json={
+                        "expected_revision": started_coaching["review_revision"],
+                        "overall_decision": "REQUEST_REVISION",
+                        "overall_feedback": "请按辅导反馈完善证据；这不会阻塞你继续旅程。",
+                        "rubric_evaluations": rubric,
+                    },
+                    role_headers=REVIEWER_HEADERS,
+                )
+                assert finalized_coaching["effect"] == "COACHING_ONLY"
+                assert finalized_coaching["assignment_status"] == "COMPLETED"
+                learner_coaching = ok(
+                    learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                )
+                assert learner_coaching["coaching"]["status"] == "REVISION_REQUIRED"
+                assert learner_coaching["coaching"]["non_blocking"] is True
+                assert "start_evidence_revision" in learner_coaching["allowed_commands"]
+                with SessionLocal() as session:
+                    assert session.scalar(
+                        select(func.count(Evaluation.id)).where(
+                            Evaluation.assignment_id == uuid.UUID(assignment_id)
+                        )
+                    ) == 0
+            if (
+                stage["stable_key"] == "TRE-002-AI-DATA-BASICS"
+                and not coaching_supersede_verified
+            ):
+                coaching_supersede_verified = True
+                treasure_detail = ok(
+                    learner.get(f"/api/v1/me/assignments/{assignment_id}")
+                )
+                reopened_treasure = post(
+                    learner,
+                    f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                    json={"expected_revision": treasure_detail["revision"]},
+                )
+                revised_treasure = post(
+                    learner,
+                    f"/api/v1/me/assignments/{assignment_id}/submissions",
+                    json={
+                        "expected_revision": reopened_treasure["revision"],
+                        "body": (
+                            "这是根据学习目标主动补充的第二版证据；我增加了可定位事实、"
+                            "判断依据和遇到不确定性时的暂停条件。"
+                        ),
+                    },
+                )
+                assert revised_treasure["version_no"] == 2
+                coaching_queue = ok(
+                    reviewer.get(
+                        "/api/v1/reviews?kind=LEARNING_COACHING",
+                        headers=REVIEWER_HEADERS,
+                    )
+                )
+                latest_coaching = next(
+                    item
+                    for item in coaching_queue["items"]
+                    if item["assignment_id"] == assignment_id
+                )
+                assert latest_coaching["submission_version_no"] == 2
+                coaching_history = ok(
+                    reviewer.get(
+                        "/api/v1/reviews/history?kind=LEARNING_COACHING",
+                        headers=REVIEWER_HEADERS,
+                    )
+                )
+                superseded = next(
+                    item
+                    for item in coaching_history["items"]
+                    if item["assignment_id"] == assignment_id
+                )
+                assert superseded["decision"] == "NOT_REVIEWED"
+                started_latest = post(
+                    reviewer,
+                    f"/api/v1/reviews/{latest_coaching['id']}/start",
+                    json={"expected_revision": latest_coaching["revision"]},
+                    role_headers=REVIEWER_HEADERS,
+                )
+                passed_coaching = post(
+                    reviewer,
+                    f"/api/v1/reviews/{latest_coaching['id']}/finalize",
+                    json={
+                        "expected_revision": started_latest["review_revision"],
+                        "overall_decision": "APPROVE",
+                        "overall_feedback": "第二版证据已达到本站学习目标，继续保持事实与判断可追溯。",
+                        "rubric_evaluations": [],
+                    },
+                    role_headers=REVIEWER_HEADERS,
+                )
+                assert passed_coaching["effect"] == "COACHING_ONLY"
+                assert passed_coaching["assignment_status"] == "COMPLETED"
+                with SessionLocal() as session:
+                    reviews = session.scalars(
+                        select(Review).where(
+                            Review.assignment_id == uuid.UUID(assignment_id)
+                        )
+                    ).all()
+                    assert sorted(item.status.value for item in reviews) == [
+                        "FINALIZED",
+                        "SUPERSEDED",
+                    ]
+                    assert session.scalar(
+                        select(func.count(Evaluation.id)).where(
+                            Evaluation.assignment_id == uuid.UUID(assignment_id)
+                        )
+                    ) == 0
             if not evidence_retest_verified:
                 evidence_retest_verified = True
                 completed = ok(
@@ -680,7 +891,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     assert retest_enrollment["status"] == "ACTIVE"
     assert retest_enrollment["evidence_retest_in_progress"] is True
     assert retest_enrollment["evidence_retest_assignment_id"] == day_zero["id"]
-    assert retest_enrollment["allowed_commands"] == []
+    assert retest_enrollment["allowed_commands"] == ["create_learner_reentry"]
     blocked_ops_cancel = operator.post(
         f"/api/v1/ops/enrollments/{completed_enrollment_id}/cancel",
         headers={
@@ -693,19 +904,44 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         },
     )
     assert blocked_ops_cancel.status_code == 409
-    blocked_reentry = operator.post(
+    retest_reentry = post(
+        operator,
         f"/api/v1/ops/enrollments/{completed_enrollment_id}/learner-reentry",
-        headers={
-            **OPERATOR_HEADERS,
-            "Idempotency-Key": str(uuid.uuid4()),
-        },
         json={
             "expected_revision": retest_enrollment["revision"],
             "expires_in_minutes": 30,
-            "reason": "结营后重测期间不得创建重新进入链接",
+            "reason": "结营后重测需要恢复同一 Learner 的当前任务",
         },
+        role_headers=OPERATOR_HEADERS,
     )
-    assert blocked_reentry.status_code == 409
+    assert retest_reentry["target_assignment_id"] == day_zero["id"]
+    reentry_browser = client_for("post-completion-reentry-browser")
+    reentry_exchange = ok(
+        reentry_browser.post(
+            "/api/v1/join/exchange",
+            json={"token": retest_reentry["invite_token"], "return_to": "/app"},
+        )
+    )
+    reentry_confirmed = ok(
+        reentry_browser.post(
+            "/api/v1/identity/confirm",
+            headers={"X-CSRF-Token": reentry_exchange["csrf_token"]},
+            json={
+                "display_name": None,
+                "accepted_purpose": True,
+                "return_to": "/app",
+            },
+        )
+    )
+    assert reentry_confirmed["enrollment_id"] == completed_enrollment_id
+    assert reentry_confirmed["target_assignment_id"] == day_zero["id"]
+    assert reentry_confirmed["enrollment_status"] == "ACTIVE"
+    assert ok(
+        reentry_browser.get(
+            f"/api/v1/me/current-action?enrollment_id={completed_enrollment_id}"
+        )
+    )["resource_id"] == day_zero["id"]
+    learner = reentry_browser
 
     cancelled_after_completion = ok(
         learner.post(

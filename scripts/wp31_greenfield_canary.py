@@ -69,7 +69,7 @@ def load() -> dict[str, object]:
         "application_candidate_sha": binding["application_candidate_sha"],
         "package_workflow_run_id": binding["package_workflow_run_id"],
         "package_manifest_sha256": binding["release_manifest_sha256"],
-        "migration_head": "0028_canary_main_merge",
+        "migration_head": "0029_treasure_coaching_reviews",
         "production_host": "journey.muchenai.com",
         "source_database": "journey_next_cutover_20260810",
         "isolated_canary_database": "journey_next_canary_20260901_c72fea5",

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from sqlalchemy import and_, case, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
@@ -32,7 +32,9 @@ from journey_api.models import (
     Attachment,
     AttachmentScanStatus,
     AttachmentStatus,
+    AiAdvisoryRecord,
     AuditEntry,
+    CoachingFeedback,
     Decision,
     Enrollment,
     EnrollmentStatus,
@@ -43,6 +45,7 @@ from journey_api.models import (
     OutboxStatus,
     Review,
     ReviewDelegation,
+    ReviewKind,
     ReviewStatus,
     Role,
     Submission,
@@ -53,8 +56,11 @@ from journey_api.models import (
     User,
 )
 from journey_api.outcome_service import create_pass_outcome_bundle
+from journey_api.submission_service import submission_out
 from journey_api.schemas import (
     EvaluationOut,
+    AiAdvisoryRecordOut,
+    CoachingFeedbackOut,
     FinalizeReviewCommand,
     ReviewAttachmentOut,
     ReviewDetailOut,
@@ -86,7 +92,10 @@ class ReviewContext:
     learner: User
     definition: TaskDefinition
     task: TaskVersion
+    journey: JourneyVersion | None
     evaluation: Evaluation | None
+    coaching_feedback: CoachingFeedback | None
+    ai_advisory: AiAdvisoryRecord | None
 
 
 def envelope(request: Request, data: object) -> dict[str, object]:
@@ -157,7 +166,10 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
             User,
             TaskDefinition,
             TaskVersion,
+            JourneyVersion,
             Evaluation,
+            CoachingFeedback,
+            AiAdvisoryRecord,
         )
         .join(Assignment, Assignment.id == Review.assignment_id)
         .join(Submission, Submission.id == Review.submission_id)
@@ -167,6 +179,13 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
         .outerjoin(
+            JourneyVersion,
+            and_(
+                JourneyVersion.id == Enrollment.journey_version_id,
+                JourneyVersion.organization_id == Enrollment.organization_id,
+            ),
+        )
+        .outerjoin(
             JourneyStageVersion,
             and_(
                 JourneyStageVersion.id == Assignment.journey_stage_version_id,
@@ -174,6 +193,11 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
             ),
         )
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
+        .outerjoin(CoachingFeedback, CoachingFeedback.review_id == Review.id)
+        .outerjoin(
+            AiAdvisoryRecord,
+            AiAdvisoryRecord.submission_version_id == Review.submission_version_id,
+        )
         .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.id == review_id,
@@ -201,7 +225,11 @@ def locked_scoped_context_query(actor: Actor, review_id: uuid.UUID):
     return scoped_context_query(actor, review_id).where(
         or_(
             Enrollment.status == EnrollmentStatus.ACTIVE,
-            Review.status == ReviewStatus.FINALIZED,
+            and_(
+                Review.review_kind == ReviewKind.LEARNING_COACHING,
+                Enrollment.status == EnrollmentStatus.COMPLETED,
+            ),
+            Review.status.in_([ReviewStatus.FINALIZED, ReviewStatus.SUPERSEDED]),
         )
     ).with_for_update(of=(Review, Assignment))
 
@@ -287,6 +315,36 @@ def evaluation_out(evaluation: Evaluation) -> EvaluationOut:
     )
 
 
+def coaching_feedback_out(feedback: CoachingFeedback) -> CoachingFeedbackOut:
+    return CoachingFeedbackOut(
+        id=feedback.id,
+        decision=feedback.decision.value,
+        overall_decision=(
+            "APPROVE" if feedback.decision == Decision.PASS else "REQUEST_REVISION"
+        ),
+        overall_feedback=feedback.feedback,
+        rubric_evaluations=[
+            RubricEvaluationOut(**item) for item in feedback.structured_feedback
+        ],
+        reviewer_id=feedback.reviewer_id,
+        review_revision=feedback.review_revision,
+        ai_use=feedback.ai_use,
+        created_at=feedback.created_at,
+    )
+
+
+def ai_advisory_out(record: AiAdvisoryRecord) -> AiAdvisoryRecordOut:
+    return AiAdvisoryRecordOut(
+        id=record.id,
+        model_version=record.model_version,
+        prompt_version=record.prompt_version,
+        policy_version=record.policy_version,
+        input_sha256=record.input_sha256,
+        result=record.result,
+        generated_at=record.generated_at,
+    )
+
+
 def queue_item(
     session: Session, context: ReviewContext, *, materials: ReviewMaterialOut | None = None
 ) -> ReviewQueueItemOut:
@@ -301,9 +359,14 @@ def queue_item(
         allowed_commands=(
             allowed_commands(context.review.status)
             if context.enrollment.status == EnrollmentStatus.ACTIVE
+            or (
+                context.review.review_kind == ReviewKind.LEARNING_COACHING
+                and context.enrollment.status == EnrollmentStatus.COMPLETED
+            )
             else []
         ),
         learner_name=context.learner.display_name,
+        journey_title=context.journey.title if context.journey is not None else None,
         task_title=context.task.title,
         task_version=context.task.version,
         submission_version_no=context.version.version_no,
@@ -317,6 +380,12 @@ def queue_item(
         sensitivity=context.task.sensitivity,
         audience=context.task.audience,
         conflict_status="NOT_EVALUATED",
+        review_kind=context.review.review_kind.value,
+        effect=(
+            "COACHING_ONLY"
+            if context.review.review_kind == ReviewKind.LEARNING_COACHING
+            else "FORMAL_GATE"
+        ),
     )
 
 
@@ -390,6 +459,7 @@ def decode_history_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
 @router.get("/reviews", response_model=ReviewQueueResponse)
 def review_queue(
     request: Request,
+    kind: ReviewKind = Query(default=ReviewKind.FORMAL_EVALUATION),
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
@@ -404,6 +474,7 @@ def review_queue(
             User,
             TaskDefinition,
             TaskVersion,
+            JourneyVersion,
         )
         .join(Assignment, Assignment.id == Review.assignment_id)
         .join(Submission, Submission.id == Review.submission_id)
@@ -412,6 +483,13 @@ def review_queue(
         .join(User, User.id == Enrollment.learner_id)
         .join(TaskDefinition, TaskDefinition.id == Assignment.task_definition_id)
         .join(TaskVersion, TaskVersion.id == Assignment.task_version_id)
+        .outerjoin(
+            JourneyVersion,
+            and_(
+                JourneyVersion.id == Enrollment.journey_version_id,
+                JourneyVersion.organization_id == Enrollment.organization_id,
+            ),
+        )
         .outerjoin(
             JourneyStageVersion,
             and_(
@@ -424,7 +502,14 @@ def review_queue(
             Review.organization_id == actor.organization_id,
             (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
-            Enrollment.status == EnrollmentStatus.ACTIVE,
+            Review.review_kind == kind,
+            (
+                Enrollment.status == EnrollmentStatus.ACTIVE
+                if kind == ReviewKind.FORMAL_EVALUATION
+                else Enrollment.status.in_(
+                    [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED]
+                )
+            ),
             *scoped_review_lineage(actor),
         )
         .order_by(
@@ -439,7 +524,7 @@ def review_queue(
     ).all()
     items: list[ReviewQueueItemOut] = []
     for row in rows:
-        context = ReviewContext(*row, None)
+        context = ReviewContext(*row, None, None, None)
         items.append(queue_item(session, context))
     return envelope(request, ReviewQueueOut(items=items))
 
@@ -447,15 +532,32 @@ def review_queue(
 @router.get("/reviews/history", response_model=ReviewHistoryResponse)
 def review_history(
     request: Request,
+    kind: ReviewKind = Query(default=ReviewKind.FORMAL_EVALUATION),
     cursor: str | None = Query(default=None, max_length=512),
     limit: int = Query(default=20, ge=1, le=50),
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.REVIEWER)
+    history_time = func.coalesce(Review.finalized_at, Review.superseded_at)
+    history_status = (
+        Review.status == ReviewStatus.FINALIZED
+        if kind == ReviewKind.FORMAL_EVALUATION
+        else Review.status.in_([ReviewStatus.FINALIZED, ReviewStatus.SUPERSEDED])
+    )
     statement = (
-        select(Review, Evaluation, SubmissionVersion, Enrollment, User, TaskVersion, JourneyVersion)
-        .join(Evaluation, Evaluation.review_id == Review.id)
+        select(
+            Review,
+            Evaluation,
+            CoachingFeedback,
+            SubmissionVersion,
+            Enrollment,
+            User,
+            TaskVersion,
+            JourneyVersion,
+        )
+        .outerjoin(Evaluation, Evaluation.review_id == Review.id)
+        .outerjoin(CoachingFeedback, CoachingFeedback.review_id == Review.id)
         .join(Assignment, Assignment.id == Review.assignment_id)
         .join(Submission, Submission.id == Review.submission_id)
         .join(SubmissionVersion, SubmissionVersion.id == Review.submission_version_id)
@@ -481,8 +583,9 @@ def review_history(
         .where(
             Review.organization_id == actor.organization_id,
             (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
-            Review.status == ReviewStatus.FINALIZED,
-            Review.finalized_at.is_not(None),
+            history_status,
+            history_time.is_not(None),
+            Review.review_kind == kind,
             *scoped_review_lineage(actor),
         )
     )
@@ -490,32 +593,43 @@ def review_history(
         cursor_time, cursor_id = decode_history_cursor(cursor)
         statement = statement.where(
             or_(
-                Review.finalized_at < cursor_time,
-                and_(Review.finalized_at == cursor_time, Review.id < cursor_id),
+                history_time < cursor_time,
+                and_(history_time == cursor_time, Review.id < cursor_id),
             )
         )
     rows = session.execute(
-        statement.order_by(Review.finalized_at.desc(), Review.id.desc()).limit(limit + 1)
+        statement.order_by(history_time.desc(), Review.id.desc()).limit(limit + 1)
     ).all()
     has_more = len(rows) > limit
     visible_rows = rows[:limit]
     items = [
         ReviewHistoryItemOut(
             id=review.id,
+            assignment_id=review.assignment_id,
             learner_name=learner.display_name,
             journey_title=journey.title if journey is not None else None,
             task_title=task.title,
             submission_version_id=version.id,
             submission_version_no=version.version_no,
-            decision=evaluation.decision.value,
-            finalized_at=review.finalized_at,
+            decision=(evaluation or coaching).decision.value
+            if evaluation is not None or coaching is not None
+            else "NOT_REVIEWED",
+            finalized_at=review.finalized_at or review.superseded_at,
+            review_kind=review.review_kind.value,
+            effect=(
+                "COACHING_ONLY"
+                if review.review_kind == ReviewKind.LEARNING_COACHING
+                else "FORMAL_GATE"
+            ),
         )
-        for review, evaluation, version, _enrollment, learner, task, journey in visible_rows
+        for review, evaluation, coaching, version, _enrollment, learner, task, journey in visible_rows
     ]
     next_cursor = None
     if has_more and visible_rows:
         last_review = visible_rows[-1][0]
-        next_cursor = encode_history_cursor(last_review.finalized_at, last_review.id)
+        next_cursor = encode_history_cursor(
+            last_review.finalized_at or last_review.superseded_at, last_review.id
+        )
     return envelope(request, ReviewHistoryOut(items=items, next_cursor=next_cursor))
 
 
@@ -547,6 +661,17 @@ def review_detail(
                 if context.evaluation is not None
                 else None
             ),
+            coaching_feedback=(
+                coaching_feedback_out(context.coaching_feedback)
+                if context.coaching_feedback is not None
+                else None
+            ),
+            ai_advisory=(
+                ai_advisory_out(context.ai_advisory)
+                if context.ai_advisory is not None
+                else None
+            ),
+            submission_history=submission_out(session, context.submission).versions,
         ),
     )
 
@@ -578,25 +703,29 @@ def start_review(
     ensure_revision(context.review.revision, command.expected_revision)
     if context.review.status != ReviewStatus.ASSIGNED:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前评审不能开始。")
-    try:
-        target_status = transition_formal_assignment(
-            current=context.assignment.status,
-            event=FormalAssignmentEvent.START_REVIEW,
-            actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
-            actor_id=actor.id,
-            learner_id=context.learner.id,
-            assigned_reviewer_id=actor.id,
-            fixed_submission_version=True,
-        )
-    except FormalAssignmentTransitionError as exc:
-        raise ApiError(
-            409, "INVALID_STATE_TRANSITION", "对应任务不在待评审状态。"
-        ) from exc
+    if context.review.review_kind == ReviewKind.LEARNING_COACHING:
+        target_status = context.assignment.status
+    else:
+        try:
+            target_status = transition_formal_assignment(
+                current=context.assignment.status,
+                event=FormalAssignmentEvent.START_REVIEW,
+                actor_kind=WorkflowActorKind.ASSIGNED_REVIEWER,
+                actor_id=actor.id,
+                learner_id=context.learner.id,
+                assigned_reviewer_id=actor.id,
+                fixed_submission_version=True,
+            )
+        except FormalAssignmentTransitionError as exc:
+            raise ApiError(
+                409, "INVALID_STATE_TRANSITION", "对应任务不在待评审状态。"
+            ) from exc
     context.review.status = ReviewStatus.IN_REVIEW
     context.review.started_at = datetime.now(UTC)
     context.review.revision += 1
-    context.assignment.status = target_status
-    context.assignment.revision += 1
+    if context.review.review_kind == ReviewKind.FORMAL_EVALUATION:
+        context.assignment.status = target_status
+        context.assignment.revision += 1
     result = ReviewMutationOut(
         review_id=context.review.id,
         review_status=context.review.status.value,
@@ -604,6 +733,11 @@ def start_review(
         assignment_id=context.assignment.id,
         assignment_status=public_assignment_status(context.assignment.status),
         assignment_revision=context.assignment.revision,
+        effect=(
+            "COACHING_ONLY"
+            if context.review.review_kind == ReviewKind.LEARNING_COACHING
+            else "FORMAL_GATE"
+        ),
     )
     store_result(
         session,
@@ -656,7 +790,10 @@ def finalize_review(
     ensure_revision(context.review.revision, command.expected_revision)
     if context.review.status != ReviewStatus.IN_REVIEW:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前评审不能提交最终结论。")
-    if context.assignment.status != AssignmentStatus.IN_REVIEW:
+    if (
+        context.review.review_kind == ReviewKind.FORMAL_EVALUATION
+        and context.assignment.status != AssignmentStatus.IN_REVIEW
+    ):
         raise ApiError(409, "INVALID_STATE_TRANSITION", "对应任务不在评审中。")
 
     materials = review_materials(session, context)
@@ -700,23 +837,83 @@ def finalize_review(
                 raise ApiError(422, "VALIDATION_FAILED", "待改进评分必须低于固定阈值。")
         elif item.score is not None:
             raise ApiError(422, "VALIDATION_FAILED", "当前旧版 Rubric 不接受数值评分。")
-    all_meet = all(
-        item.rating == "MEETS" for item in command.rubric_evaluations
-    )
-    if command.overall_decision == "APPROVE" and not all_meet:
-        raise ApiError(422, "VALIDATION_FAILED", "只有全部 Rubric 达标才能通过。")
-    if command.overall_decision == "REQUEST_REVISION" and all_meet:
-        raise ApiError(
-            422,
-            "VALIDATION_FAILED",
-            "要求修订时至少一个 Rubric 维度应标记为待改进。",
+    if command.rubric_evaluations:
+        all_meet = all(
+            item.rating == "MEETS" for item in command.rubric_evaluations
         )
+        if command.overall_decision == "APPROVE" and not all_meet:
+            raise ApiError(422, "VALIDATION_FAILED", "只有全部 Rubric 达标才能通过。")
+        if command.overall_decision == "REQUEST_REVISION" and all_meet:
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "要求修订时至少一个 Rubric 维度应标记为待改进。",
+            )
 
     decision = (
         Decision.PASS
         if command.overall_decision == "APPROVE"
         else Decision.REVISION_REQUIRED
     )
+    if context.review.review_kind == ReviewKind.LEARNING_COACHING:
+        feedback = CoachingFeedback(
+            id=uuid.uuid4(),
+            review_id=context.review.id,
+            organization_id=context.review.organization_id,
+            assignment_id=context.review.assignment_id,
+            submission_id=context.review.submission_id,
+            submission_version_id=context.review.submission_version_id,
+            reviewer_id=context.review.reviewer_id,
+            executor_id=actor.id,
+            review_revision=command.expected_revision,
+            decision=decision,
+            structured_feedback=[
+                item.model_dump(mode="json") for item in command.rubric_evaluations
+            ],
+            feedback=command.overall_feedback,
+            ai_use=command.ai_use.model_dump(mode="json"),
+            created_by=actor.id,
+        )
+        session.add(feedback)
+        context.review.status = ReviewStatus.FINALIZED
+        context.review.finalized_at = datetime.now(UTC)
+        context.review.revision += 1
+        result = ReviewMutationOut(
+            review_id=context.review.id,
+            review_status=context.review.status.value,
+            review_revision=context.review.revision,
+            assignment_id=context.assignment.id,
+            assignment_status=public_assignment_status(
+                context.assignment.status, formal=False
+            ),
+            assignment_revision=context.assignment.revision,
+            decision=decision.value,
+            effect="COACHING_ONLY",
+        )
+        store_result(
+            session,
+            actor_id=actor.id,
+            command="review.finalize",
+            key=idempotency_key,
+            payload=payload,
+            response=result.model_dump(mode="json"),
+        )
+        add_event(session, "coaching_review.finalized.v1", "review", context.review.id)
+        add_audit(
+            session,
+            request=request,
+            actor=actor,
+            action="coaching_review.finalized",
+            review=context.review,
+            details={
+                "assignment_id": str(context.assignment.id),
+                "submission_version_id": str(context.version.id),
+                "decision": decision.value,
+                "effect": "COACHING_ONLY",
+            },
+        )
+        session.commit()
+        return envelope(request, result)
     try:
         target_status = transition_formal_assignment(
             current=context.assignment.status,

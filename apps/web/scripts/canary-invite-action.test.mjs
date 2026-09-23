@@ -37,6 +37,9 @@ function setup(policy) {
     if (name === "@/lib/text-length") {
       return { effectiveCharacterCount: (value) => Array.from(value.trim()).length };
     }
+    if (name === "@/lib/feishu-url") {
+      return { validateFeishuDocumentUrl: () => null };
+    }
     if (name === "node:crypto") return { randomUUID };
     if (name === "next/cache") return { revalidatePath: () => {} };
     if (name === "next/headers" || name === "next/navigation") return {};

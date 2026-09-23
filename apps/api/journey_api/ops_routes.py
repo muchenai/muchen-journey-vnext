@@ -18,7 +18,10 @@ from journey_api.formal_assignment_workflow import (
     transition_formal_assignment,
 )
 from journey_api.idempotency import find_replay, store_result
-from journey_api.journey_service import active_post_completion_evidence_retest
+from journey_api.journey_service import (
+    active_post_completion_evidence_retest,
+    outstanding_coaching_revision_assignment,
+)
 from journey_api.models import (
     Assignment,
     AssignmentStatus,
@@ -44,6 +47,7 @@ from journey_api.models import (
     OutboxStatus,
     Review,
     ReviewDelegation,
+    ReviewKind,
     ReviewStatus,
     Role,
     RoleAssignment,
@@ -157,6 +161,7 @@ def open_review_for_enrollment(
         .where(
             Assignment.enrollment_id == enrollment.id,
             Review.organization_id == enrollment.organization_id,
+            Review.review_kind == ReviewKind.FORMAL_EVALUATION,
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
         )
         .order_by(Review.assigned_at.desc(), Review.id)
@@ -569,18 +574,21 @@ def list_enrollments(
         ).all()
         open_review = open_review_for_enrollment(session, enrollment, for_update=False)
         evidence_retest = active_post_completion_evidence_retest(session, enrollment)
+        coaching_revision = outstanding_coaching_revision_assignment(session, enrollment)
         allowed: list[str] = []
-        if (
-            evidence_retest is None
-            and enrollment.status
-            in {EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE}
-        ):
+        if evidence_retest is not None or coaching_revision is not None:
+            allowed = ["create_learner_reentry"]
+        elif enrollment.status in {
+            EnrollmentStatus.PENDING_IDENTITY,
+            EnrollmentStatus.ACTIVE,
+        }:
             if open_review is None:
                 allowed = ["assign_reviewer", "cancel_enrollment"]
             elif open_review.status == ReviewStatus.ASSIGNED:
                 allowed = ["handoff_assigned_review"]
         if (
             evidence_retest is None
+            and coaching_revision is None
             and enrollment.status == EnrollmentStatus.ACTIVE
         ):
             allowed.append("create_learner_reentry")
@@ -748,6 +756,7 @@ def reviewer_workload(
                     Assignment.organization_id == actor.organization_id,
                     Assignment.enrollment_id.in_(enrollment_ids),
                     Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
+                    Review.review_kind == ReviewKind.FORMAL_EVALUATION,
                 )
             ).all()
             if enrollment_ids

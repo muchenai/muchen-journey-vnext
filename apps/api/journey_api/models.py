@@ -108,6 +108,12 @@ class ReviewStatus(str, enum.Enum):
     ASSIGNED = "ASSIGNED"
     IN_REVIEW = "IN_REVIEW"
     FINALIZED = "FINALIZED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class ReviewKind(str, enum.Enum):
+    FORMAL_EVALUATION = "FORMAL_EVALUATION"
+    LEARNING_COACHING = "LEARNING_COACHING"
 
 
 class Decision(str, enum.Enum):
@@ -314,6 +320,11 @@ class Invite(Base):
             name="fk_invites_target_organization",
         ),
         ForeignKeyConstraint(
+            ["target_assignment_id", "organization_id"],
+            ["assignments.id", "assignments.organization_id"],
+            name="fk_invites_target_assignment_organization",
+        ),
+        ForeignKeyConstraint(
             ["created_by", "organization_id"],
             ["users.id", "users.organization_id"],
             name="fk_invites_creator_organization",
@@ -336,6 +347,9 @@ class Invite(Base):
         Uuid, nullable=True, index=True
     )
     target_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    target_assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True
+    )
     status: Mapped[InviteStatus] = mapped_column(Enum(InviteStatus, native_enum=False), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
@@ -1230,9 +1244,18 @@ class Review(Base):
         ),
         CheckConstraint("revision >= 1", name="ck_reviews_positive_revision"),
         CheckConstraint(
+            "status IN ('ASSIGNED', 'IN_REVIEW', 'FINALIZED', 'SUPERSEDED')",
+            name="ck_reviews_status",
+        ),
+        CheckConstraint(
+            "review_kind IN ('FORMAL_EVALUATION', 'LEARNING_COACHING')",
+            name="ck_reviews_kind",
+        ),
+        CheckConstraint(
             "(status = 'ASSIGNED' AND started_at IS NULL AND finalized_at IS NULL) "
             "OR (status = 'IN_REVIEW' AND started_at IS NOT NULL AND finalized_at IS NULL) "
-            "OR (status = 'FINALIZED' AND started_at IS NOT NULL AND finalized_at IS NOT NULL)",
+            "OR (status = 'FINALIZED' AND started_at IS NOT NULL AND finalized_at IS NOT NULL) "
+            "OR (status = 'SUPERSEDED' AND finalized_at IS NULL AND superseded_at IS NOT NULL)",
             name="ck_reviews_status_timestamps",
         ),
     )
@@ -1243,6 +1266,9 @@ class Review(Base):
     submission_id: Mapped[uuid.UUID]
     submission_version_id: Mapped[uuid.UUID]
     reviewer_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    review_kind: Mapped[ReviewKind] = mapped_column(
+        Enum(ReviewKind, native_enum=False), default=ReviewKind.FORMAL_EVALUATION
+    )
     status: Mapped[ReviewStatus] = mapped_column(Enum(ReviewStatus, native_enum=False))
     revision: Mapped[int] = mapped_column(default=1)
     assigned_at: Mapped[datetime] = mapped_column(
@@ -1252,6 +1278,9 @@ class Review(Base):
         DateTime(timezone=True), nullable=True
     )
     finalized_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    superseded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -1349,6 +1378,110 @@ class Evaluation(Base):
     )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CoachingFeedback(Base):
+    """Immutable human coaching fact for one fixed treasure submission version."""
+
+    __tablename__ = "coaching_feedback"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            [
+                "review_id",
+                "organization_id",
+                "assignment_id",
+                "submission_id",
+                "submission_version_id",
+                "reviewer_id",
+            ],
+            [
+                "reviews.id",
+                "reviews.organization_id",
+                "reviews.assignment_id",
+                "reviews.submission_id",
+                "reviews.submission_version_id",
+                "reviews.reviewer_id",
+            ],
+            name="fk_coaching_feedback_review_fixed_scope",
+        ),
+        CheckConstraint(
+            "created_by = executor_id", name="ck_coaching_feedback_executor_is_actor"
+        ),
+        CheckConstraint(
+            "review_revision >= 1", name="ck_coaching_feedback_positive_review_revision"
+        ),
+        UniqueConstraint("review_id", name="uq_coaching_feedback_review"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    review_id: Mapped[uuid.UUID]
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assignment_id: Mapped[uuid.UUID]
+    submission_id: Mapped[uuid.UUID]
+    submission_version_id: Mapped[uuid.UUID]
+    reviewer_id: Mapped[uuid.UUID]
+    executor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    review_revision: Mapped[int]
+    decision: Mapped[Decision] = mapped_column(Enum(Decision, native_enum=False))
+    structured_feedback: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    feedback: Mapped[str] = mapped_column(Text)
+    ai_use: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        default=lambda: {
+            "used": False,
+            "purpose": None,
+            "model_version": None,
+            "prompt_version": None,
+            "output_is_advisory_only": True,
+        },
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class AiAdvisoryRecord(Base):
+    """Versioned immutable AI advice contract; no generation endpoint is exposed."""
+
+    __tablename__ = "ai_advisory_records"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["assignment_id", "organization_id"],
+            ["assignments.id", "assignments.organization_id"],
+            name="fk_ai_advisory_assignment_organization",
+        ),
+        ForeignKeyConstraint(
+            ["submission_id", "organization_id", "assignment_id"],
+            ["submissions.id", "submissions.organization_id", "submissions.assignment_id"],
+            name="fk_ai_advisory_submission_scope",
+        ),
+        ForeignKeyConstraint(
+            ["submission_version_id", "submission_id"],
+            ["submission_versions.id", "submission_versions.submission_id"],
+            name="fk_ai_advisory_submission_version",
+        ),
+        UniqueConstraint("submission_version_id", name="uq_ai_advisory_submission_version"),
+        CheckConstraint("advisory_only = true", name="ck_ai_advisory_only"),
+        CheckConstraint(
+            "input_sha256 ~ '^[0-9a-f]{64}$'", name="ck_ai_advisory_input_sha256"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    assignment_id: Mapped[uuid.UUID]
+    submission_id: Mapped[uuid.UUID]
+    submission_version_id: Mapped[uuid.UUID]
+    model_version: Mapped[str] = mapped_column(String(180))
+    prompt_version: Mapped[str] = mapped_column(String(180))
+    policy_version: Mapped[str] = mapped_column(String(180))
+    input_sha256: Mapped[str] = mapped_column(String(64))
+    result: Mapped[dict[str, Any]] = mapped_column(JSON)
+    advisory_only: Mapped[bool] = mapped_column(Boolean, default=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class IncentiveLedgerEntry(Base):

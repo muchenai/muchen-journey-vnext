@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { validateFeishuDocumentUrl } from "@/lib/feishu-url";
 
 import {
   anonymousApiRequest,
@@ -189,19 +190,9 @@ function submissionBody(data: FormData, requireComplete: boolean): SubmissionAct
   const body = typeof rawBody === "string" ? rawBody.trim() : "";
   const evidenceUrl = typeof rawEvidenceUrl === "string" ? rawEvidenceUrl.trim() : "";
 
-  if (evidenceUrl) {
-    try {
-      const parsed = new URL(evidenceUrl);
-      const isFeishuHost = parsed.hostname === "feishu.cn"
-        || parsed.hostname.endsWith(".feishu.cn")
-        || parsed.hostname === "larksuite.com"
-        || parsed.hostname.endsWith(".larksuite.com");
-      if (parsed.protocol !== "https:" || !isFeishuHost) {
-        return { error: "请粘贴 HTTPS 飞书文档链接；草稿仍保留在当前页面。" };
-      }
-    } catch {
-      return { error: "飞书文档链接无效；请从浏览器地址栏复制完整链接。" };
-    }
+  if (requireComplete && evidenceUrl) {
+    const linkError = validateFeishuDocumentUrl(evidenceUrl);
+    if (linkError) return { error: `${linkError} 草稿仍保留在当前页面。` };
   } else if (requireComplete && evidenceUrlRequired) {
     return { error: "请先粘贴飞书文档链接，再提交给 Reviewer。" };
   }
@@ -387,7 +378,12 @@ export async function acceptInvite(data: FormData) {
   );
 
   let confirmation: {
-    data: { expires_at: string; csrf_token: string };
+    data: {
+      expires_at: string;
+      csrf_token: string;
+      enrollment_id: string;
+      target_assignment_id: string;
+    };
     setCookies: string[];
   };
   try {
@@ -429,7 +425,7 @@ export async function acceptInvite(data: FormData) {
   cookieStore.delete(JOIN_COOKIE);
   cookieStore.delete(JOIN_SUMMARY_COOKIE);
   revalidatePath("/app");
-  redirect("/app");
+  redirect(`/app?enrollment_id=${encodeURIComponent(confirmation.data.enrollment_id)}`);
 }
 
 export async function confirmIdentity(data: FormData) {
@@ -887,8 +883,7 @@ export async function finalizeReview(
     }
     const rubricKeys = data.getAll("rubric_dimension_key");
     if (
-      rubricKeys.length < 1
-      || rubricKeys.length > 6
+      rubricKeys.length > 6
       || rubricKeys.some(
         (key) => typeof key !== "string" || !/^[a-z][a-z0-9_]{2,59}$/.test(key),
       )

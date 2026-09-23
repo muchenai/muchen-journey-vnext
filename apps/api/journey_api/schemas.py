@@ -98,7 +98,7 @@ class FinalizeReviewCommand(RevisionCommand):
     overall_decision: Literal["APPROVE", "REQUEST_REVISION"]
     overall_feedback: str = Field(min_length=10, max_length=2_000)
     rubric_evaluations: list[RubricEvaluationCommand] = Field(
-        min_length=1, max_length=6
+        max_length=6
     )
     ai_use: AiUseDisclosure = Field(
         default_factory=lambda: AiUseDisclosure(used=False)
@@ -497,6 +497,7 @@ class InviteOut(StrictModel):
     expires_at: datetime
     revision: int
     journey_version_id: UUID | None = None
+    target_assignment_id: UUID | None = None
 
 
 class CreateInviteOut(InviteOut):
@@ -576,8 +577,10 @@ class IdentityConfirmOut(StrictModel):
     user_id: UUID
     organization_id: UUID
     roles: list[str]
-    enrollment_status: Literal["ACTIVE"]
+    enrollment_status: Literal["ACTIVE", "COMPLETED"]
     safe_entry: Literal["/app"]
+    enrollment_id: UUID
+    target_assignment_id: UUID
     expires_at: datetime
     csrf_token: str
 
@@ -816,7 +819,19 @@ class AssignmentOut(StrictModel):
     draft: "SubmissionDraftOut | None"
     available_attachments: list["AttachmentOut"]
     latest_revision_feedback: str | None
+    coaching: "LearnerCoachingOut | None" = None
     journey_stage: "AssignmentJourneyStageOut | None" = None
+
+
+class LearnerCoachingOut(StrictModel):
+    review_id: UUID
+    submission_version_id: UUID
+    submission_version_no: int
+    status: Literal["PENDING", "PASS", "REVISION_REQUIRED", "SUPERSEDED"]
+    feedback: str | None
+    finalized_at: datetime | None
+    non_blocking: Literal[True] = True
+    can_start_revision: bool = False
 
 
 class AssignmentJourneyStageOut(StrictModel):
@@ -1301,6 +1316,8 @@ class SubmissionVersionOut(StrictModel):
     attachments: list[AttachmentOut]
     review_id: UUID | None
     review_status: str | None
+    review_kind: Literal["FORMAL_EVALUATION", "LEARNING_COACHING"] | None = None
+    review_finalized_at: datetime | None = None
     decision: str | None
     feedback: str | None
     rubric_feedback: list[dict[str, object]]
@@ -1356,6 +1373,7 @@ class ReviewQueueItemOut(StrictModel):
     revision: int
     allowed_commands: list[str]
     learner_name: str
+    journey_title: str | None
     task_title: str
     task_version: int
     submission_version_no: int
@@ -1369,6 +1387,8 @@ class ReviewQueueItemOut(StrictModel):
     sensitivity: str
     audience: str
     conflict_status: Literal["NOT_EVALUATED"] = "NOT_EVALUATED"
+    review_kind: Literal["FORMAL_EVALUATION", "LEARNING_COACHING"] = "FORMAL_EVALUATION"
+    effect: Literal["FORMAL_GATE", "COACHING_ONLY"] = "FORMAL_GATE"
 
 
 class ReviewQueueOut(StrictModel):
@@ -1382,13 +1402,16 @@ class ReviewQueueResponse(StrictModel):
 
 class ReviewHistoryItemOut(StrictModel):
     id: UUID
+    assignment_id: UUID
     learner_name: str
     journey_title: str | None
     task_title: str
     submission_version_id: UUID
     submission_version_no: int
-    decision: Literal["PASS", "REVISION_REQUIRED"]
+    decision: Literal["PASS", "REVISION_REQUIRED", "NOT_REVIEWED"]
     finalized_at: datetime
+    review_kind: Literal["FORMAL_EVALUATION", "LEARNING_COACHING"] = "FORMAL_EVALUATION"
+    effect: Literal["FORMAL_GATE", "COACHING_ONLY"] = "FORMAL_GATE"
 
 
 class ReviewHistoryOut(StrictModel):
@@ -1501,6 +1524,30 @@ class EvaluationOut(StrictModel):
     created_at: datetime
 
 
+class CoachingFeedbackOut(StrictModel):
+    id: UUID
+    decision: Literal["PASS", "REVISION_REQUIRED"]
+    overall_decision: Literal["APPROVE", "REQUEST_REVISION"]
+    overall_feedback: str
+    rubric_evaluations: list[RubricEvaluationOut]
+    reviewer_id: UUID
+    review_revision: int
+    ai_use: AiUseDisclosure
+    created_at: datetime
+    non_blocking: Literal[True] = True
+
+
+class AiAdvisoryRecordOut(StrictModel):
+    id: UUID
+    model_version: str
+    prompt_version: str
+    policy_version: str
+    input_sha256: str
+    result: dict[str, object]
+    generated_at: datetime
+    advisory_only: Literal[True] = True
+
+
 class ReviewDetailOut(ReviewQueueItemOut):
     submission_body: str
     submission_ai_use: AiUseDisclosure
@@ -1511,6 +1558,9 @@ class ReviewDetailOut(ReviewQueueItemOut):
     materials: ReviewMaterialOut
     finalized_at: datetime | None
     evaluation: EvaluationOut | None
+    coaching_feedback: CoachingFeedbackOut | None = None
+    ai_advisory: AiAdvisoryRecordOut | None = None
+    submission_history: list[SubmissionVersionOut] = Field(default_factory=list)
 
 
 class ReviewDetailResponse(StrictModel):
@@ -1527,6 +1577,7 @@ class ReviewMutationOut(StrictModel):
     assignment_revision: int
     evaluation_id: UUID | None = None
     decision: str | None = None
+    effect: Literal["FORMAL_GATE", "COACHING_ONLY"] = "FORMAL_GATE"
     idempotency_replay: bool = False
 
 

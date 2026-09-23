@@ -13,7 +13,8 @@ test("review queue exposes authoritative priority, SLA, risk, revisions and esca
   for (const field of ["feedback_sla_business_days", "revision_count", "sensitivity", "audience", "conflict_status"]) {
     assert.match(types, new RegExp(field));
   }
-  assert.match(queue, /最高优先级待审提交/);
+  assert.match(queue, /正式评测/);
+  assert.match(queue, /宝藏辅导/);
   assert.match(queue, /容量：未获批准，无法计算/);
   assert.match(queue, /主备与升级/);
   assert.match(queue, /材料不完整/);
@@ -37,18 +38,17 @@ test("ops overview consumes approved workload facts and fails closed on missing 
 });
 
 test("successful empty queue is distinct from unavailable data", () => {
-  assert.match(queue, /查询已成功/);
-  assert.match(queue, /不是数据未加载/);
-  assert.match(queue, /最近检查/);
-  assert.match(queue, /自证站提交后直接完成，不进入人工评审队列/);
-  assert.match(queue, /正式能力评测/);
-  assert.match(queue, /运营工作台检查 Enrollment/);
+  assert.match(queue, /当前没有待处理记录/);
+  assert.match(queue, /Day 0 仍由 Learner 自证完成/);
+  assert.match(queue, /三项评测/);
+  assert.match(queue, /不影响旅程推进、结营或准入/);
 });
 
 test("finalized reviews remain visible after the active queue is refreshed", () => {
   assert.match(queue, /\/api\/v1\/reviews\/history/);
-  assert.match(queue, /已完成评审/);
+  assert.match(queue, /已完成评阅/);
   assert.match(queue, /已通过/);
+  assert.match(queue, /已达到学习目标/);
   assert.match(detail, /审核结果提交成功/);
   assert.match(detail, /刷新后仍会保留/);
 });

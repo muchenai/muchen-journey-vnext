@@ -12,6 +12,7 @@ from journey_api.models import (
     Attachment,
     AttachmentStatus,
     Evaluation,
+    CoachingFeedback,
     Review,
     Submission,
     SubmissionDraft,
@@ -43,9 +44,10 @@ def attachment_out(attachment: Attachment) -> AttachmentOut:
 
 def submission_out(session: Session, submission: Submission) -> SubmissionOut:
     rows = session.execute(
-        select(SubmissionVersion, Review, Evaluation)
+        select(SubmissionVersion, Review, Evaluation, CoachingFeedback)
         .outerjoin(Review, Review.submission_version_id == SubmissionVersion.id)
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
+        .outerjoin(CoachingFeedback, CoachingFeedback.review_id == Review.id)
         .where(SubmissionVersion.submission_id == submission.id)
         .order_by(SubmissionVersion.version_no)
     ).all()
@@ -77,15 +79,23 @@ def submission_out(session: Session, submission: Submission) -> SubmissionOut:
                 attachments=attachments_by_version.get(version.id, []),
                 review_id=review.id if review is not None else None,
                 review_status=review.status.value if review is not None else None,
-                decision=evaluation.decision.value if evaluation is not None else None,
-                feedback=evaluation.feedback if evaluation is not None else None,
+                review_kind=review.review_kind.value if review is not None else None,
+                review_finalized_at=review.finalized_at if review is not None else None,
+                decision=(evaluation or coaching).decision.value
+                if evaluation is not None or coaching is not None
+                else None,
+                feedback=(evaluation or coaching).feedback
+                if evaluation is not None or coaching is not None
+                else None,
                 rubric_feedback=(
                     evaluation.structured_feedback or []
                     if evaluation is not None
+                    else coaching.structured_feedback
+                    if coaching is not None
                     else []
                 ),
             )
-            for version, review, evaluation in rows
+            for version, review, evaluation, coaching in rows
         ],
     )
 
