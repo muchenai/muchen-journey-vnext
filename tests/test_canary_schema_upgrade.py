@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import importlib.util
+import os
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -124,6 +126,7 @@ def test_package_workflow_pins_restore_image_and_migration_range():
     assert "ADDITIVE_SCHEMA_THEN_IMMUTABLE_BACKFILL" in source
     assert "make ci-main" in source
     assert "merge-base --is-ancestor" not in source
+    assert 'cp deploy/production/greenfield_canary_grant_runtime.py "$out/grant_runtime.py"' in source
 
 
 def test_migration_head_parser_handles_merge_revision():
@@ -138,3 +141,82 @@ def test_fact_probe_never_exports_raw_rows():
     assert "to_jsonb" in source
     assert "print(" in source
     assert "SELECT *" not in source.upper()
+
+
+def test_old_api_probe_mounts_ca_and_cleans_only_its_container(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    upgrade = mod.Upgrade(manifest(), tmp_path)
+    calls = []
+
+    def subprocess_run(command, **kwargs):
+        calls.append(command)
+        if command[:3] == ["docker", "container", "inspect"]:
+            return Mock(returncode=1)
+        return Mock(returncode=0, stdout=json.dumps({"release": manifest()["base_candidate"]}).encode())
+
+    monkeypatch.setattr(mod.subprocess, "run", subprocess_run)
+    launch = Mock(return_value=b"container-id")
+    monkeypatch.setattr(mod, "run", launch)
+    upgrade.probe_old_api()
+    command = launch.call_args.args[0]
+    assert f"{upgrade.base / 'secrets/volcengine-rds-ca.pem'}:/run/secrets/volcengine-rds-ca.pem:ro" in command
+    assert calls[-1][:3] == ["docker", "rm", "-f"]
+
+    calls.clear()
+    launch.reset_mock()
+    monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: Mock(returncode=0))
+    with pytest.raises(mod.UpgradeError, match="OLD_PROBE_CONTAINER_EXISTS"):
+        upgrade.probe_old_api()
+    launch.assert_not_called()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="production file modes require POSIX")
+def test_prepare_keeps_secrets_private_and_mounted_scripts_readable(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    package = tmp_path / "package"
+    package.mkdir()
+    upgrade = mod.Upgrade(manifest(), package)
+    (upgrade.base / "secrets").mkdir(parents=True)
+    for name in mod.COPY_FILES:
+        (upgrade.base / name).write_bytes(b"synthetic")
+    for name in mod.PACKAGE_FILES:
+        (package / name).write_bytes(b"synthetic")
+    (upgrade.base / ".deployment.env").write_text("CANDIDATE_COMMIT=old\nAPI_IMAGE=old\nWEB_IMAGE=old\n")
+    (upgrade.base / "secrets/api.env").write_text(
+        f"APP_RELEASE=old\nDATABASE_URL=postgresql+psycopg://journey_next_runtime:synthetic@db:5432/{mod.DATABASE}\n"
+    )
+    (upgrade.base / "secrets/web.env").write_text("APP_RELEASE=old\n")
+    monkeypatch.setattr(upgrade, "verify_base", Mock())
+    monkeypatch.setattr(upgrade, "image_check", Mock())
+    monkeypatch.setattr(mod, "run", Mock(return_value=b""))
+    monkeypatch.setattr(mod.subprocess, "run", Mock(return_value=Mock(returncode=0)))
+    config = {"services": {name: {"image": upgrade.old_images[name], "environment": {"APP_RELEASE": manifest()["base_candidate"]}} for name in ("api", "web")}}
+    monkeypatch.setattr(mod, "compose", Mock(return_value=json.dumps(config).encode()))
+    upgrade.prepare("synthetic", "synthetic-token", "synthetic-migration-password")
+    assert (upgrade.new / "db_facts.py").stat().st_mode & 0o777 == 0o644
+    assert (upgrade.new / "grant_runtime.py").stat().st_mode & 0o777 == 0o644
+    for name in mod.ENV_FILES + ("secrets/migration.env",):
+        assert (upgrade.new / name).stat().st_mode & 0o777 == 0o600
+
+
+def test_canary_grants_reject_wrong_database_before_any_grant(monkeypatch):
+    spec = importlib.util.spec_from_file_location("canary_grants", "deploy/production/greenfield_canary_grant_runtime.py")
+    grants = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(grants)
+    monkeypatch.setenv("DATABASE_URL", "synthetic")
+    from unittest.mock import MagicMock
+    connection = MagicMock()
+    connection.execute.return_value.scalar_one.return_value = "journey_next_staging"
+    engine = MagicMock()
+    engine.begin.return_value.__enter__.return_value = connection
+    monkeypatch.setattr(grants, "create_engine", Mock(return_value=engine))
+    with pytest.raises(RuntimeError, match="unexpected database"):
+        grants.main()
+    assert connection.execute.call_count == 1
+    engine.dispose.assert_called_once()
+    connection.reset_mock()
+    connection.execute.return_value.scalar_one.return_value = mod.DATABASE
+    grants.main()
+    statements = [str(call.args[0]) for call in connection.execute.call_args_list]
+    assert f"GRANT CONNECT ON DATABASE {mod.DATABASE} TO journey_next_runtime" in statements
+    assert all("staging" not in statement for statement in statements)
