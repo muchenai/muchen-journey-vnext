@@ -103,6 +103,17 @@ def test_release_workflow_separates_irreversible_backfill():
     assert "WP15_BACKUP_KEY" in source
     assert "canary.dump.enc" in source
     assert "terraform apply" not in source
+    assert 'PYTHONDONTWRITEBYTECODE: "1"' in source
+    assert '"$RUNNER_TEMP/schema-package/"*' not in source
+    for name in (
+        "manifest.json",
+        "canary_schema_upgrade.py",
+        "canary_schema_facts_entry.py",
+        "db_facts.py",
+        "grant_runtime.py",
+        "SHA256SUMS",
+    ):
+        assert f'"$package/{name}"' in source
 
 
 def test_package_workflow_pins_restore_image_and_migration_range():
