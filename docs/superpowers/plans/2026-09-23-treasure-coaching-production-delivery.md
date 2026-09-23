@@ -12,6 +12,8 @@
 
 **2026-09-23 Phase 1 resume amendment:** Run `35877827757` proved that even the first 16 MiB chunk could outlive three five-minute SCP attempts (`124`, `124`, `137`). Because SCP restarted the same partial file on every attempt, retries discarded prior progress; image import never started, the temporary SSH rule closed successfully, and public health remained on `b8a5dd580eaec72945cbe4f0e37c1152ee4645a1`. With user approval, the bounded chunk loop now uses OpenSSH SFTP `reput` to resume the run-scoped partial file. Before every attempt it rejects symlinks, non-numeric or oversized partials; a complete partial is accepted only after exact SHA-256 verification and atomic rename. The existing three-attempt, 300-second-per-attempt, 3000-second-overall deadlines and all image, release, database, container, and history protections remain unchanged.
 
+Run `35885196380` then exposed a bounded implementation error before any image bytes were uploaded: SFTP `reput` requires the remote partial to exist. The corrected loop uses `put` only when the verified offset is zero and `reput` only when a non-empty partial exists. The run again stopped before import, closed temporary SSH ingress, and left public production healthy on the base release.
+
 **Evidence:** Feature PRs #409/#410 merged; package Run `35843223116` passed; Prepare Run `35843920266` stopped with `COMMAND_TIMEOUT`; detailed retrospective is `D:/muchen_journey/9.6日项目阻塞复盘.md`, section 13.
 
 ## Non-negotiable boundaries

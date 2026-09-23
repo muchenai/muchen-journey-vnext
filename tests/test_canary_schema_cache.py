@@ -296,6 +296,9 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "for attempt in 1 2 3" in source
     assert "chunk_name.partial" in source
     assert "partial_bytes=$(ssh" in source
+    assert "sftp_command=put" in source
+    assert "sftp_command=reput" in source
+    assert 'if [[ "$partial_bytes" -eq 0 ]]' in source
     assert "reput" in source
     assert "sftp \"${opts[@]}\" -b -" in source
     assert "mv --" in source
