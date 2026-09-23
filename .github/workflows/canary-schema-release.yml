@@ -207,6 +207,7 @@ jobs:
           if [[ "$PHASE" == backup-migrate || "$PHASE" == backup-diagnose ]]; then
             scp "${opts[@]}" scripts/canary_schema_upgrade.py root@"$PUBLIC_IP":"$remote/canary_schema_upgrade_control.py"
             scp "${opts[@]}" scripts/wp31_database_snapshot.py root@"$PUBLIC_IP":"$remote/wp31_database_snapshot.py"
+            scp "${opts[@]}" deploy/production/db_facts.py root@"$PUBLIC_IP":"$remote/db_facts_control.py"
             upgrade_script="$remote/canary_schema_upgrade_control.py"
           fi
           command="python3 '$upgrade_script' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"

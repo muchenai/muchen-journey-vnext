@@ -118,6 +118,7 @@ def test_release_workflow_separates_irreversible_backfill():
         assert f'"$package/{name}"' in source
     assert 'scripts/canary_schema_upgrade.py root@"$PUBLIC_IP":"$remote/canary_schema_upgrade_control.py"' in source
     assert 'scripts/wp31_database_snapshot.py root@"$PUBLIC_IP":"$remote/wp31_database_snapshot.py"' in source
+    assert 'deploy/production/db_facts.py root@"$PUBLIC_IP":"$remote/db_facts_control.py"' in source
     assert 'if [[ "$PHASE" == backup-migrate || "$PHASE" == backup-diagnose ]]' in source
     assert 'backup-diagnose) expected="BACKUP_DIAGNOSE_$short"' in source
 
@@ -145,6 +146,8 @@ def test_fact_probe_never_exports_raw_rows():
     assert "to_jsonb" in source
     assert "print(" in source
     assert "SELECT *" not in source.upper()
+    assert "SET LOCAL TIME ZONE 'UTC'" in source
+    assert source.index("import_snapshot(connection") < source.index("SET LOCAL TIME ZONE 'UTC'")
 
 
 def test_incomplete_pre_migration_backup_is_recoverable(tmp_path, monkeypatch):
@@ -174,6 +177,7 @@ def test_backup_uses_one_exported_snapshot_for_dump_and_facts():
     assert '"WP31_DATABASE_SNAPSHOT=" + snapshot_id' in source
     assert "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT" in source
     assert '"docker", "rm", "-f", holder' in source
+    assert "self.package / 'db_facts_control.py'" in source
 
 
 def test_backup_diagnostic_reports_only_safe_differences():
