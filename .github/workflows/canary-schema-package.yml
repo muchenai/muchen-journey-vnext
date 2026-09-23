@@ -44,24 +44,7 @@ jobs:
           # release and is not necessarily an ancestor of the later mainline.
           # Its exact pointer, image digests, database, and migration are checked
           # on the host before any preparation or mutation.
-          test "$(python3 - <<'PY'
-          import re
-          from pathlib import Path
-          heads=[]
-          revisions={}
-          parents=set()
-          for path in Path('migrations/versions').glob('*.py'):
-              raw=path.read_text()
-              rev=re.search(r'^revision\s*=\s*["\x27]([^"\x27]+)', raw, re.M)
-              down=re.search(r'^down_revision\s*=\s*["\x27]([^"\x27]+)', raw, re.M)
-              if rev:
-                  revisions[rev.group(1)]=path
-              if down:
-                  parents.add(down.group(1))
-          heads=sorted(set(revisions)-parents)
-          print(','.join(heads))
-          PY
-          )" = 0029_treasure_coaching_reviews
+          test "$(python3 scripts/canary_schema_migration_head.py)" = 0029_treasure_coaching_reviews
           test -f migrations/versions/0029_treasure_coaching_reviews.py
       - name: Run complete machine gate
         run: make ci-main
