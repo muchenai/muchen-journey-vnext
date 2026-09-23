@@ -79,6 +79,7 @@ jobs:
       - name: Download and verify exact successful package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" > "$RUNNER_TEMP/package-run.json"
@@ -165,7 +166,15 @@ jobs:
           opts=(-i "$RUNNER_TEMP/schema-key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/schema-known-hosts")
           remote="/srv/journey-next-production/canary/schema-upgrade-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$PHASE"
           ssh "${opts[@]}" root@"$PUBLIC_IP" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$remote' && test ! -L /srv/journey-next-production/canary && install -d -m 0700 '$remote'"
-          scp "${opts[@]}" "$RUNNER_TEMP/schema-package/"* root@"$PUBLIC_IP":"$remote/"
+          package="$RUNNER_TEMP/schema-package"
+          scp "${opts[@]}" \
+            "$package/manifest.json" \
+            "$package/canary_schema_upgrade.py" \
+            "$package/canary_schema_facts_entry.py" \
+            "$package/db_facts.py" \
+            "$package/grant_runtime.py" \
+            "$package/SHA256SUMS" \
+            root@"$PUBLIC_IP":"$remote/"
           command="python3 '$remote/canary_schema_upgrade.py' '$PHASE' --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256'"
           if [[ "$PHASE" == prepare ]]; then
             PAYLOAD="$RUNNER_TEMP/prepare-input.json" python3 - <<'PY'
