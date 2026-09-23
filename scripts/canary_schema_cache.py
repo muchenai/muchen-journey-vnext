@@ -203,6 +203,95 @@ def check_image(name: str, reference: str, candidate: str) -> None:
         )
 
 
+def inspect_cached_image(reference: str, candidate: str, name: str) -> dict[str, object]:
+    tag = reference.split("@", 1)[0] + ":schema-cache-" + candidate + "-" + name
+
+    def inspect(value: str) -> dict[str, object] | None:
+        try:
+            result = subprocess.run(
+                ["docker", "image", "inspect", value],
+                capture_output=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            raise UpgradeError("CACHE_DIAGNOSTIC_TIMEOUT") from None
+        if result.returncode:
+            return None
+        rows = json.loads(result.stdout)
+        require(isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], dict), "CACHE_DIAGNOSTIC_IMAGE")
+        return rows[0]
+
+    original = inspect(reference)
+    cached = inspect(tag)
+    cached_platform_ok = bool(
+        cached and cached.get("Os") == "linux" and cached.get("Architecture") == "amd64"
+    )
+    labels = cached.get("Config", {}).get("Labels", {}) if cached else {}
+    cached_revision_ok = bool(
+        cached
+        and (
+            name == "dbrestore"
+            or (isinstance(labels, dict) and labels.get("org.opencontainers.image.revision") == candidate)
+        )
+    )
+    return {
+        "name": name,
+        "original_reference_present": original is not None,
+        "cache_tag_present": cached is not None,
+        "cache_platform_ok": cached_platform_ok,
+        "cache_revision_ok": cached_revision_ok,
+    }
+
+
+def diagnose_import(
+    manifest: dict[str, object],
+    chunks_manifest: Path,
+    archive: Path,
+    manifest_sha256: str,
+) -> None:
+    require(sys.platform == "linux" and os.geteuid() == 0, "LINUX_ROOT_REQUIRED")
+    source_dir = archive.resolve().parent
+    runs_dir = (schema.ROOT / "schema-upgrade-runs").resolve()
+    require(source_dir.parent == runs_dir and source_dir.name.endswith("-1-cache-images"), "CACHE_DIAGNOSTIC_SOURCE")
+    require(not source_dir.is_symlink(), "CACHE_DIAGNOSTIC_SOURCE")
+    require(chunks_manifest.resolve().parent == source_dir, "CACHE_DIAGNOSTIC_MANIFEST_DIRECTORY")
+    require(archive.is_file() and not archive.is_symlink(), "ARCHIVE_UNSAFE_FILE")
+    require(chunks_manifest.is_file() and not chunks_manifest.is_symlink(), "CHUNKS_MANIFEST_FILE")
+    value = json.loads(chunks_manifest.read_text(encoding="utf-8"))
+    require(value.get("release_manifest_sha256") == manifest_sha256, "CHUNKS_RELEASE_MANIFEST")
+    require(value.get("candidate") == manifest["candidate"], "CHUNKS_CANDIDATE")
+    expected_sha = value.get("archive_sha256")
+    require(isinstance(expected_sha, str) and archive_digest(archive) == expected_sha, "CHUNKS_ARCHIVE_HASH")
+    try:
+        gzip_result = subprocess.run(
+            ["gzip", "-t", str(archive)],
+            capture_output=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        raise UpgradeError("CACHE_DIAGNOSTIC_TIMEOUT") from None
+    images = [
+        inspect_cached_image(reference, str(manifest["candidate"]), name)
+        for name, reference in candidate_images(manifest)
+    ]
+    print(
+        json.dumps(
+            {
+                "cache_diagnostic": "PASS",
+                "candidate": manifest["candidate"],
+                "archive_sha256_valid": True,
+                "gzip_valid": gzip_result.returncode == 0,
+                "images": images,
+                "containers_changed": False,
+                "database_changed": False,
+                "release_changed": False,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
 def export_images(manifest: dict[str, object], path: Path) -> None:
     require(not path.exists() and not path.is_symlink(), "ARCHIVE_EXISTS")
     raw_path = path.with_name(path.name + ".raw")
@@ -311,7 +400,9 @@ def import_chunked_images(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("export", "split", "import", "import-chunks"))
+    parser.add_argument(
+        "mode", choices=("export", "split", "import", "import-chunks", "diagnose-import")
+    )
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--archive", type=Path, required=True)
@@ -342,6 +433,9 @@ def main() -> None:
             args.archive,
             args.manifest_sha256,
         )
+    elif args.mode == "diagnose-import":
+        require(args.chunks_manifest is not None, "CHUNKS_MANIFEST_REQUIRED")
+        diagnose_import(manifest, args.chunks_manifest, args.archive, args.manifest_sha256)
     else:
         import_images(manifest, args.archive, args.archive_sha256 or "")
 

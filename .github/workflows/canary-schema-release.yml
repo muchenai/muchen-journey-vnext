@@ -10,6 +10,7 @@ on:
         options:
           - inspect
           - cache-images
+          - cache-diagnose
           - prepare
           - backup-migrate
           - switch
@@ -30,6 +31,11 @@ on:
       confirmation:
         description: PHASE_SHORTSHA, for example PREPARE_F656AF9
         required: true
+        type: string
+      cache_source_run:
+        description: Completed cache-images run to inspect; only used by cache-diagnose
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -54,6 +60,7 @@ jobs:
       PACKAGE_RUN: ${{ inputs.package_run }}
       MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      CACHE_SOURCE_RUN: ${{ inputs.cache_source_run }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -70,6 +77,7 @@ jobs:
           case "$PHASE" in
             inspect) expected="INSPECT_$short" ;;
             cache-images) expected="CACHE_IMAGES_$short" ;;
+            cache-diagnose) expected="CACHE_DIAGNOSE_$short" ;;
             prepare) expected="PREPARE_$short" ;;
             backup-migrate) expected="BACKUP_MIGRATE_$short" ;;
             switch) expected="SWITCH_$short" ;;
@@ -78,6 +86,11 @@ jobs:
             *) exit 64 ;;
           esac
           test "$CONFIRMATION" = "$expected"
+          if [[ "$PHASE" == cache-diagnose ]]; then
+            [[ "$CACHE_SOURCE_RUN" =~ ^[1-9][0-9]{5,19}$ ]]
+          else
+            test -z "$CACHE_SOURCE_RUN"
+          fi
       - name: Download and verify exact successful package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -325,6 +338,10 @@ jobs:
               exit 1
             fi
             ssh "${opts[@]}" root@"$PUBLIC_IP" "python3 '$remote/canary_schema_cache.py' import-chunks --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$remote/schema-image-cache.tar.gz' --chunks-manifest '$remote/chunks.json' --chunks-dir '$remote/chunks'" | tee "$RUNNER_TEMP/phase-result.jsonl"
+          elif [[ "$PHASE" == cache-diagnose ]]; then
+            source="/srv/journey-next-production/canary/schema-upgrade-runs/$CACHE_SOURCE_RUN-1-cache-images"
+            timeout --signal=TERM --kill-after=15s 2m scp "${opts[@]}" scripts/canary_schema_cache.py root@"$PUBLIC_IP":"$remote/"
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -L '$source' && test -d '$source' && python3 '$remote/canary_schema_cache.py' diagnose-import --manifest '$remote/manifest.json' --manifest-sha256 '$MANIFEST_SHA256' --archive '$source/schema-image-cache.tar.gz' --chunks-manifest '$source/chunks.json'" | tee "$RUNNER_TEMP/phase-result.jsonl"
           elif [[ "$PHASE" == prepare ]]; then
             PAYLOAD="$RUNNER_TEMP/prepare-input.json" python3 - <<'PY'
           import json, os
