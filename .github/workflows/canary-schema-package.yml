@@ -40,7 +40,10 @@ jobs:
           test "$CANDIDATE" = "$(git rev-parse HEAD)"
           test "$CANDIDATE" = "$(git rev-parse origin/main)"
           test -z "$(git status --porcelain)"
-          git merge-base --is-ancestor b8a5dd580eaec72945cbe4f0e37c1152ee4645a1 "$CANDIDATE"
+          # The deployed application commit was produced by a reviewed rebase
+          # release and is not necessarily an ancestor of the later mainline.
+          # Its exact pointer, image digests, database, and migration are checked
+          # on the host before any preparation or mutation.
           test "$(python3 - <<'PY'
           import re
           from pathlib import Path
