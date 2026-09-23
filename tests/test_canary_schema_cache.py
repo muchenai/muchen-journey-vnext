@@ -108,6 +108,7 @@ def test_import_loads_exact_images_under_release_lock(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "execute", execute)
     monkeypatch.setattr(cache.schema, "ROOT", tmp_path)
     monkeypatch.setattr(cache, "__file__", str(tmp_path / "canary_schema_cache.py"))
+    monkeypatch.setattr(cache.os, "geteuid", Mock(return_value=0))
     cache.import_images(value, archive, expected_sha)
 
     assert upgrade.verify_base.call_count == 2
@@ -134,6 +135,7 @@ def test_import_refuses_an_active_release_phase(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "execute", Mock())
     monkeypatch.setattr(cache.schema, "ROOT", tmp_path)
     monkeypatch.setattr(cache, "__file__", str(tmp_path / "canary_schema_cache.py"))
+    monkeypatch.setattr(cache.os, "geteuid", Mock(return_value=0))
     try:
         with pytest.raises(cache.UpgradeError, match="RELEASE_PHASE_ACTIVE"):
             cache.import_images(value, archive, expected_sha)
