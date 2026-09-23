@@ -1,0 +1,137 @@
+name: Canary Schema Upgrade Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact reviewed main commit containing migration 0029
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-schema-package-${{ inputs.candidate }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.candidate }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.16.0
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Verify exact candidate and migration boundary
+        run: |
+          set -euo pipefail
+          test "$CANDIDATE" = "$(git rev-parse HEAD)"
+          test "$CANDIDATE" = "$(git rev-parse origin/main)"
+          test -z "$(git status --porcelain)"
+          git merge-base --is-ancestor b8a5dd580eaec72945cbe4f0e37c1152ee4645a1 "$CANDIDATE"
+          test "$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          heads=[]
+          revisions={}
+          parents=set()
+          for path in Path('migrations/versions').glob('*.py'):
+              raw=path.read_text()
+              rev=re.search(r'^revision\s*=\s*["\x27]([^"\x27]+)', raw, re.M)
+              down=re.search(r'^down_revision\s*=\s*["\x27]([^"\x27]+)', raw, re.M)
+              if rev:
+                  revisions[rev.group(1)]=path
+              if down:
+                  parents.add(down.group(1))
+          heads=sorted(set(revisions)-parents)
+          print(','.join(heads))
+          PY
+          )" = 0029_treasure_coaching_reviews
+          test -f migrations/versions/0029_treasure_coaching_reviews.py
+      - name: Run complete machine gate
+        run: make ci-main
+      - name: Build application and isolated-restore images
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 --build-arg VCS_REF="$CANDIDATE" -t "schema-api:$CANDIDATE" -f apps/api/Dockerfile .
+          docker build --platform linux/amd64 --build-arg VCS_REF="$CANDIDATE" -t "schema-web:$CANDIDATE" -f apps/web/Dockerfile apps/web
+          docker pull docker.io/library/postgres:17.6-alpine3.22@sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be
+      - name: Publish immutable images
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          api="ghcr.io/muchenai/muchen-journey-vnext-api:schema-upgrade-$CANDIDATE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          web="ghcr.io/muchenai/muchen-journey-vnext-web:schema-upgrade-$CANDIDATE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          db="ghcr.io/muchenai/muchen-journey-vnext-dbrestore:postgres-17.6-$CANDIDATE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker tag "schema-api:$CANDIDATE" "$api"
+          docker tag "schema-web:$CANDIDATE" "$web"
+          docker tag docker.io/library/postgres:17.6-alpine3.22@sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be "$db"
+          for item in "$api" "$web" "$db"; do docker push "$item"; docker pull "$item"; done
+          printf '%s\n' "$api" > "$RUNNER_TEMP/api.ref"
+          printf '%s\n' "$web" > "$RUNNER_TEMP/web.ref"
+          printf '%s\n' "$db" > "$RUNNER_TEMP/dbrestore.ref"
+          docker image inspect "$api" > "$RUNNER_TEMP/api.json"
+          docker image inspect "$web" > "$RUNNER_TEMP/web.json"
+          docker image inspect "$db" > "$RUNNER_TEMP/dbrestore.json"
+      - name: Produce immutable upgrade package
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/schema-upgrade-package"
+          mkdir -p "$out"
+          cp scripts/canary_schema_upgrade.py scripts/canary_schema_facts_entry.py "$out/"
+          cp deploy/production/db_facts.py "$out/"
+          cp deploy/staging/grant_runtime.py "$out/"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])
+          def digest(name, prefix):
+              row=json.loads((root/f'{name}.json').read_text())[0]
+              refs=[r for r in row['RepoDigests'] if r.startswith(prefix+'@sha256:')]
+              assert len(refs)==1
+              assert row['Os']=='linux' and row['Architecture']=='amd64'
+              return refs[0]
+          candidate=os.environ['CANDIDATE']
+          api=digest('api','ghcr.io/muchenai/muchen-journey-vnext-api')
+          web=digest('web','ghcr.io/muchenai/muchen-journey-vnext-web')
+          db=digest('dbrestore','ghcr.io/muchenai/muchen-journey-vnext-dbrestore')
+          for name in ('api','web'):
+              row=json.loads((root/f'{name}.json').read_text())[0]
+              assert row['Config']['Labels']['org.opencontainers.image.revision']==candidate
+          manifest={
+              'schema_version':2,
+              'base_candidate':'b8a5dd580eaec72945cbe4f0e37c1152ee4645a1',
+              'candidate':candidate,
+              'database':'journey_next_canary_20260901_c72fea5',
+              'migrations':{'from':'0028_canary_main_merge','to':'0029_treasure_coaching_reviews'},
+              'images':{'api':api,'web':web,'dbrestore':db},
+              'old_images':{
+                  'api':'ghcr.io/muchenai/muchen-journey-vnext-api@sha256:1e1fd3bdff18f049fffb711e080f55f54cebe227bd197cbd34f858c7f847c45d',
+                  'web':'ghcr.io/muchenai/muchen-journey-vnext-web@sha256:ec8cf205b022850f4341a6933797b091b028cdbba78bf38e421f1355d535a2e7',
+              },
+              'compatibility':'ADDITIVE_SCHEMA_THEN_IMMUTABLE_BACKFILL',
+          }
+          out=root/'schema-upgrade-package'
+          (out/'manifest.json').write_text(json.dumps(manifest,sort_keys=True)+'\n')
+          PY
+          (cd "$out" && sha256sum manifest.json canary_schema_upgrade.py canary_schema_facts_entry.py db_facts.py grant_runtime.py > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canary-schema-upgrade-${{ inputs.candidate }}
+          path: ${{ runner.temp }}/schema-upgrade-package
+          if-no-files-found: error
+          retention-days: 7
