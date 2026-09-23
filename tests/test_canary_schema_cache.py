@@ -295,7 +295,14 @@ def test_workflow_serializes_cache_with_every_release_phase():
     assert "transfer_deadline=$((SECONDS + 3000))" in source
     assert "for attempt in 1 2 3" in source
     assert "chunk_name.partial" in source
+    assert "partial_bytes=$(ssh" in source
+    assert "reput" in source
+    assert "sftp \"${opts[@]}\" -b -" in source
     assert "mv --" in source
     assert '\"source\":\"existing\"' in source
+    assert '\"source\":\"completed-partial\"' in source
+    assert "IMAGE_CACHE_PARTIAL_INVALID" in source
+    assert "IMAGE_CACHE_PARTIAL_HASH_MISMATCH" in source
     assert "IMAGE_CACHE_TRANSFER_TIMEOUT" in source
     assert "IMAGE_CACHE_CHUNK_TRANSFER_FAILED" in source
+    assert 'scp "${opts[@]}" "$local_chunk"' not in source
