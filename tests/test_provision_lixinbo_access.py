@@ -73,13 +73,12 @@ def test_remote_runtime_selection_does_not_parse_compose_files():
     assert "docker compose ps" not in script
     assert "journey-next-staging-edge-1" in script
     assert 'upstreams not in (["production-web:3000"], ["greenfield-canary-web:3000"])' in script
-    assert "journey-next-production-api-1" in script
-    assert '$root/canary/current' in script
-    assert "./compose.sh -f compose.canary.yaml ps -q api" in script
-    assert "wp31_exec_env.py" in script
+    assert "journey-next-greenfield-canary" in script
+    assert "active-web-alias" in script
+    assert '--filter label=com.docker.compose.service=web' in script
+    assert '--filter label=com.docker.compose.service=api' in script
     assert "com.docker.compose.project" in script
     assert "com.docker.compose.service" in script
-    assert "com.docker.compose.project.working_dir" in script
     assert "api_health_release" in script
 
 
