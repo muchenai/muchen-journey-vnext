@@ -10,19 +10,19 @@ live_release=$(curl -fsS --connect-timeout 3 --max-time 10 https://journey.muche
 
 matches=0
 container=""
-for candidate in "$root/current" "$root/canary/current"; do
-  [[ -L "$candidate" ]] || continue
-  release=$(readlink -f "$candidate")
+mapfile -t api_containers < <(
+  docker ps \
+    --filter label=com.docker.compose.service=api \
+    --format '{{.ID}}'
+)
+for current_container in "${api_containers[@]}"; do
+  working_dir=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$current_container")
+  [[ -n "$working_dir" ]] || continue
+  release=$(readlink -f "$working_dir" 2>/dev/null || true)
   case "$release" in
     "$root"/releases/[0-9a-f]*-[1-9][0-9]*|"$root"/canary/releases/[0-9a-f]*-[1-9][0-9]*) ;;
     *) continue ;;
   esac
-  if [[ "$candidate" == "$root/canary/current" ]]; then
-    current_container=$(cd "$release" && ./compose.sh -f compose.canary.yaml ps -q api)
-  else
-    current_container=$(cd "$release" && docker compose ps -q api)
-  fi
-  [[ -n "$current_container" ]] || continue
   app_release=$(docker exec "$current_container" printenv APP_RELEASE)
   if [[ "$app_release" == "$live_release" ]]; then
     matches=$((matches + 1))
