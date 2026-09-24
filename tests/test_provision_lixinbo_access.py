@@ -72,8 +72,13 @@ def test_remote_runtime_selection_does_not_parse_compose_files():
 
     assert "docker compose ps" not in script
     assert "compose.sh" not in script
+    assert "journey-next-staging-edge-1" in script
+    assert 'upstreams not in (["production-web:3000"], ["greenfield-canary-web:3000"])' in script
+    assert "label=com.docker.compose.service=web" in script
     assert "label=com.docker.compose.service=api" in script
+    assert 'label=com.docker.compose.project=$project' in script
     assert "com.docker.compose.project.working_dir" in script
+    assert "api_health_release" in script
 
 
 def test_creates_exact_user_and_both_roles(monkeypatch, models):
