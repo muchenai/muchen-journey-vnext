@@ -1,0 +1,138 @@
+name: Add Lixinbo Canary Learner
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ADD_LIXINBO_CANARY_LEARNER
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: add-lixinbo-canary-learner
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: inputs.confirmation == 'ADD_LIXINBO_CANARY_LEARNER'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-canary-uat
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+      WP31_CANARY_LEARNER_USER_IDS: ${{ secrets.WP31_CANARY_LEARNER_USER_IDS }}
+    steps:
+      - name: Check out the reviewed main commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify the bounded request and learner allowlist
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test '${{ inputs.confirmation }}' = ADD_LIXINBO_CANARY_LEARNER
+          bash -n scripts/add_lixinbo_canary_learner_remote.sh
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from uuid import UUID
+
+          expected = {
+              "fc74182c-048c-41de-bae6-c7ccd95f0a93",
+              "fb1bc4f8-8f81-4448-967a-36a6aebddf7f",
+              "934d4bab-2494-4ed3-ac15-9378913b9c01",
+          }
+          values = [str(UUID(item.strip())) for item in os.environ["WP31_CANARY_LEARNER_USER_IDS"].split(",") if item.strip()]
+          if len(values) != 3 or set(values) != expected:
+              raise SystemExit("configured Canary learner allowlist is not the approved three-user set")
+          path = Path(os.environ["RUNNER_TEMP"]) / "canary-learner-allowlist"
+          path.write_text(",".join(values), encoding="utf-8")
+          path.chmod(0o600)
+          PY
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Read the reviewed host coordinates
+        id: infrastructure
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          test -n "$public_ip"
+          test -n "$security_group_id"
+          echo "::add-mask::$public_ip"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open bounded SSH ingress
+        id: ssh
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\n')
+          python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$runner_ip"
+          echo "runner_cidr=$runner_ip/32" >>"$GITHUB_OUTPUT"
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id '${{ steps.infrastructure.outputs.security_group_id }}' \
+            --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/access-key"
+          chmod 0600 "$RUNNER_TEMP/access-key"
+      - name: Apply the approved learner allowlist to the live Canary runtime
+        env:
+          PUBLIC_IP: ${{ steps.infrastructure.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/access-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/access-known-hosts")
+          remote="/srv/journey-next-production/access-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-learner"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
+          scp "${opts[@]}" scripts/add_lixinbo_canary_learner_remote.sh "$RUNNER_TEMP/canary-learner-allowlist" root@"$PUBLIC_IP":"$remote/"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "chmod 0500 '$remote/add_lixinbo_canary_learner_remote.sh' && chmod 0400 '$remote/canary-learner-allowlist' && '$remote/add_lixinbo_canary_learner_remote.sh' '$remote/canary-learner-allowlist' '$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT'"
+      - name: Remove transient files
+        if: always()
+        env:
+          PUBLIC_IP: ${{ steps.infrastructure.outputs.public_ip }}
+        run: |
+          set +e
+          opts=(-i "$RUNNER_TEMP/access-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/access-known-hosts")
+          if [[ -s "$RUNNER_TEMP/access-key" && -n "$PUBLIC_IP" ]]; then
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "rm -rf -- '/srv/journey-next-production/access-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-learner'"
+          fi
+          rm -f -- "$RUNNER_TEMP/access-key" "$RUNNER_TEMP/access-known-hosts" "$RUNNER_TEMP/canary-learner-allowlist"
+      - name: Close temporary SSH ingress
+        if: always() && steps.infrastructure.outputs.security_group_id != '' && steps.ssh.outputs.runner_cidr != ''
+        run: |
+          set -euo pipefail
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id '${{ steps.infrastructure.outputs.security_group_id }}' \
+            --cidr '${{ steps.ssh.outputs.runner_cidr }}'
