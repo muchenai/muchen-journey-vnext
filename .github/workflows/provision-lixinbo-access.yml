@@ -1,0 +1,121 @@
+name: Provision Lixinbo Internal Access
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PROVISION_LIXINBO_OPERATOR_REVIEWER
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provision-lixinbo-internal-access
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: inputs.confirmation == 'PROVISION_LIXINBO_OPERATOR_REVIEWER'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-canary-uat
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      VOLCENGINE_REGION: cn-beijing
+      VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+      AWS_REGION: cn-beijing
+      AWS_ENDPOINT_URL_S3: https://tos-s3-cn-beijing.volces.com
+      AWS_S3_USE_PATH_STYLE: "false"
+      TF_VAR_primary_zone_id: ${{ vars.WP08_PRIMARY_ZONE_ID }}
+      TF_VAR_secondary_zone_id: ${{ vars.WP08_SECONDARY_ZONE_ID }}
+      TF_VAR_dns_zone_id: ${{ secrets.WP08_DNS_ZONE_ID }}
+      TF_VAR_ecs_image_id: ${{ vars.WP08_ECS_IMAGE_ID }}
+      TF_VAR_ecs_instance_type: ${{ vars.WP08_ECS_INSTANCE_TYPE }}
+      TF_VAR_ecs_ssh_public_key: ${{ secrets.WP08_DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_migration_db_password: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+      TF_VAR_runtime_db_password: ${{ secrets.WP08_RUNTIME_DB_PASSWORD }}
+      TF_VAR_tos_bucket_name: ${{ secrets.WP08_TOS_BUCKET_NAME }}
+    steps:
+      - name: Check out the reviewed main commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify the bounded request
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test '${{ inputs.confirmation }}' = PROVISION_LIXINBO_OPERATOR_REVIEWER
+          python3 -m py_compile scripts/provision_lixinbo_access.py
+          bash -n scripts/provision_lixinbo_remote.sh
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Read the reviewed host coordinates
+        id: infrastructure
+        working-directory: infra/staging
+        run: |
+          set -euo pipefail
+          terraform init \
+            -backend-config="bucket=${{ secrets.WP08_TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform/wp08-staging.tfstate" \
+            -backend-config="region=cn-beijing" \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="skip_s3_checksum=true"
+          terraform validate
+          public_ip=$(terraform output -raw staging_public_ip)
+          security_group_id=$(terraform output -raw staging_security_group_id)
+          test -n "$public_ip"
+          test -n "$security_group_id"
+          echo "::add-mask::$public_ip"
+          echo "public_ip=$public_ip" >>"$GITHUB_OUTPUT"
+          echo "security_group_id=$security_group_id" >>"$GITHUB_OUTPUT"
+      - name: Open bounded SSH ingress
+        id: ssh
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl -fsS https://checkip.amazonaws.com | tr -d '\n')
+          python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$runner_ip"
+          echo "runner_cidr=$runner_ip/32" >>"$GITHUB_OUTPUT"
+          python3 -m scripts.wp08_security_group open \
+            --security-group-id '${{ steps.infrastructure.outputs.security_group_id }}' \
+            --cidr "$runner_ip/32"
+          printf '%s\n' '${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}' >"$RUNNER_TEMP/access-key"
+          chmod 0600 "$RUNNER_TEMP/access-key"
+      - name: Provision the approved roles in the live runtime database
+        env:
+          PUBLIC_IP: ${{ steps.infrastructure.outputs.public_ip }}
+        run: |
+          set -euo pipefail
+          opts=(-i "$RUNNER_TEMP/access-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/access-known-hosts")
+          remote="/srv/journey-next-production/access-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "test ! -e '$remote' && install -d -m 0700 '$remote'"
+          scp "${opts[@]}" scripts/provision_lixinbo_access.py scripts/provision_lixinbo_remote.sh root@"$PUBLIC_IP":"$remote/"
+          ssh "${opts[@]}" root@"$PUBLIC_IP" "chmod 0500 '$remote/provision_lixinbo_remote.sh' && '$remote/provision_lixinbo_remote.sh' '$remote/provision_lixinbo_access.py'"
+      - name: Remove transient files
+        if: always()
+        env:
+          PUBLIC_IP: ${{ steps.infrastructure.outputs.public_ip }}
+        run: |
+          set +e
+          opts=(-i "$RUNNER_TEMP/access-key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o UserKnownHostsFile="$RUNNER_TEMP/access-known-hosts")
+          if [[ -s "$RUNNER_TEMP/access-key" && -n "$PUBLIC_IP" ]]; then
+            ssh "${opts[@]}" root@"$PUBLIC_IP" "rm -rf -- '/srv/journey-next-production/access-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT'"
+          fi
+          rm -f -- "$RUNNER_TEMP/access-key" "$RUNNER_TEMP/access-known-hosts"
+      - name: Close temporary SSH ingress
+        if: always() && steps.infrastructure.outputs.security_group_id != '' && steps.ssh.outputs.runner_cidr != ''
+        run: |
+          set -euo pipefail
+          python3 -m scripts.wp08_security_group close \
+            --security-group-id '${{ steps.infrastructure.outputs.security_group_id }}' \
+            --cidr '${{ steps.ssh.outputs.runner_cidr }}'
