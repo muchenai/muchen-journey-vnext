@@ -30,42 +30,50 @@ print(upstreams[0].removesuffix(":3000"))
 '
 ) || { echo 'ACCESS_PROVISION=FAIL reason=production-upstream'; exit 2; }
 
-matches=0
-project=""
-working_dir=""
-mapfile -t web_containers < <(
-  docker ps \
-    --filter label=com.docker.compose.service=web \
-    --format '{{.ID}}'
-)
-for current_container in "${web_containers[@]}"; do
-  aliases=$(docker inspect --format '{{range $network, $config := .NetworkSettings.Networks}}{{range $config.Aliases}}{{println .}}{{end}}{{end}}' "$current_container")
-  grep -Fxq "$production_upstream" <<<"$aliases" || continue
-  current_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$current_container")
-  current_working_dir=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$current_container")
-  case "$current_project" in
-    journey-next-production|journey-next-greenfield-canary) ;;
-    *) continue ;;
-  esac
-  release=$(readlink -f "$current_working_dir" 2>/dev/null || true)
-  case "$release" in
-    "$root"/releases/[0-9a-f]*-[1-9][0-9]*|"$root"/canary/releases/[0-9a-f]*-[1-9][0-9]*) ;;
-    *) continue ;;
-  esac
-  matches=$((matches + 1))
-  project="$current_project"
-  working_dir="$release"
-done
-[[ "$matches" -eq 1 && -n "$project" && -n "$working_dir" ]] || { echo 'ACCESS_PROVISION=FAIL reason=active-web-selection'; exit 2; }
+case "$production_upstream" in
+  production-web)
+    project=journey-next-production
+    working_dir=$(readlink -f "$root/current" 2>/dev/null || true)
+    container=journey-next-production-api-1
+    case "$working_dir" in
+      "$root"/releases/[0-9a-f]*-[1-9][0-9]*) ;;
+      *) echo 'ACCESS_PROVISION=FAIL reason=active-production-release'; exit 2 ;;
+    esac
+    ;;
+  greenfield-canary-web)
+    project=journey-next-greenfield-canary
+    working_dir=$(readlink -f "$root/canary/current" 2>/dev/null || true)
+    case "$working_dir" in
+      "$root"/canary/releases/[0-9a-f]*-[1-9][0-9]*) ;;
+      *) echo 'ACCESS_PROVISION=FAIL reason=active-canary-release'; exit 2 ;;
+    esac
+    for path in compose.sh wp31_exec_env.py compose.canary.yaml .deployment.env; do
+      [[ -f "$working_dir/$path" && ! -L "$working_dir/$path" ]] || {
+        echo 'ACCESS_PROVISION=FAIL reason=active-canary-runtime'
+        exit 2
+      }
+    done
+    mapfile -t api_containers < <(
+      cd "$working_dir"
+      ./compose.sh -f compose.canary.yaml ps -q api
+    )
+    [[ "${#api_containers[@]}" -eq 1 && -n "${api_containers[0]}" ]] || {
+      echo 'ACCESS_PROVISION=FAIL reason=active-canary-api-count'
+      exit 2
+    }
+    container="${api_containers[0]}"
+    ;;
+  *) echo 'ACCESS_PROVISION=FAIL reason=production-upstream-map'; exit 2 ;;
+esac
 
-mapfile -t api_containers < <(
-  docker ps \
-    --filter "label=com.docker.compose.project=$project" \
-    --filter label=com.docker.compose.service=api \
-    --format '{{.ID}}'
-)
-[[ "${#api_containers[@]}" -eq 1 ]] || { echo 'ACCESS_PROVISION=FAIL reason=active-api-count'; exit 2; }
-container="${api_containers[0]}"
+running=$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)
+current_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$container" 2>/dev/null || true)
+current_service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container" 2>/dev/null || true)
+[[ "$running" == true && "$current_project" == "$project" && "$current_service" == api ]] || {
+  echo 'ACCESS_PROVISION=FAIL reason=active-api-container'
+  exit 2
+}
+
 api_working_dir=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$container")
 api_release_dir=$(readlink -f "$api_working_dir" 2>/dev/null || true)
 [[ "$api_release_dir" == "$working_dir" ]] || { echo 'ACCESS_PROVISION=FAIL reason=active-release-mismatch'; exit 2; }
