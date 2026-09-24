@@ -1,9 +1,13 @@
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from scripts import provision_lixinbo_access as provisioner
+
+
+REMOTE_SCRIPT = Path(__file__).parents[1] / "scripts" / "provision_lixinbo_remote.sh"
 
 
 class Rows:
@@ -61,6 +65,15 @@ def models():
 
 def organization(models):
     return models.Organization(id=uuid.uuid4(), name="Muchen Journey")
+
+
+def test_remote_runtime_selection_does_not_parse_compose_files():
+    script = REMOTE_SCRIPT.read_text()
+
+    assert "docker compose ps" not in script
+    assert "compose.sh" not in script
+    assert "label=com.docker.compose.service=api" in script
+    assert "com.docker.compose.project.working_dir" in script
 
 
 def test_creates_exact_user_and_both_roles(monkeypatch, models):
