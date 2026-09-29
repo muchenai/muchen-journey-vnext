@@ -17,6 +17,10 @@ export function LanguageSwitcher({ locale }: { locale: JoinLocale }) {
     <label className="join-language-switcher">
       <span aria-hidden="true" className="join-language-icon">◎</span>
       <span className="sr-only">{locale === "zh-CN" ? "选择页面语言" : "Select page language"}</span>
+      <span aria-hidden="true" className="join-language-current">
+        {locale === "zh-CN" ? "简体中文" : "English"}
+      </span>
+      <span aria-hidden="true" className="join-language-caret">⌄</span>
       <select
         aria-label={locale === "zh-CN" ? "页面语言" : "Page language"}
         value={locale}

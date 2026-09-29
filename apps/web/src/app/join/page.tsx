@@ -68,13 +68,13 @@ export default async function JoinPage({
     <section className="learner-join" data-locale={locale}>
       <header className="join-topbar">
         <div className="join-brand-lockup">
-          <img className="join-brand-mark" src="/images/muchen-quest-group3-mark.png" alt="" />
+          <img className="join-brand-mark" src="/images/muchen-journey-group5-orb.png" alt="" />
           <span><strong>MUCHEN JOURNEY</strong><small>{isEnglish ? "NEWCOMER VILLAGE" : "沐晨新手村"}</small></span>
         </div>
         <div className="join-top-actions">
           <LanguageSwitcher locale={locale} />
           <span className="join-help-center" aria-label={isEnglish ? "Help center" : "帮助中心"}>
-            <span aria-hidden="true">◉</span>{isEnglish ? "Help Center" : "帮助中心"}
+            <span aria-hidden="true" className="join-language-icon">◎</span>{isEnglish ? "Help Center" : "帮助中心"}
           </span>
         </div>
       </header>
@@ -94,7 +94,7 @@ export default async function JoinPage({
       </div>
       <div className="join-action-card">
         <div className="join-card-brand" aria-hidden="true">
-          <img className="join-brand-mark" src="/images/muchen-quest-group3-mark.png" alt="" />
+          <img className="join-brand-mark" src="/images/muchen-journey-group5-orb.png" alt="" />
           <strong>Muchen Journey</strong>
         </div>
         <div className="join-action-heading">
