@@ -1291,7 +1291,7 @@ body:has(.exploration-dashboard) > .page-shell {
 .camp-sidebar blockquote small { display: block; margin-top: 13px; color: #6486a5; font-size: 10px; letter-spacing: .24em; line-height: 1.8; }
 .camp-main { min-width: 0; padding: 20px 28px 34px; }
 .camp-topbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(260px, 420px) auto; align-items: center; gap: 26px; min-height: 56px; }
-.camp-motto { color: #87a9c5; letter-spacing: .22em; }
+.camp-motto { color: #87a9c5; letter-spacing: .22em; white-space: nowrap; transform: translateX(92px); }
 .camp-motto small { display: block; margin-top: 2px; color: #577895; font-size: 9px; letter-spacing: .24em; }
 .camp-search { padding: 10px 18px; color: #789ab7; background: rgba(1, 14, 31, .8); border: 1px solid rgba(83, 164, 224, .58); border-radius: 10px; box-shadow: inset 0 0 18px rgba(28, 101, 179, .12); }
 .camp-profile { display: flex; align-items: center; gap: 10px; }
@@ -1390,6 +1390,8 @@ body:has(.exploration-dashboard) > .page-shell {
 
 @media (max-width: 1080px) {
   .exploration-dashboard { grid-template-columns: 260px minmax(0, 1fr); }
+  .camp-topbar { grid-template-columns: minmax(210px, 1fr) auto; }
+  .camp-search { display: none; }
   .camp-content-grid { grid-template-columns: minmax(0, 1fr); }
   .camp-right-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .camp-stage-route { grid-template-columns: repeat(5, minmax(55px, 1fr) 20px) minmax(75px, 1fr); }
@@ -1405,6 +1407,7 @@ body:has(.exploration-dashboard) > .page-shell {
   .camp-sidebar blockquote { display: none; }
   .camp-main { padding: 12px; }
   .camp-topbar { grid-template-columns: 1fr auto; }
+  .camp-motto { transform: none; }
   .camp-search, .camp-motto small { display: none; }
   .camp-stage-route { overflow-x: auto; grid-template-columns: repeat(5, 76px 20px) 92px; padding: 10px 0; }
   .camp-current-task, .camp-evidence-card { padding: 18px 14px; }
