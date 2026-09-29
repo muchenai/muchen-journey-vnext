@@ -25,9 +25,10 @@ export default async function LearnerHome({
   const enrollmentQuery = query.enrollment_id
     ? `?enrollment_id=${encodeURIComponent(query.enrollment_id)}`
     : "";
-  const [action, enrollmentsResponse, hasSession] = await Promise.all([
+  const [action, enrollmentsResponse, sessionIdentity, hasSession] = await Promise.all([
     learnerPageRequest<CurrentAction>(`/api/v1/me/current-action${enrollmentQuery}`),
     learnerPageRequest<{ items: LearnerEnrollment[] }>("/api/v1/me/enrollments"),
+    learnerPageRequest<{ display_name: string }>("/api/v1/session"),
     hasVNextSession(),
   ]);
   const opensTask = ["START_OR_CONTINUE_TASK", "REVISE_SUBMISSION"].includes(
@@ -58,7 +59,13 @@ export default async function LearnerHome({
         : "打开当前任务";
 
   if (assignment && currentNode?.position === 0 && !showSubmissionTransition) {
-    return <ExplorationCampDashboard assignment={assignment} journey={action.journey} />;
+    return (
+      <ExplorationCampDashboard
+        assignment={assignment}
+        learnerDisplayName={sessionIdentity.display_name}
+        journey={action.journey}
+      />
+    );
   }
 
   return (

@@ -52,10 +52,12 @@ function TaskTimeline({ evidence }: { evidence: boolean }) {
 
 export function ExplorationCampDashboard({
   assignment,
+  learnerDisplayName,
   journey,
   view = "material",
 }: {
   assignment: Assignment;
+  learnerDisplayName: string;
   journey?: JourneyProgress | null;
   view?: "material" | "evidence";
 }) {
@@ -93,7 +95,7 @@ export function ExplorationCampDashboard({
         <header className="camp-topbar">
           <div className="camp-motto">探索 · 学习 · 实践 · 成长<small>A BRIGHTER TOMORROW TOGETHER</small></div>
           <div className="camp-search">⌕　搜索任务、知识或关键词…</div>
-          <div className="camp-profile"><span>♟</span><strong>你好，新同学<small>继续前进吧！</small></strong></div>
+          <div className="camp-profile"><span>♟</span><strong>你好，{learnerDisplayName || "新同学"}<small>继续前进吧！</small></strong></div>
         </header>
         <StageRoute />
 

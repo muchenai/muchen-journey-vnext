@@ -169,13 +169,17 @@ export default async function TaskPage({
 }) {
   const { assignmentId } = await params;
   const query = await searchParams;
-  const assignment = await learnerPageRequest<Assignment>(
-    `/api/v1/me/assignments/${encodeURIComponent(assignmentId)}`,
-  );
+  const [assignment, sessionIdentity] = await Promise.all([
+    learnerPageRequest<Assignment>(
+      `/api/v1/me/assignments/${encodeURIComponent(assignmentId)}`,
+    ),
+    learnerPageRequest<{ display_name: string }>("/api/v1/session"),
+  ]);
   if (assignment.journey_stage?.position === 0 && !["COMPLETED", "SUBMITTED", "IN_REVIEW", "NEEDS_REVISION"].includes(assignment.status)) {
     return (
       <ExplorationCampDashboard
         assignment={assignment}
+        learnerDisplayName={sessionIdentity.display_name}
         view={query.view === "evidence" ? "evidence" : "material"}
       />
     );
