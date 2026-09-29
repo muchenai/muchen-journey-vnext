@@ -75,6 +75,7 @@ export function SubmissionComposer({
   expectsExternalDocument,
   taskActionUrl,
   nextVersionNo,
+  primaryActionLabel,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -95,6 +96,7 @@ export function SubmissionComposer({
   expectsExternalDocument: boolean;
   taskActionUrl: string | null;
   nextVersionNo: number;
+  primaryActionLabel?: string;
 }) {
   const initial = splitInitialBody(initialBody);
   const isRevision = ["submit_revision", "submit_evidence_revision"].includes(command);
@@ -548,7 +550,7 @@ export function SubmissionComposer({
               }}
               disabled={submissionBusy || draftPending}
             >
-              {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
+              {primaryActionLabel ?? (isEvidenceRetest ? "检查并重新提交" : "检查并提交")}
             </button>
             <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submissionBusy || draftPending || !isOnline || draftWait > 0}>{draftPending ? "正在保存……" : "保存草稿"}</button>
           </>

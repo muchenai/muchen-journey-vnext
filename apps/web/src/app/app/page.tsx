@@ -12,6 +12,7 @@ import {
 import { JourneyMap } from "./journey-map";
 import { LogoutControl } from "./logout-control";
 import { JourneyProgramOverview } from "./program-overview";
+import { ExplorationCampDashboard } from "./exploration-camp-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,10 @@ export default async function LearnerHome({
       : opensFirstMaterial
         ? "打开第一份必读材料"
         : "打开当前任务";
+
+  if (assignment && currentNode?.position === 0 && !showSubmissionTransition) {
+    return <ExplorationCampDashboard assignment={assignment} journey={action.journey} />;
+  }
 
   return (
     <section className={action.journey ? "learner-journey-page" : "content-narrow"}>

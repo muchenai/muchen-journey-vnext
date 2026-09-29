@@ -581,7 +581,10 @@ export async function startAssignment(data: FormData) {
     body: JSON.stringify({ expected_revision: expectedRevision }),
   });
   revalidatePath("/app");
-  redirect(`/app/tasks/${assignmentId}#task-workspace`);
+  const destination = data.get("destination") === "evidence"
+    ? "?view=evidence#task-workspace"
+    : "#task-workspace";
+  redirect(`/app/tasks/${assignmentId}${destination}`);
 }
 
 export async function startEvidenceRevision(data: FormData) {
@@ -644,6 +647,41 @@ export async function completeLearningMaterial(data: FormData) {
     ? "task-brief-title"
     : "learning-materials-title";
   redirect(`/app/tasks/${assignmentId}?material=completed#${anchor}`);
+}
+
+export async function completeRequiredLearningMaterials(data: FormData) {
+  const assignmentId = requiredUuid(data, "assignment_id");
+  const taskVersion = Number(data.get("task_version"));
+  const materialKeys = data.getAll("material_key");
+  const idempotencyKeys = data.getAll("idempotency_key");
+  if (!Number.isSafeInteger(taskVersion) || taskVersion < 1) {
+    throw new Error("学习材料版本无效。请刷新页面后重试。");
+  }
+  if (materialKeys.length < 1 || materialKeys.length > 12 || materialKeys.length !== idempotencyKeys.length) {
+    throw new Error("学习材料包无效。请刷新页面后重试。");
+  }
+  for (let index = 0; index < materialKeys.length; index += 1) {
+    const materialKey = materialKeys[index];
+    const idempotencyKey = idempotencyKeys[index];
+    if (typeof materialKey !== "string" || !MATERIAL_KEY_PATTERN.test(materialKey)) {
+      throw new Error("学习材料标识无效。请刷新页面后重试。");
+    }
+    if (typeof idempotencyKey !== "string" || !UUID_PATTERN.test(idempotencyKey)) {
+      throw new Error("材料完成凭证无效。请刷新页面后重试。");
+    }
+    await apiRequest(
+      `/api/v1/me/assignments/${assignmentId}/materials/${encodeURIComponent(materialKey)}/complete`,
+      "LEARNER",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ task_version: taskVersion }),
+      },
+    );
+  }
+  revalidatePath(`/app/tasks/${assignmentId}`);
+  revalidatePath("/app");
+  redirect(`/app/tasks/${assignmentId}?material=completed`);
 }
 
 export async function submitAssignment(

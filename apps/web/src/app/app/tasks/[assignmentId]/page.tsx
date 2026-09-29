@@ -13,6 +13,7 @@ import { Assignment, learnerPageRequest } from "@/lib/server/api";
 import { formatProductDateTime } from "@/lib/date-time";
 import { AttachmentUploader } from "./attachment-uploader";
 import { SubmissionComposer } from "./submission-composer";
+import { ExplorationCampDashboard } from "../../exploration-camp-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -163,6 +164,7 @@ export default async function TaskPage({
     revision?: string;
     submitted?: string;
     version?: string;
+    view?: string;
   }>;
 }) {
   const { assignmentId } = await params;
@@ -170,6 +172,14 @@ export default async function TaskPage({
   const assignment = await learnerPageRequest<Assignment>(
     `/api/v1/me/assignments/${encodeURIComponent(assignmentId)}`,
   );
+  if (assignment.journey_stage?.position === 0 && !["COMPLETED", "SUBMITTED", "IN_REVIEW", "NEEDS_REVISION"].includes(assignment.status)) {
+    return (
+      <ExplorationCampDashboard
+        assignment={assignment}
+        view={query.view === "evidence" ? "evidence" : "material"}
+      />
+    );
+  }
   const rubricTitles = new Map(
     assignment.rubric.dimensions.map((dimension) => [dimension.dimension_key, dimension.title]),
   );
