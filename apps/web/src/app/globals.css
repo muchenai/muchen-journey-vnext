@@ -1248,11 +1248,12 @@ body:has(.exploration-dashboard) > .page-shell {
   box-shadow: 20px 0 50px rgba(0, 0, 0, .2);
 }
 .camp-brand { position: relative; display: grid; gap: 0; padding: 0 12px 20px; text-decoration: none; }
-.camp-brand strong { position: relative; width: max-content; font-size: 27px; line-height: 1; letter-spacing: -.03em; text-shadow: 0 0 18px rgba(72, 188, 255, .55); }
-.camp-brand strong::after { position: absolute; top: 70%; left: calc(100% + 12px); width: 46px; height: 4px; background: linear-gradient(90deg, #4edfff 0 34%, transparent 34% 44%, #319cf5 44% 72%, transparent 72% 82%, #1e66d4 82%); content: ""; box-shadow: 0 0 8px rgba(58, 191, 255, .65); }
-.camp-brand b { margin-top: 7px; font-size: 20px; letter-spacing: .26em; }
+.camp-brand strong { width: max-content; font-size: 27px; line-height: 1; letter-spacing: -.03em; text-shadow: 0 0 18px rgba(72, 188, 255, .55); }
+.camp-brand b { position: relative; width: max-content; margin-top: 7px; font-size: 20px; letter-spacing: .26em; }
+.camp-brand b::after { position: absolute; top: 55%; left: calc(100% + 12px); width: 46px; height: 4px; background: linear-gradient(90deg, #4edfff 0 34%, transparent 34% 44%, #319cf5 44% 72%, transparent 72% 82%, #1e66d4 82%); content: ""; box-shadow: 0 0 8px rgba(58, 191, 255, .65); }
 .camp-brand span { margin-top: 15px; color: #87a9c5; font-size: 13px; letter-spacing: .12em; }
-.camp-sidebar nav { display: grid; gap: 16px; margin-top: 10px; }
+.camp-sidebar nav { position: relative; display: grid; gap: 16px; margin-top: 10px; }
+.camp-sidebar nav::before { position: absolute; top: -22px; right: -16px; left: -16px; z-index: -1; height: calc(100svh - 102px); border: 1px solid rgba(72, 155, 219, .38); border-bottom: 0; border-radius: 12px 12px 0 0; content: ""; box-shadow: inset -12px 0 28px rgba(24, 101, 169, .06); pointer-events: none; }
 .camp-sidebar nav > a,
 .camp-sidebar nav > span {
   position: relative;
@@ -1401,6 +1402,7 @@ body:has(.exploration-dashboard) > .page-shell {
   .camp-sidebar { padding: 16px; border-right: 0; border-bottom: 1px solid var(--camp-line); }
   .camp-brand { padding-bottom: 12px; }
   .camp-sidebar nav { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+  .camp-sidebar nav::before { display: none; }
   .camp-sidebar nav > a, .camp-sidebar nav > span { width: 100%; min-height: 54px; justify-content: center; padding: 7px; background-image: none; font-size: 0; }
   .camp-sidebar nav > a, .camp-sidebar nav > span { color: #e3f4ff; }
   .camp-sidebar nav > a > *, .camp-sidebar nav > span > * { opacity: 1; }
