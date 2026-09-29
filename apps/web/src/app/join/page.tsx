@@ -68,10 +68,15 @@ export default async function JoinPage({
     <section className="learner-join" data-locale={locale}>
       <header className="join-topbar">
         <div className="join-brand-lockup">
-          <img className="join-brand-mark" src="/images/muchen-quest-mark.svg" alt="" />
-          <span><strong>MUCHEN QUEST</strong><small>{isEnglish ? "NEWCOMER VILLAGE" : "沐晨新手村"}</small></span>
+          <img className="join-brand-mark" src="/images/muchen-quest-group3-mark.png" alt="" />
+          <span><strong>MUCHEN JOURNEY</strong><small>{isEnglish ? "NEWCOMER VILLAGE" : "沐晨新手村"}</small></span>
         </div>
-        <LanguageSwitcher locale={locale} />
+        <div className="join-top-actions">
+          <LanguageSwitcher locale={locale} />
+          <span className="join-help-center" aria-label={isEnglish ? "Help center" : "帮助中心"}>
+            <span aria-hidden="true">◉</span>{isEnglish ? "Help Center" : "帮助中心"}
+          </span>
+        </div>
       </header>
       <div className="join-intro">
         <h1>
@@ -79,15 +84,18 @@ export default async function JoinPage({
           <span className="join-heading-visible">
           {isReentry
             ? (isEnglish ? "Return to where you left off." : "回到你离开的地方。")
-            : (isEnglish ? "Muchen Quest | Newcomer Village" : "Muchen Quest | 沐晨新手村")}
+            : (isEnglish ? "Muchen Journey | Newcomer Village" : "Muchen Journey | 沐晨新手村")}
           </span>
         </h1>
         <PrivateInviteOrientation phase={orientationPhase} descriptionId={orientationDescriptionId} locale={locale} />
+        <p className="join-departure-line">
+          {isEnglish ? <>A greater you<br />starts here</> : <>更大的你<br />从这里出发</>}
+        </p>
       </div>
       <div className="join-action-card">
         <div className="join-card-brand" aria-hidden="true">
-          <img className="join-brand-mark" src="/images/muchen-quest-mark.svg" alt="" />
-          <strong>Muchen Quest</strong>
+          <img className="join-brand-mark" src="/images/muchen-quest-group3-mark.png" alt="" />
+          <strong>Muchen Journey</strong>
         </div>
         <div className="join-action-heading">
           <span>{isEnglish ? "YOUR JOURNEY STARTS HERE" : "从这里开启真实世界旅程"}</span>
@@ -143,6 +151,10 @@ export default async function JoinPage({
           <p><strong>{isEnglish ? "Protected identity flow" : "受控身份验证"}</strong><small>{isEnglish ? "Invitation verification and enterprise identity protection" : "专属邀请验证与企业身份保护"}</small></p>
         </div>
       </div>
+      <footer className="join-world-footer" aria-hidden="true">
+        <span>{isEnglish ? "AI-powered growth · Connected to the real world" : "AI 驱动成长 · 连接真实世界"}</span>
+        <span>{isEnglish ? "EXPLORE · PRACTICE · GROW · CREATE" : "探索 · 实践 · 成长 · 创造更大的价值"}</span>
+      </footer>
     </section>
   );
 }
