@@ -69,7 +69,13 @@ export default async function JoinPage({
       <header className="join-topbar">
         <div className="join-brand-lockup">
           <img className="join-brand-mark" src="/images/muchen-journey-group5-orb.png" alt="" />
-          <span><strong>MUCHEN JOURNEY</strong><small>{isEnglish ? "NEWCOMER VILLAGE" : "沐晨新手村"}</small></span>
+          <span>
+            <strong>MUCHEN JOURNEY</strong>
+            <small>
+              <span>以成长 · 连接更大的你</span>
+              <span>A BIGGER YOU. A BRIGHTER TOMORROW.</span>
+            </small>
+          </span>
         </div>
         <div className="join-top-actions">
           <LanguageSwitcher locale={locale} />
@@ -84,7 +90,7 @@ export default async function JoinPage({
           <span className="join-heading-visible">
           {isReentry
             ? (isEnglish ? "Return to where you left off." : "回到你离开的地方。")
-            : (isEnglish ? "Muchen Journey | Newcomer Village" : "Muchen Journey | 沐晨新手村")}
+            : (isEnglish ? "Muchen JOURNEY | NEWCOMER VILLAGE" : "Muchen JOURNEY | 沐晨新手村")}
           </span>
         </h1>
         <PrivateInviteOrientation phase={orientationPhase} descriptionId={orientationDescriptionId} locale={locale} />
