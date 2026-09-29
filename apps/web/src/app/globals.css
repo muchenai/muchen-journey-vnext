@@ -1361,8 +1361,6 @@ body:has(.exploration-dashboard) > .page-shell {
 .camp-right-rail section > span i { display: block; height: 100%; background: linear-gradient(90deg, #3de3f4, #4f8cf2); }
 .camp-right-rail p { color: #98b3c9; }
 .camp-evidence-card { min-height: 420px; padding: 28px; }
-.camp-evidence-prompts { display: grid; gap: 14px; max-width: 680px; margin: 0 auto 22px; padding: 30px 36px; color: #55ddef; background: rgba(34, 99, 126, .62); border: 1px solid #66e7f3; border-radius: 7px; box-shadow: 0 0 22px rgba(51, 220, 241, .45); font-size: 19px; }
-.camp-evidence-prompts p { margin: 0; }
 .camp-submission-shell { max-width: 680px; margin: 0 auto; }
 .camp-submission-shell .submission-composer { gap: 14px; }
 .camp-submission-shell .response-map { display: none; }
@@ -1403,7 +1401,6 @@ body:has(.exploration-dashboard) > .page-shell {
   .camp-timeline { overflow-x: auto; }
   .camp-timeline ol { min-width: 560px; }
   .camp-right-rail { grid-template-columns: 1fr; }
-  .camp-evidence-prompts { padding: 22px; font-size: 16px; }
   .camp-submission-shell .action-row .button.primary { width: 100%; min-width: 0; }
 }
 

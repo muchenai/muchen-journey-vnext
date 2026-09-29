@@ -50,17 +50,6 @@ function TaskTimeline({ evidence }: { evidence: boolean }) {
   );
 }
 
-function EvidencePrompts() {
-  return (
-    <section className="camp-evidence-prompts" aria-labelledby="camp-evidence-title">
-      <h2 id="camp-evidence-title" className="sr-only">任务证据提示</h2>
-      <p>我最想弄清的一件事</p>
-      <p>我会从哪里找答案</p>
-      <p>下一站我先做什么</p>
-    </section>
-  );
-}
-
 export function ExplorationCampDashboard({
   assignment,
   journey,
@@ -112,7 +101,6 @@ export function ExplorationCampDashboard({
           <div className="camp-work-column">
             {evidenceView ? (
               <section className="camp-evidence-card">
-                <EvidencePrompts />
                 {submitCommand ? (
                   <div className="camp-submission-shell">
                     <SubmissionComposer
