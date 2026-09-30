@@ -601,7 +601,10 @@ export async function startEvidenceRevision(data: FormData) {
   );
   revalidatePath("/app");
   revalidatePath(`/app/tasks/${assignmentId}`);
-  redirect(`/app/tasks/${assignmentId}?revision=retest#task-workspace`);
+  const destination = data.get("destination") === "evidence"
+    ? "?view=evidence&revision=retest#task-workspace"
+    : "?revision=retest#task-workspace";
+  redirect(`/app/tasks/${assignmentId}${destination}`);
 }
 
 export async function cancelEvidenceRevision(data: FormData) {

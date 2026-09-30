@@ -283,6 +283,17 @@ export function SubmissionComposer({
       setLocalError("使用 AI 时必须填写用途、模型版本和 Prompt 版本。");
       return false;
     }
+    if (enableDayOneAiSelfCheck && (
+      dayOneAiSelfCheckStatus !== "complete"
+      || dayOneAiSelfCheckResult?.checkedBody !== body
+    )) {
+      setLocalError(
+        dayOneAiSelfCheckResult
+          ? "答案已经修改，请重新完成一次 AI 自查后再提交。"
+          : "请先完成一次 AI 自查，再提交本次答案。",
+      );
+      return false;
+    }
     setLocalError(null);
     return true;
   }

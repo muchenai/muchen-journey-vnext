@@ -153,7 +153,7 @@ test("historical evidence stays available on demand", () => {
   assert.match(taskPage, /<summary>查看提交历史<\/summary>/);
 });
 
-test("Day 1 exposes an optional AI self-check preview without gating completion", () => {
+test("Day 1 requires a fresh AI self-check without using the score as a threshold", () => {
   assert.match(explorationCampDashboard, /stage_kind === "DAY_0"/);
   assert.match(explorationCampDashboard, /enableDayOneAiSelfCheck=\{enableDayOneAiSelfCheck\}/);
   assert.match(submissionComposer, /第二份材料《\{aiReferenceMaterialTitle\}》/);
@@ -164,6 +164,18 @@ test("Day 1 exposes an optional AI self-check preview without gating completion"
   const checkHandler = submissionComposer.match(/function runDayOneAiSelfCheck\(\) \{([\s\S]*?)\n  \}/)?.[1];
   assert.ok(checkHandler);
   assert.doesNotMatch(checkHandler, /submitAssignment|submitAction|requestSubmit/);
+  assert.match(submissionComposer, /dayOneAiSelfCheckResult\?\.checkedBody !== body/);
+  assert.match(submissionComposer, /请先完成一次 AI 自查，再提交本次答案/);
+  assert.doesNotMatch(submissionComposer, /score\s*[<>]=?\s*80/);
+});
+
+test("Day 1 review supports immutable answer versions and continuing improvement", () => {
+  assert.match(explorationCampDashboard, /allowed_commands\.includes\("start_evidence_revision"\)/);
+  assert.match(explorationCampDashboard, /继续完善答案/);
+  assert.match(explorationCampDashboard, /name="destination" value="evidence"/);
+  assert.match(explorationCampDashboard, /查看历史版本/);
+  assert.match(explorationCampDashboard, /提交新的答案版本/);
+  assert.match(styles, /\.journey-version-history/);
 });
 
 test("default learner copy does not repeat input or completion instructions", () => {

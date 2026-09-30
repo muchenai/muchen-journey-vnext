@@ -130,7 +130,8 @@ test("Feishu-document work has a visible submission entry and novice guidance", 
 });
 
 test("material transitions preserve context while submissions show completion first", () => {
-  assert.match(actions, /redirect\(`\/app\/tasks\/\$\{assignmentId\}#task-workspace`\)/);
+  assert.match(actions, /data\.get\("destination"\) === "evidence"/);
+  assert.match(actions, /redirect\(`\/app\/tasks\/\$\{assignmentId\}\$\{destination\}`\)/);
   assert.match(actions, /#\$\{anchor\}/);
   assert.match(actions, /success: "本阶段已提交，正在等待审核。"/);
   assert.doesNotMatch(actions, /redirect\("\/app\?transition=submitted"\)/);
