@@ -88,7 +88,6 @@ function JourneyBoard({ assignment, journey, learnerDisplayName }: {
 function MaterialView({ assignment, totalStages }: { assignment: Assignment; totalStages: number }) {
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
-  const firstMaterial = assignment.learning_materials.find((material) => /公司基础介绍/u.test(material.title)) ?? assignment.learning_materials[0] ?? null;
   const visibleMaterials = requiredMaterials.length > 0 ? requiredMaterials : assignment.learning_materials;
   const firstIncompleteIndex = visibleMaterials.findIndex((material) => material.completed_at === null);
   const totalMaterialMinutes = visibleMaterials.reduce((total, material) => total + material.estimated_duration_minutes, 0);
@@ -103,7 +102,7 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
       <section className="journey-material-panel">
         <div className="journey-material-copy">
           <span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span>
-          <div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>当前任务</small><h1>{firstMaterial?.title ?? assignment.task_title}</h1></div></div>
+          <div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>当前任务</small><h1>{assignment.task_title}学习输入</h1></div></div>
           <p>{assignment.task_purpose}</p>
           <dl><div><dt>预计时间</dt><dd>{totalMaterialMinutes || assignment.estimated_duration_minutes} 分钟</dd></div><div><dt>学习方式</dt><dd>材料 + 任务证据</dd></div></dl>
           <div className="journey-material-grid" aria-label="学习材料">

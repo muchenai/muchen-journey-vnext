@@ -49,6 +49,8 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         f"P0LearnerExperienceMaterial{stable_key.replace('-', '')}"
         "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
     )
+    if stable_key == "DAY-0":
+        material_url = "https://zx6w57w0j34.feishu.cn/wiki/MpxDwemUwiOY0fk9jM5cqRYRn3b"
     challenge_url = (
         "https://example.feishu.cn/docx/"
         f"P0LearnerChallenge{stable_key.replace('-', '')}"
@@ -63,7 +65,7 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
     learning_materials = [
         {
             "key": f"material-{stable_key.lower()}",
-            "title": f"{title}学习输入",
+            "title": "给 Muchener 的一封信" if stable_key == "DAY-0" else f"{title}学习输入",
             "kind": "HTTPS_LINK",
             "source_label": "P0 隔离浏览器夹具",
             "url": material_url,
@@ -73,15 +75,11 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
     ]
     verified_material_urls = [material_url]
     if stable_key == "DAY-0":
-        second_material_url = (
-            "https://example.feishu.cn/wiki/"
-            "P0LearnerExperienceMaterialDAY0ACTION"
-            "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
-        )
+        second_material_url = "https://zx6w57w0j34.feishu.cn/wiki/YpaGw0EgqidJUykHcqxcLgCvnvc"
         learning_materials.append(
             {
                 "key": "material-day-0-action",
-                "title": "Day 0｜启程行动指南",
+                "title": "公司基础介绍材料",
                 "kind": "HTTPS_LINK",
                 "source_label": "P0 隔离浏览器夹具",
                 "url": second_material_url,
