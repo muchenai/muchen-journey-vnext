@@ -159,7 +159,8 @@ test("Day 1 exposes an optional AI self-check preview without gating completion"
   assert.match(submissionComposer, /第二份材料《\{aiReferenceMaterialTitle\}》/);
   assert.match(submissionComposer, /本次自查得分/);
   assert.match(submissionComposer, /改进建议/);
-  assert.match(submissionComposer, /不设置通过线，也不影响任务提交和下一站解锁/);
+  assert.doesNotMatch(submissionComposer, /界面预览/);
+  assert.doesNotMatch(submissionComposer, /不设置通过线，也不影响任务提交和下一站解锁/);
   const checkHandler = submissionComposer.match(/function runDayOneAiSelfCheck\(\) \{([\s\S]*?)\n  \}/)?.[1];
   assert.ok(checkHandler);
   assert.doesNotMatch(checkHandler, /submitAssignment|submitAction|requestSubmit/);

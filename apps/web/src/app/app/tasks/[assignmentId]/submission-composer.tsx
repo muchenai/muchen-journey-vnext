@@ -454,15 +454,13 @@ export function SubmissionComposer({
           ) : null}
 
           <label htmlFor="submission-body">{expectsExternalDocument ? "补充说明（可选）" : requiresReview ? "你的作答" : "你的学习记录"}</label>
-          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} required={!expectsExternalDocument} aria-invalid={bodyBelowMinimum || bodyOverLimit} aria-describedby="submission-body-help submission-body-progress submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} required={!expectsExternalDocument} aria-invalid={bodyBelowMinimum || bodyOverLimit} aria-describedby="submission-body-progress submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
           <CharacterProgress id="submission-body-progress" value={body} minimum={expectsExternalDocument ? 0 : 40} maximum={8000} optional={expectsExternalDocument} />
-          <p id="submission-body-help" className="status-meta">按首尾空白裁剪后的有效字符计算。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
 
           {enableDayOneAiSelfCheck ? (
             <section className={`day-one-ai-check${dayOneAiSelfCheckStatus === "checking" ? " is-checking" : ""}`} aria-labelledby="day-one-ai-check-title">
               <header className="day-one-ai-check-header">
                 <div><span aria-hidden="true">AI</span><div><small>DAY 1 · ANSWER CHECK</small><h3 id="day-one-ai-check-title">AI 自查</h3></div></div>
-                <strong>界面预览</strong>
               </header>
               <p>AI 将结合第二份材料《{aiReferenceMaterialTitle}》和你填写的学习记录进行检查。</p>
               <div className="day-one-ai-check-source"><span>自查依据</span><strong>{aiReferenceMaterialTitle}</strong></div>
@@ -477,9 +475,7 @@ export function SubmissionComposer({
                   <div className="day-one-ai-suggestion"><small>改进建议</small><p>{dayOneAiSelfCheckResult.suggestion}</p></div>
                   {dayOneAiSelfCheckResult.checkedBody !== body ? <p className="day-one-ai-check-stale">答案已修改，请重新进行 AI 自查。</p> : null}
                 </div>
-              ) : (
-                <p className="day-one-ai-check-note">自查会给出分数和改进建议，不设置通过线，也不影响任务提交和下一站解锁。</p>
-              )}
+              ) : null}
 
               <button className="day-one-ai-check-button" type="button" onClick={runDayOneAiSelfCheck} disabled={dayOneAiSelfCheckStatus === "checking"}>
                 <span aria-hidden="true">✦</span>{dayOneAiSelfCheckResult ? "重新进行 AI 自查" : "开始 AI 自查"}<span aria-hidden="true">→</span>
