@@ -66,6 +66,10 @@ export default async function JoinPage({
 
   return (
     <section className="learner-join" data-locale={locale}>
+      <div className="join-cosmos-background" aria-hidden="true" />
+      <div className="join-atmosphere join-atmosphere-one" aria-hidden="true" />
+      <div className="join-atmosphere join-atmosphere-two" aria-hidden="true" />
+      <div className="join-starfield" aria-hidden="true" />
       <header className="join-topbar">
         <div className="join-brand-lockup">
           <img className="join-brand-mark" src="/images/muchen-journey-group5-orb.png" alt="" />

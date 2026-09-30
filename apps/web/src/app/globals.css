@@ -408,12 +408,48 @@ body:has(.learner-join) > .site-footer { display: none; }
   grid-template-columns: minmax(0, 1.58fr) minmax(430px, .82fr);
   grid-template-rows: auto 1fr;
   color: #fff;
-  background:
-    linear-gradient(90deg, rgba(0, 7, 29, .18) 0%, rgba(0, 10, 38, .02) 58%, rgba(0, 6, 26, .36) 100%),
-    url("/images/muchen-journey-group5-bg.png") center / cover no-repeat;
+  background: #020b20;
   border: 0;
   border-radius: 0;
   box-shadow: inset 0 0 120px rgba(0, 4, 24, .45);
+}
+.join-cosmos-background {
+  position: absolute;
+  inset: -4%;
+  z-index: -5;
+  background:
+    linear-gradient(90deg, rgba(0, 7, 29, .18) 0%, rgba(0, 10, 38, .02) 58%, rgba(0, 6, 26, .36) 100%),
+    url("/images/muchen-journey-group5-bg.png") center / cover no-repeat;
+  transform: scale(1.035);
+  will-change: transform;
+}
+.join-atmosphere {
+  position: absolute;
+  z-index: -3;
+  width: 72vw;
+  height: 18vw;
+  opacity: .26;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(63, 198, 255, .34), rgba(94, 111, 255, .16), transparent);
+  filter: blur(34px);
+  transform: rotate(-28deg);
+  will-change: opacity, transform;
+}
+.join-atmosphere-one { top: 5%; left: -25%; }
+.join-atmosphere-two { right: -28%; bottom: 14%; animation-delay: -3s; }
+.join-starfield {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  opacity: .62;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(196, 239, 255, .92) 0 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(69, 184, 255, .76) 0 1px, transparent 1.7px);
+  background-position: 0 0, 43px 31px;
+  background-size: 83px 83px, 127px 127px;
+  mask-image: linear-gradient(to bottom, #000, transparent 76%);
+  will-change: background-position;
 }
 .learner-join::before {
   position: absolute;
@@ -532,6 +568,17 @@ body:has(.learner-join) > .site-footer { display: none; }
   box-shadow: 0 0 0 1px rgba(83, 114, 255, .3), 0 0 32px rgba(0, 194, 255, .34), inset 0 0 70px rgba(29, 123, 235, .18);
   backdrop-filter: blur(20px) saturate(130%);
 }
+.join-action-card::before {
+  position: absolute;
+  inset: -26px;
+  z-index: -1;
+  opacity: .18;
+  background: radial-gradient(ellipse, rgba(50, 225, 255, .72), transparent 68%);
+  border-radius: 42px;
+  content: "";
+  pointer-events: none;
+  will-change: opacity, transform;
+}
 .join-card-brand { display: grid; justify-items: center; gap: 8px; margin-bottom: 2px; }
 .join-card-brand .join-brand-mark { width: 132px; height: 132px; margin: -30px 0 -18px; }
 .join-card-brand > strong { color: #fff; font-size: 22px; letter-spacing: .02em; }
@@ -562,6 +609,8 @@ body:has(.learner-join) > .site-footer { display: none; }
 .join-token-form > input::placeholder { color: #7898b7; }
 .join-token-form > input:focus, .join-pass form > input:focus { border-color: #49e9ff; box-shadow: 0 0 0 3px rgba(57, 224, 255, .15), 0 0 22px rgba(34, 171, 255, .13); outline: 0; }
 .join-token-form > .button, .join-pass form > .button {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   min-height: 62px;
   justify-content: center;
@@ -570,6 +619,14 @@ body:has(.learner-join) > .site-footer { display: none; }
   background: linear-gradient(90deg, #28dcff, #29e7ef);
   border-color: #81f7ff;
   box-shadow: 0 0 28px rgba(26, 218, 255, .36), inset 0 1px 0 rgba(255, 255, 255, .62);
+}
+.join-token-form > .button::before, .join-pass form > .button::before {
+  position: absolute;
+  inset: -80% -30%;
+  background: linear-gradient(105deg, transparent 43%, rgba(255,255,255,.82) 50%, transparent 57%);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-85%);
 }
 .join-token-form > .button:hover, .join-pass form > .button:hover { background: linear-gradient(90deg, #60e7ff, #54f5f4); transform: translateY(-1px); }
 .join-button-mark { font-size: 18px; }
@@ -610,6 +667,30 @@ body:has(.learner-join) > .site-footer { display: none; }
 .learner-join .notice { color: #ffd7d2; background: rgba(113, 23, 35, .42); border-color: rgba(255, 128, 135, .55); }
 .learner-join .notice p { margin-bottom: 0; }
 .learner-join .consent-row { color: #c8def0; }
+
+@keyframes join-bg-drift { to { transform: scale(1.09) translate(-.6%, -.4%); } }
+@keyframes join-beam { 50% { opacity: .78; transform: rotate(-28deg) translateX(12vw); } }
+@keyframes join-stars { to { background-position: 173px 173px, 300px 350px; } }
+@keyframes join-logo-pulse { 50% { transform: scale(1.045); filter: drop-shadow(0 0 28px #31eaf8); } }
+@keyframes join-card-pulse { 50% { opacity: .34; transform: scale(1.055); } }
+@keyframes join-button-scan { 0%, 62% { transform: translateX(-85%); } 82%, 100% { transform: translateX(85%); } }
+@keyframes join-heading-glow { 50% { text-shadow: 0 0 7px #fff, 0 0 24px rgba(54, 183, 255, .9), 0 5px 30px rgba(0, 19, 72, .96); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .join-cosmos-background { animation: join-bg-drift 24s ease-in-out infinite alternate; }
+  .join-atmosphere { animation: join-beam 7s ease-in-out infinite; }
+  .join-starfield { animation: join-stars 14s linear infinite; }
+  .join-brand-mark { animation: join-logo-pulse 4s ease-in-out infinite; }
+  .join-action-card::before { animation: join-card-pulse 4s ease-in-out infinite; }
+  .join-token-form > .button::before, .join-pass form > .button::before { animation: join-button-scan 4.6s ease-in-out infinite; }
+  .join-intro > h1 { animation: join-heading-glow 5s ease-in-out infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .join-cosmos-background, .join-atmosphere, .join-starfield, .join-brand-mark,
+  .join-action-card::before, .join-token-form > .button::before,
+  .join-pass form > .button::before, .join-intro > h1 { animation: none; }
+}
 
 .learner-journey-page { display: grid; gap: 18px; max-width: 1040px; margin: 0 auto; }
 .journey-map { position: relative; isolation: isolate; overflow: hidden; min-height: min(680px, calc(100svh - 216px)); padding: clamp(28px, 5vw, 54px); color: #fff; background: #0b293e; border: 1px solid rgba(255, 255, 255, .12); border-radius: 38px; box-shadow: 0 30px 78px rgba(15, 45, 64, .28); }
