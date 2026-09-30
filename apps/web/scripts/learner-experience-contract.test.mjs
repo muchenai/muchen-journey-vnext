@@ -29,6 +29,10 @@ const journeyMap = await readFile(
   new URL("../src/app/app/journey-map.tsx", import.meta.url),
   "utf8",
 );
+const explorationCampDashboard = await readFile(
+  new URL("../src/app/app/exploration-camp-dashboard.tsx", import.meta.url),
+  "utf8",
+);
 const stageTitle = await readFile(
   new URL("../src/app/app/stage-title.ts", import.meta.url),
   "utf8",
@@ -147,6 +151,18 @@ test("treasure one begins with a quick judgment and a three-line response map", 
 
 test("historical evidence stays available on demand", () => {
   assert.match(taskPage, /<summary>查看提交历史<\/summary>/);
+});
+
+test("Day 1 exposes an optional AI self-check preview without gating completion", () => {
+  assert.match(explorationCampDashboard, /stage_kind === "DAY_0"/);
+  assert.match(explorationCampDashboard, /enableDayOneAiSelfCheck=\{enableDayOneAiSelfCheck\}/);
+  assert.match(submissionComposer, /第二份材料《\{aiReferenceMaterialTitle\}》/);
+  assert.match(submissionComposer, /本次自查得分/);
+  assert.match(submissionComposer, /改进建议/);
+  assert.match(submissionComposer, /不设置通过线，也不影响任务提交和下一站解锁/);
+  const checkHandler = submissionComposer.match(/function runDayOneAiSelfCheck\(\) \{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(checkHandler);
+  assert.doesNotMatch(checkHandler, /submitAssignment|submitAction|requestSubmit/);
 });
 
 test("default learner copy does not repeat input or completion instructions", () => {
