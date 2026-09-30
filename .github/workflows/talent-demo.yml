@@ -25,11 +25,11 @@ jobs:
   inspect:
     if: inputs.phase == 'inspect' && inputs.expected_commit == github.sha && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: staging
+    environment: production-canary-uat
     timeout-minutes: 10
     env:
-      TALENT_HOST: ${{ vars.TALENT_HOST }}
-      TALENT_SECURITY_GROUP: ${{ vars.TALENT_SECURITY_GROUP }}
+      TALENT_HOST: ${{ secrets.TALENT_HOST }}
+      TALENT_SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
