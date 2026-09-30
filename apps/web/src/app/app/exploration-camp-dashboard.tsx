@@ -14,6 +14,11 @@ function learningMaterialUrl(material: Assignment["learning_materials"][number])
   return material.body?.match(URL_PATTERN)?.[0] ?? null;
 }
 
+function taskInstructionUrl(assignment: Assignment) {
+  const urls = assignment.instructions.flatMap((instruction) => instruction.match(URL_PATTERN) ?? []);
+  return urls.find((url) => new URL(url).hostname.endsWith(".feishu.cn")) ?? urls[0] ?? null;
+}
+
 function nodeStatusLabel(node: JourneyProgressNode) {
   if (node.status === "COMPLETED") return "已完成";
   if (node.status === "CURRENT") return "进行中";
@@ -146,15 +151,21 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
 function EvidenceView({ assignment, totalStages }: { assignment: Assignment; totalStages: number }) {
   const submitCommand = assignment.allowed_commands.find((command) => ["submit", "submit_revision", "submit_evidence_revision"].includes(command));
   const position = (assignment.journey_stage?.position ?? 0) + 1;
+  const isTreasure = assignment.journey_stage?.stage_kind === "TREASURE";
+  const experience = "response_sections" in assignment.learning_experience ? assignment.learning_experience : null;
+  const responseSections = isTreasure
+    ? experience?.response_sections ?? ["我的判断", "支持判断的证据", "下一步行动"]
+    : ["我最想弄清的一件事", "我会从哪里找答案", "下一站我先做什么"];
+  const taskActionUrl = isTreasure ? taskInstructionUrl(assignment) : null;
   return (
     <div className="journey-console-shell journey-detail-page">
       <div className="journey-console-vignette" aria-hidden="true" />
       <ConsoleHeader completed={Math.max(0, position - 1)} total={totalStages} />
       <Link className="journey-back-link" href={`/app/tasks/${assignment.id}`}>← 返回学习材料</Link>
       <section className="journey-submit-panel">
-        <div className="journey-submit-intro"><span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span><div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>提交任务证据</small><h1>{assignment.task_title}</h1></div></div><p>{assignment.learner_outcome.replace(/[。！？!?]+$/u, "")}。提交后，系统会按照当前任务规则更新旅程状态。</p></div>
+        <div className="journey-submit-intro"><span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span><div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>{isTreasure ? "宝藏测试题" : "提交任务证据"}</small><h1>{assignment.task_title}</h1></div></div><p>{assignment.learner_outcome.replace(/[。！？!?]+$/u, "")}。提交后，系统会按照当前任务规则更新旅程状态。</p></div>
         <div className="journey-submission-shell">
-          {submitCommand ? <SubmissionComposer assignmentId={assignment.id} assignmentRevision={assignment.revision} command={submitCommand} initialBody={assignment.draft?.body ?? ""} initialAttachmentIds={assignment.draft?.attachment_ids ?? []} attachments={assignment.available_attachments} submissionIdempotencyKey={randomUUID()} initialDraftRevision={assignment.draft?.revision ?? null} initialDraftUpdatedAt={assignment.draft?.updated_at ?? null} responseSections={["我最想弄清的一件事", "我会从哪里找答案", "下一站我先做什么"]} requiresReview={assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"} isFirstStation={position === 1} taskVersion={assignment.task_version} rubricVersion={assignment.rubric.version} reviewerName={assignment.reviewer_display_name} visibility={`${assignment.audience} · ${assignment.sensitivity}`} expectsExternalDocument={false} taskActionUrl={null} nextVersionNo={(assignment.submission?.current_version_no ?? 0) + 1} primaryActionLabel="确认提交任务证据" skipFinalConfirmation /> : <p className="journey-state-message">当前任务暂时不能提交，请返回任务总览查看状态。</p>}
+          {submitCommand ? <SubmissionComposer assignmentId={assignment.id} assignmentRevision={assignment.revision} command={submitCommand} initialBody={assignment.draft?.body ?? ""} initialAttachmentIds={assignment.draft?.attachment_ids ?? []} attachments={assignment.available_attachments} submissionIdempotencyKey={randomUUID()} initialDraftRevision={assignment.draft?.revision ?? null} initialDraftUpdatedAt={assignment.draft?.updated_at ?? null} responseSections={responseSections} requiresReview={assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"} isFirstStation={position === 1} taskVersion={assignment.task_version} rubricVersion={assignment.rubric.version} reviewerName={assignment.reviewer_display_name} visibility={`${assignment.audience} · ${assignment.sensitivity}`} expectsExternalDocument={isTreasure} taskActionUrl={taskActionUrl} nextVersionNo={(assignment.submission?.current_version_no ?? 0) + 1} primaryActionLabel="确认提交任务证据" skipFinalConfirmation /> : <p className="journey-state-message">当前任务暂时不能提交，请返回任务总览查看状态。</p>}
         </div>
       </section>
     </div>
