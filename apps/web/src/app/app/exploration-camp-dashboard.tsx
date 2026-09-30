@@ -84,7 +84,6 @@ function JourneyBoard({ assignment, journey, learnerDisplayName }: {
           })}
         </div>
       </section>
-      <div className="journey-path-strip"><img src="/images/journey-v2-progress-strip.png" alt="学习材料、实践任务、提交、审核、返工、通过" /><span>真实进度来自服务器 · 草稿与提交版本均会保留</span></div>
     </div>
   );
 }
@@ -126,7 +125,6 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
         </div>
         <img className="journey-material-cover" src="/images/journey-v2-material-cover.png" alt="学习材料预览" />
       </section>
-      <div className="journey-path-strip"><img src="/images/journey-v2-progress-strip.png" alt="学习材料、实践任务、提交、审核、返工、通过" /></div>
     </div>
   );
 }
