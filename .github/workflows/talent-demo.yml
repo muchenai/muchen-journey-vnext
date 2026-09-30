@@ -1,0 +1,100 @@
+name: Talent Demo Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Independently invocable Talent deployment stage
+        type: choice
+        options: [inspect]
+        required: true
+      expected_commit:
+        description: Exact workflow commit to execute
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Share the existing host deployment lock; never interrupt another deployment.
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: inputs.phase == 'inspect' && inputs.expected_commit == github.sha && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 10
+    env:
+      TALENT_HOST: ${{ vars.TALENT_HOST }}
+      TALENT_SECURITY_GROUP: ${{ vars.TALENT_SECURITY_GROUP }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Identify exact runner ingress
+        id: runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cidr="$(curl --fail --silent --show-error --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress, sys
+          n=ipaddress.ip_network(sys.argv[1], strict=True)
+          assert n.version == 4 and n.prefixlen == 32 and n.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only this runner's SSH ingress
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: >-
+          python3 -m scripts.wp08_security_group open
+          --security-group-id "$TALENT_SECURITY_GROUP"
+          --cidr "$RUNNER_CIDR"
+      - name: Read isolated deployment inventory
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          TALENT_TRANSPORT_KEY: ${{ secrets.TALENT_TRANSPORT_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/talent-deploy-key"
+          known_hosts="$RUNNER_TEMP/talent-known-hosts"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          unset DEPLOY_KEY
+          set +e
+          ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" \
+            "root@$TALENT_HOST" 'bash -s' < deploy/talent-demo/inspect.sh > "$RUNNER_TEMP/inventory.txt" 2>&1
+          result=$?
+          set -e
+          node deploy/talent-demo/sealed-file.mjs seal "$RUNNER_TEMP/inventory.txt" "$RUNNER_TEMP/inventory.enc"
+          rm -f "$RUNNER_TEMP/inventory.txt"
+          echo "Inventory command exit status: $result; details in encrypted artifact"
+          exit "$result"
+      - name: Close and verify exact runner ingress
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: >-
+          python3 -m scripts.wp08_security_group close
+          --security-group-id "$TALENT_SECURITY_GROUP"
+          --cidr "$RUNNER_CIDR"
+      - name: Preserve encrypted inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: talent-inventory-${{ github.run_id }}
+          path: ${{ runner.temp }}/inventory.enc
+          if-no-files-found: ignore
+          retention-days: 7
