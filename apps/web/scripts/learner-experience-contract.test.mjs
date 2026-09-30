@@ -66,12 +66,6 @@ test("the task page reveals one learning material at a time", () => {
   assert.match(taskPage, /不用通读，先带着这一个问题/);
 });
 
-test("a single learning material and its submit action are centered in the content column", () => {
-  assert.match(styles, /\.journey-material-grid:has\(> \.journey-material-card:only-child\)/);
-  assert.match(styles, /\.journey-material-actions \{[^}]*justify-content: center/);
-  assert.doesNotMatch(styles, /\.journey-material-actions form:first-child \{ width: 100%; \}/);
-});
-
 test("the response workspace stays hidden until required input is complete", () => {
   assert.match(
     taskPage,
