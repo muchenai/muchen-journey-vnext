@@ -2,7 +2,7 @@
 
 User-authorized scope: deploy the independent synthetic Talent demo at talent.muchenai.com on the existing Journey server. This does not authorize a Journey release, database migration, real personnel import or changes to existing Journey role assignments.
 
-The workflow is manually dispatched on protected main with its exact commit. It uses the existing staging environment SSH key and existing exact-runner security-group helper. It shares Journey's host deployment concurrency group. Ingress cleanup runs even when inventory fails. Private keys stay on the ephemeral runner and are never exported as artifacts.
+The workflow is manually dispatched on protected main with its exact commit. It uses the existing production-canary-uat environment SSH key and existing exact-runner security-group helper. It shares Journey's host deployment concurrency group. Ingress cleanup runs even when inventory fails. Private keys stay on the ephemeral runner and are never exported as artifacts.
 
 ## Stage 1: inspect
 
@@ -13,4 +13,6 @@ The first connection follows the existing deployment's accept-new host-key polic
 
 Inventory must be reviewed before adding the separate install, migration, route and acceptance stages. A failed stage is reconciled before retrying. Do not invoke an existing Journey release workflow to deploy Talent. No Talent installation or DNS changes are performed by this initial inspection stage.
 
-The Journey repository is public. Host and security-group identifiers are environment variables `TALENT_HOST` and `TALENT_SECURITY_GROUP`. Inventory stdout/stderr is AES-256-GCM sealed with a dedicated `TALENT_TRANSPORT_KEY` environment secret before upload; only the owner-held local key can decode downloaded evidence. That key is independent of SSH credentials. The workflow must never upload the plaintext inventory or credentials. The public artifact contains only nonce, authentication tag and ciphertext and expires after seven days.
+The Journey repository is public. Host and security-group identifiers are environment secrets `TALENT_HOST` and `TALENT_SECURITY_GROUP`. Inventory stdout/stderr is AES-256-GCM sealed with a dedicated `TALENT_TRANSPORT_KEY` environment secret before upload; only the owner-held local key can decode downloaded evidence. That key is independent of SSH credentials. The workflow must never upload the plaintext inventory or credentials. The public artifact contains only nonce, authentication tag and ciphertext and expires after seven days.
+
+Access reconciliation: the staging SSH secret was last updated in July and was rejected by the target host during run 36713241808; that run closed and verified its temporary ingress. Current successful Journey operations use production-canary-uat, whose SSH secret was updated in September. This workflow now uses that environment and preserves its required-reviewer and allowed-branch policies. Approval must happen through the existing environment review; do not bypass or remove it. No Journey runtime mutation is added.
