@@ -8,10 +8,7 @@ import { SubmissionComposer } from "./tasks/[assignmentId]/submission-composer";
 
 const URL_PATTERN = /https:\/\/[^\s)\]，。；！？、]+/gu;
 
-function firstMaterialUrl(assignment: Assignment) {
-  const material = assignment.learning_materials.find((item) => /公司基础介绍/u.test(item.title))
-    ?? assignment.learning_materials[0];
-  if (!material) return null;
+function learningMaterialUrl(material: Assignment["learning_materials"][number]) {
   if (material.kind === "HTTPS_LINK") return material.url;
   return material.body?.match(URL_PATTERN)?.[0] ?? null;
 }
@@ -92,7 +89,9 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
   const requiredMaterials = assignment.learning_materials.filter((material) => material.required);
   const materialsReady = requiredMaterials.every((material) => material.completed_at !== null);
   const firstMaterial = assignment.learning_materials.find((material) => /公司基础介绍/u.test(material.title)) ?? assignment.learning_materials[0] ?? null;
-  const materialUrl = firstMaterialUrl(assignment);
+  const visibleMaterials = requiredMaterials.length > 0 ? requiredMaterials : assignment.learning_materials;
+  const firstIncompleteIndex = visibleMaterials.findIndex((material) => material.completed_at === null);
+  const totalMaterialMinutes = visibleMaterials.reduce((total, material) => total + material.estimated_duration_minutes, 0);
   const canStart = assignment.allowed_commands.includes("start");
   const position = (assignment.journey_stage?.position ?? 0) + 1;
 
@@ -106,22 +105,37 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
           <span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span>
           <div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>当前任务</small><h1>{firstMaterial?.title ?? assignment.task_title}</h1></div></div>
           <p>{assignment.task_purpose}</p>
-          <dl><div><dt>预计时间</dt><dd>{firstMaterial?.estimated_duration_minutes ?? assignment.estimated_duration_minutes} 分钟</dd></div><div><dt>学习方式</dt><dd>材料 + 任务证据</dd></div></dl>
-          <div className="journey-material-actions">
-            {!materialsReady && firstMaterial ? (
-              <form action={completeRequiredLearningMaterials}>
-                <input type="hidden" name="assignment_id" value={assignment.id} />
-                <input type="hidden" name="task_version" value={assignment.task_version} />
-                {requiredMaterials.map((material) => <span key={material.key}><input type="hidden" name="material_key" value={material.key} /><input type="hidden" name="idempotency_key" value={randomUUID()} /></span>)}
-                <MaterialLaunchButton href={materialUrl}>打开第一份材料</MaterialLaunchButton>
-              </form>
-            ) : (
-              <>
-                {materialUrl ? <a className="journey-console-secondary" href={materialUrl} target="_blank" rel="noreferrer"><img src="/images/journey-v2-reopen-icon.svg" alt="" />重新打开材料</a> : null}
-                {canStart ? <form action={startAssignment}><input type="hidden" name="assignment_id" value={assignment.id} /><input type="hidden" name="revision" value={assignment.revision} /><input type="hidden" name="destination" value="evidence" /><button className="journey-console-primary" type="submit"><img src="/images/journey-v2-submit-icon.svg" alt="" />点击提交任务证据</button></form> : <Link className="journey-console-primary" href={`/app/tasks/${assignment.id}?view=evidence`}><img src="/images/journey-v2-submit-icon.svg" alt="" />点击提交任务证据</Link>}
-              </>
-            )}
+          <dl><div><dt>预计时间</dt><dd>{totalMaterialMinutes || assignment.estimated_duration_minutes} 分钟</dd></div><div><dt>学习方式</dt><dd>材料 + 任务证据</dd></div></dl>
+          <div className="journey-material-grid" aria-label="学习材料">
+            {visibleMaterials.map((material, index) => {
+              const completed = material.completed_at !== null;
+              const available = completed || index === firstIncompleteIndex;
+              const url = learningMaterialUrl(material);
+              return (
+                <article className={`journey-material-card${completed ? " is-completed" : available ? " is-current" : " is-locked"}`} key={material.key}>
+                  <header><span>材料 {String(index + 1).padStart(2, "0")}</span><strong>{completed ? "已完成" : available ? "待学习" : "未开放"}</strong></header>
+                  <h2>{material.title}</h2>
+                  <p>预计 {material.estimated_duration_minutes} 分钟</p>
+                  {completed ? (
+                    url ? <a className="journey-material-card-link" href={url} target="_blank" rel="noreferrer"><img src="/images/journey-v2-reopen-icon.svg" alt="" />重新打开材料 {String(index + 1).padStart(2, "0")}</a> : <span className="journey-material-card-note">材料已完成</span>
+                  ) : available ? (
+                    <form action={completeRequiredLearningMaterials}>
+                      <input type="hidden" name="assignment_id" value={assignment.id} />
+                      <input type="hidden" name="task_version" value={assignment.task_version} />
+                      <input type="hidden" name="material_key" value={material.key} />
+                      <input type="hidden" name="idempotency_key" value={randomUUID()} />
+                      <MaterialLaunchButton href={url}>打开材料 {String(index + 1).padStart(2, "0")}</MaterialLaunchButton>
+                    </form>
+                  ) : <span className="journey-material-card-note">完成上一份材料后开放</span>}
+                </article>
+              );
+            })}
           </div>
+          {materialsReady ? (
+            <div className="journey-material-actions">
+              {canStart ? <form action={startAssignment}><input type="hidden" name="assignment_id" value={assignment.id} /><input type="hidden" name="revision" value={assignment.revision} /><input type="hidden" name="destination" value="evidence" /><button className="journey-console-primary" type="submit"><img src="/images/journey-v2-submit-icon.svg" alt="" />点击提交任务证据</button></form> : <Link className="journey-console-primary" href={`/app/tasks/${assignment.id}?view=evidence`}><img src="/images/journey-v2-submit-icon.svg" alt="" />点击提交任务证据</Link>}
+            </div>
+          ) : null}
         </div>
         <img className="journey-material-cover" src="/images/journey-v2-material-cover.png" alt="学习材料预览" />
       </section>
