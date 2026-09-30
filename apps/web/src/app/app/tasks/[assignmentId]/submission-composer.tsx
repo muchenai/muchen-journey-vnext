@@ -76,6 +76,7 @@ export function SubmissionComposer({
   taskActionUrl,
   nextVersionNo,
   primaryActionLabel,
+  skipFinalConfirmation = false,
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -97,6 +98,7 @@ export function SubmissionComposer({
   taskActionUrl: string | null;
   nextVersionNo: number;
   primaryActionLabel?: string;
+  skipFinalConfirmation?: boolean;
 }) {
   const initial = splitInitialBody(initialBody);
   const isRevision = ["submit_revision", "submit_evidence_revision"].includes(command);
@@ -253,29 +255,39 @@ export function SubmissionComposer({
     setSubmissionLocked(true);
   }
 
-  function beginConfirmation() {
+  function validateSubmission() {
     if (bodyBelowMinimum || bodyOverLimit) {
       setLocalError(
         bodyOverLimit
           ? "提交内容不能超过 8000 个有效字符；当前内容仍保留。"
           : "提交内容需为 40–8000 个有效字符；当前内容仍保留。",
       );
-      return;
+      return false;
     }
     if (expectsExternalDocument && !evidenceUrl.trim()) {
       setLocalError("请先粘贴飞书文档链接，再提交给 Reviewer。");
-      return;
+      return false;
     }
     if (evidenceUrlError) {
       setLocalError(`${evidenceUrlError} 当前输入仍保留。`);
-      return;
+      return false;
     }
     if (learnerAiUsed && (!learnerAiPurpose.trim() || !learnerAiModelVersion.trim() || !learnerAiPromptVersion.trim())) {
       setLocalError("使用 AI 时必须填写用途、模型版本和 Prompt 版本。");
-      return;
+      return false;
     }
     setLocalError(null);
+    return true;
+  }
+
+  function beginConfirmation() {
+    if (!validateSubmission()) return;
     setConfirming(true);
+  }
+
+  function submitDirectly() {
+    if (!validateSubmission()) return;
+    formRef.current?.requestSubmit();
   }
 
   function restoreLocalDraft() {
@@ -546,7 +558,8 @@ export function SubmissionComposer({
               type="button"
               onClick={(event) => {
                 event.preventDefault();
-                beginConfirmation();
+                if (skipFinalConfirmation) submitDirectly();
+                else beginConfirmation();
               }}
               disabled={submissionBusy || draftPending}
             >
