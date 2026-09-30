@@ -58,9 +58,11 @@ test("all eight formal stages have short route labels and progressive disclosure
 });
 
 test("published stages use runtime short labels and progressive disclosure", () => {
-  assert.match(component, /import \{ stageDisplayTitle \} from "\.\/stage-title"/);
+  assert.match(component, /import \{ stageDisplayTitle, stageUserFacingTitle \} from "\.\/stage-title"/);
   assert.match(component, /stageDisplayTitle\(node\.title\)/);
-  assert.match(stageTitle, /Day\\s\*0/);
+  assert.match(component, /stageUserFacingTitle\(current\.title\)/);
+  assert.match(stageTitle, /replace\(\/\^Day\\s\*0/);
+  assert.match(stageTitle, /Day\\s\*1/);
   assert.match(stageTitle, /宝藏\[一二三四\]/);
   assert.match(stageTitle, /\(\?:能力\)\?评测\[一二三\]/);
   assert.doesNotMatch(component, /const ROUTE_LABELS/);

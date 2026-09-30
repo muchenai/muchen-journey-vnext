@@ -232,7 +232,7 @@ export default async function OpsPage({
       </section>
 
       <section className="panel ops-section" id="journey-v3" aria-labelledby="journey-v3-heading">
-        <p className="section-label">DAY 0 / 4 TREASURES / 3 ASSESSMENTS</p>
+        <p className="section-label">DAY 1 / 4 TREASURES / 3 ASSESSMENTS</p>
         <h2 id="journey-v3-heading">固定 Journey V3</h2>
         <JourneyV3AssemblyPanel
           tasks={tasks.items}

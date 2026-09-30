@@ -6,7 +6,7 @@ import type {
 } from "@/lib/server/api";
 
 const STAGES = [
-  ["DAY-0", "Day 0"],
+  ["DAY-0", "Day 1"],
   ["TRE-001-COMPANY-VALUES", "宝藏一"],
   ["TRE-002-AI-DATA-BASICS", "宝藏二"],
   ["TRE-003-PROJECT-AWARENESS", "宝藏三"],
@@ -67,7 +67,7 @@ export function JourneyV3AssemblyPanel({
       </label>
       <label className="checkbox-row">
         <input type="checkbox" name="review_acknowledged" required />
-        我确认八站均绑定已复核的不可变 TaskVersion，顺序为 Day 0＋四宝藏＋三评测
+        我确认八站均绑定已复核的不可变 TaskVersion，顺序为 Day 1＋四宝藏＋三评测
       </label>
       <button className="button primary" type="submit">创建并发布 Journey V3 固定组合</button>
     </form>

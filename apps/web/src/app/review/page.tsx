@@ -91,7 +91,7 @@ export default async function ReviewQueuePage({ searchParams }: {
       {query.finalized ? <p className="success-text" role="status">审核结果提交成功，刷新后仍会保留。</p> : null}
       <QueueSection id="formal-review-title" title="正式评测" description="三项评测；结论进入 Evaluation，并按既有正式状态机处理。" items={formalQueue.items} />
       <QueueSection id="coaching-review-title" title="宝藏辅导" description="四个宝藏；可确认达到目标或要求修订，但不阻塞后续旅程。" items={coachingQueue.items} />
-      <p className="status-meta">Day 0 仍由 Learner 自证完成，不进入评阅。</p>
+      <p className="status-meta">Day 1 仍由 Learner 自证完成，不进入评阅。</p>
       <section aria-labelledby="review-history-title"><h2 id="review-history-title">已完成评阅</h2>
         <HistorySection title="正式评测历史" history={formalHistory} cursorName="formal_history_cursor" />
         <HistorySection title="宝藏辅导历史" history={coachingHistory} cursorName="coaching_history_cursor" />

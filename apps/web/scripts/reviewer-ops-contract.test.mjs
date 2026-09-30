@@ -39,7 +39,7 @@ test("ops overview consumes approved workload facts and fails closed on missing 
 
 test("successful empty queue is distinct from unavailable data", () => {
   assert.match(queue, /当前没有待处理记录/);
-  assert.match(queue, /Day 0 仍由 Learner 自证完成/);
+  assert.match(queue, /Day 1 仍由 Learner 自证完成/);
   assert.match(queue, /三项评测/);
   assert.match(queue, /不影响旅程推进、结营或准入/);
 });

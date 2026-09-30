@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { JourneyProgress } from "@/lib/server/api";
 
-import { stageDisplayTitle } from "./stage-title";
+import { stageDisplayTitle, stageUserFacingTitle } from "./stage-title";
 
 const KIND_LABELS = {
   DAY_0: "启程",
@@ -124,7 +124,7 @@ export function JourneyMap({
       </header>
       <article className="journey-current-mission">
         <p>当前任务 · 第 {current.position + 1} 站</p>
-        <h2>{current.title}</h2>
+        <h2>{stageUserFacingTitle(current.title)}</h2>
         <span>{current.reason}</span>
         {current.href && current.actionLabel ? (
           <Link className="button primary" href={current.href}>{current.actionLabel}<b aria-hidden="true">→</b></Link>
@@ -139,7 +139,7 @@ export function JourneyMap({
         <RouteMapSvg journey={journey} points={ROUTE_POINTS.narrow} variant="narrow" />
         <ol className="journey-route-accessible" aria-label="探索营阶段进度">
           {journey.nodes.map((node) => {
-            const label = `${STATUS_LABELS[node.status]}：${node.title}。${node.short_description}`;
+            const label = `${STATUS_LABELS[node.status]}：${stageUserFacingTitle(node.title)}。${node.short_description}`;
             return <li key={node.stable_key}>{label}</li>;
           })}
         </ol>

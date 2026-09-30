@@ -6,6 +6,7 @@ import { formatProductDateTime } from "@/lib/date-time";
 import type { Assignment, JourneyProgress, JourneyProgressNode } from "@/lib/server/api";
 import { MaterialLaunchButton } from "./material-launch-button";
 import { SubmissionComposer } from "./tasks/[assignmentId]/submission-composer";
+import { stageUserFacingTitle } from "./stage-title";
 
 const URL_PATTERN = /https:\/\/[^\s)\]，。；！？、]+/gu;
 
@@ -76,7 +77,7 @@ function JourneyBoard({ assignment, journey, learnerDisplayName }: {
                 <span className="journey-tile-number">{String(node.position + 1).padStart(2, "0")}</span>
                 <img src="/images/journey-v2-task-icon.png" alt="" />
                 <span className="journey-status-pill">{nodeStatusLabel(node)}</span>
-                <h3>{node.title}</h3>
+                <h3>{stageUserFacingTitle(node.title)}</h3>
                 <p>{node.short_description}</p>
                 <footer><small>{node.completion_policy === "REVIEW_REQUIRED" ? "需要真人评审" : "提交证据后完成"}</small><strong>{node.status === "LOCKED" ? "需要完成上一任务" : node.status === "COMPLETED" ? "回看任务 →" : "进入任务 →"}</strong></footer>
               </article>
@@ -108,7 +109,7 @@ function MaterialView({ assignment, totalStages }: { assignment: Assignment; tot
       <section className="journey-material-panel">
         <div className="journey-material-copy">
           <span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span>
-          <div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>当前任务</small><h1>{assignment.task_title}学习输入</h1></div></div>
+          <div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>当前任务</small><h1>{stageUserFacingTitle(assignment.task_title)}学习输入</h1></div></div>
           <p>{assignment.task_purpose}</p>
           <dl><div><dt>预计时间</dt><dd>{totalMaterialMinutes || assignment.estimated_duration_minutes} 分钟</dd></div><div><dt>学习方式</dt><dd>材料 + 任务证据</dd></div></dl>
           <div className="journey-material-grid" aria-label="学习材料">
@@ -163,7 +164,7 @@ function EvidenceView({ assignment, totalStages }: { assignment: Assignment; tot
       <ConsoleHeader completed={Math.max(0, position - 1)} total={totalStages} />
       <Link className="journey-back-link" href={`/app/tasks/${assignment.id}`}>← 返回学习材料</Link>
       <section className="journey-submit-panel">
-        <div className="journey-submit-intro"><span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span><div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>{isTreasure ? "宝藏测试题" : "提交任务证据"}</small><h1>{assignment.task_title}</h1></div></div><p>{assignment.learner_outcome.replace(/[。！？!?]+$/u, "")}。提交后，系统会按照当前任务规则更新旅程状态。</p></div>
+        <div className="journey-submit-intro"><span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span><div className="journey-material-title"><img src="/images/journey-v2-task-icon.png" alt="" /><div><small>{isTreasure ? "宝藏测试题" : "提交任务证据"}</small><h1>{stageUserFacingTitle(assignment.task_title)}</h1></div></div><p>{assignment.learner_outcome.replace(/[。！？!?]+$/u, "")}。提交后，系统会按照当前任务规则更新旅程状态。</p></div>
         <div className="journey-submission-shell">
           {submitCommand ? <SubmissionComposer assignmentId={assignment.id} assignmentRevision={assignment.revision} command={submitCommand} initialBody={assignment.draft?.body ?? ""} initialAttachmentIds={assignment.draft?.attachment_ids ?? []} attachments={assignment.available_attachments} submissionIdempotencyKey={randomUUID()} initialDraftRevision={assignment.draft?.revision ?? null} initialDraftUpdatedAt={assignment.draft?.updated_at ?? null} responseSections={responseSections} requiresReview={assignment.journey_stage?.completion_policy !== "LEARNER_EVIDENCE"} isFirstStation={position === 1} taskVersion={assignment.task_version} rubricVersion={assignment.rubric.version} reviewerName={assignment.reviewer_display_name} visibility={`${assignment.audience} · ${assignment.sensitivity}`} expectsExternalDocument={isTreasure} taskActionUrl={taskActionUrl} nextVersionNo={(assignment.submission?.current_version_no ?? 0) + 1} primaryActionLabel="确认提交任务证据" skipFinalConfirmation /> : <p className="journey-state-message">当前任务暂时不能提交，请返回任务总览查看状态。</p>}
         </div>
@@ -189,7 +190,7 @@ function ReviewView({ assignment, totalStages }: { assignment: Assignment; total
             <span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span>
             <div className="journey-material-title">
               <img src="/images/journey-v2-task-icon.png" alt="" />
-              <div><small>任务回看</small><h1 id="journey-review-title">{assignment.task_title}</h1></div>
+              <div><small>任务回看</small><h1 id="journey-review-title">{stageUserFacingTitle(assignment.task_title)}</h1></div>
             </div>
           </div>
           <strong className="journey-review-status"><span aria-hidden="true">✓</span> 已完成</strong>

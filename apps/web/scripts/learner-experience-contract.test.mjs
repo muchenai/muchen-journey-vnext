@@ -184,8 +184,9 @@ test("join and result pages keep operational explanations below the primary expe
 });
 
 test("the map and result share the published Journey stage titles", () => {
-  assert.match(journeyMap, /import \{ stageDisplayTitle \} from "\.\/stage-title"/);
+  assert.match(journeyMap, /import \{ stageDisplayTitle, stageUserFacingTitle \} from "\.\/stage-title"/);
   assert.match(journeyMap, /stageDisplayTitle\(node\.title\)/);
+  assert.match(journeyMap, /stageUserFacingTitle\(current\.title\)/);
   assert.doesNotMatch(journeyMap, /const ROUTE_LABELS/);
   assert.doesNotMatch(journeyMap, /AI 与模型/);
   assert.match(resultPage, /stageDisplayTitle\(node\.title\)/);
@@ -194,7 +195,7 @@ test("the map and result share the published Journey stage titles", () => {
 
 test("the golden path starts from the governed shared home and private orientation", () => {
   assert.match(homePage, /一天，八站。带走四份认知与三项真实能力证据/);
-  assert.match(homePage, /Day 0 · 启程/);
+  assert.match(homePage, /Day 1 · 启程/);
   assert.match(joinPage, /<PrivateInviteOrientation/);
   assert.match(joinPage, /验证你的专属邀请/);
   assert.match(joinPage, /进入探索营/);

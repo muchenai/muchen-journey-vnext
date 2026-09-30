@@ -14,6 +14,7 @@ import { formatProductDateTime } from "@/lib/date-time";
 import { AttachmentUploader } from "./attachment-uploader";
 import { SubmissionComposer } from "./submission-composer";
 import { ExplorationCampDashboard } from "../../exploration-camp-dashboard";
+import { stageUserFacingTitle } from "../../stage-title";
 
 export const dynamic = "force-dynamic";
 
@@ -226,7 +227,7 @@ export default async function TaskPage({
   const isTreasure = assignment.journey_stage?.stage_kind === "TREASURE";
   const isDayZero = assignment.journey_stage?.stage_kind === "DAY_0";
   const isFirstTreasure = assignment.journey_stage?.stable_key === "TRE-001-COMPANY-VALUES";
-  const stageMarker = isDayZero ? "DAY 0 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
+  const stageMarker = isDayZero ? "DAY 1 · 启程" : isTreasure ? "宝藏 · 探索" : "能力评测 · 真人评审";
   const learningStepTitle = "学习材料";
   const actionStepTitle = isAssessment ? "能力评测" : isDayZero ? "启程" : "宝藏小任务";
   const completionStepTitle = isAssessment ? "主管评审" : "阶段完成";
@@ -305,12 +306,12 @@ export default async function TaskPage({
             {assignment.journey_stage?.stage_kind === "ASSESSMENT" ? "◇" : "●"}
           </span>
           <p>
-            {assignment.journey_stage?.title ?? assignment.stable_task_key}
+            {stageUserFacingTitle(assignment.journey_stage?.title ?? assignment.stable_task_key)}
             <small>V{assignment.task_version}</small>
           </p>
         </div>
         <p className="task-hero-label">{stageMarker}</p>
-        <h1>{assignment.journey_stage?.title ?? assignment.task_title}</h1>
+        <h1>{stageUserFacingTitle(assignment.journey_stage?.title ?? assignment.task_title)}</h1>
         {assignment.journey_stage?.title !== assignment.task_title ? (
           <p className="task-specific-title">当前任务 · {assignment.task_title}</p>
         ) : null}
