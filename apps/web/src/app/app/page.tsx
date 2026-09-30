@@ -58,12 +58,13 @@ export default async function LearnerHome({
         ? "打开第一份必读材料"
         : "打开当前任务";
 
-  if (assignment && currentNode?.position === 0 && !showSubmissionTransition) {
+  if (assignment && action.journey && !showSubmissionTransition) {
     return (
       <ExplorationCampDashboard
         assignment={assignment}
         learnerDisplayName={sessionIdentity.display_name}
         journey={action.journey}
+        mode="board"
       />
     );
   }
