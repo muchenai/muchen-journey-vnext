@@ -579,6 +579,20 @@ body:has(.learner-join) > .site-footer { display: none; }
   pointer-events: none;
   will-change: opacity, transform;
 }
+.join-action-card::after {
+  position: absolute;
+  top: 0;
+  right: -15%;
+  left: -15%;
+  z-index: 2;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(220, 255, 255, .95), transparent);
+  box-shadow: 0 0 10px rgba(86, 232, 255, .58);
+  content: "";
+  pointer-events: none;
+  will-change: top, opacity;
+}
 .join-card-brand { display: grid; justify-items: center; gap: 8px; margin-bottom: 2px; }
 .join-card-brand .join-brand-mark { width: 132px; height: 132px; margin: -30px 0 -18px; }
 .join-card-brand > strong { color: #fff; font-size: 22px; letter-spacing: .02em; }
@@ -677,6 +691,7 @@ body:has(.learner-join) > .site-footer { display: none; }
 @keyframes join-heading-glow { 50% { text-shadow: 0 0 7px #fff, 0 0 24px rgba(54, 183, 255, .9), 0 5px 30px rgba(0, 19, 72, .96); } }
 @keyframes join-copy-float { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(18px) scale(1.015); } }
 @keyframes join-text-zap { 0%, 100% { text-shadow: inherit; transform: translateX(0); } 50% { text-shadow: -3px 0 #3fffff, 3px 0 #6a8cff; transform: translateX(1px); } }
+@keyframes join-card-scan { 0% { top: 0; opacity: 0; } 7%, 93% { opacity: .82; } 100% { top: calc(100% - 2px); opacity: 0; } }
 
 @media (prefers-reduced-motion: no-preference) {
   .join-cosmos-background { animation: join-bg-drift 24s ease-in-out infinite alternate; }
@@ -684,6 +699,7 @@ body:has(.learner-join) > .site-footer { display: none; }
   .join-starfield { animation: join-stars 14s linear infinite; }
   .join-brand-mark { animation: join-logo-pulse 4s ease-in-out infinite; }
   .join-action-card::before { animation: join-card-pulse 4s ease-in-out infinite; }
+  .join-action-card::after { animation: join-card-scan 4s linear infinite; }
   .join-token-form > .button::before, .join-pass form > .button::before { animation: join-button-scan 4.6s ease-in-out infinite; }
   .join-intro > h1 { animation: join-heading-glow 5s ease-in-out infinite; }
   .join-intro { animation: join-copy-float 7s ease-in-out infinite; }
@@ -692,7 +708,7 @@ body:has(.learner-join) > .site-footer { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .join-cosmos-background, .join-atmosphere, .join-starfield, .join-brand-mark,
-  .join-action-card::before, .join-token-form > .button::before,
+  .join-action-card::before, .join-action-card::after, .join-token-form > .button::before,
   .join-pass form > .button::before, .join-intro, .join-intro > h1,
   .join-token-form > .button, .join-pass form > .button { animation: none; }
 }
