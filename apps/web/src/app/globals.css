@@ -562,11 +562,11 @@ body:has(.learner-join) > .site-footer { display: none; }
   margin: 18px clamp(28px, 4.2vw, 70px) 38px 18px;
   padding: clamp(30px, 2.8vw, 44px);
   color: #fff;
-  background: linear-gradient(160deg, rgba(3, 38, 82, .78), rgba(1, 14, 47, .88));
+  background: rgba(0, 16, 44, .61);
   border: 2px solid rgba(112, 220, 255, .8);
   border-radius: 30px;
   box-shadow: 0 0 0 1px rgba(83, 114, 255, .3), 0 0 32px rgba(0, 194, 255, .34), inset 0 0 70px rgba(29, 123, 235, .18);
-  backdrop-filter: blur(20px) saturate(130%);
+  backdrop-filter: none;
 }
 .join-action-card::before {
   position: absolute;
