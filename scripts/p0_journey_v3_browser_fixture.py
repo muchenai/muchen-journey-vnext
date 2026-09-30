@@ -58,6 +58,8 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         f"P0LearnerChallenge{stable_key.replace('-', '')}"
         "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
     )
+    if stable_key == "TRE-001-COMPANY-VALUES":
+        challenge_url = "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg"
     answer_url = (
         "https://example.feishu.cn/docx/"
         f"P0LearnerAnswer{stable_key.replace('-', '')}"

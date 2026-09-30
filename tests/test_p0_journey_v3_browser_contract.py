@@ -50,6 +50,10 @@ def test_treasure_one_uses_the_real_newcomer_training_video() -> None:
             "required": True,
         }
     ]
+    assert payload["instructions"][0] == (
+        "先打开完整挑战题面并确认本阶段边界："
+        "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg"
+    )
 
 
 def test_reentry_helper_targets_one_existing_active_enrollment(monkeypatch) -> None:
