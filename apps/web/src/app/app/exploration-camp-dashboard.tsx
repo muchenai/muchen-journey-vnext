@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 
 import { completeRequiredLearningMaterials, startAssignment } from "@/app/actions";
+import { formatProductDateTime } from "@/lib/date-time";
 import type { Assignment, JourneyProgress, JourneyProgressNode } from "@/lib/server/api";
 import { MaterialLaunchButton } from "./material-launch-button";
 import { SubmissionComposer } from "./tasks/[assignmentId]/submission-composer";
@@ -55,7 +56,7 @@ function JourneyBoard({ assignment, journey, learnerDisplayName }: {
           <p>{done
             ? "这段探索营旅程已经完成，你可以回看每一站留下的成长证据。"
             : "完成材料并提交真实任务证据后，下一站会由系统自动解锁；草稿与正式提交都会保存在服务器。"}</p>
-          {current ? <Link className="journey-console-primary" href={`/app/tasks/${current.assignment_id}`}>{done ? "查看当前旅程" : "继续当前任务"}<span aria-hidden="true">→</span></Link> : null}
+          {current ? <Link className="journey-console-primary" href={`/app/tasks/${current.assignment_id}${done ? "?view=review" : ""}`}>{done ? "查看当前旅程" : "继续当前任务"}<span aria-hidden="true">→</span></Link> : null}
         </div>
         <div className="journey-hero-orbit"><b>{completed}<small>/{String(total).padStart(2, "0")}</small></b><span>完成进度</span></div>
       </section>
@@ -77,7 +78,7 @@ function JourneyBoard({ assignment, journey, learnerDisplayName }: {
             );
             return node.status === "LOCKED"
               ? <div aria-disabled="true" key={node.assignment_id}>{card}</div>
-              : <Link href={`/app/tasks/${node.assignment_id}`} key={node.assignment_id}>{card}</Link>;
+              : <Link href={`/app/tasks/${node.assignment_id}${node.status === "COMPLETED" ? "?view=review" : ""}`} key={node.assignment_id}>{card}</Link>;
           })}
         </div>
       </section>
@@ -160,8 +161,70 @@ function EvidenceView({ assignment, totalStages }: { assignment: Assignment; tot
   );
 }
 
-export function ExplorationCampDashboard({ assignment, learnerDisplayName, journey, view = "material", mode = "task" }: { assignment: Assignment; learnerDisplayName: string; journey?: JourneyProgress | null; view?: "material" | "evidence"; mode?: "board" | "task" }) {
+function ReviewView({ assignment, totalStages }: { assignment: Assignment; totalStages: number }) {
+  const position = (assignment.journey_stage?.position ?? 0) + 1;
+  const materials = assignment.learning_materials.filter((material) => material.required);
+  const visibleMaterials = materials.length > 0 ? materials : assignment.learning_materials;
+  const latestVersion = assignment.submission?.versions.at(-1);
+
+  return (
+    <div className="journey-console-shell journey-detail-page">
+      <div className="journey-console-vignette" aria-hidden="true" />
+      <ConsoleHeader completed={position} total={totalStages} />
+      <Link className="journey-back-link" href="/app">← 返回任务总览</Link>
+      <section className="journey-review-panel" aria-labelledby="journey-review-title">
+        <header className="journey-review-heading">
+          <div>
+            <span className="journey-task-eyebrow">探索营 · {String(position).padStart(2, "0")} / {String(totalStages).padStart(2, "0")}</span>
+            <div className="journey-material-title">
+              <img src="/images/journey-v2-task-icon.png" alt="" />
+              <div><small>任务回看</small><h1 id="journey-review-title">{assignment.task_title}</h1></div>
+            </div>
+          </div>
+          <strong className="journey-review-status"><span aria-hidden="true">✓</span> 已完成</strong>
+        </header>
+
+        <div className="journey-review-section">
+          <div className="journey-review-section-title"><span>01</span><div><small>LEARNING MATERIALS</small><h2>学习材料</h2></div></div>
+          <div className="journey-material-grid" aria-label="已完成的学习材料">
+            {visibleMaterials.map((material, index) => {
+              const url = learningMaterialUrl(material);
+              return (
+                <article className="journey-material-card is-completed" key={material.key}>
+                  <header><span>材料 {String(index + 1).padStart(2, "0")}</span><strong>已完成</strong></header>
+                  <h2>{material.title}</h2>
+                  <p>预计 {material.estimated_duration_minutes} 分钟</p>
+                  {url ? <a className="journey-material-card-link" href={url} target="_blank" rel="noreferrer"><img src="/images/journey-v2-reopen-icon.svg" alt="" />重新打开材料 {String(index + 1).padStart(2, "0")}</a> : <span className="journey-material-card-note">材料已完成</span>}
+                </article>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="journey-review-section">
+          <div className="journey-review-section-title"><span>02</span><div><small>SUBMITTED EVIDENCE</small><h2>已提交任务证据</h2></div></div>
+          {latestVersion ? (
+            <article className="journey-review-evidence">
+              <header><strong>Version {latestVersion.version_no}</strong><time>{formatProductDateTime(latestVersion.created_at)}</time></header>
+              <div>{latestVersion.body}</div>
+              {latestVersion.attachments.length > 0 ? <ul>{latestVersion.attachments.map((attachment) => <li key={attachment.id}>{attachment.original_filename}</li>)}</ul> : null}
+              {latestVersion.feedback ? <p><strong>任务反馈：</strong>{latestVersion.feedback}</p> : null}
+            </article>
+          ) : <p className="journey-state-message">这项任务尚未生成正式提交版本。</p>}
+        </div>
+
+        <footer className="journey-review-footer">
+          <span>任务版本 V{assignment.task_version} · 证据记录只读保存</span>
+          <Link className="journey-console-primary" href="/app">返回任务总览 <span aria-hidden="true">→</span></Link>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+export function ExplorationCampDashboard({ assignment, learnerDisplayName, journey, view = "material", mode = "task" }: { assignment: Assignment; learnerDisplayName: string; journey?: JourneyProgress | null; view?: "material" | "evidence" | "review"; mode?: "board" | "task" }) {
   if (journey && mode === "board") return <JourneyBoard assignment={assignment} journey={journey} learnerDisplayName={learnerDisplayName} />;
   const totalStages = journey?.total_stages ?? 9;
+  if (view === "review") return <ReviewView assignment={assignment} totalStages={totalStages} />;
   return view === "evidence" ? <EvidenceView assignment={assignment} totalStages={totalStages} /> : <MaterialView assignment={assignment} totalStages={totalStages} />;
 }

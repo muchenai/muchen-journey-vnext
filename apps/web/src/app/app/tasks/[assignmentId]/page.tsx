@@ -176,13 +176,13 @@ export default async function TaskPage({
     learnerPageRequest<{ display_name: string }>("/api/v1/session"),
     learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
   ]);
-  if (assignment.journey_stage && !["COMPLETED", "SUBMITTED", "IN_REVIEW", "NEEDS_REVISION"].includes(assignment.status)) {
+  if (assignment.journey_stage && !["SUBMITTED", "IN_REVIEW", "NEEDS_REVISION"].includes(assignment.status)) {
     return (
       <ExplorationCampDashboard
         assignment={assignment}
         learnerDisplayName={sessionIdentity.display_name}
         journey={currentAction.journey}
-        view={query.view === "evidence" ? "evidence" : "material"}
+        view={assignment.status === "COMPLETED" || query.view === "review" ? "review" : query.view === "evidence" ? "evidence" : "material"}
       />
     );
   }
