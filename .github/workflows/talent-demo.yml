@@ -6,7 +6,7 @@ on:
       phase:
         description: Independently invocable Talent deployment stage
         type: choice
-        options: [inspect]
+        options: [inspect, install, transfer, prepare, migrate, start, publish, route, verify]
         required: true
       expected_commit:
         description: Exact workflow commit to execute
@@ -22,11 +22,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inspect:
-    if: inputs.phase == 'inspect' && inputs.expected_commit == github.sha && github.ref == 'refs/heads/main'
+  deploy:
+    if: inputs.expected_commit == github.sha && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production-canary-uat
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       TALENT_HOST: ${{ secrets.TALENT_HOST }}
       TALENT_SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
@@ -56,30 +56,43 @@ jobs:
           python3 -m scripts.wp08_security_group open
           --security-group-id "$TALENT_SECURITY_GROUP"
           --cidr "$RUNNER_CIDR"
-      - name: Read isolated deployment inventory
+      - name: Prepare ephemeral SSH identity
         env:
           DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
-          TALENT_TRANSPORT_KEY: ${{ secrets.TALENT_TRANSPORT_KEY }}
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          key="$RUNNER_TEMP/talent-deploy-key"
-          known_hosts="$RUNNER_TEMP/talent-known-hosts"
-          trap 'rm -f "$key"' EXIT
-          printf '%s\n' "$DEPLOY_KEY" > "$key"
-          unset DEPLOY_KEY
-          set +e
-          ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
-            -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" \
-            "root@$TALENT_HOST" 'bash -s' < deploy/talent-demo/inspect.sh > "$RUNNER_TEMP/inventory.txt" 2>&1
-          result=$?
-          set -e
-          node deploy/talent-demo/sealed-file.mjs seal "$RUNNER_TEMP/inventory.txt" "$RUNNER_TEMP/inventory.enc"
-          rm -f "$RUNNER_TEMP/inventory.txt"
-          echo "Inventory command exit status: $result; details in encrypted artifact"
-          exit "$result"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/talent-deploy-key"
+      - name: Read remote inventory
+        if: inputs.phase == 'inspect'
+        run: bash deploy/talent-demo/runner.sh inspect >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Transfer encrypted Talent candidate
+        if: inputs.phase == 'transfer' || inputs.phase == 'install'
+        env:
+          TALENT_TRANSPORT_KEY: ${{ secrets.TALENT_TRANSPORT_KEY }}
+          TALENT_USERS_JSON: ${{ secrets.TALENT_USERS_JSON }}
+        run: bash deploy/talent-demo/runner.sh transfer >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Prepare isolated runtime
+        if: inputs.phase == 'prepare' || inputs.phase == 'install'
+        run: bash deploy/talent-demo/runner.sh prepare >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Back up and reconcile Talent migrations
+        if: inputs.phase == 'migrate' || inputs.phase == 'install'
+        run: bash deploy/talent-demo/runner.sh migrate >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Start and check Talent service
+        if: inputs.phase == 'start' || inputs.phase == 'install'
+        run: bash deploy/talent-demo/runner.sh start >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Validate and apply Talent virtual host
+        if: inputs.phase == 'route' || inputs.phase == 'publish'
+        run: bash deploy/talent-demo/runner.sh route >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Check private runtime
+        if: inputs.phase == 'verify' || inputs.phase == 'publish'
+        run: bash deploy/talent-demo/runner.sh verify >> "$RUNNER_TEMP/deployment.txt" 2>&1
+      - name: Verify public TLS and authenticated access
+        if: inputs.phase == 'publish' || inputs.phase == 'verify'
+        env:
+          TALENT_SMOKE_ACCOUNTS: ${{ secrets.TALENT_SMOKE_ACCOUNTS }}
+        run: node deploy/talent-demo/verify.mjs >> "$RUNNER_TEMP/deployment.txt" 2>&1
       - name: Close and verify exact runner ingress
         if: always() && steps.runner.outputs.cidr != ''
         env:
@@ -90,11 +103,22 @@ jobs:
           python3 -m scripts.wp08_security_group close
           --security-group-id "$TALENT_SECURITY_GROUP"
           --cidr "$RUNNER_CIDR"
-      - name: Preserve encrypted inventory
+      - name: Seal evidence and remove private runner files
+        if: always()
+        env:
+          TALENT_TRANSPORT_KEY: ${{ secrets.TALENT_TRANSPORT_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/talent-deploy-key" "$RUNNER_TEMP/talent-known-hosts" "$RUNNER_TEMP/payload.tar.gz" "$RUNNER_TEMP/users.json" "$RUNNER_TEMP/deployment.txt"' EXIT
+          if [ -f "$RUNNER_TEMP/deployment.txt" ]; then
+            node deploy/talent-demo/sealed-file.mjs seal "$RUNNER_TEMP/deployment.txt" "$RUNNER_TEMP/deployment.enc"
+          fi
+      - name: Preserve encrypted evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: talent-inventory-${{ github.run_id }}
-          path: ${{ runner.temp }}/inventory.enc
+          name: talent-deployment-${{ github.run_id }}
+          path: ${{ runner.temp }}/deployment.enc
           if-no-files-found: ignore
           retention-days: 7

@@ -1,18 +1,18 @@
-# Talent Demo deployment via the Journey host
+# Talent demo deployment
 
-User-authorized scope: deploy the independent synthetic Talent demo at talent.muchenai.com on the existing Journey server. This does not authorize a Journey release, database migration, real personnel import or changes to existing Journey role assignments.
+Deploy the independent synthetic demo through protected main and the existing production-canary-uat reviewer gate. This is not a Journey release. Existing Journey containers, data, permissions and release remain unchanged; adding Talent routing requires a brief restart of the shared Caddy 2.10.2 edge because its admin API is disabled.
 
-The workflow is manually dispatched on protected main with its exact commit. It uses the existing production-canary-uat environment SSH key and existing exact-runner security-group helper. It shares Journey's host deployment concurrency group. Ingress cleanup runs even when inventory fails. Private keys stay on the ephemeral runner and are never exported as artifacts.
+Manual phases (each requires exact workflow commit):
+- `inspect`: read bounded host inventory.
+- `install`: transfer → prepare → migrate → start, as separate Actions steps. Does not change DNS or proxy.
+- `transfer`, `prepare`, `migrate`, `start`: resume a reconciled stage independently. Migration checks applied SQL history and backs up an existing Talent database first. Never blindly replay an entire failed workflow.
+- `publish`: route → private health → external acceptance. DNS must first point exclusively to the inspected host.
+- `route`, `verify`: independent proxy or acceptance steps.
 
-## Stage 1: inspect
+The manifest pins the exact Talent source revision and archive SHA-256. The PUBLIC Journey repo contains only the AES-256-GCM encrypted application payload, deployment tools, manifest and service unit. TALENT_TRANSPORT_KEY seals payload/evidence; TALENT_USERS_JSON holds five scrypt records; TALENT_SMOKE_ACCOUNTS holds two trial credentials for acceptance. These are new Talent-only environment secrets. Existing SSH/cloud keys are used only on the ephemeral runner, never exported. Host/SG references are direct environment secrets. Sensitive command output is encrypted before artifact upload (7-day retention). Temporary exact-runner /32 SSH ingress is closed and verified in an always step.
 
-Dispatch `Talent Demo Deployment` with `phase=inspect` and `expected_commit=<full main SHA>`.
-This reads architecture, resources, listeners, running container names/networks/mounts, Caddy version and selected routing directives, Talent install presence and Journey public readiness. It does not read application records, container environments, database contents or private credentials. The temporary runner /32 TCP 22 rule is the only remote mutation and is revoked and verified before completion.
+Runtime: checksum-pinned official Node 24, unprivileged systemd service, private Docker bridge gateway bind on 3187, independent SQLite state and accounts. No public/wildcard runtime bind. The Caddy candidate is validated before applying; existing config hash and Journey release are drift guards. Proxy writes preserve the bind-mounted inode. Failed Journey readiness triggers original-config restoration and a second readiness check. TLS failure alone leaves Journey healthy and is investigated before retrying verification. Database downgrade is never automatic.
 
-The first connection follows the existing deployment's accept-new host-key policy on a dedicated ephemeral known_hosts file. It does not disable host verification. Subsequent connections in a run must use that same file.
+The temporary known_hosts uses the established accept-new policy; later connections reuse it. Stage scripts assert the expected host, release and paths. A partial preparation is stopped for explicit reconciliation. Remove only Talent paths/service/route if rolling back the initial install, retaining database/history for diagnosis. Future Journey proxy replacement must preserve this additional virtual host; it is not added to Journey's application release pipeline.
 
-Inventory must be reviewed before adding the separate install, migration, route and acceptance stages. A failed stage is reconciled before retrying. Do not invoke an existing Journey release workflow to deploy Talent. No Talent installation or DNS changes are performed by this initial inspection stage.
-
-The Journey repository is public. Host and security-group identifiers are environment secrets `TALENT_HOST` and `TALENT_SECURITY_GROUP`. Inventory stdout/stderr is AES-256-GCM sealed with a dedicated `TALENT_TRANSPORT_KEY` environment secret before upload; only the owner-held local key can decode downloaded evidence. That key is independent of SSH credentials. The workflow must never upload the plaintext inventory or credentials. The public artifact contains only nonce, authentication tag and ciphertext and expires after seven days.
-
-Access reconciliation: the staging SSH secret was last updated in July and was rejected by the target host during run 36713241808; that run closed and verified its temporary ingress. Current successful Journey operations use production-canary-uat, whose SSH secret was updated in September. This workflow now uses that environment and preserves its required-reviewer and allowed-branch policies. Approval must happen through the existing environment review; do not bypass or remove it. No Journey runtime mutation is added.
+Validation: `python3 deploy/talent-demo/test_remote.py`, actionlint, shell/Node syntax; Talent repository runs its own domain/SQLite/auth tests and both builds. External acceptance verifies TLS, exact revision, anonymous rejection, authenticated UI/assets/workspace, origin rejection and Journey readiness. This does not establish production readiness or human trial outcomes.
