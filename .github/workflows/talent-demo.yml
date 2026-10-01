@@ -6,7 +6,7 @@ on:
       phase:
         description: Independently invocable Talent deployment stage
         type: choice
-        options: [inspect, install, transfer, prepare, migrate, start, publish, route, verify]
+        options: [inspect, install, resume-install, transfer, prepare, migrate, start, publish, route, verify]
         required: true
       expected_commit:
         description: Exact workflow commit to execute
@@ -74,13 +74,13 @@ jobs:
           TALENT_USERS_JSON: ${{ secrets.TALENT_USERS_JSON }}
         run: bash deploy/talent-demo/runner.sh transfer >> "$RUNNER_TEMP/deployment.txt" 2>&1
       - name: Prepare isolated runtime
-        if: inputs.phase == 'prepare' || inputs.phase == 'install'
+        if: inputs.phase == 'prepare' || inputs.phase == 'install' || inputs.phase == 'resume-install'
         run: bash deploy/talent-demo/runner.sh prepare >> "$RUNNER_TEMP/deployment.txt" 2>&1
       - name: Back up and reconcile Talent migrations
-        if: inputs.phase == 'migrate' || inputs.phase == 'install'
+        if: inputs.phase == 'migrate' || inputs.phase == 'install' || inputs.phase == 'resume-install'
         run: bash deploy/talent-demo/runner.sh migrate >> "$RUNNER_TEMP/deployment.txt" 2>&1
       - name: Start and check Talent service
-        if: inputs.phase == 'start' || inputs.phase == 'install'
+        if: inputs.phase == 'start' || inputs.phase == 'install' || inputs.phase == 'resume-install'
         run: bash deploy/talent-demo/runner.sh start >> "$RUNNER_TEMP/deployment.txt" 2>&1
       - name: Validate and apply Talent virtual host
         if: inputs.phase == 'route' || inputs.phase == 'publish'
@@ -110,7 +110,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trap 'rm -f "$RUNNER_TEMP/talent-deploy-key" "$RUNNER_TEMP/talent-known-hosts" "$RUNNER_TEMP/payload.tar.gz" "$RUNNER_TEMP/users.json" "$RUNNER_TEMP/deployment.txt"' EXIT
+          trap 'rm -f "$RUNNER_TEMP/talent-deploy-key" "$RUNNER_TEMP/talent-known-hosts" "$RUNNER_TEMP/payload.tar.gz" "$RUNNER_TEMP/users.json" "$RUNNER_TEMP/talent-node.tar.xz" "$RUNNER_TEMP/deployment.txt"' EXIT
           if [ -f "$RUNNER_TEMP/deployment.txt" ]; then
             node deploy/talent-demo/sealed-file.mjs seal "$RUNNER_TEMP/deployment.txt" "$RUNNER_TEMP/deployment.enc"
           fi

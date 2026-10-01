@@ -5,6 +5,7 @@ Deploy the independent synthetic demo through protected main and the existing pr
 Manual phases (each requires exact workflow commit):
 - `inspect`: read bounded host inventory.
 - `install`: transfer → prepare → migrate → start, as separate Actions steps. Does not change DNS or proxy.
+- `resume-install`: after reviewing an installation failure, continue prepare → migrate → start without retransferring the application or rotating accounts. If Node is absent, the runner downloads the same official pinned archive, verifies SHA-256 and transfers it to the private stage; the host verifies it again. SSH errors do not trigger a missing-runtime fallback.
 - `transfer`, `prepare`, `migrate`, `start`: resume a reconciled stage independently. Migration checks applied SQL history and backs up an existing Talent database first. Never blindly replay an entire failed workflow.
 - `publish`: route → private health → external acceptance. DNS must first point exclusively to the inspected host.
 - `route`, `verify`: independent proxy or acceptance steps.
