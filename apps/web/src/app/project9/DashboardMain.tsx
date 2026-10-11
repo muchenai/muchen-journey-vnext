@@ -125,7 +125,7 @@ export function DashboardMain({ decoration, stageDecoration, identity }: { decor
                 <div className="h-[21.031px] relative shrink-0 w-[18.402px]" data-node-id="2047:4451" data-name="Vector (Stroke)">
                   <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVectorStroke} />
                 </div>
-                <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#03245f] text-[18.402px] text-center tracking-[3.5052px] w-[220.978px]" data-node-id="2047:4452">
+                <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#03245f] text-[18.402px] text-center tracking-[3.5052px] w-auto whitespace-nowrap" data-node-id="2047:4452">
                   点击查看当前任务详情
                 </p>
               </div>
