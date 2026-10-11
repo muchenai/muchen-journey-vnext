@@ -12,6 +12,7 @@ from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
+from journey_api.reviewer_access import effective_roles
 from journey_api.models import (
     ExternalIdentity,
     IdentitySession,
@@ -121,6 +122,7 @@ def get_actor(
                 )
             ).all()
         )
+        roles = effective_roles(user.id, roles)
         if not roles:
             raise ApiError(401, "UNAUTHENTICATED", "当前会话已不具备任何有效权限。")
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
@@ -163,7 +165,7 @@ def get_actor(
         Actor(
             user.id,
             user.organization_id,
-            frozenset({assignment.role}),
+            effective_roles(user.id, frozenset({assignment.role})),
             user.display_name,
             None,
             assignment.role,
@@ -172,5 +174,5 @@ def get_actor(
 
 
 def require_role(actor: Actor, role: Role) -> None:
-    if not actor.has_role(role):
+    if role not in effective_roles(actor.id, actor.roles):
         raise ApiError(403, "FORBIDDEN", "当前身份无权执行此操作。")

@@ -36,7 +36,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0031_learner_feishu_login"
+EXPECTED_MIGRATION_HEAD = "0032_shared_learner_review"
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 ROLLBACK_OWNED_FACT_TABLES = (
     "coaching_feedback",

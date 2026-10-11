@@ -136,7 +136,7 @@ def test_package_workflow_pins_restore_image_and_migration_range():
 
 def test_migration_head_parser_handles_merge_revision():
     assert migration_heads(Path("migrations/versions")) == [
-        "0031_learner_feishu_login"
+        "0032_shared_learner_review"
     ]
 
 

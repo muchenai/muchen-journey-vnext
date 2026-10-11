@@ -57,7 +57,18 @@ def provision_learner(session: Session, identity: ExternalIdentity | None, *,
     enrollment = session.scalar(select(Enrollment).where(
         Enrollment.organization_id == organization_id, Enrollment.learner_id == user.id))
     if enrollment is None:
-        reviewer_id = get_settings().feishu_learner_reviewer_id
+        settings = get_settings()
+        reviewer_id = settings.feishu_learner_reviewer_id
+        pool = settings.feishu_learner_shared_reviewer_ids
+        if reviewer_id in settings.reviewer_excluded_user_ids:
+            raise ApiError(503, "LEARNER_LOGIN_NOT_CONFIGURED", "默认审核人已停用。")
+        if pool:
+            active_pool = set(session.scalars(select(User.id).join(RoleAssignment, RoleAssignment.user_id == User.id)
+                .where(User.id.in_(pool), User.organization_id == organization_id,
+                       User.status == UserStatus.ACTIVE, RoleAssignment.organization_id == organization_id,
+                       RoleAssignment.role == Role.REVIEWER)).all())
+            if active_pool != set(pool):
+                raise ApiError(503, "LEARNER_LOGIN_NOT_CONFIGURED", "公共审核人员尚未配置完整。")
         reviewer = session.scalar(select(User.id).join(RoleAssignment, RoleAssignment.user_id == User.id)
             .where(User.id == reviewer_id, User.organization_id == organization_id,
                    User.status == UserStatus.ACTIVE, RoleAssignment.organization_id == organization_id,
@@ -67,12 +78,14 @@ def provision_learner(session: Session, identity: ExternalIdentity | None, *,
             raise ApiError(503, "LEARNER_LOGIN_NOT_CONFIGURED", "默认学习旅程或审核人尚未配置。")
         enrollment = Enrollment(id=uuid.uuid4(), organization_id=organization_id,
             learner_id=user.id, reviewer_id=reviewer, journey_version_id=journey.id,
+            review_assignment_mode="SHARED" if pool else "ASSIGNED",
             status=EnrollmentStatus.ACTIVE, revision=1)
         session.add(enrollment)
         session.flush()
         create_journey_assignments(session, enrollment=enrollment)
         add_audit(session, request_id=request_id, organization_id=organization_id,
             actor_id=user.id, action="learner.feishu_registered", resource_type="enrollment",
-            resource_id=enrollment.id, result="SUCCESS", details={"provider": "FEISHU"})
+            resource_id=enrollment.id, result="SUCCESS", details={"provider": "FEISHU",
+                "review_mode": "SHARED" if pool else "ASSIGNED"})
     session.flush()
     return identity

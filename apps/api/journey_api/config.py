@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     feishu_learner_registration_enabled: bool = False
     feishu_learner_organization_id: UUID | None = None
     feishu_learner_reviewer_id: UUID | None = None
+    feishu_learner_shared_reviewer_ids: Annotated[list[UUID], NoDecode] = Field(default_factory=list)
+    reviewer_excluded_user_ids: Annotated[list[UUID], NoDecode] = Field(default_factory=list)
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
     feishu_oauth_redirect_uri: str = "http://localhost:3000/auth/feishu/callback"
@@ -99,6 +101,27 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("feishu_learner_shared_reviewer_ids", "reviewer_excluded_user_ids", mode="before")
+    @classmethod
+    def split_reviewer_ids(cls, value: object) -> object:
+        if value in (None, ""):
+            return []
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def reviewer_pool_is_explicit(self) -> "Settings":
+        pool = self.feishu_learner_shared_reviewer_ids
+        excluded = self.reviewer_excluded_user_ids
+        if len(pool) != len(set(pool)) or len(excluded) != len(set(excluded)):
+            raise ValueError("Reviewer IDs must be unique")
+        if set(pool) & set(excluded):
+            raise ValueError("Excluded reviewers cannot be in the shared pool")
+        if pool and (not self.feishu_learner_organization_id or self.feishu_learner_reviewer_id not in pool):
+            raise ValueError("Shared review requires an organization and a default reviewer in the pool")
+        return self
 
     @field_validator("app_env")
     @classmethod
