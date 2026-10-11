@@ -54,7 +54,7 @@ export function PrivateInviteOrientation({
 
   return (
     <aside id={descriptionId} className={styles.orientation} aria-labelledby={`${descriptionId}-title`}>
-      <p className={styles.eyebrow}>Muchen Quest · {isEnglish ? "Controlled release · Exploration Camp" : "四模块受控首发 · 探索营"}</p>
+      <p className={styles.eyebrow}>Muchen Journey · {isEnglish ? "Controlled release · Exploration Camp" : "四模块受控首发 · 探索营"}</p>
       <h2 id={`${descriptionId}-title`} className={styles.title}>
         {isEnglish ? "A real-world quest for AI talent" : "AI 数据公司真实世界闯关计划"}
       </h2>

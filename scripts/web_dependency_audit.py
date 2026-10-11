@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed on Web dependency advisories with one bounded dev-only waiver."""
+"""Fail closed on Web dependency advisories with bounded, expiring dev-only exceptions."""
 
 from __future__ import annotations
 
@@ -14,7 +14,14 @@ ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = ROOT / "apps" / "web"
 LOCK_FILE = WEB_ROOT / "package-lock.json"
 BRACE_EXPANSION_DOS = "https://github.com/advisories/GHSA-mh99-v99m-4gvg"
-WAIVERS = {BRACE_EXPANSION_DOS: date(2026, 8, 31)}
+BRACES_PARSE_DOS = "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+# Owner accepted this one-week internal-test exception on 2026-10-11.
+# Only trusted repository patterns reach this ESLint development dependency.
+# Runtime reachability, unknown advisories and expiry still fail closed.
+WAIVERS = {
+    BRACE_EXPANSION_DOS: date(2026, 8, 31),
+    BRACES_PARSE_DOS: date(2026, 10, 18),
+}
 
 
 class AuditError(RuntimeError):
