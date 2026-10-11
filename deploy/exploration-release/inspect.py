@@ -59,5 +59,21 @@ paths = {name: (ROOT / relative).exists() for name, relative in {
     "prior_backup_exists": "backups/exploration-05e7e0d2ca488bcdbf0fbf8ab964d98ea3efc292",
     "prior_backup_receipt_exists": "backups/exploration-05e7e0d2ca488bcdbf0fbf8ab964d98ea3efc292/backup-receipt.json",
 }.items()}
+diagnostics = {}
+for label, command in {
+    "storage_driver": ["docker", "info", "--format", "{{.Driver}}"],
+    "docker_disk_percent": ["df", "--output=pcent", "/var/lib/docker"],
+}.items():
+    try:
+        diagnostics[label] = run(command).strip()[:100]
+    except (RuntimeError, subprocess.TimeoutExpired):
+        diagnostics[label] = "UNAVAILABLE"
+try:
+    journal = run(["journalctl", "-u", "docker", "--since", "-1 hour", "--no-pager", "-n", "200"]).lower()
+    diagnostics["docker_error_counts"] = {word: journal.count(word) for word in
+        ("timeout", "deadline exceeded", "failed to resolve", "failed to extract", "no space left", "unauthorized")}
+except (RuntimeError, subprocess.TimeoutExpired):
+    diagnostics["docker_error_counts"] = "UNAVAILABLE"
 print(json.dumps({"current_release": str(current), "containers": containers, "database": database,
-                  "cached_journey_images": images, "preparation_paths": paths}, indent=2))
+                  "cached_journey_images": images, "preparation_paths": paths,
+                  "docker_diagnostics": diagnostics}, indent=2))
