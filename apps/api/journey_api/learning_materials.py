@@ -103,7 +103,9 @@ def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
     Keep immutable versions and existing completion facts intact. Match only
     known placeholder records; explicit published materials remain authoritative.
     """
-    materials = learner_learning_materials(task.learning_materials)
+    # Match verified source pairs before filtering historical no-video notes;
+    # those placeholders now have real owner-supplied video links.
+    materials = learner_learning_materials(published_exploration_materials(task.learning_materials))
     for stable_key, (label, first_title, second_title, first_url, second_url) in LEGACY_STAGE_LINKS.items():
         material_key = f"material-{stable_key.lower()}"
         if not (
@@ -155,7 +157,7 @@ def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
             "estimated_duration_minutes": 1,
             "required": True,
         }, {**video, "source_label": "宝藏一材料二"}]
-    return published_exploration_materials(materials)
+    return materials
 
 
 def is_publishable_learning_material(material: object) -> bool:
