@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -47,6 +48,53 @@ LEGACY_STAGE_LINKS = {
         "https://lcnf4xe7p1h6.feishu.cn/minutes/obcnk1s9uh3y25xle6723aq3",
     ),
 }
+
+
+def published_exploration_materials(materials: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Resolve the exact legacy pairs verified in the production preflight.
+
+    The old video records are TEXT, which the link-only exploration UI cannot
+    open. Only recognized two-record signatures receive the owner's supplied
+    links. Stored versions and historical completion facts are never rewritten.
+    A replacement resource gets a new key; an unchanged document keeps its key.
+    """
+    if len(materials) != 2 or materials[0].get("kind") != "TEXT" or materials[1].get("kind") != "HTTPS_LINK":
+        return materials
+    first, second = materials
+    if (first.get("key") == "day0-company-intro" and second.get("key") == "day0-letter"
+            and str(second.get("url", "")).split("?", 1)[0] == "https://zx6w57w0j34.feishu.cn/wiki/MpxDwemUwiOY0fk9jM5cqRYRn3b"):
+        return [dict(second), {
+            "key": "day0-company-intro-linked", "title": "公司基础介绍材料", "kind": "HTTPS_LINK",
+            "url": "https://zx6w57w0j34.feishu.cn/docx/B9f2d0P0ior6UBxTeFRc2ELmnlg",
+            "source_label": "Day 1 材料二", "estimated_duration_minutes": 1, "required": bool(first.get("required")),
+        }]
+    stage_by_prefix = {
+        "tre002": "TRE-002-AI-DATA-BASICS", "tre003": "TRE-003-PROJECT-AWARENESS",
+        "tre004": "TRE-004-DELIVERY-FIT", "asm001": "ASM-001-RULE-BREAKDOWN",
+        "asm002": "ASM-002-MODEL-JUDGEMENT", "asm003": "ASM-003-DATA-CONSTRUCTION",
+    }
+    prefix = str(second.get("key", "")).removesuffix("-document")
+    video_key = "tre002-video-note" if prefix == "tre002" else prefix + "-video"
+    if first.get("key") != video_key or second.get("key") != prefix + "-document":
+        return materials
+    if prefix == "tre001":
+        label, title1, title2 = "宝藏一", "使命愿景价值观", "公司价值体现视频"
+        old_url = "https://zx6w57w0j34.feishu.cn/docx/Av3pdq3lhoQlfbxcep1cG8gtn4e"
+        url1 = "https://zx6w57w0j34.feishu.cn/wiki/TUV1wbptdiXmapkfDsOcRrvknme"
+        url2 = "https://zx6w57w0j34.feishu.cn/file/PewIbRCP3oDKAIx7MS9cSqUMnod"
+    elif prefix in stage_by_prefix:
+        label, title1, title2, url1, url2 = LEGACY_STAGE_LINKS[stage_by_prefix[prefix]]
+        old_url = url1
+    else:
+        return materials
+    if urlsplit(str(second.get("url", "")))._replace(query="", fragment="").geturl() != old_url:
+        return materials
+    document_key = str(second["key"]) if old_url == url1 else prefix + "-document-linked"
+    return [
+        {**second, "key": document_key, "title": title1, "url": url1, "source_label": label + "材料一"},
+        {"key": prefix + "-video-linked", "title": title2, "kind": "HTTPS_LINK", "url": url2,
+         "source_label": label + "材料二", "estimated_duration_minutes": 1, "required": bool(first.get("required"))},
+    ]
 
 
 def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
@@ -107,7 +155,7 @@ def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
             "estimated_duration_minutes": 1,
             "required": True,
         }, {**video, "source_label": "宝藏一材料二"}]
-    return materials
+    return published_exploration_materials(materials)
 
 
 def is_publishable_learning_material(material: object) -> bool:
