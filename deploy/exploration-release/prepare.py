@@ -85,6 +85,7 @@ class ExplorationPreparation(Upgrade):
             (self.backup / "restored.json").write_bytes(restored_raw_json)
             (self.backup / "restored.json").chmod(0o600)
             require(restored == before, "RESTORED_FACTS_DIFFER_FROM_DUMP_SNAPSHOT")
+            self.validate_restored_database(network, restore_env)
         finally:
             if container_created:
                 subprocess.run(["docker", "rm", "-f", restore_name], capture_output=True)
@@ -111,6 +112,11 @@ class ExplorationPreparation(Upgrade):
         }
         write_new(self.backup / "backup-receipt.json", json.dumps(receipt, sort_keys=True).encode())
         print(json.dumps(receipt, sort_keys=True), flush=True)
+
+    def validate_restored_database(self, network, restore_env):
+        # Preparation alone intentionally never runs a schema migration.
+        # The separately reviewed activation subclass rehearses it on the copy.
+        pass
 
 
 def main():
