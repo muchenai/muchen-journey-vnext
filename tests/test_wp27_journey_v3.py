@@ -3,6 +3,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from journey_api.fixtures import REVIEWER_ID
+from journey_api.formal_journey_catalog import FORMAL_JOURNEY_KEY
 from journey_api.journey_service import FORMAL_V3_STAGE_KEYS
 from journey_api.main import app
 
@@ -81,7 +82,8 @@ def test_v3_composition_requires_eight_approved_material_bearing_versions():
     existing = data(
         client.get("/api/v1/ops/formal-journeys", headers=OPERATOR)
     )["items"]
-    current = existing[0] if existing else data(
+    existing = [item for item in existing if item["stable_key"] == FORMAL_JOURNEY_KEY]
+    current = max(existing, key=lambda item: item["version"]) if existing else data(
         command(
             "/api/v1/ops/formal-journeys/publish",
             {
@@ -95,6 +97,16 @@ def test_v3_composition_requires_eight_approved_material_bearing_versions():
     )
     assert len(current["stages"]) == 8
     existing_ids = [stage["task_version_id"] for stage in current["stages"]]
+    # Build an explicit invalid input; previous tests may already have published
+    # fully material-bearing versions of this journey.
+    definitions = data(client.get("/api/v1/ops/task-definitions", headers=OPERATOR))["items"]
+    first = next(item for item in definitions if item["stable_key"] == FORMAL_V3_STAGE_KEYS[0])
+    missing_payload = task_payload(first["stable_key"], first["revision"])
+    missing_payload["learning_materials"] = []
+    without_material = data(command(
+        f"/api/v1/ops/task-definitions/{first['id']}/publish", missing_payload,
+    ))
+    existing_ids[0] = without_material["id"]
     missing_inputs = command(
         "/api/v1/ops/formal-journeys/assemble-v3",
         {

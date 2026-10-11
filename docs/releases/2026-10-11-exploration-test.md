@@ -6,6 +6,17 @@
 
 生产发布前仍需实际环境盘点、备份、正式组织与审核人配置、迁移及线上往返验收。不得复制本地 fixture 用户或密钥。
 
+## 发布验证与剩余门禁（2026-10-11）
+
+- LF 干净发布源码、专用 PostgreSQL 测试库：1069 项后端测试通过。按仓库既有约定，外部 Legacy 归档完整性测试不在运行时测试套件中。
+- 前端：100 项测试通过；审核端文字同步后的 6 项针对性检查通过；构建、类型检查通过，lint 无错误。
+- 发布源码及相对主分支新增的 34 个提交均通过 Gitleaks 扫描。真实 `.env`、临时登录会话、浏览器资料和本地测试数据库未纳入 Git。
+- 补齐审核端说明：Day 1、四个宝藏和三项评测的新提交统一进入任务审核；旧辅导记录保留。
+- 已升级 Next.js/eslint-config-next 16.3.8、sharp 0.35.5、source-map-js 1.2.2 和 brace-expansion 修复版本；OpenSSL 构建包更新为 3.5.9-r0 并校验官方包哈希。
+- **未上线**：安全门禁仍拒绝 `GHSA-vfj7-8cjw-p6xm`（braces 3.0.3，经 ESLint 开发依赖引入；官方尚无修复版）。未新增豁免，未关闭审计。
+- **未读取或修改生产数据库**：只读环境盘点准备在 PR #439；生产环境 `production-canary-uat` 仍要求指定审核账号审批。当前 GitHub 登录账号不能代替该审核人。
+- 后续仍需：安全门禁处理、只读盘点正式组织/审核人/已发布任务、验证备份与迁移、配置线上飞书回调与学员登录、构建发布镜像、三端往返验收。禁止把本地 fixture 旅程/用户/会话复制到线上。
+
 ## 被新版行为替代的旧页面断言
 
 - `exploration-camp-first-win-contract.test.mjs`: the first station keeps approved learning input before any personal output

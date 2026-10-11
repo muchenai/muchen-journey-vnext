@@ -13,7 +13,7 @@ test("review queue exposes authoritative priority, SLA, risk, revisions and esca
   for (const field of ["feedback_sla_business_days", "revision_count", "sensitivity", "audience", "conflict_status"]) {
     assert.match(types, new RegExp(field));
   }
-  assert.match(queue, /正式评测/);
+  assert.match(queue, /任务审核/);
   assert.match(queue, /宝藏辅导/);
   assert.match(queue, /容量：未获批准，无法计算/);
   assert.match(queue, /主备与升级/);
@@ -39,7 +39,8 @@ test("ops overview consumes approved workload facts and fails closed on missing 
 
 test("successful empty queue is distinct from unavailable data", () => {
   assert.match(queue, /当前没有待处理记录/);
-  assert.match(queue, /Day 1 仍由 Learner 自证完成/);
+  assert.match(queue, /Day 1 与其他关卡一样，提交后进入任务审核/);
+  assert.match(queue, /审核通过后显示已完成/);
   assert.match(queue, /三项评测/);
   assert.match(queue, /不影响旅程推进、结营或准入/);
 });
