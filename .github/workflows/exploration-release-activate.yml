@@ -21,7 +21,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
     runs-on: ubuntu-latest
     environment: production-canary-uat
-    timeout-minutes: 50
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -100,8 +100,8 @@ jobs:
           opts=(-i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_KNOWN")
           [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
           ssh "${opts[@]}" "root@$JOURNEY_HOST" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$REMOTE_PACKAGE' && install -d -m 0700 '$REMOTE_PACKAGE'"
-          python3 deploy/exploration-release/transfer_package.py
-          ssh "${opts[@]}" "root@$JOURNEY_HOST" "cd '$REMOTE_PACKAGE' && sha256sum -c SHA256SUMS && python3 activate.py" < "$ACTIVATION_PAYLOAD" | tee "$RUNNER_TEMP/journey-activation.txt"
+          python3 deploy/exploration-release/transfer_package.py | tee "$RUNNER_TEMP/journey-activation.txt"
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "cd '$REMOTE_PACKAGE' && sha256sum -c SHA256SUMS && python3 activate.py" < "$ACTIVATION_PAYLOAD" | tee -a "$RUNNER_TEMP/journey-activation.txt"
       - name: Close and verify the exact runner SSH rule
         if: always() && steps.runner.outputs.cidr != ''
         env:
