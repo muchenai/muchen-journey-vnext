@@ -45,7 +45,8 @@ def package(build, output):
         chunks = []
         with compressed.open("rb") as handle:
             index = 0
-            while data := handle.read(16 * 1024 * 1024):
+            # Smaller parts suit the slow cross-region link without changing hashes.
+            while data := handle.read(2 * 1024 * 1024):
                 path = output / f"{name}.part{index:04}"
                 path.write_bytes(data)
                 chunks.append({"file": path.name, "sha256": hashlib.sha256(data).hexdigest()})
