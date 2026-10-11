@@ -8,12 +8,15 @@ from scripts import wp31_prepare_amd64_dockerfiles as build
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# This utility intentionally builds an older, frozen candidate. The current
+# release has independently patched Dockerfiles and must not alter that evidence.
+REVIEWED_ROOT = ROOT / "tests/fixtures/wp31-reviewed"
 
 
 @pytest.mark.parametrize("service", ["api", "worker", "web"])
 def test_transform_preserves_reviewed_architecture_aware_dockerfile(service: str) -> None:
     relative, expected_hash = build.FILES[service]
-    source = (ROOT / relative).read_bytes()
+    source = (REVIEWED_ROOT / relative).read_bytes()
     assert build.sha256_bytes(source) == expected_hash
     derived = build.transform(source)
     assert derived == source
@@ -41,14 +44,14 @@ def test_prepare_binds_exact_candidate_and_refuses_existing_output(
         else "",
     )
     output = tmp_path / "derived"
-    result = build.prepare(ROOT, output)
+    result = build.prepare(REVIEWED_ROOT, output)
     assert result["application_candidate_sha"] == build.CANDIDATE
     assert result["target_platform"] == "linux/amd64"
     assert result["semantic_change"] is False
     manifest = json.loads((output / "build-definition-manifest.json").read_text())
     assert manifest == result
     with pytest.raises(build.Amd64DockerfileError, match="must not already exist"):
-        build.prepare(ROOT, output)
+        build.prepare(REVIEWED_ROOT, output)
 
 
 def test_prepare_accepts_explicit_candidate_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,7 +63,7 @@ def test_prepare_accepts_explicit_candidate_sha(tmp_path: Path, monkeypatch: pyt
         if arguments == ("rev-parse", "--verify", "HEAD")
         else "",
     )
-    result = build.prepare(ROOT, tmp_path / "derived", candidate)
+    result = build.prepare(REVIEWED_ROOT, tmp_path / "derived", candidate)
     assert result["application_candidate_sha"] == candidate
 
 

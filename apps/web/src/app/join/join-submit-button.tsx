@@ -13,7 +13,9 @@ export function JoinSubmitButton({
 
   return (
     <button className="button primary" type="submit" disabled={pending}>
-      {pending ? pendingLabel : idleLabel}
+      <span aria-hidden="true" className="join-button-mark">▶</span>
+      <span>{pending ? pendingLabel : idleLabel}</span>
+      <span aria-hidden="true" className="join-button-arrow">→</span>
     </button>
   );
 }

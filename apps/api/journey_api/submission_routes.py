@@ -46,6 +46,7 @@ from journey_api.models import (
     AttachmentScanStatus,
     AttachmentStatus,
     AuditEntry,
+    Decision,
     Enrollment,
     EnrollmentStatus,
     Evaluation,
@@ -624,6 +625,8 @@ def save_submission_draft(
         return envelope(request, SubmissionDraftOut(**replay))
     assignment = lock_learner_assignment(session, actor, assignment_id)
     ensure_revision(assignment.revision, command.expected_revision)
+    if assignment.status == AssignmentStatus.NEEDS_REVISION and assignment.journey_stage_version_id is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "请先点击重新修改，再保存草稿。")
     if assignment.status not in {
         AssignmentStatus.IN_PROGRESS,
         AssignmentStatus.NEEDS_REVISION,
@@ -720,11 +723,10 @@ def start_evidence_revision(
     ensure_revision(assignment.revision, command.expected_revision)
     stage = assignment_stage(session, assignment)
     if (
-        assignment.status != AssignmentStatus.COMPLETED
+        assignment.status not in {AssignmentStatus.COMPLETED, AssignmentStatus.NEEDS_REVISION}
         or stage is None
-        or stage.completion_policy != JourneyCompletionPolicy.LEARNER_EVIDENCE
     ):
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有已完成的自证站点可以重新测试。")
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有已有审核结果的关卡可以重新修改。")
     submission = session.scalar(
         select(Submission)
         .where(Submission.assignment_id == assignment.id)
@@ -745,7 +747,7 @@ def start_evidence_revision(
         .where(SubmissionDraft.assignment_id == assignment.id)
         .with_for_update()
     )
-    if existing_draft is not None:
+    if existing_draft is not None and assignment.status != AssignmentStatus.NEEDS_REVISION:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点已有未完成草稿。")
     if enrollment.status == EnrollmentStatus.COMPLETED:
         if not enrollment_has_outcome(session, enrollment) or not formal_journey_is_complete(
@@ -760,23 +762,26 @@ def start_evidence_revision(
         enrollment.revision += 1
     elif enrollment_has_outcome(session, enrollment):
         active_retest = active_post_completion_evidence_retest(session, enrollment)
-        if active_retest is not None:
+        if active_retest is not None and active_retest.assignment_id != assignment.id:
             raise ApiError(
                 409,
                 "INVALID_STATE_TRANSITION",
-                "结营后一次只能重新测试一个自证站点。",
+                "结营后一次只能重新修改一个关卡。",
             )
-    session.add(
-        SubmissionDraft(
-            id=uuid.uuid4(),
-            organization_id=actor.organization_id,
-            assignment_id=assignment.id,
-            owner_id=actor.id,
-            body=latest.body,
-            attachment_ids=[],
-            revision=1,
+    if existing_draft is None:
+        session.add(
+            SubmissionDraft(
+                id=uuid.uuid4(),
+                organization_id=actor.organization_id,
+                assignment_id=assignment.id,
+                owner_id=actor.id,
+                body=latest.body,
+                attachment_ids=[str(value) for value in session.scalars(
+                    select(SubmissionVersionAttachment.attachment_id).where(
+                        SubmissionVersionAttachment.submission_version_id == latest.id))],
+                revision=1,
+            )
         )
-    )
     assignment.status = AssignmentStatus.IN_PROGRESS
     assignment.revision += 1
     result = {
@@ -855,7 +860,6 @@ def cancel_evidence_revision(
     if (
         assignment.status != AssignmentStatus.IN_PROGRESS
         or stage is None
-        or stage.completion_policy != JourneyCompletionPolicy.LEARNER_EVIDENCE
         or submission is None
         or submission.current_version_no < 1
     ):
@@ -874,9 +878,19 @@ def cancel_evidence_revision(
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
     )
-    assignment.status = AssignmentStatus.COMPLETED
+    # Cancel restores the latest immutable human result, including a rejection.
+    latest_decision = session.scalar(
+        select(Evaluation.decision)
+        .join(SubmissionVersion, SubmissionVersion.id == Evaluation.submission_version_id)
+        .where(SubmissionVersion.submission_id == submission.id,
+               SubmissionVersion.version_no == submission.current_version_no,
+               Evaluation.assignment_id == assignment.id)
+    )
+    assignment.status = (AssignmentStatus.NEEDS_REVISION
+                         if latest_decision == Decision.REVISION_REQUIRED
+                         else AssignmentStatus.COMPLETED)
     assignment.revision += 1
-    if post_completion_retest is not None:
+    if post_completion_retest is not None and assignment.status == AssignmentStatus.COMPLETED:
         restore_completed_enrollment_after_evidence_retest(session, enrollment)
     result = {
         "resource_id": str(assignment.id),
@@ -949,6 +963,8 @@ def submit_assignment(
         return envelope(request, SubmissionMutationOut(**replay))
     ensure_revision(assignment.revision, command.expected_revision)
     source_status = assignment.status
+    if source_status == AssignmentStatus.NEEDS_REVISION and assignment.journey_stage_version_id is not None:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "请先点击重新修改，再提交任务。")
     if source_status not in {
         AssignmentStatus.IN_PROGRESS,
         AssignmentStatus.NEEDS_REVISION,
@@ -1005,100 +1021,49 @@ def submit_assignment(
     if enrollment is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
     stage = assignment_stage(session, assignment)
-    learner_evidence = bool(
-        stage is not None
-        and stage.completion_policy == JourneyCompletionPolicy.LEARNER_EVIDENCE
-    )
-    treasure_coaching = bool(
-        learner_evidence
-        and stage is not None
-        and stage.stage_kind == JourneyStageKind.TREASURE
-    )
-    post_completion_retest = (
-        active_post_completion_evidence_retest(session, enrollment)
-        if learner_evidence
-        else None
-    )
-    if (
-        post_completion_retest is not None
-        and post_completion_retest.assignment_id != assignment.id
-    ):
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前站点不是正在进行的结营后重测。")
-    if learner_evidence and assignment.status == AssignmentStatus.NEEDS_REVISION:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "认知证据阶段不进入评审修订。")
-    review: Review | None = None
-    if not learner_evidence:
-        try:
-            target_status = transition_formal_assignment(
-                current=source_status,
-                event=(
-                    FormalAssignmentEvent.RESUBMIT
-                    if source_status is AssignmentStatus.NEEDS_REVISION
-                    else FormalAssignmentEvent.SUBMIT
-                ),
-                actor_kind=WorkflowActorKind.LEARNER,
-                actor_id=actor.id,
-                learner_id=enrollment.learner_id,
-                assigned_reviewer_id=enrollment.reviewer_id,
-                new_submission_version=True,
-            )
-        except FormalAssignmentTransitionError as exc:
-            raise ApiError(
-                409, "INVALID_STATE_TRANSITION", "当前任务不能提交。"
-            ) from exc
-    if not learner_evidence:
-        review = Review(
-            id=uuid.uuid4(),
-            organization_id=assignment.organization_id,
-            assignment_id=assignment.id,
-            submission_id=submission.id,
-            submission_version_id=version.id,
-            reviewer_id=enrollment.reviewer_id,
-            review_kind=ReviewKind.FORMAL_EVALUATION,
-            status=ReviewStatus.ASSIGNED,
-            revision=1,
+    # Published legacy stages retain their original metadata, but every new
+    # submission now requires a formal human review (including Day 1/treasures).
+    try:
+        target_status = transition_formal_assignment(
+            current=source_status,
+            event=(FormalAssignmentEvent.RESUBMIT
+                   if source_status is AssignmentStatus.NEEDS_REVISION
+                   else FormalAssignmentEvent.SUBMIT),
+            actor_kind=WorkflowActorKind.LEARNER,
+            actor_id=actor.id,
+            learner_id=enrollment.learner_id,
+            assigned_reviewer_id=enrollment.reviewer_id,
+            new_submission_version=True,
         )
-        session.add(review)
-    elif treasure_coaching:
-        now = datetime.now(UTC)
-        previous_open_reviews = session.scalars(
-            select(Review)
-            .where(
-                Review.organization_id == assignment.organization_id,
-                Review.assignment_id == assignment.id,
-                Review.review_kind == ReviewKind.LEARNING_COACHING,
-                Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
-            )
-            .with_for_update()
-        ).all()
-        for previous in previous_open_reviews:
-            previous.status = ReviewStatus.SUPERSEDED
-            previous.superseded_at = now
-            previous.revision += 1
-        review = Review(
-            id=uuid.uuid4(),
-            organization_id=assignment.organization_id,
-            assignment_id=assignment.id,
-            submission_id=submission.id,
-            submission_version_id=version.id,
-            reviewer_id=enrollment.reviewer_id,
-            review_kind=ReviewKind.LEARNING_COACHING,
-            status=ReviewStatus.ASSIGNED,
-            revision=1,
-        )
-        session.add(review)
+    except FormalAssignmentTransitionError as exc:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能提交。") from exc
+    # Legacy coaching reviews refer to older versions and cannot review this one.
+    for previous in session.scalars(select(Review).where(
+        Review.assignment_id == assignment.id,
+        Review.review_kind == ReviewKind.LEARNING_COACHING,
+        Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
+    ).with_for_update()).all():
+        previous.status = ReviewStatus.SUPERSEDED
+        previous.superseded_at = datetime.now(UTC)
+        previous.revision += 1
+    review = Review(
+        id=uuid.uuid4(), organization_id=assignment.organization_id,
+        assignment_id=assignment.id, submission_id=submission.id,
+        submission_version_id=version.id, reviewer_id=enrollment.reviewer_id,
+        review_kind=ReviewKind.FORMAL_EVALUATION,
+        status=ReviewStatus.ASSIGNED, revision=1,
+    )
+    session.add(review)
     submission.current_version_no = version_no
-    assignment.status = AssignmentStatus.COMPLETED if learner_evidence else target_status
+    assignment.status = target_status
     assignment.revision += 1
     session.execute(
         delete(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id)
     )
-    if post_completion_retest is not None:
-        restore_completed_enrollment_after_evidence_retest(session, enrollment)
     result = SubmissionMutationOut(
         assignment_id=assignment.id,
         assignment_status=public_assignment_status(
-            assignment.status, formal=not learner_evidence
+            assignment.status
         ),
         assignment_revision=assignment.revision,
         submission_id=submission.id,
@@ -1114,16 +1079,7 @@ def submit_assignment(
         payload=payload,
         response=result.model_dump(mode="json"),
     )
-    add_event(
-        session,
-        "journey_stage.evidence_completed.v1"
-        if learner_evidence
-        else "submission.created.v1",
-        "assignment" if learner_evidence else "submission",
-        assignment.id if learner_evidence else submission.id,
-    )
-    if review is not None and treasure_coaching:
-        add_event(session, "coaching_review.assigned.v1", "review", review.id)
+    add_event(session, "submission.created.v1", "submission", submission.id)
     add_audit(
         session,
         request=request,
@@ -1137,7 +1093,7 @@ def submit_assignment(
             "version_no": version.version_no,
             "attachment_count": len(attachments),
             "completion_policy": (
-                stage.completion_policy.value if stage is not None else "LEGACY_REVIEW"
+                JourneyCompletionPolicy.REVIEW_REQUIRED.value
             ),
         },
     )

@@ -122,7 +122,7 @@ def validate_published_structure(stages: list[JourneyStageVersion]) -> None:
             if stage.stage_kind == JourneyStageKind.ASSESSMENT
             else JourneyCompletionPolicy.LEARNER_EVIDENCE
         )
-        if stage.completion_policy != expected_policy:
+        if stage.completion_policy not in {expected_policy, JourneyCompletionPolicy.REVIEW_REQUIRED}:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "正式探索营阶段完成策略无效。")
 
 
@@ -283,7 +283,7 @@ def publish_catalog_journey(
             stable_key=item.stable_key,
             position=position,
             stage_kind=item.stage_kind,
-            completion_policy=item.completion_policy,
+            completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED,
             task_version_id=task_version.id,
             title=item.title,
             short_description=item.short_description,
@@ -398,11 +398,7 @@ def publish_composed_v3_journey(
             if position < 5
             else JourneyStageKind.ASSESSMENT
         )
-        completion_policy = (
-            JourneyCompletionPolicy.REVIEW_REQUIRED
-            if stage_kind == JourneyStageKind.ASSESSMENT
-            else JourneyCompletionPolicy.LEARNER_EVIDENCE
-        )
+        completion_policy = JourneyCompletionPolicy.REVIEW_REQUIRED
         stages.append(
             JourneyStageVersion(
                 id=uuid.uuid4(),
@@ -462,7 +458,8 @@ def create_journey_assignments(
 
 
 def lock_active_learner_assignment(
-    session: Session, actor: Actor, assignment_id: uuid.UUID
+    session: Session, actor: Actor, assignment_id: uuid.UUID,
+    *, allow_completed_material_review: bool = False,
 ) -> tuple[Assignment, Enrollment]:
     enrollment = session.scalar(
         select(Enrollment)
@@ -472,7 +469,10 @@ def lock_active_learner_assignment(
             Assignment.organization_id == actor.organization_id,
             Enrollment.organization_id == actor.organization_id,
             Enrollment.learner_id == actor.id,
-            Enrollment.status == EnrollmentStatus.ACTIVE,
+            ((Enrollment.status == EnrollmentStatus.ACTIVE)
+             | ((Enrollment.status == EnrollmentStatus.COMPLETED)
+                & (Assignment.status == AssignmentStatus.COMPLETED)
+                & allow_completed_material_review)),
         )
         .with_for_update(of=Enrollment)
     )
@@ -489,14 +489,52 @@ def lock_active_learner_assignment(
     )
     if assignment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的任务。")
-    ensure_formal_assignment_is_current(session, enrollment, assignment)
+    # Reopening materials on a completed stage must not reopen the task itself.
+    # Every other write still requires the current unlocked stage.
+    if not (allow_completed_material_review and assignment.status == AssignmentStatus.COMPLETED):
+        ensure_formal_assignment_is_current(session, enrollment, assignment)
     return assignment, enrollment
+
+
+def completed_evidence_revision_ids(session: Session, enrollment: Enrollment) -> set[uuid.UUID]:
+    """A new draft does not revoke the previously submitted learning milestone.
+
+    Post-graduation retests retain their separate, single-task lifecycle.
+    """
+    if enrollment.journey_version_id is None or enrollment_has_outcome(session, enrollment):
+        return set()
+    return set(session.scalars(
+        select(Assignment.id)
+        .join(JourneyStageVersion, JourneyStageVersion.id == Assignment.journey_stage_version_id)
+        .join(Submission, Submission.assignment_id == Assignment.id)
+        .where(
+            Assignment.enrollment_id == enrollment.id,
+            Assignment.organization_id == enrollment.organization_id,
+            JourneyStageVersion.journey_version_id == enrollment.journey_version_id,
+            Assignment.status == AssignmentStatus.IN_PROGRESS,
+            Submission.current_version_no > 0,
+        )
+    ))
+
+
+def submitted_assignment_ids(session: Session, enrollment: Enrollment) -> set[uuid.UUID]:
+    """Durable unlock facts, including submissions returned for revision."""
+    return set(session.scalars(
+        select(Submission.assignment_id).join(Assignment, Assignment.id == Submission.assignment_id)
+        .where(Assignment.enrollment_id == enrollment.id,
+               Assignment.organization_id == enrollment.organization_id,
+               Submission.organization_id == enrollment.organization_id,
+               Submission.current_version_no > 0)
+    ).all())
 
 
 def ensure_formal_assignment_is_current(
     session: Session, enrollment: Enrollment, assignment: Assignment
 ) -> None:
     if enrollment.journey_version_id is None:
+        return
+    submitted_ids = submitted_assignment_ids(session, enrollment)
+    if assignment.id in submitted_ids:
         return
     current_id = session.scalar(
         select(Assignment.id)
@@ -512,6 +550,7 @@ def ensure_formal_assignment_is_current(
             Assignment.status.not_in(
                 [AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED]
             ),
+            Assignment.id.not_in(submitted_ids),
         )
         .order_by(JourneyStageVersion.position, Assignment.id)
         .limit(1)
@@ -520,7 +559,7 @@ def ensure_formal_assignment_is_current(
         raise ApiError(
             409,
             "JOURNEY_STAGE_LOCKED",
-            "请先完成当前阶段，后续节点尚未开放。",
+            "请先提交当前阶段，后续节点尚未开放。",
         )
 
 
@@ -614,14 +653,12 @@ def active_post_completion_evidence_retest(
             JourneyStageVersion,
             JourneyStageVersion.id == Assignment.journey_stage_version_id,
         )
-        .join(SubmissionDraft, SubmissionDraft.assignment_id == Assignment.id)
         .where(
             Assignment.enrollment_id == enrollment.id,
             Assignment.organization_id == enrollment.organization_id,
-            Assignment.status == AssignmentStatus.IN_PROGRESS,
+            Assignment.status.in_([AssignmentStatus.IN_PROGRESS, AssignmentStatus.SUBMITTED,
+                                  AssignmentStatus.IN_REVIEW, AssignmentStatus.NEEDS_REVISION]),
             JourneyStageVersion.organization_id == enrollment.organization_id,
-            JourneyStageVersion.completion_policy
-            == JourneyCompletionPolicy.LEARNER_EVIDENCE,
         )
         .order_by(Assignment.position, Assignment.id)
     ).first()

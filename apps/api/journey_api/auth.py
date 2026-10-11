@@ -30,6 +30,7 @@ class Actor:
     display_name: str
     session_id: UUID | None = None
     entry_role: Role | None = None
+    external_identity_verified: bool = False
 
     def has_role(self, role: Role) -> bool:
         return role in self.roles
@@ -41,6 +42,11 @@ def enforce_canary_learner_scope(actor: Actor) -> Actor:
         settings.release_marker == "PRODUCTION_CANARY_UAT"
         and actor.has_role(Role.LEARNER)
         and actor.id not in set(settings.canary_learner_user_ids)
+        and not (
+            settings.feishu_learner_registration_enabled
+            and actor.external_identity_verified
+            and actor.organization_id == settings.feishu_learner_organization_id
+        )
     ):
         raise ApiError(
             403,
@@ -136,6 +142,7 @@ def get_actor(
                 user.display_name,
                 identity_session.id,
                 identity_session.role if identity_session.role in roles else None,
+                identity_session.external_identity_id is not None,
             )
         )
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:

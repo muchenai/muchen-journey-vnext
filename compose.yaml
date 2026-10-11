@@ -49,6 +49,13 @@ services:
       INVITE_SECRET: journey-next-local-invite-secret-change-me
       IMPORT_SIGNING_KEY: journey-next-local-import-signing-key-change-me
       ATTACHMENTS_ENABLED: "true"
+      FEISHU_OAUTH_ENABLED: ${FEISHU_OAUTH_ENABLED:-false}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_OAUTH_REDIRECT_URI: ${FEISHU_OAUTH_REDIRECT_URI:-http://localhost:3000/auth/feishu/callback}
+      FEISHU_LEARNER_REGISTRATION_ENABLED: "true"
+      FEISHU_LEARNER_ORGANIZATION_ID: ${FEISHU_LEARNER_ORGANIZATION_ID:-10000000-0000-4000-8000-000000000001}
+      FEISHU_LEARNER_REVIEWER_ID: ${FEISHU_LEARNER_REVIEWER_ID:-10000000-0000-4000-8000-000000000003}
     depends_on:
       db:
         condition: service_healthy
@@ -101,6 +108,7 @@ services:
       APP_RELEASE: wp06-local-no-head
       CONFIG_SCHEMA_VERSION: 3
       API_INTERNAL_URL: http://api:8000
+      FEISHU_OAUTH_REDIRECT_URI: ${FEISHU_OAUTH_REDIRECT_URI:-http://localhost:3000/auth/feishu/callback}
       ALLOW_FIXTURE_IDENTITY: "true"
     depends_on:
       api:

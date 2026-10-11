@@ -912,8 +912,8 @@ class JourneyStageVersion(Base):
         ),
         CheckConstraint("position >= 0", name="ck_journey_stages_nonnegative_position"),
         CheckConstraint(
-            "(stage_kind IN ('DAY_0', 'TREASURE') AND completion_policy = 'LEARNER_EVIDENCE') "
-            "OR (stage_kind = 'ASSESSMENT' AND completion_policy = 'REVIEW_REQUIRED')",
+            "completion_policy = 'REVIEW_REQUIRED' OR "
+            "(stage_kind IN ('DAY_0', 'TREASURE') AND completion_policy = 'LEARNER_EVIDENCE')",
             name="ck_journey_stages_kind_policy",
         ),
     )

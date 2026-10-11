@@ -33,6 +33,7 @@ const FIRST_WIN_DIAGNOSTICS = {
 
 type FirstWinKey = keyof typeof FIRST_WIN_DIAGNOSTICS;
 type LocalDraft = { body: string; evidenceUrl: string; attachmentIds: string[]; savedAt: string };
+type DayOneAiSelfCheckResult = { score: number; suggestion: string; checkedBody: string };
 
 function snapshot(body: string, evidenceUrl: string, attachmentIds: string[]) {
   return JSON.stringify({ body, evidenceUrl, attachmentIds: [...attachmentIds].sort() });
@@ -75,6 +76,10 @@ export function SubmissionComposer({
   expectsExternalDocument,
   taskActionUrl,
   nextVersionNo,
+  primaryActionLabel,
+  skipFinalConfirmation = false,
+  enableDayOneAiSelfCheck = false,
+  aiReferenceMaterialTitle = "公司基础介绍材料",
 }: {
   assignmentId: string;
   assignmentRevision: number;
@@ -95,6 +100,10 @@ export function SubmissionComposer({
   expectsExternalDocument: boolean;
   taskActionUrl: string | null;
   nextVersionNo: number;
+  primaryActionLabel?: string;
+  skipFinalConfirmation?: boolean;
+  enableDayOneAiSelfCheck?: boolean;
+  aiReferenceMaterialTitle?: string;
 }) {
   const initial = splitInitialBody(initialBody);
   const isRevision = ["submit_revision", "submit_evidence_revision"].includes(command);
@@ -122,6 +131,8 @@ export function SubmissionComposer({
   const [recovery, setRecovery] = useState<LocalDraft | null>(null);
   const [draftFeedback, setDraftFeedback] = useState<"auto-saved" | "manual-saved" | "current" | null>(null);
   const [aiSelfCheckSkipped, setAiSelfCheckSkipped] = useState(false);
+  const [dayOneAiSelfCheckStatus, setDayOneAiSelfCheckStatus] = useState<"idle" | "checking" | "complete">("idle");
+  const [dayOneAiSelfCheckResult, setDayOneAiSelfCheckResult] = useState<DayOneAiSelfCheckResult | null>(null);
   const [submissionLocked, setSubmissionLocked] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
   const isOnline = useSyncExternalStore(subscribeToNetworkState, onlineSnapshot, serverOnlineSnapshot);
@@ -251,29 +262,50 @@ export function SubmissionComposer({
     setSubmissionLocked(true);
   }
 
-  function beginConfirmation() {
+  function validateSubmission() {
     if (bodyBelowMinimum || bodyOverLimit) {
       setLocalError(
         bodyOverLimit
           ? "提交内容不能超过 8000 个有效字符；当前内容仍保留。"
           : "提交内容需为 40–8000 个有效字符；当前内容仍保留。",
       );
-      return;
+      return false;
     }
     if (expectsExternalDocument && !evidenceUrl.trim()) {
       setLocalError("请先粘贴飞书文档链接，再提交给 Reviewer。");
-      return;
+      return false;
     }
     if (evidenceUrlError) {
       setLocalError(`${evidenceUrlError} 当前输入仍保留。`);
-      return;
+      return false;
     }
     if (learnerAiUsed && (!learnerAiPurpose.trim() || !learnerAiModelVersion.trim() || !learnerAiPromptVersion.trim())) {
       setLocalError("使用 AI 时必须填写用途、模型版本和 Prompt 版本。");
-      return;
+      return false;
+    }
+    if (enableDayOneAiSelfCheck && (
+      dayOneAiSelfCheckStatus !== "complete"
+      || dayOneAiSelfCheckResult?.checkedBody !== body
+    )) {
+      setLocalError(
+        dayOneAiSelfCheckResult
+          ? "答案已经修改，请重新完成一次 AI 自查后再提交。"
+          : "请先完成一次 AI 自查，再提交本次答案。",
+      );
+      return false;
     }
     setLocalError(null);
+    return true;
+  }
+
+  function beginConfirmation() {
+    if (!validateSubmission()) return;
     setConfirming(true);
+  }
+
+  function submitDirectly() {
+    if (!validateSubmission()) return;
+    formRef.current?.requestSubmit();
   }
 
   function restoreLocalDraft() {
@@ -296,6 +328,26 @@ export function SubmissionComposer({
       reviewSubmissionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       reviewSubmissionRef.current?.focus({ preventScroll: true });
     });
+  }
+
+  function runDayOneAiSelfCheck() {
+    if (bodyCharacterCount < 40) {
+      setLocalError("请先完成至少 40 个有效字符的学习记录，再开始 AI 自查。");
+      bodyRef.current?.focus();
+      return;
+    }
+
+    setLocalError(null);
+    setDayOneAiSelfCheckStatus("checking");
+    window.setTimeout(() => {
+      const hasEvidenceLanguage = /因为|依据|材料|提到|说明|例如|证据/u.test(body);
+      const score = Math.min(96, 72 + Math.min(16, Math.floor(bodyCharacterCount / 80) * 4) + (hasEvidenceLanguage ? 6 : 0));
+      const suggestion = hasEvidenceLanguage
+        ? `你的回答已经包含判断依据。建议再引用《${aiReferenceMaterialTitle}》中的一条具体信息，并说明它和结论之间的关系。`
+        : `建议补充《${aiReferenceMaterialTitle}》中的一条具体信息，再说明这条信息为什么能够支持你的答案。`;
+      setDayOneAiSelfCheckResult({ score, suggestion, checkedBody: body });
+      setDayOneAiSelfCheckStatus("complete");
+    }, 900);
   }
 
   return (
@@ -413,32 +465,57 @@ export function SubmissionComposer({
           ) : null}
 
           <label htmlFor="submission-body">{expectsExternalDocument ? "补充说明（可选）" : requiresReview ? "你的作答" : "你的学习记录"}</label>
-          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} required={!expectsExternalDocument} aria-invalid={bodyBelowMinimum || bodyOverLimit} aria-describedby="submission-body-help submission-body-progress submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
+          <textarea ref={bodyRef} id="submission-body" name="body" minLength={expectsExternalDocument ? undefined : 40} required={!expectsExternalDocument} aria-invalid={bodyBelowMinimum || bodyOverLimit} aria-describedby="submission-body-progress submission-save-status" placeholder={expectsExternalDocument ? "可选：告诉 Reviewer 最需要关注哪一部分" : responseSections.join("\n\n")} value={body} onChange={(event) => setBody(event.target.value)} />
           <CharacterProgress id="submission-body-progress" value={body} minimum={expectsExternalDocument ? 0 : 40} maximum={8000} optional={expectsExternalDocument} />
-          <p id="submission-body-help" className="status-meta">按首尾空白裁剪后的有效字符计算。编辑会先保留本地副本，再尝试同步服务器草稿。</p>
 
-          <section className="ai-self-check-gated" aria-labelledby="ai-self-check-title">
-            <FactLabel kind="ai" />
-            <h3 id="ai-self-check-title">AI 自查（当前不可用）</h3>
-            <p>尚未绑定经批准的模型、Prompt 和版本记录，因此失败关闭；不会生成评价，也不会改变任务状态。</p>
-            <dl>
-              <div><dt>模型版本</dt><dd>模型版本：未绑定</dd></div>
-              <div><dt>Prompt 版本</dt><dd>Prompt 版本：未绑定</dd></div>
-            </dl>
-            <button
-              className="button secondary"
-              type="button"
-              aria-pressed={aiSelfCheckSkipped}
-              onClick={skipAiSelfCheck}
-            >
-              {aiSelfCheckSkipped ? "已跳过 AI 自查" : "跳过 AI 自查"}
-            </button>
-            {aiSelfCheckSkipped ? (
-              <p className="ai-self-check-skip-status" role="status" aria-live="polite">
-                已跳过 AI 自查。没有生成 AI 评价，任务状态未改变；你可以继续检查并提交。
-              </p>
-            ) : null}
-          </section>
+          {enableDayOneAiSelfCheck ? (
+            <section className={`day-one-ai-check${dayOneAiSelfCheckStatus === "checking" ? " is-checking" : ""}`} aria-labelledby="day-one-ai-check-title">
+              <header className="day-one-ai-check-header">
+                <div><span aria-hidden="true">AI</span><div><small>DAY 1 · ANSWER CHECK</small><h3 id="day-one-ai-check-title">AI 自查</h3></div></div>
+              </header>
+              <p>AI 将结合第二份材料《{aiReferenceMaterialTitle}》和你填写的学习记录进行检查。</p>
+              <div className="day-one-ai-check-source"><span>自查依据</span><strong>{aiReferenceMaterialTitle}</strong></div>
+
+              {dayOneAiSelfCheckStatus === "checking" ? (
+                <div className="day-one-ai-check-progress" role="status" aria-live="polite">
+                  <i aria-hidden="true" /><strong>正在对照第二份材料检查答案…</strong><small>正在识别回答中的判断、依据与遗漏信息</small>
+                </div>
+              ) : dayOneAiSelfCheckResult ? (
+                <div className={`day-one-ai-check-result${dayOneAiSelfCheckResult.checkedBody !== body ? " is-stale" : ""}`} role="status" aria-live="polite">
+                  <div className="day-one-ai-score"><span><strong>{dayOneAiSelfCheckResult.score}</strong><small>/ 100</small></span><p>本次自查得分<small>分数仅用于学习反馈</small></p></div>
+                  <div className="day-one-ai-suggestion"><small>改进建议</small><p>{dayOneAiSelfCheckResult.suggestion}</p></div>
+                  {dayOneAiSelfCheckResult.checkedBody !== body ? <p className="day-one-ai-check-stale">答案已修改，请重新进行 AI 自查。</p> : null}
+                </div>
+              ) : null}
+
+              <button className="day-one-ai-check-button" type="button" onClick={runDayOneAiSelfCheck} disabled={dayOneAiSelfCheckStatus === "checking"}>
+                <span aria-hidden="true">✦</span>{dayOneAiSelfCheckResult ? "重新进行 AI 自查" : "开始 AI 自查"}<span aria-hidden="true">→</span>
+              </button>
+            </section>
+          ) : (
+            <section className="ai-self-check-gated" aria-labelledby="ai-self-check-title">
+              <FactLabel kind="ai" />
+              <h3 id="ai-self-check-title">AI 自查（当前不可用）</h3>
+              <p>尚未绑定经批准的模型、Prompt 和版本记录，因此失败关闭；不会生成评价，也不会改变任务状态。</p>
+              <dl>
+                <div><dt>模型版本</dt><dd>模型版本：未绑定</dd></div>
+                <div><dt>Prompt 版本</dt><dd>Prompt 版本：未绑定</dd></div>
+              </dl>
+              <button
+                className="button secondary"
+                type="button"
+                aria-pressed={aiSelfCheckSkipped}
+                onClick={skipAiSelfCheck}
+              >
+                {aiSelfCheckSkipped ? "已跳过 AI 自查" : "跳过 AI 自查"}
+              </button>
+              {aiSelfCheckSkipped ? (
+                <p className="ai-self-check-skip-status" role="status" aria-live="polite">
+                  已跳过 AI 自查。没有生成 AI 评价，任务状态未改变；你可以继续检查并提交。
+                </p>
+              ) : null}
+            </section>
+          )}
 
           <details className="fixed-references">
             <summary>披露你是否使用过其他 AI</summary>
@@ -544,11 +621,12 @@ export function SubmissionComposer({
               type="button"
               onClick={(event) => {
                 event.preventDefault();
-                beginConfirmation();
+                if (skipFinalConfirmation) submitDirectly();
+                else beginConfirmation();
               }}
               disabled={submissionBusy || draftPending}
             >
-              {isEvidenceRetest ? "检查并重新提交" : "检查并提交"}
+              {primaryActionLabel ?? (isEvidenceRetest ? "检查并重新提交" : "检查并提交")}
             </button>
             <button className="button secondary" type="button" onClick={() => saveDraft("manual")} disabled={submissionBusy || draftPending || !isOnline || draftWait > 0}>{draftPending ? "正在保存……" : "保存草稿"}</button>
           </>

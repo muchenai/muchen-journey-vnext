@@ -6,6 +6,7 @@ import pytest
 
 from scripts.web_dependency_audit import (
     BRACE_EXPANSION_DOS,
+    BRACES_PARSE_DOS,
     AuditError,
     main,
     validate_report,
@@ -93,3 +94,17 @@ def test_audit_allows_registry_response_within_five_minute_bound(
         "WEB_DEPENDENCY_AUDIT=PASS vulnerability_packages=0"
         in capsys.readouterr().out
     )
+
+
+@pytest.mark.parametrize("day", [date(2026, 10, 11), date(2026, 10, 18)])
+def test_owner_approved_braces_exception_is_dev_only_and_time_bounded(day):
+    count, waived = validate_report(report(BRACES_PARSE_DOS), lock(), today=day)
+    assert count == 2
+    assert waived == {BRACES_PARSE_DOS}
+    with pytest.raises(AuditError, match="non-dev"):
+        validate_report(report(BRACES_PARSE_DOS), lock(minimatch_dev=False), today=day)
+
+
+def test_braces_exception_stops_after_october_18():
+    with pytest.raises(AuditError, match="expired"):
+        validate_report(report(BRACES_PARSE_DOS), lock(), today=date(2026, 10, 19))

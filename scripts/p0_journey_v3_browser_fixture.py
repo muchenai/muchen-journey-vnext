@@ -49,17 +49,68 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         f"P0LearnerExperienceMaterial{stable_key.replace('-', '')}"
         "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
     )
+    if stable_key == "DAY-0":
+        material_url = "https://zx6w57w0j34.feishu.cn/wiki/MpxDwemUwiOY0fk9jM5cqRYRn3b"
+    elif stable_key == "TRE-001-COMPANY-VALUES":
+        material_url = "https://zx6w57w0j34.feishu.cn/file/PewIbRCP3oDKAIx7MS9cSqUMnod"
     challenge_url = (
         "https://example.feishu.cn/docx/"
         f"P0LearnerChallenge{stable_key.replace('-', '')}"
         "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
     )
+    if stable_key == "TRE-001-COMPANY-VALUES":
+        challenge_url = "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg"
     answer_url = (
         "https://example.feishu.cn/docx/"
         f"P0LearnerAnswer{stable_key.replace('-', '')}"
         "?from=from_copylink&source=p0-2r2-real-length-layout-regression"
     )
     requires_external_document = stable_key.startswith("ASM-")
+    learning_materials = [
+        {
+            "key": f"material-{stable_key.lower()}",
+            "title": (
+                "给 Muchener 的一封信"
+                if stable_key == "DAY-0"
+                else "沐晨AI新人培训视频"
+                if stable_key == "TRE-001-COMPANY-VALUES"
+                else f"{title}学习输入"
+            ),
+            "kind": "HTTPS_LINK",
+            "source_label": "P0 隔离浏览器夹具",
+            "url": material_url,
+            "estimated_duration_minutes": 1,
+            "required": True,
+        }
+    ]
+    verified_material_urls = [material_url]
+    if stable_key == "TRE-001-COMPANY-VALUES":
+        learning_materials.append(
+            {
+                "key": "material-tre-001-company-values-quiz",
+                "title": "宝藏一｜视频小测",
+                "kind": "HTTPS_LINK",
+                "source_label": "宝藏一任务题目",
+                "url": challenge_url,
+                "estimated_duration_minutes": 1,
+                "required": False,
+            }
+        )
+        verified_material_urls.append(challenge_url)
+    if stable_key == "DAY-0":
+        second_material_url = "https://zx6w57w0j34.feishu.cn/wiki/YpaGw0EgqidJUykHcqxcLgCvnvc"
+        learning_materials.append(
+            {
+                "key": "material-day-0-action",
+                "title": "公司基础介绍材料",
+                "kind": "HTTPS_LINK",
+                "source_label": "P0 隔离浏览器夹具",
+                "url": second_material_url,
+                "estimated_duration_minutes": 1,
+                "required": True,
+            }
+        )
+        verified_material_urls.append(second_material_url)
     return {
         "expected_revision": revision,
         "title": title,
@@ -82,18 +133,8 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         "allowed_attachment_types": [],
         "max_attachment_size_bytes": 0,
         "reference_materials": [f"参考答案：{answer_url}"],
-        "learning_materials": [
-            {
-                "key": f"material-{stable_key.lower()}",
-                "title": f"{title}学习输入",
-                "kind": "HTTPS_LINK",
-                "source_label": "P0 隔离浏览器夹具",
-                "url": material_url,
-                "estimated_duration_minutes": 1,
-                "required": True,
-            }
-        ],
-        "verified_material_urls": [material_url],
+        "learning_materials": learning_materials,
+        "verified_material_urls": verified_material_urls,
         "estimated_duration_minutes": 5,
         "rubric": {
             "version": 1,
@@ -187,16 +228,148 @@ def create_reentry(base_url: str, learner_display_name: str) -> str:
     return str(result["invite_token"])
 
 
+def upgrade_day0_materials(base_url: str) -> dict[str, object]:
+    """Publish a new local journey that only replaces Day 0 with two materials."""
+
+    identity_items = request_json(base_url, "/api/v1/ops/identity-access")["items"]
+    reviewer_id = next(item["user_id"] for item in identity_items if item["role"] == "REVIEWER")
+    definitions = request_json(base_url, "/api/v1/ops/task-definitions")["items"]
+    day0_definition = next(item for item in definitions if item["stable_key"] == "DAY-0")
+    published = request_json(
+        base_url,
+        f"/api/v1/ops/task-definitions/{day0_definition['id']}/publish",
+        method="POST",
+        payload=task_payload(
+            "DAY-0",
+            dict(STAGES)["DAY-0"],
+            day0_definition["revision"],
+            reviewer_id,
+        ),
+    )
+    journeys = request_json(base_url, "/api/v1/ops/formal-journeys")["items"]
+    current = max(journeys, key=lambda item: item["version"])
+    current_stages = sorted(current["stages"], key=lambda item: item["position"])
+    journey = request_json(
+        base_url,
+        "/api/v1/ops/formal-journeys/assemble-v3",
+        method="POST",
+        payload={
+            "reviewed_by": reviewer_id,
+            "expected_current_version": current["version"],
+            "task_version_ids": [published["id"]]
+            + [item["task_version_id"] for item in current_stages[1:]],
+            "content_review_note": "Day 0 增加第二份必修学习材料；其余七站沿用原有固定版本。",
+            "review_acknowledged": True,
+        },
+    )
+    invite = request_json(
+        base_url,
+        "/api/v1/ops/invites",
+        method="POST",
+        payload={
+            "purpose": "Day 0 双材料本地验收",
+            "expires_in_hours": 24,
+            "role": "LEARNER",
+            "reviewer_id": reviewer_id,
+            "journey_version_id": journey["id"],
+            "target_user_id": None,
+        },
+    )
+    return {
+        "day0_task_version_id": published["id"],
+        "day0_task_version": published["version"],
+        "journey_version_id": journey["id"],
+        "journey_version": journey["version"],
+        "invite_token": invite["invite_token"],
+        "expires_at": invite["expires_at"],
+    }
+
+
+def upgrade_treasure_one_material(base_url: str) -> dict[str, object]:
+    """Publish a local journey with the requested Treasure 1 video material."""
+
+    identity_items = request_json(base_url, "/api/v1/ops/identity-access")["items"]
+    reviewer_id = next(item["user_id"] for item in identity_items if item["role"] == "REVIEWER")
+    definitions = request_json(base_url, "/api/v1/ops/task-definitions")["items"]
+    definition = next(
+        item for item in definitions if item["stable_key"] == "TRE-001-COMPANY-VALUES"
+    )
+    published = request_json(
+        base_url,
+        f"/api/v1/ops/task-definitions/{definition['id']}/publish",
+        method="POST",
+        payload=task_payload(
+            "TRE-001-COMPANY-VALUES",
+            dict(STAGES)["TRE-001-COMPANY-VALUES"],
+            definition["revision"],
+            reviewer_id,
+        ),
+    )
+    journeys = request_json(base_url, "/api/v1/ops/formal-journeys")["items"]
+    current = max(journeys, key=lambda item: item["version"])
+    current_stages = sorted(current["stages"], key=lambda item: item["position"])
+    task_version_ids = [item["task_version_id"] for item in current_stages]
+    treasure_one_index = next(
+        index
+        for index, item in enumerate(current_stages)
+        if item["stable_key"] == "TRE-001-COMPANY-VALUES"
+    )
+    task_version_ids[treasure_one_index] = published["id"]
+    journey = request_json(
+        base_url,
+        "/api/v1/ops/formal-journeys/assemble-v3",
+        method="POST",
+        payload={
+            "reviewed_by": reviewer_id,
+            "expected_current_version": current["version"],
+            "task_version_ids": task_version_ids,
+            "content_review_note": "宝藏一接入《沐晨AI新人培训视频》；其余七站沿用原有固定版本。",
+            "review_acknowledged": True,
+        },
+    )
+    invite = request_json(
+        base_url,
+        "/api/v1/ops/invites",
+        method="POST",
+        payload={
+            "purpose": "宝藏一视频材料本地验收",
+            "expires_in_hours": 24,
+            "role": "LEARNER",
+            "reviewer_id": reviewer_id,
+            "journey_version_id": journey["id"],
+            "target_user_id": None,
+        },
+    )
+    return {
+        "treasure_one_task_version_id": published["id"],
+        "treasure_one_task_version": published["version"],
+        "journey_version_id": journey["id"],
+        "journey_version": journey["version"],
+        "invite_token": invite["invite_token"],
+        "expires_at": invite["expires_at"],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--create-reentry", action="store_true")
+    parser.add_argument("--upgrade-day0-materials", action="store_true")
+    parser.add_argument("--upgrade-treasure-one-material", action="store_true")
     parser.add_argument("--learner-display-name", default="P0 Browser Learner")
     args = parser.parse_args()
     parsed = urlparse(args.base_url)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}:
         raise SystemExit("P0 browser fixture is restricted to a loopback HTTP API")
     base_url = args.base_url.rstrip("/")
+
+    if args.upgrade_day0_materials:
+        sys.stdout.write(json.dumps(upgrade_day0_materials(base_url), ensure_ascii=False))
+        return 0
+
+    if args.upgrade_treasure_one_material:
+        sys.stdout.write(json.dumps(upgrade_treasure_one_material(base_url), ensure_ascii=False))
+        return 0
 
     if args.create_reentry:
         sys.stdout.write(create_reentry(base_url, args.learner_display_name))

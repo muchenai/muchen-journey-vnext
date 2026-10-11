@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ExperienceState, FactLabel } from "@/app/human-experience";
 import { getJourneyModule, JOURNEY_MODULES } from "@/lib/journey-program";
@@ -23,6 +23,9 @@ export default async function JourneyModulePage({
 
   if (!journeyModule) {
     notFound();
+  }
+  if (journeyModule.key !== "exploration-camp") {
+    redirect("/app?view=dashboard&notice=module-designing");
   }
 
   const enrollments = await learnerPageRequest<{ items: LearnerEnrollment[] }>(

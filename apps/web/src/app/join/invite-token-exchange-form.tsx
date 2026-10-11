@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { exchangeInvite } from "@/app/actions";
 
 import { JoinSubmitButton } from "./join-submit-button";
+import type { JoinLocale } from "./language-switcher";
 
 let capturedToken = "";
 function readFragmentToken(): string {
@@ -26,12 +27,21 @@ function subscribeToFragment(onChange: () => void): () => void {
   };
 }
 
-export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientationDescriptionId: string }) {
+export function InviteTokenExchangeForm({
+  orientationDescriptionId,
+  locale,
+}: {
+  orientationDescriptionId: string;
+  locale: JoinLocale;
+}) {
   const token = useSyncExternalStore(subscribeToFragment, readFragmentToken, () => "");
+  const isEnglish = locale === "en";
 
   useEffect(() => {
     if (token) {
-      window.history.replaceState(null, "", "/join");
+      const query = new URLSearchParams(window.location.search);
+      if (query.get("lang") === "en") window.history.replaceState(null, "", "/join?lang=en");
+      else window.history.replaceState(null, "", "/join");
     }
     return () => {
       capturedToken = "";
@@ -45,8 +55,14 @@ export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientat
         className="join-token-form"
         aria-describedby={orientationDescriptionId}
       >
-        <label htmlFor="invite-token">粘贴完整邀请链接</label>
-        <p id="invite-token-hint">只用于验证本次邀请；链接中的凭证不会留在浏览器地址栏。</p>
+        <label htmlFor="invite-token">
+          {isEnglish ? "Your private invitation" : "你的专属邀请"}
+        </label>
+        <p id="invite-token-hint">
+          {isEnglish
+            ? "Paste the complete invitation link. Its credential will be removed from the address bar."
+            : "粘贴完整邀请链接；链接中的凭证不会留在浏览器地址栏。"}
+        </p>
         <input
           id="invite-token"
           name="token"
@@ -59,7 +75,10 @@ export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientat
           spellCheck={false}
           required
         />
-        <JoinSubmitButton idleLabel="验证专属邀请" pendingLabel="正在验证…" />
+        <JoinSubmitButton
+          idleLabel={isEnglish ? "Verify and start exploring" : "验证专属邀请并开始探索"}
+          pendingLabel={isEnglish ? "Verifying…" : "正在验证…"}
+        />
       </form>
     );
   }
@@ -71,8 +90,14 @@ export function InviteTokenExchangeForm({ orientationDescriptionId }: { orientat
       aria-describedby={orientationDescriptionId}
     >
       <input type="hidden" name="token" value={token} />
-      <p className="join-ready-copy"><strong>邀请已读取</strong><span>验证后还会由你本人确认身份。</span></p>
-      <JoinSubmitButton idleLabel="验证专属邀请" pendingLabel="正在验证…" />
+      <p className="join-ready-copy">
+        <strong>{isEnglish ? "Invitation received" : "邀请已读取"}</strong>
+        <span>{isEnglish ? "You will confirm your identity next." : "验证后还会由你本人确认身份。"}</span>
+      </p>
+      <JoinSubmitButton
+        idleLabel={isEnglish ? "Verify and start exploring" : "验证专属邀请并开始探索"}
+        pendingLabel={isEnglish ? "Verifying…" : "正在验证…"}
+      />
     </form>
   );
 }

@@ -100,7 +100,8 @@ def finalize_current_review(
         )
     )
     dimensions = detail["rubric"]["dimensions"]
-    assert 1 <= len(dimensions) <= 6
+    # Learning stages have a human pass/revise decision without numeric rubric.
+    assert len(dimensions) <= 6
     request_revision = decision == "REQUEST_REVISION"
     rubric = [
         {
@@ -219,8 +220,8 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     action = ok(learner.get("/api/v1/me/current-action"))
     assert action["journey"]["total_stages"] == 8
     assert action["journey"]["completed_stages"] == 0
-    assert action["responsible_party"] == "由你完成证据"
-    assert action["feedback_expectation"] == "提交后进入下一站"
+    assert action["responsible_party"] == "试点主管"
+    assert action["feedback_expectation"].startswith("提交即解锁下一关")
     assert "主管" not in action["reason"]
     day_zero = ok(
         learner.get(f"/api/v1/me/assignments/{action['resource_id']}")
@@ -302,7 +303,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
 
     revised_once = False
     evidence_retest_verified = False
-    formal_retest_rejection_verified = False
+    formal_retest_verified = False
     coaching_revision_verified = False
     coaching_supersede_verified = False
     while action["action_type"] != "VIEW_RESULT_OR_HANDOFF":
@@ -315,9 +316,18 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                 json={"expected_revision": detail["revision"]},
             )
             detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
+        if "start_evidence_revision" in detail["allowed_commands"]:
+            post(
+                learner,
+                f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+                json={"expected_revision": detail["revision"]},
+            )
+            detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
         command = (
             "submit_revision"
             if "submit_revision" in detail["allowed_commands"]
+            else "submit_evidence_revision"
+            if "submit_evidence_revision" in detail["allowed_commands"]
             else "submit"
         )
         assert command in detail["allowed_commands"]
@@ -750,14 +760,14 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
             else:
                 assert finalized["assignment_status"] == "PASSED"
                 if (
-                    not formal_retest_rejection_verified
+                    not formal_retest_verified
                     and stage["stable_key"] == "ASM-002-MODEL-JUDGEMENT"
                 ):
-                    formal_retest_rejection_verified = True
+                    formal_retest_verified = True
                     formal_detail = ok(
                         learner.get(f"/api/v1/me/assignments/{assignment_id}")
                     )
-                    rejected_retest = learner.post(
+                    reopened = learner.post(
                         f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
                         headers={
                             "X-CSRF-Token": learner.cookies["journey_next_csrf"],
@@ -765,13 +775,15 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
                         },
                         json={"expected_revision": formal_detail["revision"]},
                     )
-                    assert rejected_retest.status_code == 409
-                    assert (
-                        rejected_retest.json()["error"]["code"]
-                        == "INVALID_STATE_TRANSITION"
+                    assert ok(reopened)["status"] == "IN_PROGRESS"
+                    cancelled = post(
+                        learner,
+                        f"/api/v1/me/assignments/{assignment_id}/evidence-revision/cancel",
+                        json={"expected_revision": ok(reopened)["revision"]},
                     )
-                if stage["stable_key"] != "ASM-003-DATA-CONSTRUCTION":
-                    # Intermediate formal stages must not expose a final result.
+                    assert cancelled["status"] == "COMPLETED"
+                if ok(learner.get("/api/v1/me/current-action"))["journey"]["completed_stages"] < 8:
+                    # Approval order is independent of submission order.
                     assert learner.get("/api/v1/me/result").status_code == 404
         action = ok(learner.get("/api/v1/me/current-action"))
 
@@ -817,7 +829,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     completed_day_zero = ok(
         learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
     )
-    assert completed_day_zero["status"] == "COMPLETED"
+    assert completed_day_zero["status"] == "PASSED"
     assert completed_day_zero["allowed_commands"] == ["start_evidence_revision"]
     completed_mutation = learner.post(
         f"/api/v1/me/assignments/{day_zero['id']}/start",
@@ -861,7 +873,7 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     another_evidence_node = next(
         node
         for node in completed_action["journey"]["nodes"]
-        if node["completion_policy"] == "LEARNER_EVIDENCE"
+        if node["stage_kind"] in {"DAY_0", "TREASURE"}
         and node["assignment_id"] != day_zero["id"]
     )
     another_evidence = ok(
@@ -979,10 +991,12 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         },
     )
     assert submitted_after_completion["version_no"] == original_version_no + 1
+    assert submitted_after_completion["assignment_status"] == "SUBMITTED"
+    finalize_current_review(reviewer, day_zero["id"], decision="APPROVE")
     final_day_zero = ok(
         learner.get(f"/api/v1/me/assignments/{day_zero['id']}")
     )
-    assert final_day_zero["status"] == "COMPLETED"
+    assert final_day_zero["status"] == "PASSED"
     assert final_day_zero["allowed_commands"] == ["start_evidence_revision"]
     final_result = ok(learner.get("/api/v1/me/result"))
     assert final_result["outcome_id"] == result["outcome_id"]
@@ -1087,6 +1101,10 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
             task=task,
             submission=submission,
             version=submission_version,
+            previous_version=session.scalar(select(SubmissionVersion).where(
+                SubmissionVersion.submission_id == submission.id,
+                SubmissionVersion.version_no == submission_version.version_no - 1,
+            )) if submission_version.version_no > 1 else None,
             review=review,
             evaluation=final_evaluation,
             context=ModuleProjectionContext(

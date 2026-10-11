@@ -17,6 +17,7 @@ from journey_api.feishu_oauth import (
     get_feishu_oauth_client,
 )
 from journey_api.idempotency import canonical_hash, find_replay, store_result
+from journey_api.learner_oauth import lock_learner_organization, provision_learner
 from journey_api.identity import (
     OAUTH_COOKIE,
     add_audit,
@@ -73,6 +74,7 @@ def envelope(request: Request, data: object) -> dict[str, object]:
 
 def safe_entry(role: Role) -> str:
     return {
+        Role.LEARNER: "/app",
         Role.REVIEWER: "/review",
         Role.OPERATOR: "/ops",
         Role.CONTENT_EDITOR: "/content",
@@ -81,6 +83,7 @@ def safe_entry(role: Role) -> str:
 
 def requested_role(return_to: str) -> Role:
     return {
+        "/app": Role.LEARNER,
         "/review": Role.REVIEWER,
         "/ops": Role.OPERATOR,
         "/content": Role.CONTENT_EDITOR,
@@ -939,6 +942,10 @@ def start_feishu_oauth(
 ) -> dict[str, object]:
     require_feishu_enabled()
     settings = get_settings()
+    if command.return_to == "/app":
+        lock_learner_organization(session)
+        if command.link_token is not None:
+            raise ApiError(422, "VALIDATION_FAILED", "学员登录无需绑定链接。")
     enforce_auth_limit(
         request,
         scope="oauth.feishu.start",
@@ -1069,6 +1076,8 @@ def complete_feishu_oauth(
         f"external:{PROVIDER}:{settings.feishu_app_id}",
         profile.open_id,
     )
+    role = requested_role(return_to)
+    learner_organization_id = lock_learner_organization(session) if role == Role.LEARNER else None
     identity = session.scalar(
         select(ExternalIdentity)
         .where(
@@ -1081,7 +1090,10 @@ def complete_feishu_oauth(
     if identity_was_revoked and identity_link_id is None:
         raise ApiError(403, "IDENTITY_REVOKED", "该外部身份已撤销。")
 
-    role = requested_role(return_to)
+    if learner_organization_id is not None:
+        identity = provision_learner(session, identity, subject=subject_hash,
+            name=profile.name, organization_id=learner_organization_id,
+            request_id=request.state.request_id)
     link = None
     if identity_link_id is not None:
         link = session.scalar(
@@ -1192,10 +1204,12 @@ def complete_feishu_oauth(
         .with_for_update()
     ).all()
     for previous in previous_sessions:
-        previous.revoked_at = issued_at
+        if role != Role.LEARNER or previous.role == Role.LEARNER:
+            previous.revoked_at = issued_at
     session_token = random_token()
     csrf_token = random_token()
-    expires_at = issued_at + timedelta(hours=settings.session_ttl_hours)
+    ttl_hours = settings.learner_session_ttl_hours if role == Role.LEARNER else settings.session_ttl_hours
+    expires_at = issued_at + timedelta(hours=ttl_hours)
     identity_session = IdentitySession(
         id=uuid.uuid4(),
         organization_id=user.organization_id,
@@ -1228,7 +1242,7 @@ def complete_feishu_oauth(
         response,
         session_token,
         csrf_token,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=ttl_hours * 3600,
     )
     clear_oauth_cookie(response)
     return envelope(
