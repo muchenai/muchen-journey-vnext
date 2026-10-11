@@ -48,6 +48,16 @@ def test_day_one_keeps_letter_completion_and_links_company_document():
     assert resolved[1]["key"] != source[0]["key"]
 
 
+def test_owner_supplied_video_replaces_legacy_no_video_sentinel_before_filtering():
+    source = [
+        {"key": "tre002-video-note", "title": "视频材料说明", "kind": "TEXT", "body": "无，自行观看", "required": True},
+        {"key": "tre002-document", "title": "AI 与数据基础", "kind": "HTTPS_LINK", "url": "https://zx6w57w0j34.feishu.cn/docx/EDm2dFzmco58SJx10Xeceo0WnIc", "required": True},
+    ]
+    resolved = task_learning_materials(SimpleNamespace(learning_materials=source))
+    assert len(resolved) == 2
+    assert resolved[1]["url"] == "https://zx6w57w0j34.feishu.cn/docx/B9uhdkLwUoqqIYxeh9TcWErbnHd?from=from_parent_sheet"
+
+
 def test_newly_published_video_url_is_authoritative():
     source = [
         {"key": "tre001-video", "title": "新视频", "kind": "HTTPS_LINK", "url": "https://example.com/video", "required": True},
