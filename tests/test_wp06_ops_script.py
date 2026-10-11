@@ -160,7 +160,7 @@ def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
 
 
 def test_current_ops_contract_tracks_0029_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0029_treasure_coaching_reviews"
+    assert ops.EXPECTED_MIGRATION_HEAD == "0031_learner_feishu_login"
     assert ops.SAFE_ROLLBACK_REVISION == "0025_formal_result_gate"
     assert {
         "submission_versions",
@@ -190,7 +190,7 @@ def test_current_ops_contract_tracks_0029_head_and_all_protected_fact_tables():
 
 def test_schema_rollback_only_accepts_the_current_identity_scope_head():
     facts = {
-        "migration_revision": "0029_treasure_coaching_reviews",
+        "migration_revision": "0031_learner_feishu_login",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -202,7 +202,7 @@ def test_schema_rollback_only_accepts_the_current_identity_scope_head():
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0029_treasure_coaching_reviews",
+            "migration_revision": "0031_learner_feishu_login",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -224,7 +224,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0029_treasure_coaching_reviews",
+        "migration_revision": "0031_learner_feishu_login",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []
