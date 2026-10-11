@@ -12,6 +12,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
+from journey_api.reviewer_access import review_visibility
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.formal_assignment_workflow import (
@@ -156,7 +157,7 @@ def scoped_review_lineage(actor: Actor):
     )
 
 
-def scoped_context_query(actor: Actor, review_id: uuid.UUID):
+def scoped_context_query(actor: Actor, review_id: uuid.UUID | None):
     return (
         select(
             Review,
@@ -201,9 +202,9 @@ def scoped_context_query(actor: Actor, review_id: uuid.UUID):
         )
         .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
-            Review.id == review_id,
+            Review.id == review_id if review_id is not None else True,
             Review.organization_id == actor.organization_id,
-            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
+            review_visibility(actor),
             *scoped_review_lineage(actor),
         )
     )
@@ -510,7 +511,7 @@ def review_queue(
         .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.organization_id == actor.organization_id,
-            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
+            review_visibility(actor),
             Review.status.in_([ReviewStatus.ASSIGNED, ReviewStatus.IN_REVIEW]),
             Review.review_kind == kind,
             (
@@ -592,7 +593,7 @@ def review_history(
         .outerjoin(ReviewDelegation, ReviewDelegation.review_id == Review.id)
         .where(
             Review.organization_id == actor.organization_id,
-            (Review.reviewer_id == actor.id) | (ReviewDelegation.reviewer_id == actor.id),
+            review_visibility(actor),
             history_status,
             history_time.is_not(None),
             Review.review_kind == kind,

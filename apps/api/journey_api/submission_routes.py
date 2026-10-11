@@ -559,8 +559,11 @@ def download_attachment(
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
     allowed = actor.has_role(Role.LEARNER) and attachment.owner_id == actor.id
     if actor.has_role(Role.REVIEWER):
+        from journey_api.review_routes import scoped_context_query
+
         allowed = session.scalar(
-            select(Review.id)
+            scoped_context_query(actor, None)
+            .with_only_columns(Review.id)
             .join(
                 SubmissionVersionAttachment,
                 SubmissionVersionAttachment.submission_version_id
@@ -569,7 +572,6 @@ def download_attachment(
             .where(
                 SubmissionVersionAttachment.attachment_id == attachment.id,
                 Review.organization_id == actor.organization_id,
-                Review.reviewer_id == actor.id,
             )
         ) is not None
     if not allowed:

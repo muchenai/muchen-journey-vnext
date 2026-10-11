@@ -18,6 +18,7 @@ from journey_api.feishu_oauth import (
 )
 from journey_api.idempotency import canonical_hash, find_replay, store_result
 from journey_api.learner_oauth import lock_learner_organization, provision_learner
+from journey_api.reviewer_access import effective_roles
 from journey_api.identity import (
     OAUTH_COOKIE,
     add_audit,
@@ -1175,6 +1176,7 @@ def complete_feishu_oauth(
             )
         ).all()
     )
+    active_roles = effective_roles(user.id, active_roles)
     if role not in active_roles:
         raise ApiError(403, "FORBIDDEN", "当前身份没有该入口的有效权限。")
 
