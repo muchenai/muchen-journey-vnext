@@ -1,0 +1,26 @@
+[Unit]
+Description=Muchen Talent Cloud synthetic trial
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=talent-cloud
+Group=talent-cloud
+WorkingDirectory=/opt/talent-cloud/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/talent-cloud/runtime.env
+ExecStart=/opt/talent-cloud/node/bin/node /opt/talent-cloud/current/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/talent-cloud
+UMask=0077
+MemoryMax=384M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

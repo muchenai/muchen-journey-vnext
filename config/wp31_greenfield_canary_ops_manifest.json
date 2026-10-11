@@ -7,7 +7,7 @@
   "files": {
     "scripts/wp31_identity_result.py": "afa56fbc7c0c5f09c2fe254aebcddc4ee12ecea8d4b681d94f160a38b5983521",
     "tests/test_wp31_identity_result.py": "0b494e387b8472303cb185655d23de993c39a2369ed33975837fec9656bcdbe2",
-    "requirements.lock": "ee6acb986fcf0258c30f34cb9456d455c6b8b7e2ab84271639d5da31199de929",
+    "requirements.lock": "cffe25b6736dc1ee696ef40d6b31fd2b714e2ad92fc132984502401a1d1dd7b2",
     ".github/workflows/wp31-dbtool-mirror.yml": "b2717f51902dfec474d3fd90d4f0e2df131e8706fe81741bbac11ffe0b524eab",
     "config/wp31_greenfield_canary.json": "e4342d1fb698eee5550713f058c1907404481df12e6a73a42b8a4be46b47ae5e",
     "config/wp31_greenfield_canary_execution_authorization.schema.json": "651c1e82209331a6cfe55c6c1d39e58c42323f3420764ff8253d36d1be9e5d21",
