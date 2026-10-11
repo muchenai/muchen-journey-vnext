@@ -11,6 +11,7 @@ import shutil
 import socket
 import stat
 import sys
+import tarfile
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from canary_schema_upgrade import (
@@ -64,6 +65,18 @@ def file_sha(path):
         return stream_sha(handle)
 
 
+def verify_exported_config(path, expected):
+    with tarfile.open(path, "r") as archive:
+        stream = archive.extractfile("manifest.json")
+        require(stream is not None, "EXPORTED_MANIFEST_MISSING")
+        manifests = json.load(stream)
+        require(len(manifests) == 1, "EXPORTED_IMAGE_COUNT")
+        config = archive.getmember(manifests[0]["Config"])
+        require(config.isfile() and config.size <= 2_000_000, "EXPORTED_CONFIG_INVALID")
+        content = archive.extractfile(config)
+        require(content is not None and "sha256:" + stream_sha(content) == expected, "EXPORTED_CONFIG_DIGEST")
+
+
 class Activation(ExplorationPreparation):
     def __init__(self, manifest, package):
         Upgrade.__init__(self, manifest, package)
@@ -91,8 +104,20 @@ class Activation(ExplorationPreparation):
                 require(stream_sha(handle) == entry["source_tar_sha256"], "SOURCE_TAR_SHA")
             event("IMPORT_" + name.upper())
             run(["docker", "load", "--input", str(archive)], timeout=600)
-            # Runtime uses the immutable image-config digest from the verified
-            # build artifact, not a mutable tag or a guessed registry digest.
+            # Docker/containerd may rewrap an imported image in a new manifest.
+            # Prove its original config (including rootfs diff IDs), then pin
+            # the actual locally loaded immutable ID. Never deploy by tag.
+            loaded = json.loads(run(["docker", "image", "inspect", entry["source_reference"]]))[0]
+            require(re.fullmatch(r"sha256:[0-9a-f]{64}", loaded["Id"]), "LOADED_IMAGE_ID")
+            exported = self.package / (name + "-verification.tar")
+            require(not exported.exists(), "VERIFICATION_FILE_EXISTS")
+            try:
+                run(["docker", "image", "save", "--output", str(exported), loaded["Id"]], timeout=600)
+                verify_exported_config(exported, entry["config_digest"])
+            finally:
+                if exported.is_file() and not exported.is_symlink():
+                    exported.unlink()
+            self.manifest["images"][name] = loaded["Id"]
             self.image_check(name, self.images[name], self.manifest["candidate"])
         for name, reference in self.old_images.items():
             Upgrade.image_check(self, name, reference, BASE)
@@ -127,7 +152,8 @@ class Activation(ExplorationPreparation):
             write_new(self.new / name, add_env(originals[name], changes[name]))
         write_new(self.new / "secrets/migration.env", add_env(originals["secrets/api.env"], {"APP_RELEASE": self.manifest["candidate"], "DATABASE_URL": migration_url}))
         for name in PACKAGE_FILES:
-            write_new(self.new / name, read_file(self.package / name), 0o644)
+            raw = json.dumps(self.manifest, sort_keys=True).encode() if name == "manifest.json" else read_file(self.package / name)
+            write_new(self.new / name, raw, 0o644)
         before = json.loads(compose(self.base, "config", "--format", "json"))
         after = json.loads(compose(self.new, "config", "--format", "json"))
         normalized = json.loads(json.dumps(after).replace(str(self.new), str(self.base)))

@@ -50,7 +50,7 @@ def package(build, output):
                 path.write_bytes(data)
                 chunks.append({"file": path.name, "sha256": hashlib.sha256(data).hexdigest()})
                 index += 1
-        manifest["archives"][name] = {"gzip_sha256": sha(compressed), "source_tar_sha256": entry["sha256"], "chunks": chunks}
+        manifest["archives"][name] = {"gzip_sha256": sha(compressed), "source_tar_sha256": entry["sha256"], "config_digest": entry["local_image_digest"], "source_reference": entry["runtime_reference"], "chunks": chunks}
         compressed.unlink()
     files = {
         "activate.py": source / "activate.py", "prepare.py": source / "prepare.py",

@@ -2,7 +2,7 @@
   "schema_version": 3,
   "base_candidate": "9a35f45053e903aa8e4d113aadbf7168d9ae9d0d",
   "base_release": "/srv/journey-next-production/canary/releases/9a35f45053e903aa8e4d113aadbf7168d9ae9d0d-learner-35975348184-1",
-  "candidate": "21df4aa5e8e17a392b31b5240638fea48655c958",
+  "candidate": "9e24e64a6b35509da1f28a0dd0e4f8f2131c7399",
   "database": "journey_next_canary_20260901_c72fea5",
   "migrations": {
     "from": "0029_treasure_coaching_reviews",
@@ -15,5 +15,5 @@
     "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:7e4d1ae0de84712045e4119d855bc47a2f30f438653ffaaefff1494369ef9d0d",
     "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:381bd7d0e82c8d95aed4990782bf6fb9edc91d0d21eb6f8535714fb703c5285b"
   },
-  "package_run_id": "38122277263"
+  "package_run_id": "38123259548"
 }

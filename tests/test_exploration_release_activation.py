@@ -1,15 +1,23 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import sys
 import tempfile
+import tarfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
-sys.path.insert(0, str(ROOT / 'deploy/exploration-release'))
-import activate
+original_paths = list(sys.path)
+try:
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    sys.path.insert(0, str(ROOT / 'deploy/exploration-release'))
+    import activate
+finally:
+    # Multiprocessing children inherit sys.path. Never expose the operational
+    # inspect.py as a replacement for Python's standard-library inspect module.
+    sys.path[:] = original_paths
 
 
 class ActivationTests(unittest.TestCase):
@@ -45,6 +53,18 @@ class ActivationTests(unittest.TestCase):
         with patch.object(activate, 'run', return_value=json.dumps([row]).encode()):
             with self.assertRaisesRegex(activate.UpgradeError, 'CONFIG_DIGEST_MISMATCH'):
                 self.release.image_check('api', self.release.images['api'], self.release.manifest['candidate'])
+
+    def test_rewrapped_archive_requires_the_original_config_including_layer_ids(self):
+        path = self.root / 'saved.tar'
+        config = b'{"rootfs":{"diff_ids":["sha256:original-layer"]}}'
+        with tarfile.open(path, 'w') as archive:
+            for name, content in [('manifest.json', b'[{"Config":"config.json","Layers":[]}]'), ('config.json', config)]:
+                member = tarfile.TarInfo(name)
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+        activate.verify_exported_config(path, 'sha256:' + activate.digest(config))
+        with self.assertRaisesRegex(activate.UpgradeError, 'EXPORTED_CONFIG_DIGEST'):
+            activate.verify_exported_config(path, 'sha256:' + 'f' * 64)
 
     def exercise(self, *, business_write=False, switch_failure=False, migration_failure=False):
         release = self.release
