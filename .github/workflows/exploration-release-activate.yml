@@ -28,12 +28,20 @@ jobs:
           persist-credentials: false
       - name: Read the reviewed build pin
         id: pin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json,os,pathlib,re
+          import json,os,pathlib,re,urllib.request
           p=json.loads(pathlib.Path('deploy/exploration-release/activation-manifest.json').read_text())
           assert re.fullmatch('[0-9]+',p['package_run_id'])
           assert re.fullmatch('[0-9a-f]{40}',p['candidate'])
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+p['package_run_id']
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response:
+            run=json.load(response)
+          assert run['status']=='completed' and run['conclusion']=='success'
+          assert run['head_sha']==p['candidate'] and run['head_branch']=='main' and run['event']=='push'
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
             f.write('run='+p['package_run_id']+'\ncandidate='+p['candidate']+'\n')
           PY

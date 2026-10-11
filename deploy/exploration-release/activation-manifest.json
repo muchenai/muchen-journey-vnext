@@ -9,8 +9,6 @@
     "to": "0032_shared_learner_review"
   },
   "images": {
-    "api": "ghcr.io/muchenai/muchen-journey-vnext-api@sha256:ea4931097d7bb7da8d7140cc6676929a2ff5eca1a0b693071081471fdf0fd909",
-    "web": "ghcr.io/muchenai/muchen-journey-vnext-web@sha256:7e075a7d27677935fa30d58e93a729b09315ec9899a2aba3a2326c9e33ad7eda",
     "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
   },
   "old_images": {
