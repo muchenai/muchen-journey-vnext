@@ -80,20 +80,21 @@ export default async function ReviewQueuePage({ searchParams }: {
 
   return (
     <section className="content-narrow review-queue-page">
-      <p className="eyebrow">主管工作台</p><h1>评测与辅导</h1>
+      <p className="eyebrow">主管工作台</p><h1>任务审核与历史辅导</h1>
       <p className="lede">只显示当前组织内明确分配或合法委派给你的固定提交版本。</p>
       <div className="review-queue-boundary"><FactLabel kind="system" />
-        <p><strong>正式评测</strong>会形成 Evaluation/Human Gate；<strong>宝藏辅导</strong>只形成辅导事实，不影响旅程推进、结营或准入。</p>
+        <p><strong>任务审核</strong>包括 Day 1、四个宝藏和三项评测。提交后显示待审核并解锁下一关；审核通过后显示已完成。</p>
+        <p><strong>历史宝藏辅导</strong>保留旧版本的辅导记录，不影响旅程推进、结营或准入。</p>
         <p>反馈 SLA 只显示配置值；未绑定营业日历时不虚构精确逾期时间。</p>
         <p><strong>容量：未获批准，无法计算。</strong> 主备与升级仍由运营依据固定 Reviewer 绑定处理。</p>
       </div>
       <LiveStatusSignal statusKey={statusKey} active title={allItems.length ? `有 ${allItems.length} 项等待处理` : "当前没有新提交"} detail="页面会自动检查新提交。" changedMessage="有新的提交或状态变化，队列已更新。" />
       {query.finalized ? <p className="success-text" role="status">审核结果提交成功，刷新后仍会保留。</p> : null}
-      <QueueSection id="formal-review-title" title="正式评测" description="三项评测；结论进入 Evaluation，并按既有正式状态机处理。" items={formalQueue.items} />
-      <QueueSection id="coaching-review-title" title="宝藏辅导" description="四个宝藏；可确认达到目标或要求修订，但不阻塞后续旅程。" items={coachingQueue.items} />
-      <p className="status-meta">Day 0 仍由 Learner 自证完成，不进入评阅。</p>
+      <QueueSection id="formal-review-title" title="任务审核" description="Day 1、四个宝藏和三项评测的固定提交；通过或要求修改后，学员都可以重新修改。" items={formalQueue.items} />
+      <QueueSection id="coaching-review-title" title="历史宝藏辅导" description="旧版本遗留的辅导任务；新提交统一进入任务审核。" items={coachingQueue.items} />
+      <p className="status-meta">Day 1 与其他关卡一样，提交后进入任务审核。</p>
       <section aria-labelledby="review-history-title"><h2 id="review-history-title">已完成评阅</h2>
-        <HistorySection title="正式评测历史" history={formalHistory} cursorName="formal_history_cursor" />
+        <HistorySection title="任务审核历史" history={formalHistory} cursorName="formal_history_cursor" />
         <HistorySection title="宝藏辅导历史" history={coachingHistory} cursorName="coaching_history_cursor" />
       </section>
     </section>

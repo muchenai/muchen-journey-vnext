@@ -17,15 +17,52 @@ def test_synthetic_fixture_covers_eight_distinct_https_material_links() -> None:
             1,
             "00000000-0000-0000-0000-000000000000",
         )
-        assert len(payload["learning_materials"]) == 1
+        expected_material_count = 2 if stable_key in {"DAY-0", "TRE-001-COMPANY-VALUES"} else 1
+        assert len(payload["learning_materials"]) == expected_material_count
         material = payload["learning_materials"][0]
         assert material["kind"] == "HTTPS_LINK"
         assert material["url"].startswith("https://")
-        assert payload["verified_material_urls"] == [material["url"]]
-        urls.append(material["url"])
+        assert payload["verified_material_urls"] == [
+            item["url"] for item in payload["learning_materials"]
+        ]
+        urls.extend(payload["verified_material_urls"])
 
-    assert len(urls) == 8
-    assert len(set(urls)) == 8
+    assert len(urls) == 10
+    assert len(set(urls)) == 10
+
+
+def test_treasure_one_uses_the_real_newcomer_training_video() -> None:
+    payload = fixture.task_payload(
+        "TRE-001-COMPANY-VALUES",
+        dict(fixture.STAGES)["TRE-001-COMPANY-VALUES"],
+        1,
+        "00000000-0000-0000-0000-000000000000",
+    )
+
+    assert payload["learning_materials"] == [
+        {
+            "key": "material-tre-001-company-values",
+            "title": "沐晨AI新人培训视频",
+            "kind": "HTTPS_LINK",
+            "source_label": "P0 隔离浏览器夹具",
+            "url": "https://zx6w57w0j34.feishu.cn/file/PewIbRCP3oDKAIx7MS9cSqUMnod",
+            "estimated_duration_minutes": 1,
+            "required": True,
+        },
+        {
+            "key": "material-tre-001-company-values-quiz",
+            "title": "宝藏一｜视频小测",
+            "kind": "HTTPS_LINK",
+            "source_label": "宝藏一任务题目",
+            "url": "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg",
+            "estimated_duration_minutes": 1,
+            "required": False,
+        },
+    ]
+    assert payload["instructions"][0] == (
+        "先打开完整挑战题面并确认本阶段边界："
+        "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg"
+    )
 
 
 def test_reentry_helper_targets_one_existing_active_enrollment(monkeypatch) -> None:

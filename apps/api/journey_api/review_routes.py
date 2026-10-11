@@ -24,6 +24,7 @@ from journey_api.formal_assignment_workflow import (
 from journey_api.idempotency import find_replay, store_result
 from journey_api.journey_service import (
     formal_evaluation_evidence,
+    enrollment_has_outcome,
     formal_journey_is_complete,
 )
 from journey_api.models import (
@@ -237,6 +238,15 @@ def locked_scoped_context_query(actor: Actor, review_id: uuid.UUID):
 def lock_scoped_context(
     session: Session, actor: Actor, review_id: uuid.UUID
 ) -> ReviewContext:
+    # Several stages may now be reviewed simultaneously. Serialize completion
+    # on Enrollment first, using the same lock order as learner submissions.
+    # This prevents concurrent last approvals from both missing final graduation.
+    locked = session.execute(
+        scoped_context_query(actor, review_id).with_only_columns(Enrollment.id)
+        .with_for_update(of=Enrollment)
+    ).first()
+    if locked is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可访问的评审。")
     row = session.execute(locked_scoped_context_query(actor, review_id)).first()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的评审。")
@@ -1002,15 +1012,16 @@ def finalize_review(
                         context.enrollment,
                     )
                 )
-                create_pass_outcome_bundle(
-                    session,
-                    enrollment=context.enrollment,
-                    assignment=context.assignment,
-                    evaluation=evaluation,
-                    reviewer_id=actor.id,
-                    request_id=request.state.request_id,
-                    formal_evidence=evidence,
-                )
+                if not enrollment_has_outcome(session, context.enrollment):
+                    create_pass_outcome_bundle(
+                        session,
+                        enrollment=context.enrollment,
+                        assignment=context.assignment,
+                        evaluation=evaluation,
+                        reviewer_id=actor.id,
+                        request_id=request.state.request_id,
+                        formal_evidence=evidence,
+                    )
                 assignment_event = "formal_journey.completed.v1"
             else:
                 assignment_event = "journey_stage.completed.v1"

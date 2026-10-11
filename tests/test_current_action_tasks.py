@@ -258,7 +258,20 @@ def test_published_task_version_is_immutable_in_database():
         assert stored.title == version["title"]
 
 
-def test_assignment_stays_on_v1_when_v2_is_published_and_drives_current_action():
+def test_assignment_stays_on_v1_when_v2_is_published_and_drives_current_action(request):
+    # This version-pinning test must not depend on another suite having already
+    # completed the seed assignment. Restore the seed state afterwards.
+    with SessionLocal.begin() as session:
+        previous_states = [(item.id, item.status) for item in session.scalars(
+            select(Assignment).where(Assignment.enrollment_id == ENROLLMENT_ID)
+        ).all()]
+        for previous_id, _ in previous_states:
+            session.get(Assignment, previous_id).status = AssignmentStatus.COMPLETED
+    def restore_seed_states():
+        with SessionLocal.begin() as session:
+            for previous_id, status in previous_states:
+                session.get(Assignment, previous_id).status = status
+    request.addfinalizer(restore_seed_states)
     definition = create_definition(f"TSK-FIXED-{uuid.uuid4().hex[:8].upper()}")
     version_one = assert_ok(
         publish(str(definition["id"]), publish_payload(expected_revision=1, title="固定版本一"))

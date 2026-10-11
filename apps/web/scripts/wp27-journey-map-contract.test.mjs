@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -31,14 +33,6 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);
 });
 
-test("the route is orientation-only and leaves one primary current-stage entry", () => {
-  assert.match(component, /journey-completed-links/);
-  assert.match(component, /node\.status === "COMPLETED"/);
-  assert.match(component, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
-  assert.doesNotMatch(component, /route-node-link/);
-  assert.match(learnerHome, /打开第一份必读材料/);
-  assert.match(learnerHome, /#first-learning-input/);
-});
 
 test("all eight formal stages have short route labels and progressive disclosure", () => {
   for (const stableKey of [
@@ -58,9 +52,11 @@ test("all eight formal stages have short route labels and progressive disclosure
 });
 
 test("published stages use runtime short labels and progressive disclosure", () => {
-  assert.match(component, /import \{ stageDisplayTitle \} from "\.\/stage-title"/);
+  assert.match(component, /import \{ stageDisplayTitle, stageUserFacingTitle \} from "\.\/stage-title"/);
   assert.match(component, /stageDisplayTitle\(node\.title\)/);
-  assert.match(stageTitle, /Day\\s\*0/);
+  assert.match(component, /stageUserFacingTitle\(current\.title\)/);
+  assert.match(stageTitle, /replace\(\/\^Day\\s\*0/);
+  assert.match(stageTitle, /Day\\s\*1/);
   assert.match(stageTitle, /宝藏\[一二三四\]/);
   assert.match(stageTitle, /\(\?:能力\)\?评测\[一二三\]/);
   assert.doesNotMatch(component, /const ROUTE_LABELS/);

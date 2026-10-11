@@ -19,6 +19,7 @@ class OAuthProviderError(RuntimeError):
 @dataclass(frozen=True)
 class FeishuProfile:
     open_id: str
+    name: str = "飞书学员"
 
 
 def _read_json(response: Any) -> dict[str, Any]:
@@ -43,7 +44,8 @@ class FeishuOAuthClient:
     def authorization_url(self, state: str) -> str:
         query = parse.urlencode(
             {
-                "app_id": self._app_id,
+                "client_id": self._app_id,
+                "response_type": "code",
                 "redirect_uri": self._redirect_uri,
                 "state": state,
             }
@@ -75,7 +77,8 @@ class FeishuOAuthClient:
         open_id = profile_data.get("open_id") if isinstance(profile_data, dict) else None
         if not isinstance(open_id, str) or not 1 <= len(open_id) <= 180:
             raise OAuthProviderError("provider did not return a stable subject")
-        return FeishuProfile(open_id=open_id)
+        name = profile_data.get("name")
+        return FeishuProfile(open_id=open_id, name=name.strip()[:120] if isinstance(name, str) and name.strip() else "飞书学员")
 
     @staticmethod
     def _request_json(

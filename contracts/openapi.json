@@ -10640,6 +10640,16 @@
             "type": "string",
             "format": "uuid",
             "title": "Assignment Id"
+          },
+          "assignment_status": {
+            "type": "string",
+            "title": "Assignment Status",
+            "default": ""
+          },
+          "is_revising": {
+            "type": "boolean",
+            "title": "Is Revising",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -12068,7 +12078,8 @@
             "enum": [
               "/review",
               "/ops",
-              "/content"
+              "/content",
+              "/app"
             ],
             "title": "Safe Entry"
           },
@@ -12116,7 +12127,8 @@
             "enum": [
               "/review",
               "/ops",
-              "/content"
+              "/content",
+              "/app"
             ],
             "title": "Return To"
           },

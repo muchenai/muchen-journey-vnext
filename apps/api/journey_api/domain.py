@@ -14,6 +14,7 @@ class AssignmentActionState:
     stage_title: str | None = None
     stage_kind: str | None = None
     completion_policy: str | None = None
+    has_submission: bool = False
 
 
 @dataclass(frozen=True)
@@ -127,9 +128,12 @@ def resolve_current_action(
                 (
                     item
                     for item in ordered
-                    if item.status != AssignmentStatus.COMPLETED
+                    if item.status in {AssignmentStatus.AVAILABLE, AssignmentStatus.IN_PROGRESS}
+                    and not item.has_submission
                 ),
-                None,
+                next((item for item in ordered if item.status == AssignmentStatus.NEEDS_REVISION),
+                     next((item for item in ordered if item.status not in {
+                         AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED}), None)),
             )
             if selected is not None:
                 action_type, fallback_stage, title, reason, commands = assignment_action(
@@ -141,7 +145,7 @@ def resolve_current_action(
                         reason = "先看清这一站，再留下你自己的认知证据。"
                     elif selected.status == AssignmentStatus.IN_PROGRESS:
                         title = "继续这一站"
-                        reason = "完成记录后，这一站会直接点亮并开放下一站。"
+                        reason = "提交后进入待审核并开放下一站，审核通过后本关完成。"
                 return CurrentAction(
                     action_type,
                     selected.stage_title or fallback_stage,

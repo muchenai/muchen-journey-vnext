@@ -69,7 +69,7 @@ def oauth_provider(monkeypatch: pytest.MonkeyPatch):
         "SESSION_SECRET": "test-session-secret-independent-00000001",
         "INVITE_SECRET": "test-invite-secret-independent-000000002",
         "IMPORT_SIGNING_KEY": "test-import-secret-independent-000000003",
-        "IDENTITY_SUBJECT_SECRET": "test-subject-secret-independent-0000004",
+        "IDENTITY_SUBJECT_SECRET": "test-subject-secret-" + uuid.uuid4().hex,
         "FEISHU_OAUTH_ENABLED": "true",
         "FEISHU_APP_ID": "cli_test",
         "FEISHU_APP_SECRET": "test-feishu-app-secret-00005",

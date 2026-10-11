@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     oauth_state_ttl_minutes: int = 10
     identity_subject_secret: str = "journey-next-local-identity-subject-secret"
     feishu_oauth_enabled: bool = False
+    feishu_learner_registration_enabled: bool = False
+    feishu_learner_organization_id: UUID | None = None
+    feishu_learner_reviewer_id: UUID | None = None
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
     feishu_oauth_redirect_uri: str = "http://localhost:3000/auth/feishu/callback"

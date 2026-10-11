@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -11,16 +13,6 @@ const composer = await readFile(
   "utf8",
 );
 
-test("the first station keeps approved learning input before any personal output", () => {
-  assert.ok(taskPage.indexOf('id="first-learning-input"') < taskPage.indexOf("<SubmissionComposer"));
-  assert.match(taskPage, /isFirstStation=\{assignment\.journey_stage\?\.position === 0\}/);
-  assert.match(taskPage, /material\.key === nextMaterialKey/);
-  assert.match(taskPage, /完成上一份后开放/);
-  assert.match(
-    taskPage,
-    /\{materialsReady \? <section id="task-workspace" className="task-workspace"/,
-  );
-});
 
 test("the first-station composer returns one truthful judgement and experiment from little input", () => {
   assert.match(composer, /60 秒起点判断/);

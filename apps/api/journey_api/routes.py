@@ -20,11 +20,13 @@ from journey_api.idempotency import find_replay, store_result
 from journey_api.learning_materials import (
     completed_materials,
     ensure_required_materials_completed,
-    learner_learning_materials,
+    task_learning_materials,
     material_by_key,
     reviewable_material_links,
 )
 from journey_api.journey_service import (
+    completed_evidence_revision_ids,
+    submitted_assignment_ids,
     active_post_completion_evidence_retest,
     enrollment_has_outcome,
     formal_admission_scorecard,
@@ -41,6 +43,7 @@ from journey_api.models import (
     Enrollment,
     EnrollmentStatus,
     JourneyCompletionPolicy,
+    JourneyStageKind,
     JourneyAdmissionDecision,
     JourneyDefinition,
     JourneyDefinitionStatus,
@@ -254,7 +257,7 @@ def formal_journey_out(
                 stable_key=stage.stable_key,
                 position=stage.position,
                 stage_kind=stage.stage_kind.value,
-                completion_policy=stage.completion_policy.value,
+                completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED.value,
                 task_version_id=stage.task_version_id,
                 title=stage.title,
                 short_description=stage.short_description,
@@ -922,6 +925,7 @@ def current_action(
                 User.organization_id == actor.organization_id,
             )
         )
+    submitted_ids = submitted_assignment_ids(session, enrollment) if enrollment is not None else set()
     action = resolve_current_action(
         fallback_resource_id=enrollment.id if enrollment is not None else actor.id,
         fallback_revision=enrollment.revision if enrollment is not None else 1,
@@ -929,6 +933,7 @@ def current_action(
         assignments=tuple(
             AssignmentActionState(
                 id=assignment.id,
+                has_submission=assignment.id in submitted_ids,
                 status=assignment.status,
                 revision=assignment.revision,
                 position=assignment.position,
@@ -936,7 +941,7 @@ def current_action(
                 stage_title=stage.title if stage is not None else None,
                 stage_kind=stage.stage_kind if stage is not None else None,
                 completion_policy=(
-                    stage.completion_policy.value if stage is not None else None
+                    JourneyCompletionPolicy.REVIEW_REQUIRED.value if stage is not None else None
                 ),
             )
             for assignment, _, stage in assignment_rows
@@ -981,6 +986,11 @@ def current_action(
         )
         if journey_version is None or journey_definition is None:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "当前旅程版本不可用。")
+        revising_ids = completed_evidence_revision_ids(session, enrollment)
+        frontier_id = next((assignment.id for assignment, _, stage in assignment_rows
+                            if stage is not None
+                            and assignment.status not in {AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED}
+                            and assignment.id not in submitted_ids), None)
         completed_stages = sum(
             assignment.status == AssignmentStatus.COMPLETED
             for assignment, _task, stage in assignment_rows
@@ -1007,16 +1017,19 @@ def current_action(
                     stable_key=stage.stable_key,
                     position=stage.position,
                     stage_kind=stage.stage_kind.value,
-                    completion_policy=stage.completion_policy.value,
+                    completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED.value,
                     title=stage.title,
                     short_description=stage.short_description,
                     status=(
                         "COMPLETED"
                         if assignment.status == AssignmentStatus.COMPLETED
                         else "CURRENT"
-                        if assignment.id == action.resource_id
+                        if assignment.id == action.resource_id or assignment.id == frontier_id
+                        or assignment.status in {AssignmentStatus.IN_PROGRESS, AssignmentStatus.SUBMITTED, AssignmentStatus.IN_REVIEW, AssignmentStatus.NEEDS_REVISION}
                         else "LOCKED"
                     ),
+                    assignment_status=assignment.status.value,
+                    is_revising=assignment.id in revising_ids,
                     assignment_id=assignment.id,
                 )
                 for assignment, _task, stage in assignment_rows
@@ -1029,25 +1042,19 @@ def current_action(
         resource_id=action.resource_id,
         title=action.title,
         reason=action.reason,
-        allowed_commands=list(action.allowed_commands),
+        allowed_commands=[
+            "start_evidence_revision"
+            if selected_stage is not None and command == "submit_revision"
+            else command
+            for command in action.allowed_commands
+        ],
         revision=action.revision,
-        responsible_party=(
-            "由你完成证据"
-            if selected_stage is not None
-            and selected_stage.completion_policy
-            == JourneyCompletionPolicy.LEARNER_EVIDENCE
-            else reviewer.display_name
-            if reviewer is not None
-            else "运营支持"
-        ),
+        responsible_party=reviewer.display_name if reviewer is not None else "运营支持",
         feedback_expectation=(
-            "提交后进入下一站"
-            if selected_stage is not None
-            and selected_stage.completion_policy
-            == JourneyCompletionPolicy.LEARNER_EVIDENCE
+            f"提交即解锁下一关，{selected_task.feedback_sla_business_days} 个工作日内审核"
+            if selected_task is not None and selected_stage is not None
             else f"{selected_task.feedback_sla_business_days} 个工作日内"
-            if selected_task is not None
-            else "按当前加入状态处理"
+            if selected_task is not None else "按当前加入状态处理"
         ),
         journey=journey_progress,
     )
@@ -1174,13 +1181,12 @@ def assignment_detail(
     elif (
         enrollment.status in {EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED}
         and journey_stage is not None
-        and journey_stage.completion_policy is JourneyCompletionPolicy.LEARNER_EVIDENCE
         and submission is not None
     ):
-        if assignment.status == AssignmentStatus.COMPLETED:
+        if assignment.status in {AssignmentStatus.COMPLETED, AssignmentStatus.NEEDS_REVISION}:
             commands = (
                 ("start_evidence_revision",)
-                if post_completion_retest is None
+                if (post_completion_retest is None or post_completion_retest.assignment_id == assignment.id)
                 and (
                     enrollment.status == EnrollmentStatus.ACTIVE
                     or completed_enrollment_can_retest
@@ -1227,14 +1233,7 @@ def assignment_detail(
             )
     data = AssignmentOut(
         id=assignment.id,
-        status=public_assignment_status(
-            assignment.status,
-            formal=(
-                journey_stage is None
-                or journey_stage.completion_policy
-                is JourneyCompletionPolicy.REVIEW_REQUIRED
-            ),
-        ),
+        status=public_assignment_status(assignment.status),
         revision=assignment.revision,
         assigned_at=assignment.assigned_at,
         reviewer_display_name=reviewer.display_name,
@@ -1263,7 +1262,7 @@ def assignment_detail(
                     else None
                 ),
             )
-            for material in learner_learning_materials(task.learning_materials)
+            for material in task_learning_materials(task)
         ],
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
@@ -1282,7 +1281,7 @@ def assignment_detail(
                 stable_key=journey_stage.stable_key,
                 position=journey_stage.position,
                 stage_kind=journey_stage.stage_kind.value,
-                completion_policy=journey_stage.completion_policy.value,
+                completion_policy=JourneyCompletionPolicy.REVIEW_REQUIRED.value,
                 title=journey_stage.title,
                 short_description=journey_stage.short_description,
             )
@@ -1327,7 +1326,7 @@ def complete_learning_material(
             ),
         )
     assignment, enrollment = lock_active_learner_assignment(
-        session, actor, assignment_id
+        session, actor, assignment_id, allow_completed_material_review=True
     )
     replay = find_replay(
         session,
@@ -1369,6 +1368,9 @@ def complete_learning_material(
             AssignmentStatus.AVAILABLE,
             AssignmentStatus.IN_PROGRESS,
             AssignmentStatus.NEEDS_REVISION,
+            AssignmentStatus.SUBMITTED,
+            AssignmentStatus.IN_REVIEW,
+            AssignmentStatus.COMPLETED,
         }:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能记录材料完成。")
         completion = LearningMaterialCompletion(

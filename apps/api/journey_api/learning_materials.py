@@ -13,6 +13,101 @@ from journey_api.models import Assignment, LearningMaterialCompletion, TaskVersi
 HTTPS_URL = re.compile(r"https://[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+")
 TRAILING_URL_PUNCTUATION = re.compile(r"[),.;!?，。；！？、）】》]+$")
 NON_MATERIAL_SENTINEL = "无，自行观看"
+TREASURE_ONE_QUIZ_URL = "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg"
+TREASURE_TWO_DOCUMENT_URL = "https://zx6w57w0j34.feishu.cn/docx/EDm2dFzmco58SJx10Xeceo0WnIc"
+TREASURE_TWO_QUIZ_URL = "https://zx6w57w0j34.feishu.cn/docx/B9uhdkLwUoqqIYxeh9TcWErbnHd?from=from_parent_sheet"
+LEGACY_STAGE_LINKS = {
+    "TRE-002-AI-DATA-BASICS": (
+        "宝藏二", "AI与数据基础文档", "AI基础学习小测",
+        TREASURE_TWO_DOCUMENT_URL, TREASURE_TWO_QUIZ_URL,
+    ),
+    "TRE-003-PROJECT-AWARENESS": (
+        "宝藏三", "MDOS 项目经理全流程操作指引", "宝藏三材料二",
+        "https://zx6w57w0j34.feishu.cn/docx/HDoidinI9oTlmzxw5H7cqQbqnCF",
+        "https://zx6w57w0j34.feishu.cn/file/QcEqbZ3NlolbaTxvmc0cZNeYnvc",
+    ),
+    "TRE-004-DELIVERY-FIT": (
+        "宝藏四", "项目中的关键角色与新人责任边界", "项目交付与责任边界视频",
+        "https://zx6w57w0j34.feishu.cn/wiki/Lu9ZwEM9kij7fdk7eOMcInNenld",
+        "https://zx6w57w0j34.feishu.cn/minutes/obcnk5wa15l826747rlb55rr",
+    ),
+    "ASM-001-RULE-BREAKDOWN": (
+        "评测一", "项目规则文档拆解作业 SOP", "项目规则文档拆解教学视频",
+        "https://zx6w57w0j34.feishu.cn/wiki/Fxccw68nAipuM3kK8gJcqiyDnRJ",
+        "https://zx6w57w0j34.feishu.cn/minutes/obcnk68g8j32fn4f8af53752",
+    ),
+    "ASM-002-MODEL-JUDGEMENT": (
+        "评测二", "模型回答判断与理由书写", "模型回答质量判断教学视频",
+        "https://zx6w57w0j34.feishu.cn/docx/NbGRdVd6aolCDRxkmodcHoMLnlg",
+        "https://zx6w57w0j34.feishu.cn/minutes/obcnj65w46z681x365gyo3wu",
+    ),
+    "ASM-003-DATA-CONSTRUCTION": (
+        "评测三", "通用数据构造讲义", "通用数据构造教学视频",
+        "https://zx6w57w0j34.feishu.cn/docx/Hx8HdBHYmoSFOexbyoxc9A3dn0c",
+        "https://lcnf4xe7p1h6.feishu.cn/minutes/obcnk1s9uh3y25xle6723aq3",
+    ),
+}
+
+
+def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
+    """Resolve supplied materials for legacy local journey versions.
+
+    Keep immutable versions and existing completion facts intact. Match only
+    known placeholder records; explicit published materials remain authoritative.
+    """
+    materials = learner_learning_materials(task.learning_materials)
+    for stable_key, (label, first_title, second_title, first_url, second_url) in LEGACY_STAGE_LINKS.items():
+        material_key = f"material-{stable_key.lower()}"
+        if not (
+            len(materials) == 1
+            and materials[0].get("key") == material_key
+            and str(materials[0].get("url", "")).startswith(
+                f"https://example.feishu.cn/wiki/P0LearnerExperienceMaterial{stable_key.replace('-', '')}?"
+            )
+        ):
+            continue
+        # New keys prevent clicks on the old placeholder from completing the
+        # newly supplied documents. Never mutate the published source version.
+        # Treasure 3/4 videos moved from slot 1 to slot 2: keep their old keys,
+        # while the newly supplied documents receive separate completion keys.
+        moved_video = stable_key in {"TRE-003-PROJECT-AWARENESS", "TRE-004-DELIVERY-FIT"}
+        materials = [
+            {
+                **materials[0],
+                "key": f"{material_key}-reference" if moved_video else f"{material_key}-document",
+                "title": first_title,
+                "source_label": f"{label}材料一",
+                "url": first_url,
+            },
+            {
+                "key": (f"{material_key}-document" if moved_video
+                        else f"{material_key}-video" if stable_key.startswith("ASM-")
+                        else f"{material_key}-quiz"),
+                "title": second_title,
+                "kind": "HTTPS_LINK",
+                "source_label": f"{label}材料二",
+                "url": second_url,
+                "estimated_duration_minutes": 1,
+                "required": False,
+            },
+        ]
+    if (
+        len(materials) in {1, 2}
+        and materials[0].get("key") == "material-tre-001-company-values"
+        and materials[0].get("url") == "https://zx6w57w0j34.feishu.cn/file/PewIbRCP3oDKAIx7MS9cSqUMnod"
+        and (len(materials) == 1 or materials[1].get("url") == TREASURE_ONE_QUIZ_URL)
+    ):
+        video = materials[0]
+        materials = [{
+            "key": "material-tre-001-company-values-document",
+            "title": "使命愿景价值观",
+            "kind": "HTTPS_LINK",
+            "source_label": "宝藏一材料一",
+            "url": "https://zx6w57w0j34.feishu.cn/wiki/TUV1wbptdiXmapkfDsOcRrvknme",
+            "estimated_duration_minutes": 1,
+            "required": True,
+        }, {**video, "source_label": "宝藏一材料二"}]
+    return materials
 
 
 def is_publishable_learning_material(material: object) -> bool:
@@ -67,7 +162,7 @@ def material_by_key(task: TaskVersion, material_key: str) -> dict[str, Any]:
     material = next(
         (
             item
-            for item in learner_learning_materials(task.learning_materials)
+            for item in task_learning_materials(task)
             if item.get("key") == material_key
         ),
         None,
@@ -102,7 +197,7 @@ def missing_required_material_keys(
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
     required = {
         str(item["key"])
-        for item in learner_learning_materials(fixed_task.learning_materials)
+        for item in task_learning_materials(fixed_task)
         if item.get("required") is True and item.get("key")
     }
     return sorted(required - set(completed_materials(session, assignment)))
