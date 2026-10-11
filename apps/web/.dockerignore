@@ -3,3 +3,6 @@
 node_modules
 *.tsbuildinfo
 npm-debug.log*
+src/app/project6
+src/app/project-ui/project-experience.tsx
+src/app/project-ui/project-ui.css

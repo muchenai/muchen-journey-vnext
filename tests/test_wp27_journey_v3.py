@@ -151,8 +151,7 @@ def test_v3_composition_requires_eight_approved_material_bearing_versions():
         "ASSESSMENT",
     ]
     assert [stage["completion_policy"] for stage in journey["stages"]] == [
-        *("LEARNER_EVIDENCE" for _ in range(5)),
-        *("REVIEW_REQUIRED" for _ in range(3)),
+        *("REVIEW_REQUIRED" for _ in range(8)),
     ]
 
     wrong_order = command(

@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -31,14 +33,6 @@ test("journey nodes and route line share one coordinate source", () => {
   assert.doesNotMatch(css, /\.route-node:nth-child\([^)]*\)\s*\{[^}]*translateY/);
 });
 
-test("the route is orientation-only and leaves one primary current-stage entry", () => {
-  assert.match(component, /journey-completed-links/);
-  assert.match(component, /node\.status === "COMPLETED"/);
-  assert.match(component, /href=\{`\/app\/tasks\/\$\{node\.assignment_id\}`\}/);
-  assert.doesNotMatch(component, /route-node-link/);
-  assert.match(learnerHome, /打开第一份必读材料/);
-  assert.match(learnerHome, /#first-learning-input/);
-});
 
 test("all eight formal stages have short route labels and progressive disclosure", () => {
   for (const stableKey of [

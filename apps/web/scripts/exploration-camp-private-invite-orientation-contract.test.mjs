@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -32,14 +34,6 @@ test("private invitations explain the controlled release before the first form a
   assert.match(orientation, /一个真实问题 \+ 一种验证方法/);
 });
 
-test("the orientation is non-interactive and preserves one primary form action", () => {
-  assert.doesNotMatch(orientation, /<(?:a|button|input|form)\b/);
-  assert.doesNotMatch(orientation, /tabIndex/);
-  assert.ok(joinPage.indexOf("<PrivateInviteOrientation") < joinPage.indexOf("{errorMessage ?"));
-  assert.ok(joinPage.indexOf("<PrivateInviteOrientation") < joinPage.indexOf("{summary ?"));
-  assert.match(joinPage, /aria-describedby=\{orientationDescriptionId\}/);
-  assert.match(joinPage, /orientationDescriptionId=\{orientationDescriptionId\}/);
-});
 
 test("both invitation exchange states retain fragment security and share the orientation context", () => {
   assert.equal(inviteForm.match(/aria-describedby=\{orientationDescriptionId\}/g)?.length, 2);

@@ -38,6 +38,8 @@ export type LearnerEnrollment = {
 };
 
 export type JourneyProgressNode = {
+  assignment_status?: string;
+  is_revising?: boolean;
   stable_key: string;
   position: number;
   stage_kind: "DAY_0" | "TREASURE" | "ASSESSMENT";
@@ -90,6 +92,7 @@ export type Assignment = {
     | "SUBMITTED"
     | "IN_REVIEW"
     | "NEEDS_REVISION"
+    | "PASSED"
     | "COMPLETED"
     | "CANCELLED";
   revision: number;

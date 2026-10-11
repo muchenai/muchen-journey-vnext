@@ -84,6 +84,19 @@ def task_payload(stable_key: str, title: str, revision: int, reviewer_id: str):
         }
     ]
     verified_material_urls = [material_url]
+    if stable_key == "TRE-001-COMPANY-VALUES":
+        learning_materials.append(
+            {
+                "key": "material-tre-001-company-values-quiz",
+                "title": "宝藏一｜视频小测",
+                "kind": "HTTPS_LINK",
+                "source_label": "宝藏一任务题目",
+                "url": challenge_url,
+                "estimated_duration_minutes": 1,
+                "required": False,
+            }
+        )
+        verified_material_urls.append(challenge_url)
     if stable_key == "DAY-0":
         second_material_url = "https://zx6w57w0j34.feishu.cn/wiki/YpaGw0EgqidJUykHcqxcLgCvnvc"
         learning_materials.append(

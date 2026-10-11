@@ -154,7 +154,7 @@ def test_authenticated_learner_session_cannot_bypass_canary_scope(
     settings = production_settings(canary_learner_user_ids=[allowed_id])
     monkeypatch.setattr(auth, "get_settings", lambda: settings)
 
-    identity_session = SimpleNamespace(id=uuid4(), role=Role.LEARNER)
+    identity_session = SimpleNamespace(id=uuid4(), role=Role.LEARNER, external_identity_id=None)
     user = SimpleNamespace(
         id=denied_id,
         organization_id=ORGANIZATION_ID,

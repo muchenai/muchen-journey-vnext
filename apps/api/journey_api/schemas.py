@@ -672,7 +672,7 @@ class TransferRevokedExternalIdentityCommand(RevisionCommand):
 
 
 class OAuthStartCommand(StrictModel):
-    return_to: Literal["/review", "/ops", "/content"]
+    return_to: Literal["/review", "/ops", "/content", "/app"]
     link_token: str | None = Field(default=None, min_length=32, max_length=256)
 
 
@@ -692,7 +692,7 @@ class OAuthCallbackCommand(StrictModel):
 
 
 class OAuthCallbackOut(StrictModel):
-    safe_entry: Literal["/review", "/ops", "/content"]
+    safe_entry: Literal["/review", "/ops", "/content", "/app"]
     expires_at: datetime
     csrf_token: str
 
@@ -751,6 +751,8 @@ class JourneyProgressNodeOut(StrictModel):
     short_description: str
     status: Literal["COMPLETED", "CURRENT", "LOCKED"]
     assignment_id: UUID
+    assignment_status: str = ""
+    is_revising: bool = False
 
 
 class JourneyProgressOut(StrictModel):

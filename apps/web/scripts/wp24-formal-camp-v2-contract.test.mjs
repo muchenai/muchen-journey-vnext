@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -27,15 +29,6 @@ const invitePanel = await readFile(
   "utf8",
 );
 
-test("learner receives the V2 learning input before the response composer", () => {
-  assert.match(taskPage, /learning_blocks/);
-  assert.match(taskPage, /knowledge_checks/);
-  assert.match(taskPage, /先探索，再输出/);
-  assert.ok(
-    taskPage.indexOf("experience.learning_blocks")
-      < taskPage.indexOf("<SubmissionComposer"),
-  );
-});
 
 test("reviewer records bounded numeric evidence alongside the human judgment", () => {
   assert.match(reviewer, /max_points/);

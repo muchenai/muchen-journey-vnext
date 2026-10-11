@@ -57,7 +57,8 @@ def test_feishu_client_uses_approved_hosts_and_server_side_code_exchange(monkeyp
     authorization = parse.urlsplit(client.authorization_url("state-value"))
     assert f"{authorization.scheme}://{authorization.netloc}{authorization.path}" == AUTHORIZE_URL
     assert parse.parse_qs(authorization.query) == {
-        "app_id": ["cli_test"],
+        "client_id": ["cli_test"],
+        "response_type": ["code"],
         "redirect_uri": ["http://localhost/auth/feishu/callback"],
         "state": ["state-value"],
     }

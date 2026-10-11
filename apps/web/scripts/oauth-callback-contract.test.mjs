@@ -7,10 +7,10 @@ const callbackSource = readFileSync(
   "utf8",
 );
 
-test("all staff OAuth callbacks allow only the three role entry points", () => {
+test("OAuth callbacks allow only the staff and learner entry points", () => {
   assert.match(
     callbackSource,
-    /const SAFE_ENTRIES = new Set\(\["\/review", "\/ops", "\/content"\]\);/,
+    /const SAFE_ENTRIES = new Set\(\["\/review", "\/ops", "\/content", "\/app"\]\);/,
   );
   assert.match(
     callbackSource,

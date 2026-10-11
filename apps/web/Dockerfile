@@ -23,14 +23,14 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 RUN set -eu; \
     case "${TARGETARCH}" in \
-        amd64) alpine_arch=x86_64; libcrypto_sha=161223a16f042b8e469e9441291e071464fd91d4f4bbe6f496ee8d0abd4e0701; libssl_sha=aca521e5ae4a321322a9d47ed64a1775f5ab1ffd215d1e9fc0433c58f7bfd037; openssl_sha=e18c561e6a8fb744b42fe000f4a8cdfcc38e7956e62a6ab44b0a0580db948450 ;; \
-        arm64) alpine_arch=aarch64; libcrypto_sha=35b892813c23664a3592e4fc8c12a03538a22c579057655361c7043305272a9a; libssl_sha=d6ec970cc10e01539e41626f720c4e0ac69016eaa2079a10ef776ffd3243db5b; openssl_sha=0d12f4f145ec045dd19e8465bd3cb07b08197f96a3776641511dc2bec53cc0b7 ;; \
+        amd64) alpine_arch=x86_64; libcrypto_sha=6632d758d8f5e9ea3b650fe966f23bbf9a202f8b8dceecac93da135dec5e3689; libssl_sha=05e3393fb95aa5751ca2f9d242f659f6cff82c1cc7767cc2df4a086f7ad01877; openssl_sha=9358e8f38eb19a1e035355626570c76bda1e5a49084c768fb0edc1e607251e99 ;; \
+        arm64) alpine_arch=aarch64; libcrypto_sha=2676a2b0b6e23ea2edccf3ee982b9842a665d52603d047de3d0a185dc316d983; libssl_sha=20ac252b276d73f2c69c1d25f84537c7fba81caefc026c6be1094b394af2082e; openssl_sha=aa27b9edfeffbf7ebafbcf29df3f02eef4bf50f793a4874ae2f52aba6b53e653 ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 64 ;; \
     esac; \
     base_url="https://dl-cdn.alpinelinux.org/alpine/v3.24/main/${alpine_arch}"; \
-    wget -q -O /tmp/libcrypto3.apk "${base_url}/libcrypto3-3.5.8-r0.apk"; \
-    wget -q -O /tmp/libssl3.apk "${base_url}/libssl3-3.5.8-r0.apk"; \
-    wget -q -O /tmp/openssl.apk "${base_url}/openssl-3.5.8-r0.apk"; \
+    wget -q -O /tmp/libcrypto3.apk "${base_url}/libcrypto3-3.5.9-r0.apk"; \
+    wget -q -O /tmp/libssl3.apk "${base_url}/libssl3-3.5.9-r0.apk"; \
+    wget -q -O /tmp/openssl.apk "${base_url}/openssl-3.5.9-r0.apk"; \
     printf '%s  %s\n' \
         "${libcrypto_sha}" /tmp/libcrypto3.apk \
         "${libssl_sha}" /tmp/libssl3.apk \

@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -76,49 +78,4 @@ test("module pages lead with the human question, next action, evidence and gate"
   assert.match(detailSource, /可复核证据/);
   assert.match(detailSource, /必须经过的真人 Gate/);
   assert.match(detailSource, /系统明确不能做/);
-});
-
-test("the current learner action precedes the controlled-module directory", () => {
-  const currentActionIndex = learnerHomeSource.indexOf("<JourneyMap");
-  const programOverviewIndex = learnerHomeSource.indexOf("<JourneyProgramOverview");
-
-  assert.ok(currentActionIndex >= 0);
-  assert.ok(programOverviewIndex > currentActionIndex);
-  assert.match(overviewSource, /做完当前一步，再看四个模块/);
-});
-
-test("a learner without a journey projection still receives one executable current action", () => {
-  assert.match(
-    learnerHomeSource,
-    /query\.transition === "submitted" && \(opensTask \|\| opensResult\) \? null : opensTask \|\| waitsForReview \|\| opensResult \? \(/,
-  );
-  assert.match(learnerHomeSource, /href=\{taskHref\}/);
-  assert.match(learnerHomeSource, /进入当前任务/);
-});
-
-test("module entry reuses existing Enrollment facts and does not create a second task source", () => {
-  assert.match(learnerHomeSource, /\/api\/v1\/me\/enrollments/);
-  assert.match(learnerHomeSource, /enrollment_id=/);
-  assert.match(overviewSource, /LearnerEnrollment/);
-  assert.match(overviewSource, /journey_stable_key/);
-  assert.match(overviewSource, /进入已分配任务/);
-  assert.match(overviewSource, /\/app\?enrollment_id=/);
-  assert.doesNotMatch(overviewSource, /create|POST|new Enrollment/);
-});
-
-test("public orientation is limited to the four controlled release modules", () => {
-  assert.deepEqual(
-    product.maps.map(({ key }) => key),
-    [
-      "exploration-camp",
-      "newcomer-village",
-      "ai-academy",
-      "delivery-guild",
-      "certification-arena",
-    ],
-  );
-  assert.match(inviteOrientationSource, /controlledRelease\.modules/);
-  assert.match(inviteOrientationSource, /四个受控首发模块/);
-  assert.doesNotMatch(inviteOrientationSource, /Career Map|认证竞技场/);
-  assert.doesNotMatch(inviteOrientationSource, /BOSS副本/);
 });

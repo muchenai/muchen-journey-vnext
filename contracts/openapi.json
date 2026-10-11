@@ -12068,7 +12068,8 @@
             "enum": [
               "/review",
               "/ops",
-              "/content"
+              "/content",
+              "/app"
             ],
             "title": "Safe Entry"
           },
@@ -12116,7 +12117,8 @@
             "enum": [
               "/review",
               "/ops",
-              "/content"
+              "/content",
+              "/app"
             ],
             "title": "Return To"
           },

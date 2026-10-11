@@ -1,3 +1,5 @@
+// Active learner UI coverage: project9-render.test.mjs.
+// Superseded page-layout contracts are listed in docs/releases/2026-10-11-exploration-test.md.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -34,13 +36,6 @@ test("learner reentry is explicit and restores the existing journey", () => {
   assert.match(actions, /JOIN_SUMMARY_COOKIE/);
 });
 
-test("https links embedded in frozen text materials remain clickable without unsafe html", () => {
-  assert.match(taskPage, /function textWithSafeLinks/);
-  assert.match(taskPage, /part\.startsWith\("https:\/\/"\)/);
-  assert.match(taskPage, /target="_blank" rel="noreferrer" aria-label="打开学习材料"/);
-  assert.match(taskPage, /new URL\(href\)\.hostname/);
-  assert.doesNotMatch(taskPage, /dangerouslySetInnerHTML/);
-});
 
 test("operations shows an explicit production environment notice", () => {
   assert.match(opsPage, /production: "当前为 production/);

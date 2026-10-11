@@ -217,6 +217,7 @@ export type SubmissionActionState = {
   savedAt?: string;
   draftRevision?: number;
   success?: string;
+  assignmentStatus?: string;
 };
 
 function aiUseDisclosure(data: FormData, prefix: "learner_ai" | "reviewer_ai") {
@@ -263,7 +264,7 @@ function cookieSecure(): boolean {
 function safeJoinError(error: unknown): never {
   if (error instanceof ApiRequestError) {
     const query = new URLSearchParams({ code: error.code, request_id: error.requestId });
-    redirect(`/join?${query.toString()}`);
+    redirect(`/join?method=invite&${query.toString()}`);
   }
   throw error;
 }
@@ -320,7 +321,7 @@ export async function exchangeInvite(data: FormData) {
     ).toString("base64url"),
     { ...options, httpOnly: true },
   );
-  redirect("/join");
+  redirect("/join?method=invite");
 }
 
 export async function acceptInvite(data: FormData) {
@@ -604,6 +605,7 @@ export async function startEvidenceRevision(data: FormData) {
   const destination = data.get("destination") === "evidence"
     ? "?view=evidence&revision=retest#task-workspace"
     : "?revision=retest#task-workspace";
+  if (data.get("response_mode") === "inline") return;
   redirect(`/app/tasks/${assignmentId}${destination}`);
 }
 
@@ -621,10 +623,11 @@ export async function cancelEvidenceRevision(data: FormData) {
   );
   revalidatePath("/app");
   revalidatePath(`/app/tasks/${assignmentId}`);
+  if (data.get("response_mode") === "inline") return;
   redirect(`/app/tasks/${assignmentId}?revision=cancelled#task-workspace`);
 }
 
-export async function completeLearningMaterial(data: FormData) {
+async function persistLearningMaterial(data: FormData) {
   const assignmentId = requiredUuid(data, "assignment_id");
   const materialKey = data.get("material_key");
   const taskVersion = Number(data.get("task_version"));
@@ -646,6 +649,21 @@ export async function completeLearningMaterial(data: FormData) {
   );
   revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
+  return assignmentId;
+}
+
+export async function recordOpenedLearningMaterial(data: FormData): Promise<{ error?: string }> {
+  try {
+    await persistLearningMaterial(data);
+    return {};
+  } catch (error) {
+    return { error: error instanceof ApiRequestError
+      ? error.message : "材料完成状态保存失败，请重新点击材料重试。" };
+  }
+}
+
+export async function completeLearningMaterial(data: FormData) {
+  const assignmentId = await persistLearningMaterial(data);
   const anchor = data.get("final_required_material") === "true"
     ? "task-brief-title"
     : "learning-materials-title";
@@ -696,9 +714,9 @@ export async function submitAssignment(
   const idempotencyKey = requiredIdempotencyKey(data, "submission_idempotency_key");
   const body = submissionBody(data, true);
   if (typeof body !== "string") return body;
-  let result: { version_no: number };
+  let result: { version_no: number; assignment_status: string };
   try {
-    result = await apiRequest<{ version_no: number }>(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
+    result = await apiRequest<{ version_no: number; assignment_status: string }>(`/api/v1/me/assignments/${assignmentId}/submissions`, "LEARNER", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
@@ -715,12 +733,18 @@ export async function submitAssignment(
   const evidenceRetest = data.get("submission_command") === "submit_evidence_revision";
   revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  if (evidenceRetest) {
+  // The project9 client displays the confirmed result in place. Keep the legacy
+  // form redirect for callers that still use the retest success destination.
+  if (evidenceRetest && data.get("submission_response") !== "inline") {
     redirect(
       `/app/tasks/${assignmentId}?submitted=retest&version=${result.version_no}#retest-success`,
     );
   }
-  return { success: "本阶段已提交，正在等待审核。" };
+  return {
+    success: ["SUBMITTED", "IN_REVIEW"].includes(result.assignment_status)
+      ? "提交成功，请等待审核" : "提交成功",
+    assignmentStatus: result.assignment_status,
+  };
 }
 
 export async function saveSubmissionDraft(

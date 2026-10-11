@@ -516,6 +516,10 @@ def test_ai_and_guild_each_reuse_full_revision_and_human_pass_loop(module_key: s
     revision_detail = _data(
         learner.get(f"/api/v1/me/assignments/{assignment_id}")
     )
+    revision_detail = _data(_command(
+        learner, f"/api/v1/me/assignments/{assignment_id}/evidence-revision/start",
+        {"expected_revision": revision_detail["revision"]},
+    ))
     second_submission = _data(
         _command(
             learner,

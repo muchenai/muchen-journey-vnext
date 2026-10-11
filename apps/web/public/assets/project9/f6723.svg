@@ -1,0 +1,17 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="550" height="89" viewBox="0 0 550 89" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="Button" d="M528.879 1H21.121C10.0085 1 1 8.61116 1 18V71C1 80.3888 10.0085 88 21.121 88H528.879C539.992 88 549 80.3888 549 71V18C549 8.61116 539.992 1 528.879 1Z" fill="url(#paint0_linear_0_6)" stroke-width="2" stroke="url(#paint1_linear_0_6)"/>
+<defs>
+<linearGradient id="paint0_linear_0_6" x1="1" y1="1" x2="549" y2="1" gradientUnits="userSpaceOnUse">
+<stop stop-color="#55EBFD"/>
+<stop offset="0.25" stop-color="#49B5FC"/>
+<stop offset="0.5" stop-color="#456EFC"/>
+<stop offset="0.72" stop-color="#5747FC"/>
+<stop offset="1" stop-color="#8248F7"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_6" x1="1" y1="1" x2="549" y2="1" gradientUnits="userSpaceOnUse">
+<stop stop-color="#B8FBFF"/>
+<stop offset="0.5" stop-color="#75BCFF"/>
+<stop offset="1" stop-color="#EDC0FF"/>
+</linearGradient>
+</defs>
+</svg>

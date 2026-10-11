@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="584" height="123" viewBox="0 0 584 123" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="CyanGlow" filter="url(#filter0_f_0_8)">
+<path d="M38.121 18H545.879C556.992 18 566 25.6112 566 35V88C566 97.3888 556.992 105 545.879 105H38.121C27.0085 105 18 97.3888 18 88V35C18 25.6112 27.0085 18 38.121 18Z" stroke-width="8" stroke="#35DFFF" stroke-opacity="0.58"/>
+</g>
+<defs>
+<filter id="filter0_f_0_8" x="0" y="0" width="584" height="123" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="7" result="effect1_foregroundBlur_0_8"/>
+</filter>
+</defs>
+</svg>
