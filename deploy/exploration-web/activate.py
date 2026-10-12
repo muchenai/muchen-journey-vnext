@@ -56,12 +56,13 @@ def activate(package):
     candidate = pin['candidate']
     require(re.fullmatch('[0-9a-f]{40}', candidate), 'CANDIDATE')
     baseline = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
-    base = ROOT / 'releases' / (baseline + '-exploration')
-    new = ROOT / 'releases' / (candidate + '-web-button')
+    web_baseline = '3d8d941c8b8a26ee35958d61443ad5508ebfcc48'
+    base = ROOT / 'releases' / (web_baseline + '-web-button')
+    new = ROOT / 'releases' / (candidate + '-web-links')
     require((ROOT / 'current').resolve(strict=True) == base and not new.exists(), 'BASE_RELEASE')
     api_before = container('api')
     require('APP_RELEASE=' + baseline in api_before['Config']['Env'], 'API_BASELINE')
-    require('APP_RELEASE=' + baseline in container('web')['Config']['Env'], 'WEB_BASELINE')
+    require('APP_RELEASE=' + web_baseline in container('web')['Config']['Env'], 'WEB_BASELINE')
     before = json.loads(compose(base, 'config', '--format', 'json'))
     entry = pin['archive']
     archive = package / 'web.tar.gz'
