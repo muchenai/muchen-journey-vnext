@@ -42,7 +42,7 @@ class LoginReleaseTests(unittest.TestCase):
     def exercise(self, failure=None):
         candidate = '1' * 40
         images = {'api': 'sha256:' + '2' * 64, 'web': 'sha256:' + '3' * 64}
-        baseline = {'api': release.BASE_API, 'web': release.BASE_WEB}
+        baseline = {'api': release.BASE_BACKEND, 'web': release.BASE_WEB}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             base = root / 'releases' / (release.BASE_WEB + '-web-labels')
@@ -56,7 +56,7 @@ class LoginReleaseTests(unittest.TestCase):
             package = root / 'exploration-runs/1-1-activate'
             package.mkdir(parents=True)
             (package / 'manifest.json').write_text(json.dumps({'candidate': candidate,
-                'base_api': release.BASE_API, 'base_web': 'wrong' if failure == 'baseline' else release.BASE_WEB,
+                'base_backend': release.BASE_BACKEND, 'base_web': 'wrong' if failure == 'baseline' else release.BASE_WEB,
                 'archives': {name: {} for name in release.SERVICES}, 'sdk_sha256': '4' * 64}))
             before = {'services': {name: {'image': name+'-old', 'environment': {
                 'APP_RELEASE': baseline[name], 'DATABASE_URL': 'unchanged'}} for name in release.SERVICES}}

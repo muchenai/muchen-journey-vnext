@@ -17,7 +17,7 @@ from canary_schema_upgrade import (
     read_file, require, run, write_new,
 )
 
-BASE_API = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
+BASE_BACKEND = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
 BASE_WEB = '50650ae883b14c3ec7485ebb20f518e47e0ac748'
 APP_ID = 'cli_aaef896604b85bb4'
 SERVICES = ('api', 'web')
@@ -110,13 +110,13 @@ def activate(package):
     pin = json.loads(read_file(package / 'manifest.json'))
     candidate = pin['candidate']
     require(re.fullmatch('[0-9a-f]{40}', candidate), 'CANDIDATE')
-    require(pin['base_api'] == BASE_API and pin['base_web'] == BASE_WEB, 'BASE_PIN')
+    require(pin['base_backend'] == BASE_BACKEND and pin['base_web'] == BASE_WEB, 'BASE_PIN')
     require(set(pin['archives']) == set(SERVICES), 'IMAGE_SET')
     base = ROOT / 'releases' / (BASE_WEB + '-web-labels')
     new = ROOT / 'releases' / (candidate + '-feishu-login')
     require((ROOT / 'current').resolve(strict=True) == base and not new.exists(), 'BASE_RELEASE')
     old = {name: container(name) for name in SERVICES}
-    for name, revision in [('api', BASE_API), ('web', BASE_WEB)]:
+    for name, revision in [('api', BASE_BACKEND), ('web', BASE_WEB)]:
         require('APP_RELEASE=' + revision in old[name]['Config']['Env'], 'RUNTIME_BASELINE')
     untouched = other_containers()
     before = json.loads(compose(base, 'config', '--format', 'json'))
@@ -147,7 +147,7 @@ def activate(package):
             require('APP_RELEASE=' + candidate in current['Config']['Env'], 'RELEASE_MISMATCH')
         require(other_containers() == untouched, 'OTHER_CONTAINER_CHANGED')
         public_checks(candidate, pin['sdk_sha256'])
-        receipt = {'result': 'PASS', 'candidate': candidate, 'previous_api': BASE_API,
+        receipt = {'result': 'PASS', 'candidate': candidate, 'previous_api': BASE_BACKEND,
             'previous_web': BASE_WEB, 'migrations': 0, 'data_reset': False,
             'other_containers_unchanged': True, 'previous_release': str(base)}
         write_new(new / 'login-release-receipt.json', json.dumps(receipt).encode())
