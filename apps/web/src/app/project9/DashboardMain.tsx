@@ -58,7 +58,7 @@ export function DashboardMain({ decoration, stageDecoration, identity }: { decor
             <div className="absolute contents left-[568px] top-[404px]" data-node-id="2047:4426">
               <div className="absolute bg-gradient-to-r from-[#bff359] h-[31.71px] left-[568px] rounded-[5.115px] to-[#60ed8e] top-[404px] w-[109.452px]" data-node-id="2047:4427" />
               <div className="-translate-y-1/2 [word-break:break-word] absolute flex flex-col font-['Source_Han_Sans_SC'] font-medium h-[1.023px] justify-center leading-[0] left-[575.16px] not-italic text-[#031308] text-[15.344px] top-[419.86px] w-[95.131px]" data-node-id="2047:4428">
-                <p className="leading-[normal]">{`探索任务·${String(currentTaskIndex + 1).padStart(2, "0")}`}</p>
+                <p className="leading-[normal] whitespace-nowrap">{`探索任务·${String(currentTaskIndex + 1).padStart(2, "0")}`}</p>
               </div>
             </div>
             <div className="absolute border-[2.137px] border-[rgba(30,57,97,0.85)] border-solid h-[201.913px] left-[403px] rounded-[19.23px] top-[473.54px] w-[172px]" data-node-id="2047:4429" data-name="image 87">
