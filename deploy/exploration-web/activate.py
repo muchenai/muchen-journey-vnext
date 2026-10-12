@@ -55,10 +55,11 @@ def activate(package):
     pin = json.loads(read_file(package / 'manifest.json'))
     candidate = pin['candidate']
     require(re.fullmatch('[0-9a-f]{40}', candidate), 'CANDIDATE')
-    baseline = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
-    web_baseline = '0cb53fe04c51b6382a844fd7c49ea1c81ce66eec'
-    base = ROOT / 'releases' / (web_baseline + '-web-links')
-    new = ROOT / 'releases' / (candidate + '-web-labels')
+    baseline = 'fc591682249c34d7737144e7753ddef5da7aa554'
+    web_baseline = baseline
+    require(pin['base_candidate'] == web_baseline, 'BASE_PIN')
+    base = ROOT / 'releases' / (web_baseline + '-feishu-login')
+    new = ROOT / 'releases' / (candidate + '-feishu-auto-login')
     require((ROOT / 'current').resolve(strict=True) == base and not new.exists(), 'BASE_RELEASE')
     api_before = container('api')
     require('APP_RELEASE=' + baseline in api_before['Config']['Env'], 'API_BASELINE')
