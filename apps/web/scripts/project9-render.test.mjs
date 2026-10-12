@@ -60,6 +60,15 @@ test("Feishu login renders one authorization action without nickname or invite i
   assert.match(render({ initialScreen: "login", joinPhase: "feishu", joinError: "授权已过期，请重试" }), /授权已过期，请重试/);
 });
 
+test("post-login welcome renders on the server without browser globals", () => {
+  assert.equal(typeof window, "undefined");
+  const html = render({ initialScreen: "welcome" });
+  assert.match(html, /欢迎来到/);
+  assert.match(html, /开启旅程/);
+  assert.match(html, /data-welcome-narrative="true"/);
+  assert.match(html, /Muchen Journey是沐晨面向新人和在岗成员建设的学习与实践成长平台/);
+});
+
 test("unfinished modules have explicit non-navigation actions; exploration remains available", () => {
   const html = render();
   for (const action of ["novice-village", "ai-academy", "delivery-guild"]) {

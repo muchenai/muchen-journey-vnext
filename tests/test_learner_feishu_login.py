@@ -70,7 +70,8 @@ def test_concurrent_first_callbacks_create_only_one_account(learner_provider):
         responses = list(pool.map(lambda i: callback(clients[i], codes[i], states[i]), range(2)))
     for response in responses:
         assert_ok(response)
-    # One of the sessions rotates the other; DB identity and enrollment remain unique.
+    # Both clients remain logged in; DB identity and enrollment remain unique.
+    assert all(client.get("/api/v1/session").status_code == 200 for client in clients)
     with SessionLocal() as session:
         hashed = credential_hash(get_settings().identity_subject_secret, "external:FEISHU:cli_test", subject)
         identities = list(session.scalars(select(ExternalIdentity).where(ExternalIdentity.subject == hashed)))

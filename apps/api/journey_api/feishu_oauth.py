@@ -53,6 +53,14 @@ class FeishuOAuthClient:
         return f"{AUTHORIZE_URL}?{query}"
 
     def exchange_code(self, code: str) -> FeishuProfile:
+        return self._exchange_code(code, use_redirect=True)
+
+    def exchange_client_code(self, code: str) -> FeishuProfile:
+        # requestAccess returns a code directly; there was no redirect_uri
+        # in that authorization request. Identity still comes from this app.
+        return self._exchange_code(code, use_redirect=False)
+
+    def _exchange_code(self, code: str, *, use_redirect: bool) -> FeishuProfile:
         token_payload = self._request_json(
             TOKEN_URL,
             method="POST",
@@ -61,7 +69,7 @@ class FeishuOAuthClient:
                 "client_id": self._app_id,
                 "client_secret": self._app_secret,
                 "code": code,
-                "redirect_uri": self._redirect_uri,
+                **({"redirect_uri": self._redirect_uri} if use_redirect else {}),
             },
         )
         token_data = token_payload.get("data", token_payload)

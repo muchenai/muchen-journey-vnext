@@ -689,6 +689,7 @@ class OAuthStartResponse(StrictModel):
 class OAuthCallbackCommand(StrictModel):
     code: str = Field(min_length=1, max_length=512)
     state: str = Field(min_length=32, max_length=256)
+    authorization_method: Literal["redirect", "client"] = "redirect"
 
 
 class OAuthCallbackOut(StrictModel):
