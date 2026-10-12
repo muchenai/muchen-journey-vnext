@@ -1,4 +1,4 @@
-name: Exploration Web-only Button Fix
+name: Exploration Web-only Link Update
 
 on:
   workflow_dispatch:

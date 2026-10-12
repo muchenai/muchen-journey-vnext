@@ -29,6 +29,7 @@ class WebReleaseTests(unittest.TestCase):
 
     def exercise(self, fail):
         baseline = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
+        web_baseline = '3d8d941c8b8a26ee35958d61443ad5508ebfcc48'
         candidate = '1' * 40
         image_id = 'sha256:' + '2' * 64
         config = b'{"rootfs":{"diff_ids":[]}}'
@@ -41,12 +42,12 @@ class WebReleaseTests(unittest.TestCase):
         tar_bytes = buffer.getvalue()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            base = root / 'releases' / (baseline + '-exploration')
+            base = root / 'releases' / (web_baseline + '-web-button')
             (base / 'secrets').mkdir(parents=True)
             for name in release.COPY_FILES:
                 (base / name).write_bytes(b'preserve file')
-            (base / '.deployment.env').write_text('WEB_IMAGE=old\nCANDIDATE_COMMIT='+baseline+'\n')
-            (base / 'secrets/web.env').write_text('APP_RELEASE='+baseline+'\n')
+            (base / '.deployment.env').write_text('WEB_IMAGE=old\nCANDIDATE_COMMIT='+web_baseline+'\n')
+            (base / 'secrets/web.env').write_text('APP_RELEASE='+web_baseline+'\n')
             (base / 'secrets/api.env').write_text('APP_RELEASE='+baseline+'\n')
             (root / 'current').symlink_to(base)
             package = root / 'exploration-runs/1-1-activate'
@@ -57,7 +58,7 @@ class WebReleaseTests(unittest.TestCase):
                 'chunks': [{'file': 'web.part0000', 'sha256': hashlib.sha256(zipped).hexdigest()}],
                 'gzip_sha256': hashlib.sha256(zipped).hexdigest(), 'tar_sha256': hashlib.sha256(tar_bytes).hexdigest(),
                 'config_digest': config_digest, 'reference': 'verified-web'}}))
-            before = {'services': {'api': {'image': 'api-old'}, 'web': {'image': 'old', 'environment': {'APP_RELEASE': baseline}}}}
+            before = {'services': {'api': {'image': 'api-old'}, 'web': {'image': 'old', 'environment': {'APP_RELEASE': web_baseline}}}}
             operations = []
             def compose(path, *args, **kwargs):
                 if args[0] == 'config':
@@ -78,7 +79,7 @@ class WebReleaseTests(unittest.TestCase):
                 return b''
             def container(service):
                 return {'Id': 'api-stable' if service == 'api' else 'web-id', 'Image': image_id,
-                        'Config': {'Env': ['APP_RELEASE='+baseline]}}
+                        'Config': {'Env': ['APP_RELEASE='+(baseline if service == 'api' else web_baseline)]}}
             def urlopen(*args, **kwargs):
                 stream = io.BytesIO(json.dumps({'status': 'ready', 'release': candidate}).encode())
                 stream.status = 200
