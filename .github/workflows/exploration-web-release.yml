@@ -1,4 +1,4 @@
-name: Feishu Automatic Login Web Release
+name: Feishu Inline Login Web Release
 
 on:
   workflow_dispatch:
