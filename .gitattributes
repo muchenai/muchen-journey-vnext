@@ -3,3 +3,4 @@
 
 # Approved baseline packages are hash-bound and may retain intentional EOF spacing.
 docs/baselines/** whitespace=-trailing-space,-blank-at-eof
+apps/web/public/vendor/feishu/*.js -text

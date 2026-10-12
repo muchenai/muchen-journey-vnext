@@ -60,6 +60,9 @@ class FakeFeishuOAuthClient:
             raise OAuthProviderError("test provider failure")
         return FeishuProfile(open_id=subject)
 
+    def exchange_client_code(self, code: str) -> FeishuProfile:
+        return self.exchange_code(code)
+
 
 @pytest.fixture
 def oauth_provider(monkeypatch: pytest.MonkeyPatch):

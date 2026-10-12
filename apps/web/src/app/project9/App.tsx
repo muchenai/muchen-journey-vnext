@@ -3,6 +3,7 @@
 import { FormEvent, MouseEvent, useState, useEffect, useId, useRef, useLayoutEffect, CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/lib/feishu-client-login";
 import { ExecutionDetail, ExecutionView, TaskCards, executionTasks } from "./ExecutionPages";
 import { DashboardMain } from "./DashboardMain";
 import { SelfCheckHistoryDialog } from "./SelfCheckHistoryDialog";
@@ -315,6 +316,16 @@ function Login() {
     if (joinPhase === 'feishu') {
       if (isLaunched) return;
       setIsLaunched(true);
+      if (isFeishuClient(navigator.userAgent)) {
+        setMessage('正在获取飞书授权…');
+        try {
+          await loginInsideFeishu();
+        } catch (error) {
+          setIsLaunched(false);
+          setMessage(clientLoginErrorMessage(error));
+        }
+        return;
+      }
       setMessage('正在前往飞书授权…');
       window.location.assign('/auth/feishu?return_to=%2Fapp');
       return;
@@ -1171,7 +1182,9 @@ const welcomeParagraphs = [
 function WelcomeNarrative() {
   const characters = Array.from(welcomeParagraphs.join(""));
   const total = characters.length;
-  const [revealed, setRevealed] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? total : 0);
+  // Keep the server render and first browser render identical. Motion
+  // preferences are applied by the client-only effect below.
+  const [revealed, setRevealed] = useState(0);
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     let timer: number | undefined;

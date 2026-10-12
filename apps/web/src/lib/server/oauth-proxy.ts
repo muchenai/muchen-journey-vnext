@@ -15,7 +15,7 @@ function forwardedFor(request: NextRequest): string | null {
   return request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip");
 }
 
-function appendSetCookies(source: Response, target: NextResponse): void {
+export function appendSetCookies(source: Response, target: NextResponse): void {
   const headers = source.headers as Headers & { getSetCookie?: () => string[] };
   const combined = source.headers.get("set-cookie");
   const values = headers.getSetCookie?.() ?? (combined ? [combined] : []);

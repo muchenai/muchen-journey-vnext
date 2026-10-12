@@ -21,6 +21,7 @@ from journey_api.learner_oauth import lock_learner_organization, provision_learn
 from journey_api.reviewer_access import effective_roles
 from journey_api.identity import (
     OAUTH_COOKIE,
+    SESSION_COOKIE,
     add_audit,
     clear_oauth_cookie,
     credential_hash,
@@ -1051,6 +1052,8 @@ def complete_feishu_oauth(
         state_row.browser_token_hash, expected_browser_hash
     ):
         raise ApiError(401, "OAUTH_BROWSER_MISMATCH", "身份登录上下文不存在或已过期。")
+    if command.authorization_method == "client" and state_row.return_to != "/app":
+        raise ApiError(422, "VALIDATION_FAILED", "客户端登录仅用于学员入口。")
     now = utc_now()
     if state_row.consumed_at is not None:
         raise ApiError(409, "OAUTH_STATE_REPLAY", "身份登录状态已经使用。")
@@ -1064,7 +1067,11 @@ def complete_feishu_oauth(
     session.commit()
 
     try:
-        profile = client.exchange_code(command.code)
+        profile = (
+            client.exchange_client_code(command.code)
+            if command.authorization_method == "client"
+            else client.exchange_code(command.code)
+        )
     except OAuthProviderError as exc:
         raise ApiError(
             502,
@@ -1205,8 +1212,16 @@ def complete_feishu_oauth(
         )
         .with_for_update()
     ).all()
+    current_token = request.cookies.get(SESSION_COOKIE, "")
+    current_hash = credential_hash(settings.session_secret, "session", current_token) if current_token else None
     for previous in previous_sessions:
-        if role != Role.LEARNER or previous.role == Role.LEARNER:
+        # Learners can keep Feishu and browser sessions simultaneously. Rotate
+        # only the session being replaced in this browser; staff policy stays.
+        if role != Role.LEARNER or (
+            previous.role == Role.LEARNER
+            and current_hash is not None
+            and compare_digest(previous.token_hash, current_hash)
+        ):
             previous.revoked_at = issued_at
     session_token = random_token()
     csrf_token = random_token()

@@ -12061,6 +12061,15 @@
             "maxLength": 256,
             "minLength": 32,
             "title": "State"
+          },
+          "authorization_method": {
+            "type": "string",
+            "enum": [
+              "redirect",
+              "client"
+            ],
+            "title": "Authorization Method",
+            "default": "redirect"
           }
         },
         "additionalProperties": false,

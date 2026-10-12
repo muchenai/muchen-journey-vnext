@@ -96,3 +96,21 @@ def test_feishu_client_rejects_invalid_token_responses(monkeypatch, payload):
     )
     with pytest.raises(OAuthProviderError):
         FeishuOAuthClient(settings()).exchange_code("invalid-code")
+
+
+def test_client_authorization_uses_same_application_without_redirect_uri(monkeypatch):
+    calls = []
+
+    def fake_urlopen(request, timeout):
+        calls.append(request)
+        if request.full_url == TOKEN_URL:
+            return FakeResponse({"access_token": "client-user-token"})
+        return FakeResponse({"data": {"open_id": "ou_same_person"}})
+
+    monkeypatch.setattr("journey_api.feishu_oauth.request.urlopen", fake_urlopen)
+    assert FeishuOAuthClient(settings()).exchange_client_code("client-code").open_id == "ou_same_person"
+    assert json.loads(calls[0].data) == {
+        "grant_type": "authorization_code", "client_id": "cli_test",
+        "client_secret": "test-feishu-app-secret-00005", "code": "client-code",
+    }
+    assert calls[1].headers["Authorization"] == "Bearer client-user-token"
