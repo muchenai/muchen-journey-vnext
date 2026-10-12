@@ -6,9 +6,9 @@ import test from "node:test";
 const source = readFileSync(new URL("../public/vendor/feishu/h5-js-sdk-1.5.26.js", import.meta.url), "utf8");
 const compatible = readFileSync(new URL("../public/vendor/feishu/h5-js-sdk-1.5.26.csp.js", import.meta.url), "utf8");
 
-function initialize(code) {
+function initialize(code, userAgent = "Mozilla/5.0 Chrome/140.0 Lark/7.50.0 WebApp") {
   const context = {
-    navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Lark/7.50.0 WebApp", platform: "Win32" },
+    navigator: { userAgent, platform: "Win32" },
     document: { addEventListener() {}, head: {}, createElement() { return { style: {} }; }, querySelectorAll() { return []; } },
     console, setTimeout: () => 1, clearTimeout() {},
     MutationObserver: class { observe() {} }, CustomEvent: class {},
@@ -31,4 +31,10 @@ test("actual compatible SDK exposes Feishu login APIs without eval", () => {
   const context = initialize(compatible);
   assert.equal(typeof context.h5sdk?.ready, "function");
   assert.equal(typeof context.tt?.requestAccess, "function");
+});
+
+test("actual SDK does not expose login APIs in an ordinary desktop Feishu webview", () => {
+  const context = initialize(compatible, "Mozilla/5.0 Chrome/140.0 Lark/7.50.0");
+  assert.equal(context.h5sdk, undefined);
+  assert.equal(context.tt?.requestAccess, undefined);
 });
