@@ -1,6 +1,8 @@
 // Pinned official SDK, served with Journey so client login does not depend on
 // a second network connection to a third-party CDN. See vendor/feishu/SOURCE.md.
 const SDK_URL = "/vendor/feishu/h5-js-sdk-1.5.26.csp.js";
+const APP_ENTRY_MARKER = "feishu_app_entry";
+let loginInFlight: Promise<void> | undefined;
 type Authorization = { code: string; state?: string };
 type FeishuWindow = Window & {
   h5sdk?: { ready(callback: () => void): void; error(callback: () => void): void };
@@ -34,11 +36,45 @@ export function clientLoginErrorMessage(error: unknown): string {
   if (error.detail === "SDK_CONTAINER_UNAVAILABLE") {
     return "飞书登录组件未完成初始化，请反馈此诊断信息。（诊断：sdk/SDK_CONTAINER_UNAVAILABLE）";
   }
+  if (error.detail === "SDK_APP_ENTRY_UNAVAILABLE") {
+    return "已尝试在飞书应用中打开，但当前窗口仍未提供登录接口。（诊断：sdk/SDK_APP_ENTRY_UNAVAILABLE）";
+  }
   return `${labels[error.stage]}。请将此提示反馈给管理员。（诊断：${error.stage}/${error.detail}）`;
 }
 
 export function isFeishuClient(userAgent: string): boolean {
   return /\b(?:Lark|Feishu)\//i.test(userAgent);
+}
+
+// A Feishu browser window is not necessarily an H5 application container.
+// Match the pinned SDK's desktop gate, including its legacy-client exception.
+export function isFeishuAppContainer(userAgent: string): boolean {
+  if (!isFeishuClient(userAgent)) return false;
+  if (/(Android|Mobile|iPhone|iPad|iPod|iOS)/i.test(userAgent)) return true;
+  const version = userAgent.match(/(?:Lark|Feishu)\/(\d+)\.(\d+)/i);
+  const legacy = version && (Number(version[1]) < 3 || (Number(version[1]) === 3 && Number(version[2]) < 46));
+  return Boolean(legacy || userAgent.includes("WebApp"));
+}
+
+async function openFeishuApplication(): Promise<void> {
+  const current = new URL(window.location.href);
+  // The destination performs a fresh login. Never carry OAuth state, codes,
+  // cookies, or an arbitrary return URL across the application handoff.
+  if (current.searchParams.has(APP_ENTRY_MARKER)) {
+    throw new ClientLoginError("sdk", "SDK_APP_ENTRY_UNAVAILABLE");
+  }
+  const { appId } = await atStage("start", () => clientRequest({ step: "start" }));
+  if (typeof appId !== "string" || !/^cli_[A-Za-z0-9]+$/.test(appId)) {
+    throw new ClientLoginError("start", "IDENTITY_PROVIDER_INVALID");
+  }
+  const destination = new URL("/join", current.origin);
+  destination.searchParams.set(APP_ENTRY_MARKER, "1");
+  const entry = new URL("https://applink.feishu.cn/client/web_app/open");
+  entry.searchParams.set("appId", appId);
+  entry.searchParams.set("mode", "window");
+  entry.searchParams.set("reload", "true");
+  entry.searchParams.set("lk_target_url", destination.href);
+  window.location.assign(entry.href);
 }
 
 async function loadSdk(target: FeishuWindow): Promise<void> {
@@ -69,9 +105,22 @@ async function clientRequest(body: Record<string, string>) {
   return data;
 }
 
-export async function loginInsideFeishu(): Promise<void> {
+async function performClientLogin(): Promise<void> {
   const target = window as FeishuWindow;
-  await atStage("sdk", () => loadSdk(target));
+  if (!isFeishuClient(window.navigator.userAgent)) {
+    throw new ClientLoginError("sdk", "SDK_NOT_FEISHU_CLIENT");
+  }
+  if (!(target.h5sdk && target.tt?.requestAccess) && !isFeishuAppContainer(window.navigator.userAgent)) {
+    return openFeishuApplication();
+  }
+  try {
+    await atStage("sdk", () => loadSdk(target));
+  } catch (error) {
+    if (error instanceof ClientLoginError && error.detail === "SDK_CONTAINER_UNAVAILABLE") {
+      return openFeishuApplication();
+    }
+    throw error;
+  }
   await atStage("ready", () => new Promise<void>((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new Error("SDK_TIMEOUT")), 15000);
     target.h5sdk!.error(() => { window.clearTimeout(timer); reject(new Error("SDK_UNAVAILABLE")); });
@@ -85,7 +134,7 @@ export async function loginInsideFeishu(): Promise<void> {
       success: (result) => { window.clearTimeout(timer); resolve(result); },
       fail: (error) => {
         window.clearTimeout(timer);
-        const code = error?.errCode ?? error?.errno;
+        const code = error?.errno ?? error?.errCode;
         reject(new Error(`AUTH_DENIED${typeof code === "number" && Number.isSafeInteger(code) && code >= 0 ? `:${code}` : ""}`));
       },
     });
@@ -94,4 +143,16 @@ export async function loginInsideFeishu(): Promise<void> {
   const result = await atStage("complete", () => clientRequest({ step: "complete", code: authorization.code, state }));
   if (result.entry !== "/app") throw new ClientLoginError("complete", "AUTH_INVALID");
   window.location.assign("/app");
+}
+
+// React's development remount and a simultaneous retry must share one OAuth
+// attempt; a second start would replace the browser-binding cookie.
+export function loginInsideFeishu(): Promise<void> {
+  if (!loginInFlight) {
+    loginInFlight = performClientLogin().catch(error => {
+      loginInFlight = undefined;
+      throw error;
+    });
+  }
+  return loginInFlight;
 }

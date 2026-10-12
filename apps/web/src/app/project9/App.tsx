@@ -304,6 +304,21 @@ function Login() {
   const [name, setName] = useState('')
   const [message, setMessage] = useState(joinError)
   const [isLaunched, setIsLaunched] = useState(false)
+  useEffect(() => {
+    if (joinPhase !== 'feishu' || joinError || !isFeishuClient(navigator.userAgent)) return;
+    let active = true;
+    // Defer one tick so React Strict Mode can cancel its first effect setup.
+    const timer = window.setTimeout(() => {
+      setIsLaunched(true);
+      setMessage('正在使用当前飞书账号登录…');
+      void loginInsideFeishu().catch(error => {
+        if (!active) return;
+        setIsLaunched(false);
+        setMessage(clientLoginErrorMessage(error));
+      });
+    }, 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [joinPhase, joinError]);
   useLayoutEffect(() => {
     const resize = () => setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))
     window.addEventListener('resize', resize)

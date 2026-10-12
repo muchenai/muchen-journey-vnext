@@ -16,10 +16,19 @@ function compile(relative, overrides = {}) {
     (name) => name in overrides ? overrides[name] : require(name), compiled, compiled.exports);
   return compiled.exports;
 }
-const { isFeishuClient } = compile("../src/lib/feishu-client-login.ts");
+const { isFeishuClient, isFeishuAppContainer } = compile("../src/lib/feishu-client-login.ts");
 test("Feishu desktop/mobile use client auth while Chrome keeps redirect auth", () => {
   for (const ua of ["Mozilla/5.0 Lark/7.50.0", "Mozilla/5.0 Feishu/7.0.0"]) assert.equal(isFeishuClient(ua), true);
   for (const ua of ["Mozilla/5.0 Chrome/140.0 Safari/537.36", "LarkishBrowser/1.0"]) assert.equal(isFeishuClient(ua), false);
+});
+
+test("desktop Feishu browser and application containers are distinct", () => {
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Lark/7.50.0"), false);
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Lark/7.50.0 WebApp"), true);
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Lark/3.45.0"), true);
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Lark/3.46.0"), false);
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Android Feishu/7.50.0"), true);
+  assert.equal(isFeishuAppContainer("Mozilla/5.0 Chrome/140.0 WebApp"), false);
 });
 
 function route(handler) {
@@ -80,10 +89,11 @@ function clientRuntime(authorize, configure = () => {}) {
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const compiled = { exports: {} };
   const sandbox = {
-    exports: compiled.exports, module: compiled, AbortSignal,
+    exports: compiled.exports, module: compiled, AbortSignal, URL,
     window: {
+      navigator: { userAgent: "Mozilla/5.0 Lark/7.50.0 WebApp" },
       setTimeout, clearTimeout,
-      location: { assign: (url) => navigations.push(url) },
+      location: { href: "https://journey.example/join?feishu_app_entry=1", assign: (url) => navigations.push(url) },
       h5sdk: { ready: (ready) => ready(), error() {} },
       tt: { requestAccess: authorize },
     },
@@ -166,9 +176,68 @@ test("SDK download failure differs from missing Feishu container APIs", async ()
       };
     });
     await assert.rejects(runtime.login(), error => {
-      assert.match(runtime.errorMessage(error), load ? /SDK_CONTAINER_UNAVAILABLE/ : /SDK_LOAD_FAILED/);
+      assert.match(runtime.errorMessage(error), load ? /SDK_APP_ENTRY_UNAVAILABLE/ : /SDK_LOAD_FAILED/);
       return true;
     });
     assert.equal(runtime.calls.length, 0);
   }
+});
+
+test("ordinary desktop webview enters the configured app without exporting auth data", async () => {
+  const runtime = clientRuntime(() => assert.fail("must not authorize in ordinary webview"), sandbox => {
+    sandbox.window.navigator.userAgent = "Mozilla/5.0 Lark/7.50.0";
+    sandbox.window.location.href = "https://journey.example/join?return_to=https://evil.example&code=private";
+    delete sandbox.window.h5sdk;
+    delete sandbox.window.tt;
+  });
+  await Promise.all([runtime.login(), runtime.login()]);
+  assert.deepEqual(runtime.calls, [{ step: "start" }]);
+  assert.equal(runtime.navigations.length, 1);
+  const entry = new URL(runtime.navigations[0]);
+  assert.equal(entry.origin, "https://applink.feishu.cn");
+  assert.equal(entry.pathname, "/client/web_app/open");
+  assert.equal(entry.searchParams.get("appId"), "cli_test");
+  assert.equal(entry.searchParams.get("mode"), "window");
+  assert.equal(entry.searchParams.get("lk_target_url"), "https://journey.example/join?feishu_app_entry=1");
+  assert.doesNotMatch(entry.href, /private|evil|native-code|aaaaaaaa/);
+});
+
+test("handoff marker stops loops even if new window still lacks container support", async () => {
+  const runtime = clientRuntime(() => {}, sandbox => {
+    sandbox.window.navigator.userAgent = "Mozilla/5.0 Lark/7.50.0";
+    delete sandbox.window.h5sdk;
+    delete sandbox.window.tt;
+  });
+  await assert.rejects(runtime.login(), error => /SDK_APP_ENTRY_UNAVAILABLE/.test(runtime.errorMessage(error)));
+  assert.deepEqual(runtime.navigations, []);
+  assert.deepEqual(runtime.calls, []);
+});
+
+test("concurrent native login requests share one authorization and state exchange", async () => {
+  let authorizeCount = 0;
+  const runtime = clientRuntime(options => { authorizeCount++; options.success({ code: "native-code", state }); });
+  await Promise.all([runtime.login(), runtime.login(), runtime.login()]);
+  assert.equal(authorizeCount, 1);
+  assert.deepEqual(runtime.calls, [{ step: "start" }, { step: "complete", code: "native-code", state }]);
+});
+
+test("browser never enters native authorization or application handoff", async () => {
+  const runtime = clientRuntime(() => assert.fail("native auth"), sandbox => {
+    sandbox.window.navigator.userAgent = "Mozilla/5.0 Chrome/140.0";
+  });
+  await assert.rejects(runtime.login(), error => /SDK_NOT_FEISHU_CLIENT/.test(runtime.errorMessage(error)));
+  assert.deepEqual(runtime.calls, []);
+  assert.deepEqual(runtime.navigations, []);
+});
+
+test("failed authorization can be retried and errno takes precedence over generic errCode", async () => {
+  let attempts = 0;
+  const runtime = clientRuntime(options => {
+    if (++attempts === 1) options.fail({ errCode: 999, errno: 2700002 });
+    else options.success({ code: "retry-code", state });
+  });
+  await assert.rejects(runtime.login(), error => /AUTH_DENIED:2700002/.test(runtime.errorMessage(error)));
+  await runtime.login();
+  assert.equal(attempts, 2);
+  assert.deepEqual(runtime.navigations, ["/app"]);
 });
