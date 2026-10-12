@@ -5,6 +5,7 @@ import type { Assignment, CurrentAction } from "@/lib/server/api";
 import { learnerPageRequest } from "@/lib/server/api";
 import type { ProjectExperienceData } from "./types";
 import { collectReviewFeedback } from "./review-feedback";
+import { learnerMaterialDestinations } from "./exploration-links";
 
 export async function loadProjectExperience(assignmentId?: string): Promise<{
   learnerName: string;
@@ -67,12 +68,12 @@ export async function loadProjectExperience(assignmentId?: string): Promise<{
       currentAssignmentId: action.resource_id,
       currentStagePosition: (action.journey?.nodes.find(node => node.assignment_id === action.resource_id)?.position ?? 0) + 1,
       allowedCommands: assignment.allowed_commands,
-      materials: assignment.learning_materials.map((material) => ({
+      materials: learnerMaterialDestinations(assignment.journey_stage?.stable_key ?? assignment.stable_task_key, assignment.learning_materials.map((material) => ({
         key: material.key,
         title: material.title,
         url: material.url,
         completed: material.completed_at !== null,
-      })),
+      }))),
       draftBody: assignment.draft?.body ?? "",
       completedStages: action.journey?.completed_stages ?? 0,
       totalStages: action.journey?.total_stages ?? 8,

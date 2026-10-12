@@ -1,11 +1,12 @@
 import { useJourney, useTaskStatus } from "./journey-context";
 import type { ReactNode } from 'react';
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { explorationLinks } from "@/app/project-ui/exploration-links";
 
 const taskDefinitions = [
   {
     "id": "3059",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/B9f2d0P0ior6UBxTeFRc2ELmnlg",
+    "taskLink": explorationLinks["DAY-0"].taskDetails,
     "title": "Day 1｜启程-公司基础介绍材料",
     "label": "DAY 1",
     "name": "启程",
@@ -23,7 +24,7 @@ const taskDefinitions = [
   },
   {
     "id": "3117",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/wiki/WEXlw0EoPizH2FkLx4ccCsvnngc",
+    "taskLink": explorationLinks["ASM-001-RULE-BREAKDOWN"].taskDetails,
     "title": "评测一/规则拆解",
     "label": "评测一",
     "name": "规则拆解",
@@ -41,7 +42,7 @@ const taskDefinitions = [
   },
   {
     "id": "3175",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/KEe7dazYooA2J2x0zPUcGhshnhb",
+    "taskLink": explorationLinks["ASM-002-MODEL-JUDGEMENT"].taskDetails,
     "title": "评测二/模型判断",
     "label": "评测二",
     "name": "模型判断",
@@ -59,7 +60,7 @@ const taskDefinitions = [
   },
   {
     "id": "3233",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/JGyrdojJEoFSGuxxfULc46gfnvd",
+    "taskLink": explorationLinks["ASM-003-DATA-CONSTRUCTION"].taskDetails,
     "title": "评测三/数据构造",
     "label": "评测三",
     "name": "数据构造",
@@ -77,7 +78,7 @@ const taskDefinitions = [
   },
   {
     "id": "3291",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/N1CmdNwvtoF6ubxGGK6cztvnnpg",
+    "taskLink": explorationLinks["TRE-001-COMPANY-VALUES"].taskDetails,
     "title": "宝藏一｜公司价值",
     "label": "宝藏一",
     "name": "公司价值",
@@ -95,7 +96,7 @@ const taskDefinitions = [
   },
   {
     "id": "3349",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/B9uhdkLwUoqqIYxeh9TcWErbnHd?from=from_parent_sheet",
+    "taskLink": explorationLinks["TRE-002-AI-DATA-BASICS"].taskDetails,
     "title": "宝藏二/AI与数据基础",
     "label": "宝藏二",
     "name": "AI与数据基础",
@@ -113,7 +114,7 @@ const taskDefinitions = [
   },
   {
     "id": "3407",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/StsEdbAXzorBNUxxX89cQPgcnyg",
+    "taskLink": explorationLinks["TRE-004-DELIVERY-FIT"].taskDetails,
     "title": "宝藏四/交付边界",
     "label": "宝藏四",
     "name": "交付边界",
@@ -131,7 +132,7 @@ const taskDefinitions = [
   },
   {
     "id": "3465",
-    "taskLink": "https://zx6w57w0j34.feishu.cn/docx/Tsq7daDoIoPhNoxXBDbcTMaRnEc?from=from_parent_sheet",
+    "taskLink": explorationLinks["TRE-003-PROJECT-AWARENESS"].taskDetails,
     "title": "宝藏三/项目认知",
     "label": "宝藏三",
     "name": "项目认知",
