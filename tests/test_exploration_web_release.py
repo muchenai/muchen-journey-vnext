@@ -28,8 +28,8 @@ class WebReleaseTests(unittest.TestCase):
         self.assertNotEqual(release.normalized(after, Path('/new'), Path('/old'), before['services']['web']), before)
 
     def exercise(self, fail):
-        baseline = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
-        web_baseline = '0cb53fe04c51b6382a844fd7c49ea1c81ce66eec'
+        baseline = 'fc591682249c34d7737144e7753ddef5da7aa554'
+        web_baseline = baseline
         candidate = '1' * 40
         image_id = 'sha256:' + '2' * 64
         config = b'{"rootfs":{"diff_ids":[]}}'
@@ -42,7 +42,7 @@ class WebReleaseTests(unittest.TestCase):
         tar_bytes = buffer.getvalue()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            base = root / 'releases' / (web_baseline + '-web-links')
+            base = root / 'releases' / (web_baseline + '-feishu-login')
             (base / 'secrets').mkdir(parents=True)
             for name in release.COPY_FILES:
                 (base / name).write_bytes(b'preserve file')
@@ -54,7 +54,7 @@ class WebReleaseTests(unittest.TestCase):
             package.mkdir(parents=True)
             zipped = gzip.compress(tar_bytes)
             (package / 'web.part0000').write_bytes(zipped)
-            (package / 'manifest.json').write_text(json.dumps({'candidate': candidate, 'archive': {
+            (package / 'manifest.json').write_text(json.dumps({'candidate': candidate, 'base_candidate': web_baseline, 'archive': {
                 'chunks': [{'file': 'web.part0000', 'sha256': hashlib.sha256(zipped).hexdigest()}],
                 'gzip_sha256': hashlib.sha256(zipped).hexdigest(), 'tar_sha256': hashlib.sha256(tar_bytes).hexdigest(),
                 'config_digest': config_digest, 'reference': 'verified-web'}}))

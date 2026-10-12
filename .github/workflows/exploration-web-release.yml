@@ -1,4 +1,4 @@
-name: Exploration Web-only Label Fix
+name: Feishu Automatic Login Web Release
 
 on:
   workflow_dispatch:
