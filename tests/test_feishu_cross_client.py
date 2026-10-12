@@ -1,15 +1,44 @@
 import uuid
 
+import pytest
 from sqlalchemy import func, select
 
 from journey_api.db import SessionLocal
 from journey_api.config import get_settings
 from journey_api.identity import OAUTH_COOKIE, SESSION_COOKIE, utc_now
-from journey_api.models import Enrollment, ExternalIdentity, Review
-from test_learner_feishu_login import learner_provider, login
+from journey_api.models import Enrollment, ExternalIdentity, Review, Organization, User, RoleAssignment, Role, UserStatus
+from journey_api.journey_service import publish_catalog_journey
+from test_learner_feishu_login import login
 from test_wp09_feishu_identity import oauth_provider, assert_ok, begin_oauth, callback, client_for
 from test_reviewer_workbench import client_for_linked_reviewer, create_linked_reviewer
+import test_reviewer_workbench
 from test_shared_learner_reviews import approval, review_command
+
+
+@pytest.fixture
+def learner_provider(oauth_provider, monkeypatch):
+    # Publishing this fixture must not alter the shared organization's catalog:
+    # the formal-journey suite exercises its first publication independently.
+    organization_id, operator_id = uuid.uuid4(), uuid.uuid4()
+    with SessionLocal.begin() as session:
+        session.add(Organization(id=organization_id, name="Cross-client test organization"))
+        session.flush()
+        session.add(User(id=operator_id, organization_id=organization_id,
+                         display_name="Cross-client operator", status=UserStatus.ACTIVE))
+        session.flush()
+        session.add(RoleAssignment(id=uuid.uuid4(), organization_id=organization_id,
+                                   user_id=operator_id, role=Role.OPERATOR))
+    monkeypatch.setattr(test_reviewer_workbench, "ORGANIZATION_ID", organization_id)
+    reviewer_id = create_linked_reviewer("Cross-client initial reviewer")
+    monkeypatch.setenv("FEISHU_LEARNER_REGISTRATION_ENABLED", "true")
+    monkeypatch.setenv("FEISHU_LEARNER_ORGANIZATION_ID", str(organization_id))
+    monkeypatch.setenv("FEISHU_LEARNER_REVIEWER_ID", str(reviewer_id))
+    get_settings.cache_clear()
+    with SessionLocal.begin() as session:
+        publish_catalog_journey(session, operator_id=operator_id, reviewer_id=reviewer_id,
+                                organization_id=organization_id, expected_current_version=0)
+    yield oauth_provider
+    get_settings.cache_clear()
 
 
 def client_callback(client, code, state, browser_token=None):
