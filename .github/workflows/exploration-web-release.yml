@@ -1,4 +1,4 @@
-name: Exploration Web-only Link Update
+name: Exploration Web-only Label Fix
 
 on:
   workflow_dispatch:

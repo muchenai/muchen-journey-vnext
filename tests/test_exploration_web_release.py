@@ -29,7 +29,7 @@ class WebReleaseTests(unittest.TestCase):
 
     def exercise(self, fail):
         baseline = '9e24e64a6b35509da1f28a0dd0e4f8f2131c7399'
-        web_baseline = '3d8d941c8b8a26ee35958d61443ad5508ebfcc48'
+        web_baseline = '0cb53fe04c51b6382a844fd7c49ea1c81ce66eec'
         candidate = '1' * 40
         image_id = 'sha256:' + '2' * 64
         config = b'{"rootfs":{"diff_ids":[]}}'
@@ -42,7 +42,7 @@ class WebReleaseTests(unittest.TestCase):
         tar_bytes = buffer.getvalue()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            base = root / 'releases' / (web_baseline + '-web-button')
+            base = root / 'releases' / (web_baseline + '-web-links')
             (base / 'secrets').mkdir(parents=True)
             for name in release.COPY_FILES:
                 (base / name).write_bytes(b'preserve file')
