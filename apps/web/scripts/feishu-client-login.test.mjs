@@ -165,25 +165,24 @@ test("fresh client loads same-origin SDK with CSP nonce before authorization", a
   assert.deepEqual(runtime.navigations, ["/app"]);
 });
 
-test("SDK download failure differs from missing Feishu container APIs", async () => {
-  for (const load of [false, true]) {
-    const runtime = clientRuntime(() => {}, sandbox => {
-      delete sandbox.window.h5sdk;
-      delete sandbox.window.tt;
-      sandbox.document = {
-        createElement: () => ({ remove() {} }), querySelector: () => null,
-        head: { appendChild: element => load ? element.onload() : element.onerror() },
-      };
-    });
-    await assert.rejects(runtime.login(), error => {
-      assert.match(runtime.errorMessage(error), load ? /SDK_APP_ENTRY_UNAVAILABLE/ : /SDK_LOAD_FAILED/);
-      return true;
-    });
-    assert.equal(runtime.calls.length, 0);
-  }
+test("SDK download failure stays visible and does not restart authorization", async () => {
+  const runtime = clientRuntime(() => {}, sandbox => {
+    delete sandbox.window.h5sdk;
+    delete sandbox.window.tt;
+    sandbox.document = {
+      createElement: () => ({ remove() {} }), querySelector: () => null,
+      head: { appendChild: element => element.onerror() },
+    };
+  });
+  await assert.rejects(runtime.login(), error => {
+    assert.match(runtime.errorMessage(error), /SDK_LOAD_FAILED/);
+    return true;
+  });
+  assert.equal(runtime.calls.length, 0);
+  assert.deepEqual(runtime.navigations, []);
 });
 
-test("ordinary desktop webview enters the configured app without exporting auth data", async () => {
+test("navigation-bar webview authorizes in its current page without an app handoff", async () => {
   const runtime = clientRuntime(() => assert.fail("must not authorize in ordinary webview"), sandbox => {
     sandbox.window.navigator.userAgent = "Mozilla/5.0 Lark/7.50.0";
     sandbox.window.location.href = "https://journey.example/join?return_to=https://evil.example&code=private";
@@ -191,26 +190,33 @@ test("ordinary desktop webview enters the configured app without exporting auth 
     delete sandbox.window.tt;
   });
   await Promise.all([runtime.login(), runtime.login()]);
-  assert.deepEqual(runtime.calls, [{ step: "start" }]);
-  assert.equal(runtime.navigations.length, 1);
-  const entry = new URL(runtime.navigations[0]);
-  assert.equal(entry.origin, "https://applink.feishu.cn");
-  assert.equal(entry.pathname, "/client/web_app/open");
-  assert.equal(entry.searchParams.get("appId"), "cli_test");
-  assert.equal(entry.searchParams.get("mode"), "window");
-  assert.equal(entry.searchParams.get("lk_target_url"), "https://journey.example/join?feishu_app_entry=1");
-  assert.doesNotMatch(entry.href, /private|evil|native-code|aaaaaaaa/);
+  assert.deepEqual(runtime.calls, []);
+  assert.deepEqual(runtime.navigations, ["/auth/feishu?return_to=%2Fapp"]);
 });
 
-test("handoff marker stops loops even if new window still lacks container support", async () => {
+test("old app-entry query does not force another window or block same-page OAuth", async () => {
   const runtime = clientRuntime(() => {}, sandbox => {
     sandbox.window.navigator.userAgent = "Mozilla/5.0 Lark/7.50.0";
     delete sandbox.window.h5sdk;
     delete sandbox.window.tt;
   });
-  await assert.rejects(runtime.login(), error => /SDK_APP_ENTRY_UNAVAILABLE/.test(runtime.errorMessage(error)));
-  assert.deepEqual(runtime.navigations, []);
+  await runtime.login();
+  assert.deepEqual(runtime.navigations, ["/auth/feishu?return_to=%2Fapp"]);
   assert.deepEqual(runtime.calls, []);
+});
+
+test("SDK with missing exports uses same-page OAuth even when UA says WebApp", async () => {
+  const runtime = clientRuntime(() => assert.fail("native auth unavailable"), sandbox => {
+    delete sandbox.window.h5sdk;
+    delete sandbox.window.tt;
+    sandbox.document = {
+      createElement: () => ({ remove() {} }), querySelector: () => null,
+      head: { appendChild: element => element.onload() },
+    };
+  });
+  await runtime.login();
+  assert.deepEqual(runtime.calls, []);
+  assert.deepEqual(runtime.navigations, ["/auth/feishu?return_to=%2Fapp"]);
 });
 
 test("concurrent native login requests share one authorization and state exchange", async () => {
