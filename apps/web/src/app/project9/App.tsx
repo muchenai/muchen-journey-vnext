@@ -598,7 +598,7 @@ const imgVector3 = `${assetPathPrefix}/cec96.svg`;
                           <p className="font-['Source_Han_Sans_SC'] relative shrink-0 text-[21px] text-white w-full font-medium" data-node-id="2006:57">
                             新手村
                           </p>
-                          <p className="font-['Source_Han_Sans_SC'] font-normal relative shrink-0 text-[#8ea1e2] text-[15.5px] w-full" data-node-id="2006:58">
+                          <p className="font-['Source_Han_Sans_SC'] font-normal relative shrink-0 text-[#8ea1e2] text-[15.5px] w-full whitespace-nowrap" data-node-id="2006:58">
                             开启你的成长地图
                           </p>
                         </div>
@@ -664,7 +664,7 @@ const imgVector3 = `${assetPathPrefix}/cec96.svg`;
                       <p className="font-['Source_Han_Sans_SC'] relative shrink-0 text-[21px] text-white w-full font-medium" data-node-id="2006:75">
                         交付线公会
                       </p>
-                      <p className="font-['Source_Han_Sans_SC'] font-normal relative shrink-0 text-[#8ea1e2] text-[15.5px] w-full" data-node-id="2006:76">
+                      <p className="font-['Source_Han_Sans_SC'] font-normal relative shrink-0 text-[#8ea1e2] text-[15.5px] w-full whitespace-nowrap" data-node-id="2006:76">
                         在实践中创造价值
                       </p>
                     </div>
