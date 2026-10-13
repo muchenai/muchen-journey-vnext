@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, MouseEvent, useState, useEffect, useId, useRef, useLayoutEffect, CSSProperties } from "react";
+import { FormEvent, MouseEvent, useState, useEffect, useId, useRef, useLayoutEffect, useCallback, CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { effectiveCharacterCount } from "@/lib/text-length";
 import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/lib/feishu-client-login";
@@ -10,6 +10,7 @@ import { SelfCheckHistoryDialog } from "./SelfCheckHistoryDialog";
 import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
 import { readSelfCheckHistory, saveSelfCheck, selfCheckHistoryKey, type SelfCheckRecord } from "./self-check-history";
 import { JourneyProvider, useJourney, useTaskStatus, type JourneyContextValue } from "./journey-context";
+import { ProjectResourceLoader } from "./ProjectResourceLoader";
 import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment } from "../actions";
  type Screen = "login" | "welcome" | "dashboard" | "tasks" | "detail" | "view";
 type PreviewIdentity = string;
@@ -24,6 +25,7 @@ function ExperienceScreen() {
  const taskStatus = useTaskStatus();
  const identity = null;
  const [screen, setScreen] = useState<Screen>(initialScreen);
+ const [entryResourcesReady, setEntryResourcesReady] = useState(initialScreen !== "login");
  const [scale, setScale] = useState<number | null>(null);
  const viewportRef = useRef<HTMLElement>(null);
  const [notice, setNotice] = useState(initialNotice ?? "");
@@ -268,6 +270,8 @@ function ExperienceScreen() {
  else if (text.includes("切换身份")) window.location.assign("/join");
  else setNotice("该功能尚未提供对应设计稿");
  };
+ const revealLogin = useCallback(() => setEntryResourcesReady(true), []);
+ if (screen === "login" && !entryResourcesReady) return <ProjectResourceLoader onReady={revealLogin} />;
  if (screen === "login") return <Login key={`${joinPhase}:${joinError}`} />;
  return <main ref={viewportRef} className="design-viewport" data-screen={screen} onClick={click} onPointerMove={event => {
    energizePanels(event.currentTarget, event.clientX, event.clientY);
@@ -296,7 +300,7 @@ const mission = `${assetPathPrefix}/c21d5.png`
 const exploreFrame = `${assetPathPrefix}/baa53.png`
 const loginArrow = `${assetPathPrefix}/42137.svg`
 
-function Login() {
+export function Login() {
   const { joinPhase, joinError } = useJourney();
   const [scale, setScale] = useState<number | null>(null)
   const [language, setLanguage] = useState<'简体中文' | 'English'>('简体中文')
@@ -304,20 +308,33 @@ function Login() {
   const [name, setName] = useState('')
   const [message, setMessage] = useState(joinError)
   const [isLaunched, setIsLaunched] = useState(false)
+  const [countdown, setCountdown] = useState(10)
+  const launchStarted = useRef(false)
   useEffect(() => {
     if (joinPhase !== 'feishu' || joinError || !isFeishuClient(navigator.userAgent)) return;
     let active = true;
-    // Defer one tick so React Strict Mode can cancel its first effect setup.
+    const startedAt = Date.now();
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((10000 - (Date.now() - startedAt)) / 1000));
+      setCountdown(remaining);
+      if (!launchStarted.current) setMessage(`${remaining} 秒后将使用当前飞书账号自动进入…`);
+    };
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 250);
     const timer = window.setTimeout(() => {
+      window.clearInterval(interval);
+      if (launchStarted.current) return;
+      launchStarted.current = true;
       setIsLaunched(true);
       setMessage('正在使用当前飞书账号登录…');
       void loginInsideFeishu().catch(error => {
         if (!active) return;
+        launchStarted.current = false;
         setIsLaunched(false);
         setMessage(clientLoginErrorMessage(error));
       });
-    }, 0);
-    return () => { active = false; window.clearTimeout(timer); };
+    }, 10000);
+    return () => { active = false; window.clearTimeout(timer); window.clearInterval(interval); };
   }, [joinPhase, joinError]);
   useLayoutEffect(() => {
     const resize = () => setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))
@@ -329,13 +346,15 @@ function Login() {
   const launch = async (event: FormEvent) => {
     event.preventDefault()
     if (joinPhase === 'feishu') {
-      if (isLaunched) return;
+      if (isLaunched || launchStarted.current) return;
+      launchStarted.current = true;
       setIsLaunched(true);
       if (isFeishuClient(navigator.userAgent)) {
         setMessage('正在获取飞书授权…');
         try {
           await loginInsideFeishu();
         } catch (error) {
+          launchStarted.current = false;
           setIsLaunched(false);
           setMessage(clientLoginErrorMessage(error));
         }
@@ -428,6 +447,7 @@ function Login() {
             <b aria-hidden="true" />
           </button>
           <div className="status-line" role="status">{message}</div>
+          {joinPhase === 'feishu' && !joinError && !isLaunched && isFeishuClient(typeof navigator === 'undefined' ? '' : navigator.userAgent) && <span className="login-auto-countdown" aria-hidden="true">{countdown}</span>}
         </form>
       </section>
 

@@ -33,7 +33,7 @@ function load(filename) {
   vm.runInThisContext("(function(require,module,exports){" + source + "\n})", { filename })(require, compiled, compiled.exports);
   return compiled.exports;
 }
-const { default: App } = load(path.join(root, "app/project9/App.tsx"));
+const { default: App, Login } = load(path.join(root, "app/project9/App.tsx"));
 const { JourneyProvider } = load(path.join(root, "app/project9/journey-context.tsx"));
 const { TaskCards, ExecutionDetail, executionTasks } = load(path.join(root, "app/project9/ExecutionPages.tsx"));
 const { TaskFeedbackDialog } = load(path.join(root, "app/project9/TaskFeedbackDialog.tsx"));
@@ -52,12 +52,25 @@ const experience = (overrides = {}) => ({
 });
 const render = (props = {}) => renderToStaticMarkup(React.createElement(App, { initialScreen: "dashboard", learnerName: "测试同学", experience: experience(), ...props }));
 const inside = (element, data = experience()) => renderToStaticMarkup(React.createElement(JourneyProvider, { value: { learnerName: "测试同学", experience: data } }, element));
+const renderLogin = (joinError = "") => renderToStaticMarkup(React.createElement(JourneyProvider, {
+  value: {
+    learnerName: "测试同学", experience: experience(), initialScreen: "login",
+    joinPhase: "feishu", joinError, initialNotice: "",
+  },
+}, React.createElement(Login)));
+
+test("learner entry starts with the real resource loader", () => {
+  const html = render({ initialScreen: "login", joinPhase: "feishu" });
+  assert.match(html, /项目资源载入进度/);
+  assert.match(html, /正在加载项目资源/);
+  assert.doesNotMatch(html, /使用飞书登录/);
+});
 
 test("Feishu login renders one authorization action without nickname or invite input", () => {
-  const html = render({ initialScreen: "login", joinPhase: "feishu" });
+  const html = renderLogin();
   assert.match(html, /使用飞书登录/);
   assert.doesNotMatch(html, /<input/);
-  assert.match(render({ initialScreen: "login", joinPhase: "feishu", joinError: "授权已过期，请重试" }), /授权已过期，请重试/);
+  assert.match(renderLogin("授权已过期，请重试"), /授权已过期，请重试/);
 });
 
 test("post-login welcome renders on the server without browser globals", () => {
