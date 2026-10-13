@@ -105,8 +105,8 @@ function ExperienceScreen() {
    setFeedbackAssignmentId(button.dataset.assignmentId ?? null);
    return;
  }
- if (["novice-village", "ai-academy", "delivery-guild"].includes(action ?? "")) {
-   setNotice("该功能正在设计"); return;
+ if (["novice-village", "ai-academy", "delivery-guild", "team-progress", "knowledge-base"].includes(action ?? "")) {
+   setNotice("暂未开放"); return;
  }
  if (action === "open-task") {
    const index = Number(button.dataset.taskIndex);
@@ -303,7 +303,6 @@ const loginArrow = `${assetPathPrefix}/42137.svg`
 export function Login() {
   const { joinPhase, joinError } = useJourney();
   const [scale, setScale] = useState<number | null>(null)
-  const [language, setLanguage] = useState<'简体中文' | 'English'>('简体中文')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [message, setMessage] = useState(joinError)
@@ -407,10 +406,6 @@ export function Login() {
           </span>
         </button>
         <nav className="navigation" aria-label="页面工具">
-          <button className="nav-control" onClick={() => setLanguage(language === '简体中文' ? 'English' : '简体中文')}>
-            <span className="orbit-dot">◉</span>{language}
-          </button>
-          <i />
           <button className="nav-control" onClick={() => setMessage(joinPhase === 'feishu' ? '点击使用飞书登录，授权后即可开始探索。' : '帮助星图已展开：输入邀请码即可开始探索。')}>
             <span className="orbit-dot">◉</span>帮助中心
           </button>
@@ -745,7 +740,7 @@ const imgVector3 = `${assetPathPrefix}/cec96.svg`;
                 </p>
               </div>
             </button>
-            <button type="button" data-action="true" className="content-stretch flex gap-[13px] items-center relative shrink-0" data-node-id="2006:90">
+            <button type="button" data-action="team-progress" className="content-stretch flex gap-[13px] items-center relative shrink-0" data-node-id="2006:90">
               <div className="content-stretch flex gap-[21px] items-center relative shrink-0" data-node-id="2006:91">
                 <div className="relative shrink-0 size-[24px]" data-node-id="2006:92" data-name="Frame">
                   <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame1} />
@@ -763,7 +758,7 @@ const imgVector3 = `${assetPathPrefix}/cec96.svg`;
                 </p>
               </div>
             </button>
-            <button type="button" data-action="true" className="content-stretch flex gap-[21px] items-center relative shrink-0" data-node-id="2006:99">
+            <button type="button" data-action="knowledge-base" className="content-stretch flex gap-[21px] items-center relative shrink-0" data-node-id="2006:99">
               <div className="relative shrink-0 size-[24px]" data-node-id="2006:100" data-name="Frame">
                 <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame2} />
               </div>
@@ -981,11 +976,6 @@ const imgRectangle60 = `${assetPathPrefix}/59316.svg`;
                   全部成长任务
                 </p>
               </div>
-            </div>
-            <div className="content-stretch flex flex-col items-start relative shrink-0" data-node-id="2006:330" data-name="Small">
-              <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] leading-[22px] not-italic relative shrink-0 text-[#779ab8] text-[13.333px] text-right whitespace-nowrap" data-node-id="2006:331">
-                旅程版本 V5
-              </p>
             </div>
           </div>
           <div className="content-stretch flex flex-col items-start pt-[22px] relative shrink-0 w-full" data-node-id="2006:332" data-name="Container:margin">

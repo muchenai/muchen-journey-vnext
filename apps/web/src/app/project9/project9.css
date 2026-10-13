@@ -178,10 +178,10 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
    viewport media queries stack the two columns before the scale is applied. */
 .login-stage.cosmos-shell { padding: 28px 5.5% 24px; }
 .login-stage .experience-grid { grid-template-columns: minmax(520px, 1fr) minmax(430px, 553px); gap: clamp(3rem, 9vw, 9.7rem); max-width: 1450px; margin: -8px auto 0; }
-.login-stage .mission-zone { min-height: 677px; }
+.login-stage .mission-zone { left: -129px; min-height: 677px; }
 .login-stage .mission-zone h1 { top: 0; left: 22px; font-size: 49.925px; letter-spacing: 8.9865px; gap: 7px; }
 .login-stage .mission-art { margin-top: 0; }
-.login-stage .explore-button { right: 1%; top: 50%; transform: none; transform-origin: center; }
+.login-stage .explore-button { right: 1%; top: 50%; transform: translateX(129px); transform-origin: center; }
 .login-stage .login-panel { min-height: 714px; padding: 54px 47px 48px; gap: 38px; border-radius: 41px; }
 .login-stage .panel-logo { width: 173px; height: 173px; }
 .login-stage .panel-title { font-size: 36px; }
