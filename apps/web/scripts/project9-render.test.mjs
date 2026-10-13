@@ -62,7 +62,7 @@ const renderLogin = (joinError = "") => renderToStaticMarkup(React.createElement
 test("learner entry starts with the real resource loader", () => {
   const html = render({ initialScreen: "login", joinPhase: "feishu" });
   assert.match(html, /项目资源载入进度/);
-  assert.match(html, /正在加载项目资源/);
+  assert.match(html, /已缓存 0\/78 项/);
   assert.doesNotMatch(html, /使用飞书登录/);
 });
 
@@ -70,6 +70,7 @@ test("Feishu login renders one authorization action without nickname or invite i
   const html = renderLogin();
   assert.match(html, /使用飞书登录/);
   assert.doesNotMatch(html, /<input/);
+  assert.doesNotMatch(html, /简体中文/);
   assert.match(renderLogin("授权已过期，请重试"), /授权已过期，请重试/);
 });
 
@@ -84,12 +85,13 @@ test("post-login welcome renders on the server without browser globals", () => {
 
 test("unfinished modules have explicit non-navigation actions; exploration remains available", () => {
   const html = render();
-  for (const action of ["novice-village", "ai-academy", "delivery-guild"]) {
+  for (const action of ["novice-village", "ai-academy", "delivery-guild", "team-progress", "knowledge-base"]) {
     assert.match(html, new RegExp(`<button[^>]+data-action="${action}"`));
   }
   assert.doesNotMatch(html, /href="\/app\/maps\/(newcomer-village|ai-academy|delivery-guild)/);
   assert.match(html, /探索营/);
-  assert.match(render({ initialNotice: "该功能正在设计" }), /role="status"[^>]*>该功能正在设计/);
+  assert.match(render({ initialNotice: "暂未开放" }), /role="status"[^>]*>暂未开放/);
+  assert.doesNotMatch(html, /旅程版本 V5/);
 });
 
 test("a new learner sees one accessible task and seven locked tasks", () => {

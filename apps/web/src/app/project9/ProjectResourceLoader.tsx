@@ -2,11 +2,12 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { JOURNEY_ENTRY_RESOURCES, preloadJourneyEntryResources } from "@/lib/journey-entry-preload";
+import { JOURNEY_ENTRY_RESOURCES, prepareJourneyCache, preloadJourneyEntryResources } from "@/lib/journey-entry-preload";
 
 export function ProjectResourceLoader({ onReady }: { onReady: () => void }) {
   const [loaded, setLoaded] = useState(0);
   const [total, setTotal] = useState<number>(JOURNEY_ENTRY_RESOURCES.length);
+  const [loadedBytes, setLoadedBytes] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const percent = Math.round((loaded / total) * 100);
@@ -14,10 +15,11 @@ export function ProjectResourceLoader({ onReady }: { onReady: () => void }) {
   useEffect(() => {
     const controller = new AbortController();
     let completionTimer: number | undefined;
-    void preloadJourneyEntryResources((nextLoaded, nextTotal) => {
-      setLoaded(nextLoaded);
-      setTotal(nextTotal);
-    }, controller.signal).then(() => {
+    void prepareJourneyCache().then(() => preloadJourneyEntryResources(progress => {
+      setLoaded(progress.loaded);
+      setTotal(progress.total);
+      setLoadedBytes(progress.loadedBytes);
+    }, controller.signal)).then(() => {
       completionTimer = window.setTimeout(onReady, 420);
     }).catch(error => {
       if (error instanceof DOMException && error.name === "AbortError") return;
@@ -46,14 +48,15 @@ export function ProjectResourceLoader({ onReady }: { onReady: () => void }) {
         >
           <div className="journey-loader-orbit" aria-hidden="true" />
           <strong>{percent}<small>%</small></strong>
-          <span>{failed ? "载入未完成" : percent === 100 ? "资源准备完成" : "资源载入中"}</span>
+          <span>{failed ? "缓存未完成" : percent === 100 ? "资源准备完成" : "资源缓存中"}</span>
         </div>
         <h1>{failed ? "部分资源未能载入" : percent === 100 ? "探索旅程准备完成" : "正在准备你的探索旅程"}</h1>
         <p className="journey-loader-count">
-          {failed ? "请检查网络后重新载入" : `正在加载项目资源：${loaded}/${total}`}
+          {failed ? "请检查网络后重新载入" : `已缓存 ${loaded}/${total} 项 · ${(loadedBytes / 1024 / 1024).toFixed(1)} MB`}
         </p>
         {failed && <button type="button" onClick={() => {
           setLoaded(0);
+          setLoadedBytes(0);
           setFailed(false);
           setAttempt(value => value + 1);
         }}>重新载入</button>}
