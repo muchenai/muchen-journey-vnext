@@ -29,7 +29,7 @@ class WebReleaseTests(unittest.TestCase):
 
     def exercise(self, fail):
         baseline = 'fc591682249c34d7737144e7753ddef5da7aa554'
-        web_baseline = 'aa109c2fdfc01b17030bd2110d3b4d7aa81f0bc9'
+        web_baseline = '47d97050331282634de67fc063a282c2c4bb6e8c'
         candidate = '1' * 40
         image_id = 'sha256:' + '2' * 64
         config = b'{"rootfs":{"diff_ids":[]}}'
@@ -42,7 +42,7 @@ class WebReleaseTests(unittest.TestCase):
         tar_bytes = buffer.getvalue()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            base = root / 'releases' / (web_baseline + '-feishu-auto-login')
+            base = root / 'releases' / (web_baseline + '-feishu-inline-login')
             (base / 'secrets').mkdir(parents=True)
             for name in release.COPY_FILES:
                 (base / name).write_bytes(b'preserve file')

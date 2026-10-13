@@ -56,9 +56,9 @@ def activate(package):
     candidate = pin['candidate']
     require(re.fullmatch('[0-9a-f]{40}', candidate), 'CANDIDATE')
     baseline = 'fc591682249c34d7737144e7753ddef5da7aa554'
-    web_baseline = 'aa109c2fdfc01b17030bd2110d3b4d7aa81f0bc9'
+    web_baseline = '47d97050331282634de67fc063a282c2c4bb6e8c'
     require(pin['base_candidate'] == web_baseline, 'BASE_PIN')
-    base = ROOT / 'releases' / (web_baseline + '-feishu-auto-login')
+    base = ROOT / 'releases' / (web_baseline + '-feishu-inline-login')
     new = ROOT / 'releases' / (candidate + '-feishu-inline-login')
     require((ROOT / 'current').resolve(strict=True) == base and not new.exists(), 'BASE_RELEASE')
     api_before = container('api')
