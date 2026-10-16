@@ -17,7 +17,7 @@ from journey_api.attachments import (
     safe_original_filename,
     validate_content,
 )
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -235,7 +235,7 @@ def presign_attachment(
     command: PresignAttachmentCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_attachments_enabled()
@@ -404,7 +404,7 @@ def complete_attachment(
     command: CompleteAttachmentCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_attachments_enabled()
@@ -508,7 +508,7 @@ def complete_attachment(
 def delete_attachment(
     attachment_id: uuid.UUID,
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_attachments_enabled()
@@ -557,8 +557,8 @@ def download_attachment(
     )
     if attachment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
-    allowed = actor.has_role(Role.LEARNER) and attachment.owner_id == actor.id
-    if actor.has_role(Role.REVIEWER):
+    allowed = actor.has_role(Role.LEARNER) and attachment.owner_id == actor.learner_record_id
+    if not allowed and actor.has_role(Role.REVIEWER):
         from journey_api.review_routes import scoped_context_query
 
         allowed = session.scalar(
@@ -610,7 +610,7 @@ def save_submission_draft(
     command: SaveSubmissionDraftCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -696,7 +696,7 @@ def start_evidence_revision(
     command: RevisionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -830,7 +830,7 @@ def cancel_evidence_revision(
     command: RevisionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -938,7 +938,7 @@ def submit_assignment(
     command: SubmissionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -1107,7 +1107,7 @@ def submit_assignment(
 def submission_history(
     submission_id: uuid.UUID,
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)

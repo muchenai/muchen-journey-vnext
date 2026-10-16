@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
@@ -265,7 +265,7 @@ def rubric_feedback(
 @router.get("/me/incentives", response_model=IncentiveLedgerResponse)
 def learner_incentives(
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -320,7 +320,7 @@ def learner_incentives(
 )
 def learner_next_training_stage_review_requests(
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -355,7 +355,7 @@ def request_next_training_stage_review(
     command: NextTrainingStageReviewRequestCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -500,7 +500,7 @@ def _handoff_out(handoff: Handoff, owner: User) -> HandoffOut:
 def learner_handoff_detail(
     handoff_id: uuid.UUID,
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -624,7 +624,7 @@ def accept_handoff(
     command: HandoffAcceptanceCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -926,7 +926,7 @@ def accept_handoff(
 def result(
     request: Request,
     enrollment_id: uuid.UUID | None = None,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -1448,7 +1448,7 @@ def timeline(
     cursor: str | None = Query(default=None, max_length=500),
     limit: int = Query(default=50, ge=1, le=100),
     enrollment_id: uuid.UUID | None = None,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)

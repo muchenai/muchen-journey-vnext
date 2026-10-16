@@ -26,3 +26,11 @@ The migration fingerprint checks all existing business tables without ignoring
 enrollment review mode. New authentication tables must remain empty through the
 maintenance check. Readiness confirms deployment health, not a person's actual
 Feishu authorization or completed learner acceptance test.
+
+Completion-code claims retain the corporate User, Feishu identity, sessions and
+all staff role/assignment IDs. A consumed code binds that account to the original
+immutable learning history through learner-only authorization. The phone User
+and its sessions/identities are disabled, not the corporate User. Existing target
+learning activity blocks silent replacement; one target can claim one history.
+Staff endpoints always use the corporate principal. Migrated work cannot become
+self-reviewable by acquiring reviewer access on the receiving account.

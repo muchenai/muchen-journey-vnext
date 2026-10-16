@@ -71,7 +71,7 @@ test("anonymous and wrong-role review entry recover through a dedicated login pa
   assert.match(reviewLoginSource, />\s*使用本地审核身份进入\s*</);
   assert.match(localReviewEntrySource, /process\.env\.APP_ENV === "local"/);
   assert.match(localReviewEntrySource, /process\.env\.ALLOW_FIXTURE_IDENTITY === "true"/);
-  assert.match(localReviewEntrySource, /response\.cookies\.delete\(SESSION_COOKIE\)/);
+  assert.doesNotMatch(localReviewEntrySource, /cookies\.delete/);
   assert.match(localReviewEntrySource, /status: 303/);
   assert.match(localReviewEntrySource, /Location: "\/review"/);
   assert.match(apiSource, /redirect\("\/review\/login\?auth_error=FORBIDDEN"\)/);

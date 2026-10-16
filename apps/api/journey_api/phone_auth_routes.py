@@ -9,7 +9,7 @@ from datetime import timedelta
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
@@ -37,6 +37,8 @@ from journey_api.models import (
     Role,
     RoleAssignment,
     Submission,
+    SubmissionDraft,
+    LearningMaterialCompletion,
     User,
     UserStatus,
 )
@@ -540,8 +542,10 @@ def migrate_completion_code(
     )
     if feishu_identity is None:
         raise ApiError(403, "FEISHU_ACCOUNT_REQUIRED", "请先使用公司飞书账号登录后再迁移。")
-    if any(role != Role.LEARNER for role in actor.roles):
-        raise ApiError(409, "TARGET_ACCOUNT_HAS_STAFF_ROLES", "当前飞书账号具有审核或管理权限，请联系管理员李鑫波协助迁移，保留原有权限。")
+    # Serialize claims by the receiving corporate user as well as by code.
+    target_user = session.scalar(select(User).where(User.id == actor.id).with_for_update())
+    if target_user is None or target_user.status != UserStatus.ACTIVE:
+        raise ApiError(401, "UNAUTHENTICATED", "当前飞书账号不可用。")
     raw_code = command.code.strip().upper()
     if not re.fullmatch(r"MJ-[A-Z2-9]{8}", raw_code):
         raise ApiError(422, "COMPLETION_CODE_INVALID", "探索营毕业码格式不正确。")
@@ -554,6 +558,13 @@ def migrate_completion_code(
         raise ApiError(404, "COMPLETION_CODE_INVALID", "探索营毕业码无效或已过期。")
     if row.used_at is not None:
         raise ApiError(409, "COMPLETION_CODE_USED", "该探索营毕业码已经使用。")
+    if row.organization_id != actor.organization_id:
+        raise ApiError(404, "COMPLETION_CODE_INVALID", "探索营毕业码无效或已过期。")
+    if session.scalar(select(CompletionCode.id).where(
+        CompletionCode.migrated_to_user_id == actor.id,
+        CompletionCode.used_at.is_not(None),
+    )) is not None:
+        raise ApiError(409, "TARGET_ACCOUNT_HAS_PROGRESS", "公司飞书账号已有迁入的学习记录，请联系管理员合并。")
     source_user_id = row.user_id
     if source_user_id == actor.id:
         raise ApiError(409, "COMPLETION_CODE_SAME_ACCOUNT", "当前账号无需迁移。")
@@ -591,6 +602,13 @@ def migrate_completion_code(
                 Assignment.enrollment_id == target_enrollment.id
             )
         )
+        has_target_activity = has_target_activity or session.scalar(
+            select(LearningMaterialCompletion.id).where(
+                LearningMaterialCompletion.enrollment_id == target_enrollment.id,
+            ).limit(1)
+        ) or session.scalar(select(SubmissionDraft.id).join(
+            Assignment, Assignment.id == SubmissionDraft.assignment_id,
+        ).where(Assignment.enrollment_id == target_enrollment.id).limit(1))
         if has_target_activity:
             raise ApiError(409, "TARGET_ACCOUNT_HAS_PROGRESS", "公司飞书账号已有学习记录，请联系管理员合并。")
     if actor.session_id is None:
@@ -607,45 +625,35 @@ def migrate_completion_code(
         raise ApiError(401, "UNAUTHENTICATED", "当前飞书会话无效，请重新登录。")
 
     source_user = session.scalar(select(User).where(User.id == source_user_id).with_for_update())
-    target_user = session.scalar(select(User).where(User.id == actor.id).with_for_update())
-    if source_user is None or target_user is None:
+    if source_user is None or source_user.organization_id != actor.organization_id or source_user.status != UserStatus.ACTIVE:
         raise ApiError(409, "COMPLETION_CODE_SOURCE_INVALID", "毕业码对应的账号不可迁移。")
 
-    # Journey facts such as material completions are immutable. Keep the
-    # completed phone-owned journey in place and move the verified Feishu
-    # identity to that canonical user instead of rewriting historical rows.
-    # The current session follows the identity so the browser can continue
-    # immediately with the migrated journey.
+    # Keep corporate identity, sessions, roles and review assignments unchanged.
+    # The consumed code is the durable ownership link to immutable learner facts.
     now = utc_now()
-    for other_session in session.scalars(
-        select(IdentitySession)
-        .where(
-            IdentitySession.external_identity_id == feishu_identity.id,
-            IdentitySession.id != current_identity_session.id,
-            IdentitySession.revoked_at.is_(None),
-        )
-        .with_for_update()
-    ).all():
-        other_session.revoked_at = now
-    feishu_identity.user_id = source_user_id
-    feishu_identity.revision += 1
-    current_identity_session.user_id = source_user_id
-    current_identity_session.external_identity_revision = feishu_identity.revision
+    if session.scalar(select(RoleAssignment.id).where(
+        RoleAssignment.user_id == source_user_id,
+        RoleAssignment.role != Role.LEARNER,
+    )) is not None or session.scalar(select(ExternalIdentity.id).where(
+        ExternalIdentity.user_id == source_user_id,
+        ExternalIdentity.provider.not_in(TEMPORARY_IDENTITY_PROVIDERS),
+        ExternalIdentity.revoked_at.is_(None),
+    )) is not None:
+        raise ApiError(409, "COMPLETION_CODE_SOURCE_INVALID", "毕业码来源必须是尚未绑定企业身份的临时学员账号。")
     source_user.display_name = target_user.display_name
-    target_user.status = UserStatus.DISABLED
-    session.execute(
-        delete(RoleAssignment).where(
-            RoleAssignment.user_id == actor.id,
-            RoleAssignment.role == Role.LEARNER,
-        )
-    )
+    source_user.status = UserStatus.DISABLED
+    for phone_session in session.scalars(select(IdentitySession).where(
+        IdentitySession.user_id == source_user_id,
+        IdentitySession.revoked_at.is_(None),
+    ).with_for_update()).all():
+        phone_session.revoked_at = now
     # The phone identity has served its temporary purpose. Revoking it keeps
     # the migrated Feishu account authoritative and prevents later phone login
     # from changing the corporate display name.
     for temporary_identity in temporary_identities:
         temporary_identity.revoked_at = now
     row.used_at = now
-    row.migrated_to_user_id = source_user_id
+    row.migrated_to_user_id = actor.id
     add_audit(
         session,
         request_id=request.state.request_id,
@@ -657,8 +665,8 @@ def migrate_completion_code(
         result="SUCCESS",
         details={
             "source_user_id": str(source_user_id),
-            "canonical_user_id": str(source_user_id),
-            "previous_feishu_user_id": str(actor.id),
+            "corporate_user_id": str(actor.id),
+            "retired_phone_user_id": str(source_user_id),
         },
     )
     session.commit()
