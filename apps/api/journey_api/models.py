@@ -533,6 +533,60 @@ class OAuthLoginState(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class PhoneOtpChallenge(Base):
+    __tablename__ = "phone_otp_challenges"
+    __table_args__ = (
+        CheckConstraint("attempts >= 0", name="ck_phone_otp_attempts_nonnegative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    phone_subject: Mapped[str] = mapped_column(String(64), index=True)
+    phone_last_four: Mapped[str] = mapped_column(String(4))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PhonePasswordCredential(Base):
+    __tablename__ = "phone_password_credentials"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    external_identity_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("external_identities.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    password_salt: Mapped[str] = mapped_column(String(64))
+    password_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CompletionCode(Base):
+    __tablename__ = "completion_codes"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_completion_codes_user"),
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_completion_codes_user_organization",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    code_ciphertext: Mapped[str] = mapped_column(Text)
+    code_hint: Mapped[str] = mapped_column(String(4))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    migrated_to_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
 class TaskDefinition(Base):
     __tablename__ = "task_definitions"
     __table_args__ = (

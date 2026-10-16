@@ -25,6 +25,60 @@ CONTENT_REVIEW_NOTE = (
 )
 
 
+# Owner-supplied learner destinations used by the exploration-camp UI.  These
+# belong to the published catalog as well as the visual layer: a fresh database
+# must not create task cards whose material buttons have no content behind them.
+FORMAL_STAGE_MATERIALS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    "DAY-0": (
+        ("给 Muchener 的一封信", "https://zx6w57w0j34.feishu.cn/wiki/MpxDwemUwiOY0fk9jM5cqRYRn3b"),
+        ("公司基础介绍材料", "https://zx6w57w0j34.feishu.cn/wiki/YpaGw0EgqidJUykHcqxcLgCvnvc"),
+    ),
+    "TRE-001-COMPANY-VALUES": (
+        ("使命愿景价值观", "https://zx6w57w0j34.feishu.cn/wiki/TUV1wbptdiXmapkfDsOcRrvknme"),
+        ("公司价值体现视频", "https://zx6w57w0j34.feishu.cn/file/PewIbRCP3oDKAIx7MS9cSqUMnod"),
+    ),
+    "TRE-002-AI-DATA-BASICS": (
+        ("AI与数据基础文档", "https://zx6w57w0j34.feishu.cn/docx/EDm2dFzmco58SJx10Xeceo0WnIc"),
+        ("AI与数据基础视频", "https://zx6w57w0j34.feishu.cn/docx/SYzrd6dS2oUd2Sx70dqcNcqOn9f"),
+    ),
+    "TRE-003-PROJECT-AWARENESS": (
+        ("MDOS 项目经理全流程操作指引", "https://zx6w57w0j34.feishu.cn/docx/HDoidinI9oTlmzxw5H7cqQbqnCF"),
+        ("项目认知视频", "https://zx6w57w0j34.feishu.cn/file/QcEqbZ3NlolbaTxvmc0cZNeYnvc"),
+    ),
+    "TRE-004-DELIVERY-FIT": (
+        ("项目中的关键角色与新人责任边界", "https://zx6w57w0j34.feishu.cn/wiki/Lu9ZwEM9kij7fdk7eOMcInNenld"),
+        ("项目交付与责任边界视频", "https://zx6w57w0j34.feishu.cn/minutes/obcnk5wa15l826747rlb55rr"),
+    ),
+    "ASM-001-RULE-BREAKDOWN": (
+        ("项目规则文档拆解作业 SOP", "https://zx6w57w0j34.feishu.cn/wiki/Fxccw68nAipuM3kK8gJcqiyDnRJ"),
+        ("项目规则文档拆解教学视频", "https://zx6w57w0j34.feishu.cn/minutes/obcnk68g8j32fn4f8af53752"),
+    ),
+    "ASM-002-MODEL-JUDGEMENT": (
+        ("模型回答判断与理由书写", "https://zx6w57w0j34.feishu.cn/docx/NbGRdVd6aolCDRxkmodcHoMLnlg"),
+        ("模型回答质量判断教学视频", "https://zx6w57w0j34.feishu.cn/minutes/obcnj65w46z681x365gyo3wu"),
+    ),
+    "ASM-003-DATA-CONSTRUCTION": (
+        ("通用数据构造讲义", "https://zx6w57w0j34.feishu.cn/docx/Hx8HdBHYmoSFOexbyoxc9A3dn0c"),
+        ("通用数据构造教学视频", "https://lcnf4xe7p1h6.feishu.cn/minutes/obcnk1s9uh3y25xle6723aq3"),
+    ),
+}
+
+
+def formal_stage_materials(stable_key: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "key": f"material-{stable_key.lower()}-{index}",
+            "title": title,
+            "kind": "HTTPS_LINK",
+            "source_label": f"{stable_key} 材料 {index}",
+            "url": url,
+            "estimated_duration_minutes": 1,
+            "required": True,
+        }
+        for index, (title, url) in enumerate(FORMAL_STAGE_MATERIALS.get(stable_key, ()), start=1)
+    ]
+
+
 @dataclass(frozen=True)
 class FormalStageCatalogItem:
     stable_key: str
@@ -62,7 +116,7 @@ def task_version_values(item: FormalStageCatalogItem) -> dict[str, Any]:
         "allowed_attachment_types": [],
         "max_attachment_size_bytes": 0,
         "reference_materials": [],
-        "learning_materials": [],
+        "learning_materials": formal_stage_materials(item.stable_key),
         "learning_experience": item.learning_experience,
         "estimated_duration_minutes": item.estimated_duration_minutes,
         "rubric": item.rubric,

@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from journey_api.errors import ApiError
-from journey_api.models import Assignment, LearningMaterialCompletion, TaskVersion
+from journey_api.formal_journey_catalog import formal_stage_materials
+from journey_api.models import Assignment, LearningMaterialCompletion, TaskDefinition, TaskVersion
 
 
 HTTPS_URL = re.compile(r"https://[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+")
@@ -97,7 +98,9 @@ def published_exploration_materials(materials: list[dict[str, Any]]) -> list[dic
     ]
 
 
-def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
+def task_learning_materials(
+    task: TaskVersion, stable_key: str | None = None
+) -> list[dict[str, Any]]:
     """Resolve supplied materials for legacy local journey versions.
 
     Keep immutable versions and existing completion facts intact. Match only
@@ -105,7 +108,10 @@ def task_learning_materials(task: TaskVersion) -> list[dict[str, Any]]:
     """
     # Match verified source pairs before filtering historical no-video notes;
     # those placeholders now have real owner-supplied video links.
-    materials = learner_learning_materials(published_exploration_materials(task.learning_materials))
+    source_materials = task.learning_materials
+    if not source_materials and stable_key:
+        source_materials = formal_stage_materials(stable_key)
+    materials = learner_learning_materials(published_exploration_materials(source_materials))
     for stable_key, (label, first_title, second_title, first_url, second_url) in LEGACY_STAGE_LINKS.items():
         material_key = f"material-{stable_key.lower()}"
         if not (
@@ -208,11 +214,13 @@ def reviewable_material_links(materials: list[dict[str, Any]]) -> list[dict[str,
     return links
 
 
-def material_by_key(task: TaskVersion, material_key: str) -> dict[str, Any]:
+def material_by_key(
+    task: TaskVersion, material_key: str, stable_key: str | None = None
+) -> dict[str, Any]:
     material = next(
         (
             item
-            for item in task_learning_materials(task)
+            for item in task_learning_materials(task, stable_key)
             if item.get("key") == material_key
         ),
         None,
@@ -245,9 +253,11 @@ def missing_required_material_keys(
     fixed_task = task or session.get(TaskVersion, assignment.task_version_id)
     if fixed_task is None or fixed_task.organization_id != assignment.organization_id:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
+    definition = session.get(TaskDefinition, fixed_task.task_definition_id)
+    stable_key = definition.stable_key if definition is not None else None
     required = {
         str(item["key"])
-        for item in task_learning_materials(fixed_task)
+        for item in task_learning_materials(fixed_task, stable_key)
         if item.get("required") is True and item.get("key")
     }
     return sorted(required - set(completed_materials(session, assignment)))

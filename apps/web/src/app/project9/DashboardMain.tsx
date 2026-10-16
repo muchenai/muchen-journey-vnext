@@ -44,7 +44,7 @@ export function DashboardMain({ decoration, stageDecoration, identity }: { decor
   const currentTaskIndex = (experience?.currentStagePosition ?? 1) - 1;
   const task = executionTasks[currentTaskIndex];
   const activity = (experience?.activityRecords ?? []).map(item => ({
-    id: item.assignmentId, actorId: Array.from(learnerName)[0] || "新", actorName: learnerName,
+    id: item.assignmentId, actorId: experience?.completionCode && experience.completionCode.status !== "NOT_REQUIRED" ? "沐" : Array.from(learnerName)[0] || "新", actorName: learnerName,
     action: ["PASSED", "COMPLETED"].includes(item.status) ? "完成了任务" : item.status === "NEEDS_REVISION" ? "的任务待修改" : "提交了任务",
     taskTitle: executionTasks[item.position - 1]?.title ?? "任务", createdAt: item.feedbackAt || item.submittedAt,
   })).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));

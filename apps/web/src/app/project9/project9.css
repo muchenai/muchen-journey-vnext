@@ -182,9 +182,9 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 .login-stage .mission-zone h1 { top: 0; left: 22px; font-size: 49.925px; letter-spacing: 8.9865px; gap: 7px; }
 .login-stage .mission-art { margin-top: 0; }
 .login-stage .explore-button { right: 1%; top: 50%; transform: translateX(129px); transform-origin: center; }
-.login-stage .login-panel { min-height: 714px; padding: 54px 47px 48px; gap: 38px; border-radius: 41px; }
-.login-stage .panel-logo { width: 173px; height: 173px; }
-.login-stage .panel-title { font-size: 36px; }
+.login-stage .login-panel { min-height: 714px; padding: 36px 47px 44px; gap: 24px; border-radius: 41px; }
+.login-stage .panel-logo { width: 136px; height: 136px; }
+.login-stage .panel-title { font-size: 34px; }
 .login-stage .code-field { height: 92px; }
 /* Restore project9/src/index.css and its Tailwind preflight defaults for both
    login steps; legacy global form rules must not add a white inner box. */
@@ -196,7 +196,42 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
   font-size: 19px; font-weight: 400; line-height: 1.5; letter-spacing: .18em;
 }
 .login-stage .launch-button span { font-size: 21px; }
-.login-stage .status-line { margin-top: -24px; }
+
+.login-method-tabs { position: relative; z-index: 1; width: 100%; min-height: 58px; display: grid; grid-template-columns: 1fr 1fr; padding: 6px; box-sizing: border-box; border: 1px solid rgba(117,245,255,.22); border-radius: 15px; background: rgba(0,12,38,.58); box-shadow: inset 0 0 18px rgba(19,96,176,.2); }
+.login-method-tabs button { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid transparent; border-radius: 11px; color: rgba(176,202,240,.62); background: transparent; cursor: pointer; font-size: 17px; font-weight: 700; letter-spacing: .05em; transition: color .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+.login-method-tabs button.active { color: #fff; border-color: rgba(77,240,255,.58); background: linear-gradient(135deg, rgba(56,189,248,.24), rgba(77,240,255,.13)); box-shadow: 0 0 18px rgba(77,240,255,.22), inset 0 0 12px rgba(77,240,255,.08); text-shadow: 0 0 12px rgba(85,242,255,.55); }
+.login-tab-icon { display: block; width: 20px; height: 20px; flex: 0 0 auto; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.feishu-login-fields { position: relative; z-index: 1; width: 100%; display: grid; }
+.graduation-code-field { width: 100%; height: 156px; padding: 20px 24px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(154,202,240,.46); border-radius: 17px; background: linear-gradient(135deg, rgba(115,151,204,.34), rgba(62,103,160,.26)); box-shadow: inset 0 0 22px rgba(80,142,211,.12); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.graduation-code-field:focus-within { border-color: #70fbff; background: rgba(71,142,206,.32); box-shadow: 0 0 18px rgba(46,223,255,.24), inset 0 0 24px rgba(37,136,255,.18); }
+.login-stage form.login-panel .graduation-code-field input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: 100%; min-height: 0; margin: 0; padding: 0; border: 0; outline: 0; border-radius: 0; background: transparent; color: #f5ffff; font-size: 19px; letter-spacing: .08em; text-align: center; }
+.graduation-code-field input::placeholder { color: rgba(229,239,255,.72); opacity: 1; }
+.phone-login-mode { gap: 21px !important; }
+.password-login-mode { gap: 24px !important; }
+.password-login-fields { position: relative; z-index: 1; width: 100%; display: grid; gap: 13px; }
+.password-input-row { min-height: 56px; margin: 0; padding: 0 20px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(154,202,240,.5); border-radius: 13px; background: linear-gradient(135deg, rgba(115,151,204,.38), rgba(62,103,160,.3)); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.password-input-row:focus-within { border-color: #70fbff; background: rgba(71,142,206,.38); box-shadow: 0 0 18px rgba(46,223,255,.28); }
+.login-stage form.login-panel .password-input-row input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; flex: 1; border: 0; outline: 0; border-radius: 0; background: transparent; color: #f5ffff; font-size: 17px; letter-spacing: .06em; text-align: left; }
+.password-input-row input::placeholder { color: rgba(226,241,255,.7); opacity: 1; }
+.password-login-hint { margin: 0; color: rgba(178,211,235,.72); font-size: 12px; letter-spacing: .04em; text-align: center; }
+.password-login-guidance { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.forgot-password-button { margin: 0; padding: 0; border: 0; background: transparent; color: #63eaff; cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-decoration: underline; text-underline-offset: 3px; text-shadow: 0 0 9px rgba(77,240,255,.42); }
+.forgot-password-button:hover, .forgot-password-button:focus-visible { color: #c7fdff; text-shadow: 0 0 13px rgba(77,240,255,.78); }
+.phone-login-fields { position: relative; z-index: 1; width: 100%; display: grid; gap: 18px; }
+.phone-input-row { min-height: 54px; margin: 0; padding: 0 18px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(154,202,240,.5); border-radius: 13px; background: linear-gradient(135deg, rgba(115,151,204,.38), rgba(62,103,160,.3)); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.phone-input-row:focus-within { border-color: #70fbff; background: rgba(71,142,206,.38); box-shadow: 0 0 18px rgba(46,223,255,.28); }
+.login-stage form.login-panel .phone-input-row input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; flex: 1; border: 0; outline: 0; border-radius: 0; background: transparent; color: #f5ffff; font-size: 16px; letter-spacing: .06em; }
+.phone-input-row input::placeholder { color: rgba(226,241,255,.7); opacity: 1; }
+.phone-prefix { padding-right: 15px; border-right: 1px solid rgba(198,232,255,.35); color: #eefaff; font-size: 16px; font-weight: 700; }
+.otp-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 13px; }
+.otp-button { min-height: 54px; padding: 0 13px; border: 1px solid rgba(77,240,255,.58); border-radius: 13px; color: #62f4ff; background: rgba(2,39,75,.7); box-shadow: inset 0 0 14px rgba(37,177,255,.12); cursor: pointer; font-size: 14px; font-weight: 700; }
+.otp-button:disabled { cursor: wait; opacity: .55; }
+.phone-login-note { margin: 48px 0 -8px; padding-top: 2px; color: rgba(170,197,218,.58); border-top: 1px solid rgba(112,196,233,.22); font-size: 11px; line-height: 1.5; text-align: center; }
+.phone-login-note a { margin: 0 2px; color: #63eaff; font-weight: 700; text-decoration: none; text-shadow: 0 0 9px rgba(77,240,255,.42); transition: color .2s ease, text-shadow .2s ease; }
+.phone-login-note a:hover, .phone-login-note a:focus-visible { color: #c7fdff; text-decoration: underline; text-underline-offset: 3px; text-shadow: 0 0 13px rgba(77,240,255,.78); }
+.phone-login-mode .launch-button { min-height: 60px; }
+.password-login-mode .launch-button { min-height: 60px; }
+.login-stage .status-line { min-height: 18px; margin-top: -14px; }
 .login-stage footer { flex-direction: row; text-align: initial; font-size: 17px; white-space: nowrap; gap: 1rem; }
 .login-stage .brand-mark img { width: 64px; height: 64px; }
 .login-stage .brand-mark strong { font-size: 15px; }

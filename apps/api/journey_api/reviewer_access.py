@@ -14,11 +14,12 @@ def effective_roles(user_id: UUID, roles: frozenset[Role]) -> frozenset[Role]:
 
 
 def review_visibility(actor):
+    not_own_migrated_work = Enrollment.learner_id != actor.learner_record_id if actor.inherited_learner_id is not None else True
     assigned = or_(Review.reviewer_id == actor.id, ReviewDelegation.reviewer_id == actor.id)
     settings = get_settings()
     pool = settings.feishu_learner_shared_reviewer_ids
     if actor.id not in pool or actor.organization_id != settings.feishu_learner_organization_id:
-        return assigned
+        return and_(assigned, not_own_migrated_work)
     # A durable enrollment setting opts in only new learner registrations.
     # Existing enrollment/reviewer lineage and immutable review ownership stay intact.
     shared = and_(
@@ -27,4 +28,4 @@ def review_visibility(actor):
         JourneyStageVersion.id.is_not(None),
         Enrollment.review_assignment_mode == "SHARED",
     )
-    return or_(assigned, shared)
+    return and_(or_(assigned, shared), not_own_migrated_work)

@@ -107,7 +107,7 @@ def finalize_current_review(
         {
             "dimension_key": dimension["dimension_key"],
             "rating": "NEEDS_WORK" if request_revision and index == 0 else "MEETS",
-            "score": (
+            "score": None if dimension.get("max_points") is None else (
                 dimension["meets_threshold"] - 1
                 if request_revision and index == 0
                 else dimension["max_points"]
@@ -308,6 +308,12 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     coaching_supersede_verified = False
     while action["action_type"] != "VIEW_RESULT_OR_HANDOFF":
         assignment_id = action["resource_id"]
+        detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
+        for material in detail["learning_materials"]:
+            if material["required"] and material["completed_at"] is None:
+                post(learner,
+                     f"/api/v1/me/assignments/{assignment_id}/materials/{material['key']}/complete",
+                     json={"task_version": detail["task_version"]})
         detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
         if "start" in detail["allowed_commands"]:
             post(

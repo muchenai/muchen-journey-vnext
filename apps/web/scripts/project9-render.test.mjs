@@ -66,10 +66,13 @@ test("learner entry starts with the real resource loader", () => {
   assert.doesNotMatch(html, /使用飞书登录/);
 });
 
-test("Feishu login renders one authorization action without nickname or invite input", () => {
+test("Feishu login offers phone login and an optional graduation code", () => {
   const html = renderLogin();
-  assert.match(html, /使用飞书登录/);
-  assert.doesNotMatch(html, /<input/);
+  assert.match(html, /飞书登录/);
+  assert.match(html, /手机号密码登录/);
+  assert.match(html, /登录并开始探索/);
+  assert.match(html, /placeholder="探索营毕业码（选填）"/);
+  assert.doesNotMatch(html, /placeholder="[^"]*(昵称|邀请码)/);
   assert.doesNotMatch(html, /简体中文/);
   assert.match(renderLogin("授权已过期，请重试"), /授权已过期，请重试/);
 });

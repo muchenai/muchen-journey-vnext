@@ -11,9 +11,10 @@ export async function loadProjectExperience(assignmentId?: string): Promise<{
   learnerName: string;
   experience: ProjectExperienceData | null;
 }> {
-  const [identity, action] = await Promise.all([
+  const [identity, action, completionCode] = await Promise.all([
     learnerPageRequest<{ display_name: string }>("/api/v1/session"),
     learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
+    learnerPageRequest<ProjectExperienceData["completionCode"]>("/api/v1/me/completion-code"),
   ]);
   // This learner release opens only the exploration journey. A saved link to
   // another module must not render its task in the exploration interface.
@@ -52,6 +53,7 @@ export async function loadProjectExperience(assignmentId?: string): Promise<{
   return {
     learnerName: identity.display_name,
     experience: {
+      completionCode,
       assignmentId: assignment.id,
       status: assignment.status === "PASSED" ? "COMPLETED" : assignment.status,
       revision: assignment.revision,

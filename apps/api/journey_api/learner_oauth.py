@@ -30,7 +30,7 @@ def lock_learner_organization(session: Session) -> uuid.UUID:
 
 def provision_learner(session: Session, identity: ExternalIdentity | None, *,
                       subject: str, name: str, organization_id: uuid.UUID,
-                      request_id: str) -> ExternalIdentity:
+                      request_id: str, provider: str = "FEISHU") -> ExternalIdentity:
     if identity is not None and identity.organization_id != organization_id:
         raise ApiError(403, "FORBIDDEN", "该身份不属于当前学习平台。")
     if identity is None:
@@ -39,7 +39,7 @@ def provision_learner(session: Session, identity: ExternalIdentity | None, *,
         session.add(user)
         session.flush()
         identity = ExternalIdentity(id=uuid.uuid4(), organization_id=organization_id,
-                                    user_id=user.id, provider="FEISHU", subject=subject, revision=1)
+                                    user_id=user.id, provider=provider, subject=subject, revision=1)
         session.add(identity)
     else:
         user = session.scalar(select(User).where(User.id == identity.user_id,
@@ -84,8 +84,8 @@ def provision_learner(session: Session, identity: ExternalIdentity | None, *,
         session.flush()
         create_journey_assignments(session, enrollment=enrollment)
         add_audit(session, request_id=request_id, organization_id=organization_id,
-            actor_id=user.id, action="learner.feishu_registered", resource_type="enrollment",
-            resource_id=enrollment.id, result="SUCCESS", details={"provider": "FEISHU",
+            actor_id=user.id, action="learner.identity_registered", resource_type="enrollment",
+            resource_id=enrollment.id, result="SUCCESS", details={"provider": provider,
                 "review_mode": "SHARED" if pool else "ASSIGNED"})
     session.flush()
     return identity

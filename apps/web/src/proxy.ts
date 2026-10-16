@@ -36,9 +36,12 @@ export function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const fixtureIdentityAllowed =
+    process.env.APP_ENV === "local" &&
+    process.env.ALLOW_FIXTURE_IDENTITY === "true";
   const isReviewLogin = pathname === "/review/login";
   const isReviewRoute = pathname === "/review" || pathname.startsWith("/review/");
-  if (isReviewRoute && !isReviewLogin && !hasSession) {
+  if (isReviewRoute && !isReviewLogin && !hasSession && !fixtureIdentityAllowed) {
     const response = NextResponse.redirect(new URL("/review/login", request.url), 303);
     response.headers.set("Cache-Control", "no-store");
     return withContentSecurityPolicy(response, policy);

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.idempotency import find_replay, store_result
@@ -487,7 +487,7 @@ def resolve_independent_review(
 def person_review_lineage(
     review_request_id: uuid.UUID,
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)

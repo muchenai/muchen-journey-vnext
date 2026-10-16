@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from datetime import UTC, datetime
@@ -14,6 +14,7 @@ from journey_api.errors import ApiError
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
 from journey_api.reviewer_access import effective_roles
 from journey_api.models import (
+    CompletionCode,
     ExternalIdentity,
     IdentitySession,
     Role,
@@ -32,6 +33,11 @@ class Actor:
     session_id: UUID | None = None
     entry_role: Role | None = None
     external_identity_verified: bool = False
+    inherited_learner_id: UUID | None = None
+
+    @property
+    def learner_record_id(self) -> UUID:
+        return self.inherited_learner_id or self.id
 
     def has_role(self, role: Role) -> bool:
         return role in self.roles
@@ -136,7 +142,7 @@ def get_actor(
                 or not compare_digest(identity_session.csrf_token_hash, expected_hash)
             ):
                 raise ApiError(403, "FORBIDDEN", "安全校验失败，请刷新后重试。")
-        return enforce_canary_learner_scope(
+        actor = enforce_canary_learner_scope(
             Actor(
                 user.id,
                 user.organization_id,
@@ -147,6 +153,17 @@ def get_actor(
                 identity_session.external_identity_id is not None,
             )
         )
+        # Authenticate and enforce the corporate account's scope before resolving
+        # access to inherited history. Never transfer identity or staff roles.
+        inherited_learner_id = session.scalar(
+            select(CompletionCode.user_id).where(
+                CompletionCode.migrated_to_user_id == user.id,
+                CompletionCode.organization_id == user.organization_id,
+                CompletionCode.used_at.is_not(None),
+                CompletionCode.user_id != user.id,
+            )
+        )
+        return replace(actor, inherited_learner_id=inherited_learner_id)
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:
         raise ApiError(401, "UNAUTHENTICATED", "需要有效的 vNext 会话。")
     try:
@@ -176,3 +193,16 @@ def get_actor(
 def require_role(actor: Actor, role: Role) -> None:
     if role not in effective_roles(actor.id, actor.roles):
         raise ApiError(403, "FORBIDDEN", "当前身份无权执行此操作。")
+
+
+def get_learner_actor(actor: Actor = Depends(get_actor)) -> Actor:
+    """Resolve only learner operations to the inherited immutable record owner.
+
+    Session/staff endpoints retain the authenticated corporate user. Never grant
+    the retired phone record staff roles, or change the corporate identity.
+    """
+    require_role(actor, Role.LEARNER)
+    if actor.inherited_learner_id is None:
+        return actor
+    return replace(actor, id=actor.inherited_learner_id,
+                   roles=frozenset({Role.LEARNER}), entry_role=Role.LEARNER)

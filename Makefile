@@ -41,7 +41,7 @@ api-test:
 	docker compose exec -T db-test createdb -U journey_next journey_next_test
 	# The Legacy reference archive is deliberately outside the Runtime candidate;
 	# its immutable artifact integrity remains an external evidence gate.
-	docker compose run --rm --no-deps --user root -v "$(CURDIR):/app:ro" -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_next_test api sh -ec 'apk add --no-cache $(API_TEST_APK_PACKAGES) >/dev/null; su journey -s /bin/sh -c "alembic upgrade head; python -m journey_api.seed; pytest $(API_TEST_PYTEST_ARGS)"'
+	docker compose run --rm --no-deps --user root -v "$(CURDIR):/app:ro" -e PHONE_OTP_ENABLED=false -e PHONE_OTP_PROVIDER=DISABLED -e PASSWORD_LOGIN_ENABLED=false -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_next_test api sh -ec 'apk add --no-cache $(API_TEST_APK_PACKAGES) >/dev/null; su journey -s /bin/sh -c "alembic upgrade head; python -m journey_api.seed; pytest $(API_TEST_PYTEST_ARGS)"'
 
 migration-check:
 	MJ_DB_PORT=$${MJ_DB_PORT:-$(WP08_LOCAL_DB_PORT)} python3 scripts/wp06_ops.py migration-check

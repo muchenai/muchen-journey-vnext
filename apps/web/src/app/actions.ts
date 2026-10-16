@@ -85,6 +85,101 @@ function optionalTextLines(data: FormData, key: string, maxItems: number): strin
   return lines;
 }
 
+export type PhoneCodeState = {
+  ok?: boolean;
+  message?: string;
+  debugCode?: string;
+  error?: string;
+};
+
+export type PasswordLoginState = {
+  ok?: boolean;
+  error?: string;
+};
+
+export async function loginWithPassword(phone: string, password: string): Promise<PasswordLoginState> {
+  try {
+    const registration = await anonymousApiRequest<{
+      safe_entry: string;
+      expires_at: string;
+      csrf_token: string;
+      display_name: string;
+    }>("/api/v1/auth/password/login", {
+      method: "POST",
+      body: JSON.stringify({ phone, password }),
+    });
+    const sessionToken = cookieValue(registration.setCookies, SESSION_COOKIE);
+    if (!sessionToken) return { error: "登录会话创建失败，请重试。" };
+    const cookieStore = await cookies();
+    const maxAge = Math.max(1, Math.floor((new Date(registration.data.expires_at).getTime() - Date.now()) / 1000));
+    const options = { path: "/", sameSite: "lax" as const, secure: cookieSecure(), maxAge };
+    cookieStore.set(SESSION_COOKIE, sessionToken, { ...options, httpOnly: true });
+    cookieStore.set(CSRF_COOKIE, registration.data.csrf_token, { ...options, httpOnly: false });
+    revalidatePath("/app");
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "手机号密码登录失败，请稍后重试。" };
+  }
+  redirect("/app");
+}
+
+export async function requestPhoneCode(phone: string): Promise<PhoneCodeState> {
+  try {
+    const response = await anonymousApiRequest<{
+      expires_in_seconds: number;
+      phone_mask: string;
+      debug_code?: string;
+    }>("/api/v1/auth/phone/request-code", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    });
+    return {
+      ok: true,
+      message: `验证码已发送至 ${response.data.phone_mask}`,
+      debugCode: response.data.debug_code,
+    };
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "验证码发送失败，请稍后重试。" };
+  }
+}
+
+export async function loginWithPhone(phone: string, code: string): Promise<PhoneCodeState> {
+  try {
+    const verification = await anonymousApiRequest<{
+      safe_entry: string;
+      expires_at: string;
+      csrf_token: string;
+    }>("/api/v1/auth/phone/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    });
+    const sessionToken = cookieValue(verification.setCookies, SESSION_COOKIE);
+    if (!sessionToken) return { error: "登录会话创建失败，请重试。" };
+    const cookieStore = await cookies();
+    const maxAge = Math.max(1, Math.floor((new Date(verification.data.expires_at).getTime() - Date.now()) / 1000));
+    const options = { path: "/", sameSite: "lax" as const, secure: cookieSecure(), maxAge };
+    cookieStore.set(SESSION_COOKIE, sessionToken, { ...options, httpOnly: true });
+    cookieStore.set(CSRF_COOKIE, verification.data.csrf_token, { ...options, httpOnly: false });
+    revalidatePath("/app");
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "手机号登录失败，请稍后重试。" };
+  }
+  redirect("/app");
+}
+
+export async function migrateCompletionCode(code: string): Promise<PhoneCodeState> {
+  try {
+    const result = await apiRequest<{ status: string; migrated_tasks: number }>(
+      "/api/v1/me/completion-code/migrate",
+      "LEARNER",
+      { method: "POST", body: JSON.stringify({ code }) },
+    );
+    revalidatePath("/app");
+    return { ok: true, message: `历史记录迁移完成，共迁移 ${result.migrated_tasks} 项任务。` };
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "历史记录迁移失败，请稍后重试。" };
+  }
+}
+
 function boundedInteger(data: FormData, key: string, min: number, max: number): number {
   const value = Number(data.get(key));
   if (!Number.isSafeInteger(value) || value < min || value > max) {
@@ -733,8 +828,8 @@ export async function submitAssignment(
   const evidenceRetest = data.get("submission_command") === "submit_evidence_revision";
   revalidatePath(`/app/tasks/${assignmentId}`);
   revalidatePath("/app");
-  // The project9 client displays the confirmed result in place. Keep the legacy
-  // form redirect for callers that still use the retest success destination.
+  // The project9 client navigates to the task list after a confirmed submission.
+  // Keep the legacy form redirect for callers that still use the retest destination.
   if (evidenceRetest && data.get("submission_response") !== "inline") {
     redirect(
       `/app/tasks/${assignmentId}?submitted=retest&version=${result.version_no}#retest-success`,

@@ -833,7 +833,14 @@ export async function apiRequest<T>(
   if (!requestHeaders.has("Content-Type")) {
     requestHeaders.set("Content-Type", "application/json");
   }
-  if (sessionToken) {
+  const useLocalReviewerFixture =
+    role === "REVIEWER"
+    && process.env.ALLOW_FIXTURE_IDENTITY === "true"
+    && ["local", "test"].includes(process.env.APP_ENV ?? "local");
+  if (useLocalReviewerFixture) {
+    assertFixtureBoundary();
+    requestHeaders.set("X-Fixture-Role", role);
+  } else if (sessionToken) {
     const cookieParts = [`${SESSION_COOKIE}=${sessionToken}`];
     if (csrfToken) cookieParts.push(`${CSRF_COOKIE}=${csrfToken}`);
     requestHeaders.set("Cookie", cookieParts.join("; "));
