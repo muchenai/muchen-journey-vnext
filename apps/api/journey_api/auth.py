@@ -142,17 +142,7 @@ def get_actor(
                 or not compare_digest(identity_session.csrf_token_hash, expected_hash)
             ):
                 raise ApiError(403, "FORBIDDEN", "安全校验失败，请刷新后重试。")
-        # Graduation transfers access to immutable learning history, never the
-        # corporate identity or its staff roles. Authentication stays on user.id.
-        inherited_learner_id = session.scalar(
-            select(CompletionCode.user_id).where(
-                CompletionCode.migrated_to_user_id == user.id,
-                CompletionCode.organization_id == user.organization_id,
-                CompletionCode.used_at.is_not(None),
-                CompletionCode.user_id != user.id,
-            )
-        )
-        return enforce_canary_learner_scope(
+        actor = enforce_canary_learner_scope(
             Actor(
                 user.id,
                 user.organization_id,
@@ -161,9 +151,19 @@ def get_actor(
                 identity_session.id,
                 identity_session.role if identity_session.role in roles else None,
                 identity_session.external_identity_id is not None,
-                inherited_learner_id,
             )
         )
+        # Authenticate and enforce the corporate account's scope before resolving
+        # access to inherited history. Never transfer identity or staff roles.
+        inherited_learner_id = session.scalar(
+            select(CompletionCode.user_id).where(
+                CompletionCode.migrated_to_user_id == user.id,
+                CompletionCode.organization_id == user.organization_id,
+                CompletionCode.used_at.is_not(None),
+                CompletionCode.user_id != user.id,
+            )
+        )
+        return replace(actor, inherited_learner_id=inherited_learner_id)
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:
         raise ApiError(401, "UNAUTHENTICATED", "需要有效的 vNext 会话。")
     try:
