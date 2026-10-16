@@ -97,7 +97,7 @@ REQUIRED_DELIVERABLES = [
 ]
 
 
-def seed() -> None:
+def seed(*, include_formal_journey: bool = False) -> None:
     with SessionLocal.begin() as session:
         if session.get(Organization, ORGANIZATION_ID) is None:
             session.add(Organization(id=ORGANIZATION_ID, name="Muchen Journey Fixture"))
@@ -244,7 +244,7 @@ def seed() -> None:
                     revision=1,
                 )
             )
-        if published_formal_journey(session, ORGANIZATION_ID) is None:
+        if include_formal_journey and published_formal_journey(session, ORGANIZATION_ID) is None:
             publish_catalog_journey(
                 session,
                 operator_id=OPERATOR_ID,
@@ -255,4 +255,9 @@ def seed() -> None:
 
 
 if __name__ == "__main__":
-    seed()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--with-formal-journey", action="store_true")
+    args = parser.parse_args()
+    seed(include_formal_journey=args.with_formal_journey)

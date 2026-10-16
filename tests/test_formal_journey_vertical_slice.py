@@ -107,7 +107,7 @@ def finalize_current_review(
         {
             "dimension_key": dimension["dimension_key"],
             "rating": "NEEDS_WORK" if request_revision and index == 0 else "MEETS",
-            "score": (
+            "score": None if dimension.get("max_points") is None else (
                 dimension["meets_threshold"] - 1
                 if request_revision and index == 0
                 else dimension["max_points"]
