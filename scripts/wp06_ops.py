@@ -36,14 +36,22 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0032_shared_learner_review"
+EXPECTED_MIGRATION_HEAD = "0035_phone_password_login"
+PHONE_LOGIN_BASE_REVISION = "0032_shared_learner_review"
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
+PHONE_LOGIN_TABLES = (
+    "phone_otp_challenges",
+    "completion_codes",
+    "phone_password_credentials",
+)
 ROLLBACK_OWNED_FACT_TABLES = (
     "coaching_feedback",
     "ai_advisory_records",
     "assignment_bound_reentry_invites",
+    *PHONE_LOGIN_TABLES,
 )
 CURRENT_FACT_TABLES = (
+    *PHONE_LOGIN_TABLES,
     "organizations",
     "users",
     "role_assignments",
@@ -264,10 +272,14 @@ def source_fingerprint() -> str:
     return digest.hexdigest()
 
 
-def database_facts(service: str, database: str) -> dict[str, Any]:
+def database_facts(
+    service: str,
+    database: str,
+    tables: tuple[str, ...] = CURRENT_FACT_TABLES,
+) -> dict[str, Any]:
     migration = psql(service, database, "SELECT version_num FROM alembic_version")
     counts: dict[str, int] = {}
-    for table in CURRENT_FACT_TABLES:
+    for table in tables:
         counts[table] = int(psql(service, database, f'SELECT count(*) FROM "{table}"'))
     counts["assignment_bound_reentry_invites"] = int(
         psql(
@@ -441,11 +453,10 @@ def migration_check() -> Path:
     try:
         compose("exec", "-T", "db-test", "createdb", "-U", TEST_DATABASE_USER, database)
         created = True
-        # Seed through the current ORM only after the database reaches the
-        # current schema.  Running today's model against a historical revision
-        # breaks as soon as a later migration adds a mapped column.  The
-        # downgrade below converts the fixture into the exact 0009 shape before
-        # the forward-compatibility facts are captured.
+        # Seed at the current head, then rehearse exactly the additive release
+        # range used in production. Older accepted course content cannot be
+        # represented by the pre-0030 constraints and must never be used to
+        # claim that a destructive downgrade to 0009 remains safe.
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "alembic", "upgrade", "head",
@@ -454,32 +465,38 @@ def migration_check() -> Path:
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "python", "-m", "journey_api.seed",
         )
-        compose(
-            "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
-            "api", "alembic", "downgrade", "0009_notification_scope",
-        )
-        before = legacy_database_facts("db-test", database)
-        compose(
-            "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
-            "api", "alembic", "upgrade", "head",
-        )
-        upgraded = database_facts("db-test", database)
-        if upgraded["migration_revision"] != EXPECTED_MIGRATION_HEAD:
+        before = database_facts("db-test", database)
+        if before["migration_revision"] != EXPECTED_MIGRATION_HEAD:
             raise OpsError("persistent migration drill did not reach the current head")
+        require_safe_schema_rollback(before)
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
-            "api", "alembic", "downgrade", "0009_notification_scope",
+            "api", "alembic", "downgrade", PHONE_LOGIN_BASE_REVISION,
         )
-        after_downgrade = legacy_database_facts("db-test", database)
-        if after_downgrade != before:
-            raise OpsError("WP-06 downgrade changed pre-existing business facts")
+        baseline_tables = tuple(
+            table for table in CURRENT_FACT_TABLES if table not in PHONE_LOGIN_TABLES
+        )
+        after_downgrade = database_facts(
+            "db-test", database, tables=baseline_tables
+        )
+        before_business = {
+            **before,
+            "migration_revision": PHONE_LOGIN_BASE_REVISION,
+            "counts": {
+                table: count
+                for table, count in before["counts"].items()
+                if table not in PHONE_LOGIN_TABLES
+            },
+        }
+        if after_downgrade != before_business:
+            raise OpsError("phone login downgrade changed pre-existing business facts")
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "alembic", "upgrade", "head",
         )
         reupgraded = database_facts("db-test", database)
-        if reupgraded != upgraded:
-            raise OpsError("WP-06 re-upgrade changed persistent business facts")
+        if reupgraded != before:
+            raise OpsError("phone login re-upgrade changed persistent business facts")
         directory = make_run_directory()
         report = directory / "persistent-migration-report.json"
         write_private_json(
@@ -488,10 +505,10 @@ def migration_check() -> Path:
                     "schema_version": 1,
                     "completed_at": utc_now().isoformat(),
                     "scope": "ISOLATED_LOCAL_PERSISTENT_DRILL",
-                    "upgrade_0009_to_head": "PASS",
-                    "downgrade_head_to_0009": "PASS",
+                    "upgrade_0032_to_0035": "PASS",
+                    "downgrade_0035_to_0032": "PASS",
                     "reupgrade_to_head": "PASS",
-                    "legacy_fixture_prepared_by_current_seed_then_downgrade": True,
+                    "production_release_range_rehearsed": True,
                     "business_facts_preserved": True,
                     "facts": reupgraded,
             },

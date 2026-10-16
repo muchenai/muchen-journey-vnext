@@ -114,24 +114,43 @@ def test_http_request_rejects_invalid_local_api_port(monkeypatch):
         ops.http_request("/health/ready")
 
 
-def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
+def test_migration_check_rehearses_the_exact_phone_login_release_range(
     monkeypatch, tmp_path
 ):
     calls: list[tuple[str, ...]] = []
-    legacy_facts = {"counts": {"enrollments": 1}, "task_version_fingerprint": "fixed"}
     current_facts = {
         "migration_revision": ops.EXPECTED_MIGRATION_HEAD,
-        "counts": {"enrollments": 1},
+        "counts": {
+            "enrollments": 1,
+            "coaching_feedback": 0,
+            "ai_advisory_records": 0,
+            "assignment_bound_reentry_invites": 0,
+            "phone_otp_challenges": 0,
+            "completion_codes": 0,
+            "phone_password_credentials": 0,
+        },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
         "critical_invariant_violations": 0,
     }
+    base_facts = {
+        **current_facts,
+        "migration_revision": ops.PHONE_LOGIN_BASE_REVISION,
+        "counts": {
+            "enrollments": 1,
+            "coaching_feedback": 0,
+            "ai_advisory_records": 0,
+            "assignment_bound_reentry_invites": 0,
+        },
+    }
+    fact_results = iter((current_facts, base_facts, current_facts))
 
     monkeypatch.setattr(ops, "ensure_local_services", lambda: None)
     monkeypatch.setattr(ops, "psql", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(ops, "compose", lambda *args: calls.append(args))
-    monkeypatch.setattr(ops, "legacy_database_facts", lambda *_args: legacy_facts)
-    monkeypatch.setattr(ops, "database_facts", lambda *_args: current_facts)
+    monkeypatch.setattr(
+        ops, "database_facts", lambda *_args, **_kwargs: next(fact_results)
+    )
     monkeypatch.setattr(ops, "make_run_directory", lambda: tmp_path)
     monkeypatch.setattr(
         ops,
@@ -150,17 +169,17 @@ def test_migration_check_seeds_at_head_before_preparing_historical_fixture(
     assert api_steps == [
         ("alembic", "upgrade", "head"),
         ("python", "-m", "journey_api.seed"),
-        ("alembic", "downgrade", "0009_notification_scope"),
-        ("alembic", "upgrade", "head"),
-        ("alembic", "downgrade", "0009_notification_scope"),
+        ("alembic", "downgrade", "0032_shared_learner_review"),
         ("alembic", "upgrade", "head"),
     ]
-    assert report["legacy_fixture_prepared_by_current_seed_then_downgrade"] is True
+    assert report["production_release_range_rehearsed"] is True
+    assert report["upgrade_0032_to_0035"] == "PASS"
+    assert report["downgrade_0035_to_0032"] == "PASS"
     assert report["business_facts_preserved"] is True
 
 
-def test_current_ops_contract_tracks_0029_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0032_shared_learner_review"
+def test_current_ops_contract_tracks_0035_head_and_all_protected_fact_tables():
+    assert ops.EXPECTED_MIGRATION_HEAD == "0035_phone_password_login"
     assert ops.SAFE_ROLLBACK_REVISION == "0025_formal_result_gate"
     assert {
         "submission_versions",
@@ -180,33 +199,45 @@ def test_current_ops_contract_tracks_0029_head_and_all_protected_fact_tables():
         "join_contexts",
         "identity_sessions",
         "external_identity_links",
+        "phone_otp_challenges",
+        "completion_codes",
+        "phone_password_credentials",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
         "coaching_feedback",
         "ai_advisory_records",
         "assignment_bound_reentry_invites",
+        "phone_otp_challenges",
+        "completion_codes",
+        "phone_password_credentials",
     }
 
 
-def test_schema_rollback_only_accepts_the_current_identity_scope_head():
+def test_schema_rollback_only_accepts_the_current_phone_login_head():
     facts = {
-        "migration_revision": "0032_shared_learner_review",
+        "migration_revision": "0035_phone_password_login",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
             "ai_advisory_records": 0,
             "assignment_bound_reentry_invites": 0,
+            "phone_otp_challenges": 0,
+            "completion_codes": 0,
+            "phone_password_credentials": 0,
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0032_shared_learner_review",
+            "migration_revision": "0035_phone_password_login",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
                 "assignment_bound_reentry_invites": 0,
+                "phone_otp_challenges": 0,
+                "completion_codes": 0,
+                "phone_password_credentials": 0,
                 protected_fact: 1,
             },
         }
@@ -224,7 +255,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0032_shared_learner_review",
+        "migration_revision": "0035_phone_password_login",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []
