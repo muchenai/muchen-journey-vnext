@@ -540,6 +540,8 @@ def migrate_completion_code(
     )
     if feishu_identity is None:
         raise ApiError(403, "FEISHU_ACCOUNT_REQUIRED", "请先使用公司飞书账号登录后再迁移。")
+    if any(role != Role.LEARNER for role in actor.roles):
+        raise ApiError(409, "TARGET_ACCOUNT_HAS_STAFF_ROLES", "当前飞书账号具有审核或管理权限，请联系管理员李鑫波协助迁移，保留原有权限。")
     raw_code = command.code.strip().upper()
     if not re.fullmatch(r"MJ-[A-Z2-9]{8}", raw_code):
         raise ApiError(422, "COMPLETION_CODE_INVALID", "探索营毕业码格式不正确。")

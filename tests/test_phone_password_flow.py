@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
-from journey_api.models import Assignment, AssignmentStatus, Enrollment
+from journey_api.models import Assignment, AssignmentStatus, Enrollment, Role, RoleAssignment
 from test_learner_feishu_login import learner_provider, login
 from test_wp09_feishu_identity import oauth_provider, client_for, assert_ok
 
@@ -62,6 +62,18 @@ def test_completion_code_moves_feishu_identity_once_and_retires_phone_login(pass
     assert migrate(source, code).status_code == 403
     target, response = login(password_provider, "graduate-feishu" + uuid.uuid4().hex, "ou_graduate_" + uuid.uuid4().hex)
     assert_ok(response)
+    target_id = uuid.UUID(assert_ok(target.get("/api/v1/session"))["user_id"])
+    with SessionLocal.begin() as session:
+        from journey_api.fixtures import ORGANIZATION_ID
+        staff_role = RoleAssignment(id=uuid.uuid4(), user_id=target_id, organization_id=ORGANIZATION_ID, role=Role.REVIEWER)
+        session.add(staff_role)
+        staff_role_id = staff_role.id
+    denied_staff = migrate(target, code)
+    assert denied_staff.status_code == 409
+    assert denied_staff.json()["error"]["code"] == "TARGET_ACCOUNT_HAS_STAFF_ROLES"
+    assert assert_ok(target.get("/api/v1/session"))["user_id"] == str(target_id)
+    with SessionLocal.begin() as session:
+        session.delete(session.get(RoleAssignment, staff_role_id))
     result = assert_ok(migrate(target, code))
     assert result["migrated_tasks"] == len(assignment_ids)
     assert assert_ok(target.get("/api/v1/session"))["user_id"] == str(source_id)
