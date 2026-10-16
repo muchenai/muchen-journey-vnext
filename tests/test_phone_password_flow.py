@@ -48,7 +48,7 @@ def test_returning_password_user_keeps_identity_and_journey(password_provider):
 
 
 @pytest.mark.parametrize("staff_role", [None, Role.REVIEWER, Role.OPERATOR])
-def test_completion_code_preserves_corporate_account_and_retires_phone_login(password_provider, staff_role):
+def test_completion_code_preserves_corporate_account_and_retires_phone_login(password_provider, staff_role, monkeypatch):
     source, credentials = register("password-graduate")
     source_id = uuid.UUID(assert_ok(source.get("/api/v1/session"))["user_id"])
     assignment_id = assert_ok(source.get("/api/v1/me/current-action"))["resource_id"]
@@ -80,6 +80,12 @@ def test_completion_code_preserves_corporate_account_and_retires_phone_login(pas
         identity = session.scalar(select(ExternalIdentity).where(ExternalIdentity.user_id == target_id))
         identity_id, identity_revision = identity.id, identity.revision
     roles_before = assert_ok(target.get("/api/v1/session"))["roles"]
+    if staff_role == Role.REVIEWER:
+        from test_shared_learner_reviews import new_submission, review_command, approval
+        monkeypatch.setenv("FEISHU_LEARNER_REVIEWER_ID", str(target_id))
+        get_settings.cache_clear()
+        existing_review_id = new_submission(password_provider)
+        assert target.get(f"/api/v1/reviews/{existing_review_id}").status_code == 200
     # An existing corporate learning record must never be silently overwritten.
     with SessionLocal.begin() as session:
         target_enrollment = session.scalar(select(Enrollment).where(Enrollment.learner_id == target_id))
@@ -98,7 +104,15 @@ def test_completion_code_preserves_corporate_account_and_retires_phone_login(pas
     assert assert_ok(target.get("/api/v1/session"))["user_id"] == str(target_id)
     assert assert_ok(target.get("/api/v1/session"))["roles"] == roles_before
     if staff_role == Role.REVIEWER:
-        assert target.get("/api/v1/reviews").status_code == 200
+        from journey_api.models import Evaluation
+        detail = assert_ok(target.get(f"/api/v1/reviews/{existing_review_id}"))
+        csrf = target.cookies["journey_next_csrf"]
+        started = assert_ok(review_command(target, csrf, existing_review_id, "start", {"expected_revision": detail["revision"]}))
+        assert_ok(review_command(target, csrf, existing_review_id, "finalize", approval(detail, started["review_revision"])))
+        with SessionLocal() as session:
+            evaluation = session.scalar(select(Evaluation).where(Evaluation.review_id == existing_review_id))
+            assert evaluation.reviewer_id == target_id
+            assert evaluation.executor_id == target_id
     if staff_role == Role.OPERATOR:
         assert target.get("/api/v1/ops/invite-targets").status_code == 200
     inherited = assert_ok(target.get("/api/v1/me/current-action"))
