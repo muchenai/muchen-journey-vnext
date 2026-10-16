@@ -11,7 +11,7 @@ import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
 import { readSelfCheckHistory, saveSelfCheck, selfCheckHistoryKey, type SelfCheckRecord } from "./self-check-history";
 import { JourneyProvider, useJourney, useTaskStatus, type JourneyContextValue } from "./journey-context";
 import { ProjectResourceLoader } from "./ProjectResourceLoader";
-import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment } from "../actions";
+import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment, loginWithPassword, migrateCompletionCode } from "../actions";
  type Screen = "login" | "welcome" | "dashboard" | "tasks" | "detail" | "view";
 type PreviewIdentity = string;
 export default function App(props: Partial<JourneyContextValue>) {
@@ -44,15 +44,13 @@ function ExperienceScreen() {
  const submissionInFlight = useRef(false);
  const [revisionBusy, setRevisionBusy] = useState(false);
  const revisionInFlight = useRef(false);
- const [submissionReceipt, setSubmissionReceipt] = useState<{ assignmentId: string; status: string } | null>(null);
- const submittedHere = Boolean(submissionReceipt && submissionReceipt.assignmentId === experience?.assignmentId);
- const canSubmit = Boolean(experience?.allowedCommands.some(command => command.startsWith("submit"))) && !submittedHere;
- const submissionStatus = submittedHere ? submissionReceipt?.status : experience?.status;
+ const canSubmit = Boolean(experience?.allowedCommands.some(command => command.startsWith("submit")));
+ const submissionStatus = experience?.status;
  const submitLabel = submitting ? "正在提交…"
    : ["SUBMITTED", "IN_REVIEW"].includes(submissionStatus ?? "") ? "已提交，等待审核"
    : submissionStatus === "NEEDS_REVISION" ? "待修改，请点击重新修改"
    : submissionStatus === "COMPLETED" ? "审核已通过"
-   : submittedHere ? "已提交" : "提交任务证据";
+   : "提交任务证据";
  const submitted = Boolean(experience?.pendingReviewAssignmentId);
  const executing = Boolean(experience);
  const taskIndex = Math.max(0, (experience?.stagePosition ?? 1) - 1);
@@ -76,13 +74,36 @@ function ExperienceScreen() {
  }, []);
  useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(""), 3000); return () => window.clearTimeout(timer); }, [notice]);
  useEffect(() => {
+   if (screen === "login") return;
+   const code = window.sessionStorage.getItem("journey_completion_code");
+   if (!code) return;
+   window.sessionStorage.removeItem("journey_completion_code");
+   void migrateCompletionCode(code).then(result => {
+     setNotice(result.error ?? result.message ?? "历史记录迁移完成");
+     if (result.ok) router.refresh();
+   });
+ }, [screen, router]);
+ useEffect(() => {
    if (screen !== "dashboard") return;
    const refresh = () => { if (document.visibilityState === "visible") router.refresh(); };
    window.addEventListener("focus", refresh);
    document.addEventListener("visibilitychange", refresh);
    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
  }, [screen, router]);
- const navigate = (target: Screen) => { setScreen(target); setNotice(""); };
+ const navigate = (target: Screen) => {
+   const url = new URL(window.location.href);
+   if (target === "dashboard" || target === "tasks" || target === "welcome") {
+     url.pathname = "/app";
+     if (target === "welcome") url.searchParams.delete("view");
+     else url.searchParams.set("view", target);
+   } else if (target === "detail" || target === "view") {
+     if (target === "view") url.searchParams.set("view", "evidence");
+     else url.searchParams.delete("view");
+   }
+   window.history.replaceState(window.history.state, "", url);
+   setScreen(target);
+   setNotice("");
+ };
  const assignmentForm = (kind: "draft" | "submit") => {
    if (!experience) return null;
    const data = new FormData();
@@ -131,7 +152,7 @@ function ExperienceScreen() {
  }
  if (action === "revise-proof" || action === "cancel-revision") {
    const command = action === "revise-proof" ? "start_evidence_revision" : "cancel_evidence_revision";
-   if (!experience?.allowedCommands.includes(command) || revisionInFlight.current || submissionInFlight.current || submittedHere) return;
+   if (!experience?.allowedCommands.includes(command) || revisionInFlight.current || submissionInFlight.current) return;
    if (action === "cancel-revision" && !window.confirm("取消本次修改？未提交的修改将被放弃，任务恢复到修改前的审核结果，历史提交会保留。")) return;
    revisionInFlight.current = true;
    setRevisionBusy(true);
@@ -162,9 +183,7 @@ function ExperienceScreen() {
      const result = await submitAssignment({}, data);
      if (result.error) setNotice(result.error);
      else if (result.success && result.assignmentStatus) {
-       setSubmissionReceipt({ assignmentId: experience!.assignmentId, status: result.assignmentStatus });
-       setNotice(result.success);
-       router.refresh();
+       window.location.assign("/app?view=tasks");
      } else setNotice("暂未取得提交结果，请刷新页面核对提交记录后再操作。");
    } catch {
      setNotice("暂未确认提交结果，请检查网络并刷新页面核对提交记录，避免重复提交。");
@@ -285,7 +304,7 @@ function ExperienceScreen() {
  {screen === "dashboard" && <Dashboard submitted={submitted} identity={identity} />}
  {screen === "tasks" && <Tasks />}
  {screen === "detail" && (executing ? <ExecutionDetail task={task} openedMaterials={[Boolean(openedMaterials[`${task.id}-material-1`]), Boolean(openedMaterials[`${task.id}-material-2`])]} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} /> : <Detail />)}
- {screen === "view" && <ExecutionView task={task} record={record} setRecord={updateExecutionRecord} readOnly={!canSubmit} revisionBusy={revisionBusy} canRevise={!submittedHere && !submitting && experience?.allowedCommands.includes("start_evidence_revision")} canCancelRevision={!submittedHere && !submitting && experience?.allowedCommands.includes("cancel_evidence_revision")} submitting={submitting} submitDisabled={submitting || revisionBusy || !canSubmit} submitLabel={submitLabel} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} />}
+ {screen === "view" && <ExecutionView task={task} record={record} setRecord={updateExecutionRecord} readOnly={!canSubmit} revisionBusy={revisionBusy} canRevise={!submitting && experience?.allowedCommands.includes("start_evidence_revision")} canCancelRevision={!submitting && experience?.allowedCommands.includes("cancel_evidence_revision")} submitting={submitting} submitDisabled={submitting || revisionBusy || !canSubmit} submitLabel={submitLabel} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} />}
  </div>
  {historyOpen && task && <SelfCheckHistoryDialog title={task.title} records={historyRecords} error={historyError} onClose={() => setHistoryOpen(false)} />}
  {selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position - 1]?.title ?? selectedFeedback.title} onClose={() => setFeedbackAssignmentId(null)} />}
@@ -305,12 +324,17 @@ export function Login() {
   const [scale, setScale] = useState<number | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
+  const [loginMode, setLoginMode] = useState<'feishu' | 'password'>('feishu')
+  const [passwordPhone, setPasswordPhone] = useState('')
+  const [password, setPassword] = useState('')
+  const [graduationCode, setGraduationCode] = useState('')
+  const graduationCodeRef = useRef('')
   const [message, setMessage] = useState(joinError)
   const [isLaunched, setIsLaunched] = useState(false)
   const [countdown, setCountdown] = useState(10)
   const launchStarted = useRef(false)
   useEffect(() => {
-    if (joinPhase !== 'feishu' || joinError || !isFeishuClient(navigator.userAgent)) return;
+    if (joinPhase !== 'feishu' || loginMode !== 'feishu' || joinError || !isFeishuClient(navigator.userAgent)) return;
     let active = true;
     const startedAt = Date.now();
     const updateCountdown = () => {
@@ -326,6 +350,7 @@ export function Login() {
       launchStarted.current = true;
       setIsLaunched(true);
       setMessage('正在使用当前飞书账号登录…');
+      if (graduationCodeRef.current) window.sessionStorage.setItem('journey_completion_code', graduationCodeRef.current);
       void loginInsideFeishu().catch(error => {
         if (!active) return;
         launchStarted.current = false;
@@ -334,7 +359,7 @@ export function Login() {
       });
     }, 10000);
     return () => { active = false; window.clearTimeout(timer); window.clearInterval(interval); };
-  }, [joinPhase, joinError]);
+  }, [joinPhase, joinError, loginMode]);
   useLayoutEffect(() => {
     const resize = () => setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))
     window.addEventListener('resize', resize)
@@ -344,10 +369,11 @@ export function Login() {
 
   const launch = async (event: FormEvent) => {
     event.preventDefault()
-    if (joinPhase === 'feishu') {
+    if (joinPhase === 'feishu' && loginMode === 'feishu') {
       if (isLaunched || launchStarted.current) return;
       launchStarted.current = true;
       setIsLaunched(true);
+      if (graduationCode.trim()) window.sessionStorage.setItem('journey_completion_code', graduationCode.trim().toUpperCase());
       if (isFeishuClient(navigator.userAgent)) {
         setMessage('正在获取飞书授权…');
         try {
@@ -361,6 +387,16 @@ export function Login() {
       }
       setMessage('正在前往飞书授权…');
       window.location.assign('/auth/feishu?return_to=%2Fapp');
+      return;
+    }
+    if (joinPhase === 'feishu' && loginMode === 'password') {
+      if (!/^1[3-9]\d{9}$/.test(passwordPhone)) { setMessage('请输入正确的手机号'); return; }
+      if (password.length < 6 || password.length > 11 || /\s/.test(password)) { setMessage('密码需为 6–11 个字符，且不能包含空格'); return; }
+      if (isLaunched) return;
+      setIsLaunched(true);
+      setMessage('正在验证你的探索身份…');
+      const result = await loginWithPassword(passwordPhone, password);
+      if (result?.error) { setMessage(result.error); setIsLaunched(false); }
       return;
     }
     if (joinPhase === 'invite' && !code.trim()) {
@@ -427,18 +463,42 @@ export function Login() {
           </button>
         </div>
 
-        <form className="login-panel login-gradient-border" onSubmit={launch}>
+        <form className={`login-panel login-gradient-border ${joinPhase === 'feishu' && loginMode === 'password' ? 'password-login-mode' : ''}`} onSubmit={launch}>
           <GradientStroke variant="back" strokeWidth={1} animated={false} />
           <div className="panel-glow" aria-hidden="true" />
           <img className="panel-logo" src={logo} alt="" />
           <p className="panel-title">MUCHEN JOURNEY</p>
-          {joinPhase === 'feishu' ? <div className="code-field" style={{ color: '#bdeaff', fontSize: 22, justifyContent: 'center' }}>使用飞书账号，开启你的成长旅程</div> : <label className={`code-field ${(joinPhase === 'invite' ? code : name) ? 'filled' : ''}`}>
+          {joinPhase === 'feishu' && <div className="login-method-tabs" role="tablist" aria-label="登录方式">
+            <button type="button" role="tab" aria-selected={loginMode === 'feishu'} className={loginMode === 'feishu' ? 'active' : ''} onClick={() => { setLoginMode('feishu'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5 18 12 7 18.5Z" /></svg>飞书登录</button>
+            <button type="button" role="tab" aria-selected={loginMode === 'password'} className={loginMode === 'password' ? 'active' : ''} onClick={() => { setLoginMode('password'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2" /><path d="M10 17.5h4" /></svg>手机号密码登录</button>
+          </div>}
+          {joinPhase === 'feishu' && loginMode === 'feishu' ? <div className="feishu-login-fields"><label className={`graduation-code-field ${graduationCode ? 'filled' : ''}`}>
+              <span className="sr-only">探索营毕业码（选填）</span>
+              <input value={graduationCode} onChange={(event) => { const value = event.target.value.toUpperCase().slice(0, 20); graduationCodeRef.current = value; setGraduationCode(value); }} placeholder="探索营毕业码（选填）" autoComplete="off" />
+            </label></div> : joinPhase === 'feishu' ? <div className="password-login-fields">
+            <label className={`password-input-row ${passwordPhone ? 'filled' : ''}`}>
+              <span className="phone-prefix">+86</span>
+              <input value={passwordPhone} onChange={(event) => setPasswordPhone(event.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="请输入手机号" inputMode="tel" autoComplete="tel" maxLength={11} />
+            </label>
+            <label className={`password-input-row ${password ? 'filled' : ''}`}>
+              <input value={password} onChange={(event) => setPassword(event.target.value.slice(0, 11))} placeholder="请输入密码（6–11位）" type="password" autoComplete="current-password" maxLength={11} />
+            </label>
+            <div className="password-login-guidance">
+              <p className="password-login-hint">首次登录将自动注册该手机号并设置密码</p>
+              <button type="button" className="forgot-password-button" onClick={() => setMessage('请联系管理员李鑫波重置密码。密码重置完成后，再使用手机号和新密码登录。')}>忘记密码？</button>
+            </div>
+            <p className="phone-login-note">登录即代表您已阅读并同意
+              <a href="https://zx6w57w0j34.feishu.cn/docx/Oxexd1UMdoHg2YxEOYVcx5fonkd" target="_blank" rel="noreferrer">《用户服务协议》</a>
+              与
+              <a href="https://zx6w57w0j34.feishu.cn/docx/Oxexd1UMdoHg2YxEOYVcx5fonkd" target="_blank" rel="noreferrer">《隐私政策》</a>
+            </p>
+          </div> : <label className={`code-field ${(joinPhase === 'invite' ? code : name) ? 'filled' : ''}`}>
             <span className="sr-only">{joinPhase === 'invite' ? '邀请码' : '昵称'}</span>
             {joinPhase === 'invite' ? <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入邀请码" autoComplete="one-time-code" /> : <input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入昵称" autoComplete="nickname" />}
           </label>}
           <button className="launch-button" type="submit" onMouseMove={magneticMove} onMouseLeave={resetMagnet}>
             <img src={loginArrow} alt="" />
-            <span>{joinPhase === 'feishu' ? '使用飞书登录' : '登录并开始探索'}</span>
+            <span>{joinPhase === 'feishu' ? '登录并开始探索' : joinPhase === 'invite' ? '解锁探索航线' : '进入探索营'}</span>
             <b aria-hidden="true" />
           </button>
           <div className="status-line" role="status">{message}</div>
@@ -531,7 +591,7 @@ const imgVector3 = `${assetPathPrefix}/cec96.svg`;
             <button type="button" data-action="true" className="content-stretch flex gap-[11.429px] items-center relative shrink-0" data-node-id="2006:15" data-name="Container">
               <div className="border-[#86bbdf] border-[1.143px] border-solid grid grid-cols-[_41.14px] grid-rows-[_41.14px] relative rounded-[21.714px] shrink-0 size-[43.429px]" data-node-id="2006:16" style={{ backgroundImage: "linear-gradient(145.0000003379585deg, rgb(240, 217, 192) 6.1733%, rgb(85, 115, 143) 93.827%)" }} data-name="Container">
                 <p className="[word-break:break-word] col-1 font-['Source_Han_Sans_SC'] justify-self-center leading-[normal] not-italic relative row-1 self-center shrink-0 text-[#09223c] text-[14.857px] whitespace-nowrap font-black" data-node-id="2006:17">
-                  {Array.from(learnerName.trim())[0] || "新"}
+                  {experience?.completionCode && experience.completionCode.status !== "NOT_REQUIRED" ? "沐" : Array.from(learnerName.trim())[0] || "新"}
                 </p>
               </div>
               <div className="content-stretch flex flex-col items-start relative shrink-0 w-[89.143px]" data-node-id="2006:18" data-name="Container">

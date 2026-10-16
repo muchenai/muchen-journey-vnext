@@ -1,6 +1,13 @@
 import type { TaskReviewFeedback } from "./review-feedback";
 
 export type ProjectExperienceData = {
+ completionCode?: {
+  status: "LOCKED" | "READY" | "MIGRATED" | "NOT_REQUIRED";
+  code: string | null;
+  completed?: number;
+  total?: number;
+  expires_at?: string;
+ };
  reviewFeedback?: TaskReviewFeedback[];
  assignmentId: string;
  status: string;

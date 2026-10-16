@@ -1262,7 +1262,7 @@ def assignment_detail(
                     else None
                 ),
             )
-            for material in task_learning_materials(task)
+            for material in task_learning_materials(task, definition.stable_key)
         ],
         learning_experience=task.learning_experience,
         estimated_duration_minutes=task.estimated_duration_minutes,
@@ -1347,7 +1347,12 @@ def complete_learning_material(
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
     if task.version != command.task_version:
         raise ApiError(409, "VERSION_CONFLICT", "学习材料版本已变化，请刷新后重试。")
-    material_by_key(task, material_key)
+    definition = session.get(TaskDefinition, task.task_definition_id)
+    material_by_key(
+        task,
+        material_key,
+        definition.stable_key if definition is not None else None,
+    )
     existing = session.scalar(
         select(LearningMaterialCompletion).where(
             LearningMaterialCompletion.organization_id == actor.organization_id,

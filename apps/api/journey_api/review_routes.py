@@ -84,6 +84,52 @@ from journey_api.schemas import (
 router = APIRouter(prefix="/api/v1")
 
 
+UNIFIED_FEEDBACK_STAGE_KEYS = {
+    "DAY-0",
+    "TRE-001-COMPANY-VALUES",
+    "TRE-002-AI-DATA-BASICS",
+    "TRE-003-PROJECT-AWARENESS",
+    "TRE-004-DELIVERY-FIT",
+    "ASM-001-RULE-BREAKDOWN",
+    "ASM-002-MODEL-JUDGEMENT",
+    "ASM-003-DATA-CONSTRUCTION",
+}
+
+
+def effective_review_rubric(
+    stable_key: str,
+    rubric: dict[str, object],
+    completion_criteria: list[str],
+) -> dict[str, object]:
+    """Use one detailed field plus one overall field across the local journey.
+
+    Published task versions remain immutable.  Projecting one required review
+    dimension here gives every journey task the same two-part reviewer flow,
+    while keeping the detailed feedback validated and persisted separately.
+    """
+    if stable_key not in UNIFIED_FEEDBACK_STAGE_KEYS:
+        return rubric
+    criteria = "；".join(completion_criteria) or "任务目标与提交要求"
+    return {
+        "version": rubric.get("version", 1),
+        "dimensions": [
+            {
+                "dimension_key": "task_completion",
+                "title": "本任务具体反馈",
+                "purpose": "对照任务要求记录具体、可执行的人工审核意见。",
+                "evidence_expected": f"请对照完成标准给出具体反馈：{criteria}",
+                "levels": {
+                    "MEETS": "当前提交达到任务要求",
+                    "NEEDS_WORK": "当前提交仍需补充或修改",
+                },
+                "required": True,
+                "feedback_prompt": "指出一处具体表现，以及需要保持或修改的内容。",
+                "blocking_rule": "REQUIRE_FEEDBACK",
+            }
+        ],
+    }
+
+
 @dataclass(frozen=True)
 class ReviewContext:
     review: Review
@@ -664,7 +710,11 @@ def review_detail(
             task_purpose=context.task.purpose,
             completion_criteria=list(context.task.completion_criteria),
             required_deliverables=list(context.task.required_deliverables),
-            rubric=context.task.rubric,
+            rubric=effective_review_rubric(
+                context.definition.stable_key,
+                context.task.rubric,
+                list(context.task.completion_criteria),
+            ),
             materials=materials,
             finalized_at=context.review.finalized_at,
             evaluation=(
@@ -815,7 +865,12 @@ def finalize_review(
             "评审材料不完整，不能提交最终结论。",
             details={"missing_items": materials.missing_items},
         )
-    configured_dimensions = context.task.rubric.get("dimensions", [])
+    configured_rubric = effective_review_rubric(
+        context.definition.stable_key,
+        context.task.rubric,
+        list(context.task.completion_criteria),
+    )
+    configured_dimensions = configured_rubric.get("dimensions", [])
     required_keys = {
         str(item.get("dimension_key"))
         for item in configured_dimensions

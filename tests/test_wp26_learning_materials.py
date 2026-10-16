@@ -239,6 +239,8 @@ def publish_one_treasure(operator: TestClient) -> dict:
 def finalize_review(reviewer: TestClient, assignment_id: str, decision: str) -> dict:
     queue = data(reviewer.get("/api/v1/reviews", headers=REVIEWER_HEADERS))
     item = next(row for row in queue["items"] if row["assignment_id"] == assignment_id)
+    detail = data(reviewer.get(f"/api/v1/reviews/{item['id']}", headers=REVIEWER_HEADERS))
+    dimension_key = detail["rubric"]["dimensions"][0]["dimension_key"]
     started = data(
         command(
             reviewer,
@@ -261,7 +263,7 @@ def finalize_review(reviewer: TestClient, assignment_id: str, decision: str) -> 
                 ),
                 "rubric_evaluations": [
                     {
-                        "dimension_key": "evidence_traceability",
+                        "dimension_key": dimension_key,
                         "rating": (
                             "NEEDS_WORK" if decision == "REQUEST_REVISION" else "MEETS"
                         ),

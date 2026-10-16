@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from journey_api.db import SessionLocal
+from journey_api.journey_service import publish_catalog_journey, published_formal_journey
 from journey_api.fixtures import (
     ASSIGNMENT_ID,
     ENROLLMENT_ID,
@@ -242,6 +243,14 @@ def seed() -> None:
                     status=AssignmentStatus.AVAILABLE,
                     revision=1,
                 )
+            )
+        if published_formal_journey(session, ORGANIZATION_ID) is None:
+            publish_catalog_journey(
+                session,
+                operator_id=OPERATOR_ID,
+                reviewer_id=REVIEWER_ID,
+                organization_id=ORGANIZATION_ID,
+                expected_current_version=0,
             )
 
 

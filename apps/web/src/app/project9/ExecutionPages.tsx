@@ -1,6 +1,5 @@
 import { useJourney, useTaskStatus } from "./journey-context";
-import type { ReactNode } from 'react';
-import { effectiveCharacterCount } from "@/lib/text-length";
+import { useState, type ReactNode } from 'react';
 import { explorationLinks } from "@/app/project-ui/exploration-links";
 
 const taskDefinitions = [
@@ -154,6 +153,8 @@ export const executionTasks = taskOrder.map(id => taskDefinitions.find(task => t
 export function TaskCards() {
   const taskStatus = useTaskStatus();
   const { experience } = useJourney();
+  const [copied, setCopied] = useState(false);
+  const completionCode = experience?.completionCode;
   return <div className="journey-task-grid">
     {executionTasks.map((task, index) => {
       const status = taskStatus(index);
@@ -175,6 +176,20 @@ export function TaskCards() {
         </span>
       </button>;
     })}
+    <button type="button" className={`journey-task-card journey-completion-card journey-task-${completionCode?.status === "READY" ? "completed" : completionCode?.status === "MIGRATED" || completionCode?.status === "NOT_REQUIRED" ? "completed" : "locked"}`}
+      onClick={async () => {
+        if (!completionCode?.code) return;
+        await navigator.clipboard.writeText(completionCode.code);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1800);
+      }}>
+      <span className="journey-task-icon"><img src="/assets/project9/d6a61.png" alt="" /></span>
+      <span className="journey-task-status">{completionCode?.status === "READY" ? "已生成" : completionCode?.status === "MIGRATED" ? "已迁移" : completionCode?.status === "NOT_REQUIRED" ? "无需迁移" : "未解锁"}</span>
+      <span className="journey-task-number">09</span>
+      <span className="journey-task-title">探索营毕业码</span>
+      <span className="journey-task-description">{completionCode?.status === "READY" ? `你的专属毕业码：${completionCode.code}` : completionCode?.status === "MIGRATED" ? "历史数据已迁移至公司飞书账号。" : completionCode?.status === "NOT_REQUIRED" ? "当前为公司飞书账号，无需使用毕业码。" : `完成全部探索营任务后生成。还需完成 ${Math.max(0, (completionCode?.total ?? 8) - (completionCode?.completed ?? 0))} 项任务。`}</span>
+      <span className="journey-task-footer"><span>每人一码，仅限本人使用</span><strong>{completionCode?.status === "READY" ? copied ? "已复制" : "复制毕业码 →" : completionCode?.status === "MIGRATED" ? "迁移完成" : completionCode?.status === "NOT_REQUIRED" ? "正式账号" : "完成后解锁"}</strong></span>
+    </button>
   </div>;
 }
 export type ExecutionTask = (typeof executionTasks)[number];
@@ -402,7 +417,7 @@ export function ExecutionView({ task, panelDecoration, backDecoration, record, s
                   </div>
                 </div>
                 <div className="absolute contents left-[56.4px] top-[377.05px]" data-node-id="2038:3552">
-                  <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-black leading-[21.45px] left-[56.4px] not-italic text-[#b42318] text-[13px] top-[377.05px] whitespace-nowrap" data-node-id="2038:3553">{`已输入 ${effectiveCharacterCount(record)} 个有效字符｜要求 40-8000｜还差 ${Math.max(0, 40 - effectiveCharacterCount(record))} 个`}</p>
+                  <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-black leading-[21.45px] left-[56.4px] not-italic text-[#b42318] text-[13px] top-[377.05px] whitespace-nowrap" data-node-id="2038:3553">请输入有效飞书链接</p>
                 </div>
                 <div className="absolute contents left-[830.4px] top-[366.05px]" data-node-id="2038:3554">
                   <button type="button" className="absolute bg-[#2854d7] border-[1.287px] border-[rgba(0,0,0,0)] border-solid content-stretch flex h-[49.428px] items-center justify-center left-[830.4px] min-h-[49.42789077758789px] px-[18.535px] py-[10.297px] rounded-[10.297px] top-[366.05px] w-[240px]" data-action="execution-check" data-node-id="2038:3555" data-name="Button">

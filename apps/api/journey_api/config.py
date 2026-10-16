@@ -59,6 +59,17 @@ class Settings(BaseSettings):
     invite_exchange_limit: int = 10
     oauth_attempt_limit: int = 20
     oauth_state_ttl_minutes: int = 10
+    phone_otp_enabled: bool = False
+    phone_otp_provider: str = "DISABLED"
+    phone_otp_ttl_minutes: int = 5
+    phone_otp_resend_cooldown_seconds: int = 60
+    password_login_enabled: bool = False
+    volcengine_sms_access_key_id: str = ""
+    volcengine_sms_secret_access_key: str = ""
+    volcengine_sms_account: str = ""
+    volcengine_sms_sign: str = ""
+    volcengine_sms_template_id: str = ""
+    volcengine_sms_template_code_param: str = "code"
     identity_subject_secret: str = "journey-next-local-identity-subject-secret"
     feishu_oauth_enabled: bool = False
     feishu_learner_registration_enabled: bool = False
@@ -195,6 +206,32 @@ class Settings(BaseSettings):
             raise ValueError("OAUTH_ATTEMPT_LIMIT must be between 5 and 100")
         if not 5 <= self.oauth_state_ttl_minutes <= 15:
             raise ValueError("OAUTH_STATE_TTL_MINUTES must be between 5 and 15")
+        if self.phone_otp_provider not in {"DISABLED", "LOCAL_TEST", "VOLCENGINE"}:
+            raise ValueError("PHONE_OTP_PROVIDER must be DISABLED, LOCAL_TEST, or VOLCENGINE")
+        if self.phone_otp_provider == "LOCAL_TEST" and self.app_env not in {"local", "test"}:
+            raise ValueError("LOCAL_TEST phone OTP may only be used locally")
+        if self.phone_otp_enabled and self.phone_otp_provider == "DISABLED":
+            raise ValueError("enabled phone OTP requires a provider")
+        if not 2 <= self.phone_otp_ttl_minutes <= 10:
+            raise ValueError("PHONE_OTP_TTL_MINUTES must be between 2 and 10")
+        if not 30 <= self.phone_otp_resend_cooldown_seconds <= 300:
+            raise ValueError("PHONE_OTP_RESEND_COOLDOWN_SECONDS must be between 30 and 300")
+        if self.phone_otp_enabled and self.phone_otp_provider == "VOLCENGINE":
+            required_sms_settings = {
+                "VOLCENGINE_SMS_ACCESS_KEY_ID": self.volcengine_sms_access_key_id,
+                "VOLCENGINE_SMS_SECRET_ACCESS_KEY": self.volcengine_sms_secret_access_key,
+                "VOLCENGINE_SMS_ACCOUNT": self.volcengine_sms_account,
+                "VOLCENGINE_SMS_SIGN": self.volcengine_sms_sign,
+                "VOLCENGINE_SMS_TEMPLATE_ID": self.volcengine_sms_template_id,
+                "VOLCENGINE_SMS_TEMPLATE_CODE_PARAM": self.volcengine_sms_template_code_param,
+            }
+            missing = [name for name, value in required_sms_settings.items() if not value.strip()]
+            if missing:
+                raise ValueError(
+                    "VOLCENGINE phone OTP requires: " + ", ".join(missing)
+                )
+            if not self.volcengine_sms_template_code_param.isidentifier():
+                raise ValueError("VOLCENGINE_SMS_TEMPLATE_CODE_PARAM must be an identifier")
         if self.app_env in {"staging", "production"} and not self.feishu_oauth_enabled:
             raise ValueError("FEISHU_OAUTH_ENABLED must be true outside local/test")
         if self.attachment_storage_backend not in {"LOCAL", "TOS"}:

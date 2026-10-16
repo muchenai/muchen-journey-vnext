@@ -23,6 +23,10 @@ const reviewLoginSource = readFileSync(
   new URL("../src/app/review/login/page.tsx", import.meta.url),
   "utf8",
 );
+const localReviewEntrySource = readFileSync(
+  new URL("../src/app/review/local/route.ts", import.meta.url),
+  "utf8",
+);
 const opsLoginSource = readFileSync(
   new URL("../src/app/ops/login/page.tsx", import.meta.url),
   "utf8",
@@ -49,7 +53,10 @@ test("anonymous ops browser entry recovers without weakening JSON denial", () =>
 
 test("anonymous and wrong-role review entry recover through a dedicated login page", () => {
   assert.match(proxySource, /const isReviewLogin = pathname === "\/review\/login";/);
-  assert.match(proxySource, /if \(isReviewRoute && !isReviewLogin && !hasSession\)/);
+  assert.match(
+    proxySource,
+    /if \(isReviewRoute && !isReviewLogin && !hasSession && !fixtureIdentityAllowed\)/,
+  );
   assert.match(
     proxySource,
     /NextResponse\.redirect\(new URL\("\/review\/login", request\.url\), 303\)/,
@@ -60,6 +67,13 @@ test("anonymous and wrong-role review entry recover through a dedicated login pa
     reviewLoginSource,
     /href="\/auth\/feishu\?return_to=%2Freview"/,
   );
+  assert.match(reviewLoginSource, /href="\/review\/local"/);
+  assert.match(reviewLoginSource, />\s*使用本地审核身份进入\s*</);
+  assert.match(localReviewEntrySource, /process\.env\.APP_ENV === "local"/);
+  assert.match(localReviewEntrySource, /process\.env\.ALLOW_FIXTURE_IDENTITY === "true"/);
+  assert.match(localReviewEntrySource, /response\.cookies\.delete\(SESSION_COOKIE\)/);
+  assert.match(localReviewEntrySource, /status: 303/);
+  assert.match(localReviewEntrySource, /Location: "\/review"/);
   assert.match(apiSource, /redirect\("\/review\/login\?auth_error=FORBIDDEN"\)/);
   assert.match(apiSource, /redirect\("\/review\/login\?auth_error=SESSION_EXPIRED"\)/);
 });
