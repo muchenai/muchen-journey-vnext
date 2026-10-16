@@ -89,7 +89,8 @@ class ActivationTests(unittest.TestCase):
              patch.object(release, 'guard', side_effect=guards), patch.object(release, 'docker_api', side_effect=api), \
              patch.object(release, 'probe_old_api'), patch.object(release, 'up', side_effect=up), \
              patch.object(release, 'healthy'), patch.object(release, 'pointer'), \
-             patch.object(release, 'current', return_value=release.base), patch.object(activate, 'compose'):
+             patch.object(release, 'current', return_value=release.base), patch.object(activate, 'compose'), \
+             patch.object(activate, 'run'):
             if switch_failure or migration_failure:
                 with self.assertRaises(activate.UpgradeError) as error:
                     release.activate()
