@@ -309,6 +309,12 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
     while action["action_type"] != "VIEW_RESULT_OR_HANDOFF":
         assignment_id = action["resource_id"]
         detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
+        for material in detail["learning_materials"]:
+            if material["required"] and material["completed_at"] is None:
+                post(learner,
+                     f"/api/v1/me/assignments/{assignment_id}/materials/{material['key']}/complete",
+                     json={"task_version": detail["task_version"]})
+        detail = ok(learner.get(f"/api/v1/me/assignments/{assignment_id}"))
         if "start" in detail["allowed_commands"]:
             post(
                 learner,
