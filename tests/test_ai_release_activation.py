@@ -65,6 +65,13 @@ class ActivationTests(unittest.TestCase):
             self.assertIn(f'{self.release.new / path}:/run/secrets/{key}:ro', command)
         self.assertFalse(any('AI_API_KEY=' in value or 'AI_FEISHU_APP_SECRET=' in value for value in command))
 
+    def test_development_waiver_cannot_allow_braces_in_runtime(self):
+        with patch.object(activate, 'run', return_value=b'{"braces":0}'):
+            self.release.verify_runtime_dependencies()
+        with patch.object(activate, 'run', return_value=b'{"braces":1}'):
+            with self.assertRaisesRegex(activate.UpgradeError, 'WAIVED_DEPENDENCY_IN_RUNTIME'):
+                self.release.verify_runtime_dependencies()
+
     def test_image_requires_exact_config_digest_platform_and_revision(self):
         row = {'Id': self.release.images['api'], 'Os': 'linux', 'Architecture': 'amd64',
                'Config': {'Labels': {'org.opencontainers.image.revision': self.release.manifest['candidate']}}}

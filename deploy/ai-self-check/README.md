@@ -28,3 +28,8 @@ Never downgrade or restore the production database automatically.
 
 Local self-check data remain local. Production learner and Review histories
 start accumulating from real production self-checks.
+
+On 2026-10-20 the owner explicitly renewed only the dev-only
+GHSA-vfj7-8cjw-p6xm exception through 2026-10-27. All other advisories, runtime
+reachability and expiry remain blocking. The release also scans the actual
+loaded Web image and stops before staging if any braces package is present.

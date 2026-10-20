@@ -15,12 +15,13 @@ WEB_ROOT = ROOT / "apps" / "web"
 LOCK_FILE = WEB_ROOT / "package-lock.json"
 BRACE_EXPANSION_DOS = "https://github.com/advisories/GHSA-mh99-v99m-4gvg"
 BRACES_PARSE_DOS = "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
-# Owner accepted this one-week internal-test exception on 2026-10-11.
+# Owner renewed only the braces dev-only exception on 2026-10-20 through
+# 2026-10-27 for this release; runtime reachability remains forbidden.
 # Only trusted repository patterns reach this ESLint development dependency.
 # Runtime reachability, unknown advisories and expiry still fail closed.
 WAIVERS = {
     BRACE_EXPANSION_DOS: date(2026, 8, 31),
-    BRACES_PARSE_DOS: date(2026, 10, 18),
+    BRACES_PARSE_DOS: date(2026, 10, 27),
 }
 
 

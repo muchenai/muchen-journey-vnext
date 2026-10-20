@@ -148,6 +148,23 @@ class Activation(ExplorationPreparation):
         for name, reference in self.old_images.items():
             self.image_check(name, reference, BASE if name == "api" else WEB_BASE)
         Upgrade.image_check(self, "dbrestore", self.images["dbrestore"])
+        self.verify_runtime_dependencies()
+
+    def verify_runtime_dependencies(self):
+        # The owner-approved braces exception applies to development tools only.
+        # Inspect the actual loaded production image before staging or downtime.
+        probe = """
+const fs=require('fs'), p=require('path'); let count=0;
+function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){
+ const f=p.join(d,e.name);
+ if(e.isDirectory()&&!e.isSymbolicLink()) walk(f);
+ else if(e.name==='package.json'&&JSON.parse(fs.readFileSync(f,'utf8')).name==='braces') count++;
+}}
+walk('/app'); console.log(JSON.stringify({braces:count}));
+"""
+        result = json.loads(run(["docker", "run", "--rm", "--network", "none",
+                                 self.images["web"], "node", "-e", probe], timeout=60))
+        require(result == {"braces": 0}, "WAIVED_DEPENDENCY_IN_RUNTIME")
 
     def image_check(self, name, reference, candidate=None):
         if name not in {"api", "web"} or not re.fullmatch(r"sha256:[0-9a-f]{64}", reference):
