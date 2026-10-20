@@ -82,10 +82,11 @@ export function useWorkspaceRecovery(experience: ProjectExperienceData | null, e
         if (cancelled) return;
         if (!response.ok || !data.records) throw new Error(data.error || "无法查询自查状态。");
         const state = selfCheckRecovery(data.records, pendingSince.current);
-        // Recover older sessions that started a check before autosave existed.
+        // Only an in-flight check can recover a lost link. Completed history
+        // is not a draft and must never populate a fresh task's empty editor.
         let cached = null;
         try { cached = key ? readWorkspace(localStorage, key) : null; } catch { /* optional local cache */ }
-        if (canSubmit && !bodyRef.current && !cached && state.newest?.body) updateRecord(state.newest.body);
+        if (canSubmit && !bodyRef.current && !cached && state.active?.body) updateRecord(state.active.body);
         const busy = requestInFlight.current || state.busy;
         selfCheckInFlight.current = busy;
         setSelfCheckBusy(busy);

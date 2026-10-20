@@ -5,6 +5,7 @@ import re
 import secrets
 import uuid
 from datetime import timedelta
+from typing import Literal
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import APIRouter, Depends, Request, Response
@@ -56,6 +57,7 @@ class StrictModel(BaseModel):
 
 class RequestPhoneCode(StrictModel):
     phone: str
+    purpose: Literal["login", "register", "reset"] = "login"
 
 
 class VerifyPhoneCode(StrictModel):
@@ -66,6 +68,10 @@ class VerifyPhoneCode(StrictModel):
 class PhonePasswordLogin(StrictModel):
     phone: str
     password: str
+
+
+class VerifiedPhonePassword(PhonePasswordLogin):
+    code: str
 
 
 class MigrateCompletionCode(StrictModel):
@@ -105,6 +111,39 @@ def hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
 def verify_password(password: str, salt_hex: str, expected_hash: str) -> bool:
     _, actual_hash = hash_password(password, bytes.fromhex(salt_hex))
     return hmac.compare_digest(actual_hash, expected_hash)
+
+
+def password_phone_identity(session: Session, subject: str) -> ExternalIdentity | None:
+    """Never recreate a retired phone account or silently merge different users."""
+    identities = session.scalars(select(ExternalIdentity).where(
+        ExternalIdentity.provider.in_(("PHONE_PASSWORD", "PHONE", "NICKNAME_PHONE")),
+        ExternalIdentity.subject == subject,
+    ).with_for_update()).all()
+    if any(identity.revoked_at is not None for identity in identities):
+        raise ApiError(409, "ACCOUNT_MIGRATED", "该账号已完成迁移，请使用企业飞书登录。")
+    if len({identity.user_id for identity in identities}) > 1:
+        raise ApiError(409, "PHONE_ACCOUNT_CONFLICT", "该手机号存在多个历史账号，请联系管理员李鑫波处理。")
+    return next((identity for identity in identities if identity.provider == "PHONE_PASSWORD"),
+                identities[0] if identities else None)
+
+
+def consume_phone_code(session: Session, subject: str, code: str, purpose: str) -> PhoneOtpChallenge:
+    settings = get_settings()
+    # Always use the newest challenge, including consumed ones: an older code
+    # must not become valid again after the newest one has been used.
+    challenge = session.scalar(select(PhoneOtpChallenge).where(
+        PhoneOtpChallenge.phone_subject == subject,
+    ).order_by(PhoneOtpChallenge.created_at.desc(), PhoneOtpChallenge.id.desc()).with_for_update())
+    if challenge is None or challenge.consumed_at is not None or challenge.expires_at <= utc_now():
+        raise ApiError(410, "PHONE_OTP_EXPIRED", "验证码已过期或已使用，请重新获取。")
+    challenge.attempts += 1
+    namespace = "phone-otp" if purpose == "login" else f"phone-otp:{purpose}"
+    expected = credential_hash(settings.session_secret, namespace, code.strip())
+    if challenge.attempts > 5 or not secrets.compare_digest(challenge.code_hash, expected):
+        session.commit()
+        raise ApiError(401, "PHONE_OTP_INVALID", "验证码不正确，请使用当前操作收到的验证码。")
+    challenge.consumed_at = utc_now()
+    return challenge
 
 
 def encrypt_completion_code(code: str) -> str:
@@ -198,13 +237,7 @@ def login_with_password(
     password = validate_password(command.password)
     subject = phone_subject(phone)
     organization_id = lock_learner_organization(session)
-    identity = session.scalar(
-        select(ExternalIdentity).where(
-            ExternalIdentity.provider == "PHONE_PASSWORD",
-            ExternalIdentity.subject == subject,
-        ).with_for_update()
-    )
-    is_new_user = identity is None
+    identity = password_phone_identity(session, subject)
     if identity is not None:
         if identity.revoked_at is not None:
             raise ApiError(409, "ACCOUNT_MIGRATED", "该账号已完成迁移，请使用企业飞书登录。")
@@ -227,31 +260,13 @@ def login_with_password(
             provider="PHONE_PASSWORD",
         )
     else:
-        identity = provision_learner(
-            session,
-            None,
-            subject=subject,
-            name="探索者",
-            organization_id=organization_id,
-            request_id=request.state.request_id,
-            provider="PHONE_PASSWORD",
-        )
-        session.flush()
-        password_salt, password_hash = hash_password(password)
-        session.add(
-            PhonePasswordCredential(
-                id=uuid.uuid4(),
-                external_identity_id=identity.id,
-                password_salt=password_salt,
-                password_hash=password_hash,
-            )
-        )
+        raise ApiError(401, "PHONE_OR_PASSWORD_INVALID", "手机号或密码不正确，首次使用请先注册。")
     csrf_token, expires_at = issue_learner_session(
         session,
         response,
         identity=identity,
         request_id=request.state.request_id,
-        audit_action="password.registration_succeeded" if is_new_user else "password.login_succeeded",
+        audit_action="password.login_succeeded",
     )
     session.commit()
     return envelope(
@@ -261,9 +276,88 @@ def login_with_password(
             "expires_at": expires_at,
             "csrf_token": csrf_token,
             "display_name": "探索者",
-            "is_new_user": is_new_user,
+            "is_new_user": False,
         },
     )
+
+
+def verified_password_change(
+    command: VerifiedPhonePassword, request: Request, response: Response,
+    session: Session, *, purpose: Literal["register", "reset"],
+):
+    settings = get_settings()
+    if not settings.password_login_enabled or not settings.phone_otp_enabled:
+        raise ApiError(503, "PASSWORD_LOGIN_DISABLED", "手机注册及密码重置尚未启用。")
+    enforce_auth_limit(request, scope="password.verify", secret=settings.session_secret,
+                       limit=10, message="验证尝试次数过多，请稍后再试。")
+    phone = normalized_phone(command.phone)
+    password = validate_password(command.password)
+    subject = phone_subject(phone)
+    organization_id = lock_learner_organization(session)
+    consume_phone_code(session, subject, command.code, purpose)
+    identity = password_phone_identity(session, subject)
+    if purpose == "register" and identity is not None:
+        raise ApiError(409, "PHONE_ALREADY_REGISTERED", "该手机号已注册，请登录或找回密码。")
+    if purpose == "reset" and identity is None:
+        raise ApiError(404, "PHONE_NOT_REGISTERED", "该手机号尚未注册，请先注册账号。")
+    identity = provision_learner(
+        session, identity, subject=subject, name="探索者",
+        organization_id=organization_id, request_id=request.state.request_id,
+        provider="PHONE_PASSWORD",
+    )
+    session.flush()
+    # Older SMS/nickname accounts keep the same identity, user and journey.
+    if identity.provider != "PHONE_PASSWORD":
+        identity.provider = "PHONE_PASSWORD"
+        identity.revision += 1
+    credential = session.scalar(select(PhonePasswordCredential).where(
+        PhonePasswordCredential.external_identity_id == identity.id,
+    ).with_for_update())
+    salt, digest = hash_password(password)
+    if credential is None:
+        credential = PhonePasswordCredential(
+            id=uuid.uuid4(), external_identity_id=identity.id,
+            password_salt=salt, password_hash=digest,
+        )
+        session.add(credential)
+    else:
+        credential.password_salt, credential.password_hash = salt, digest
+    if purpose == "register":
+        csrf_token, expires_at = issue_learner_session(
+            session, response, identity=identity, request_id=request.state.request_id,
+            audit_action="password.registration_succeeded",
+        )
+        session.commit()
+        return envelope(request, {"safe_entry": "/app", "csrf_token": csrf_token,
+                                  "expires_at": expires_at, "is_new_user": True})
+    now = utc_now()
+    for previous in session.scalars(select(IdentitySession).where(
+        IdentitySession.user_id == identity.user_id,
+        IdentitySession.revoked_at.is_(None),
+    ).with_for_update()):
+        previous.revoked_at = now
+    add_audit(session, request_id=request.state.request_id,
+              organization_id=identity.organization_id, actor_id=identity.user_id,
+              action="password.reset_succeeded", resource_type="external_identity",
+              resource_id=identity.id, result="SUCCESS", details={"provider": identity.provider})
+    session.commit()
+    return envelope(request, {"message": "密码已重置，请使用新密码登录。"})
+
+
+@router.post("/auth/password/register")
+def register_with_password(
+    command: VerifiedPhonePassword, request: Request, response: Response,
+    session: Session = Depends(get_db),
+):
+    return verified_password_change(command, request, response, session, purpose="register")
+
+
+@router.post("/auth/password/reset")
+def reset_password(
+    command: VerifiedPhonePassword, request: Request, response: Response,
+    session: Session = Depends(get_db),
+):
+    return verified_password_change(command, request, response, session, purpose="reset")
 
 
 @router.post("/auth/phone/request-code")
@@ -284,6 +378,18 @@ def request_phone_code(
     )
     phone = normalized_phone(command.phone)
     subject = phone_subject(phone)
+    # This also serializes cooldown checks and sends for the same account.
+    lock_learner_organization(session)
+    if settings.password_login_enabled and command.purpose == "login":
+        raise ApiError(409, "PASSWORD_LOGIN_REQUIRED", "请使用密码登录，或选择注册账号、忘记密码获取验证码。")
+    if command.purpose != "login":
+        if not settings.password_login_enabled:
+            raise ApiError(503, "PASSWORD_LOGIN_DISABLED", "手机注册及密码重置尚未启用。")
+        identity = password_phone_identity(session, subject)
+        if command.purpose == "register" and identity is not None:
+            raise ApiError(409, "PHONE_ALREADY_REGISTERED", "该手机号已注册，请登录或找回密码。")
+        if command.purpose == "reset" and identity is None:
+            raise ApiError(404, "PHONE_NOT_REGISTERED", "该手机号尚未注册，请先注册账号。")
     now = utc_now()
     previous_challenge = session.scalar(
         select(PhoneOtpChallenge)
@@ -333,7 +439,8 @@ def request_phone_code(
         id=uuid.uuid4(),
         phone_subject=subject,
         phone_last_four=phone[-4:],
-        code_hash=credential_hash(settings.session_secret, "phone-otp", code),
+        code_hash=credential_hash(settings.session_secret,
+                                  "phone-otp" if command.purpose == "login" else f"phone-otp:{command.purpose}", code),
         attempts=0,
         expires_at=now + timedelta(minutes=settings.phone_otp_ttl_minutes),
     )
@@ -349,12 +456,14 @@ def request_phone_code(
             "phone_mask": f"*******{phone[-4:]}",
             "provider": settings.phone_otp_provider,
             "provider_message_id": provider_message_id,
+            "purpose": command.purpose,
         },
     )
     session.commit()
     data: dict[str, object] = {
         "expires_in_seconds": settings.phone_otp_ttl_minutes * 60,
         "phone_mask": f"*******{phone[-4:]}",
+        "retry_after_seconds": settings.phone_otp_resend_cooldown_seconds,
     }
     if settings.app_env in {"local", "test"} and settings.phone_otp_provider == "LOCAL_TEST":
         data["debug_code"] = LOCAL_CODE
@@ -380,24 +489,10 @@ def verify_phone_code(
     )
     phone = normalized_phone(command.phone)
     subject = phone_subject(phone)
-    challenge = session.scalar(
-        select(PhoneOtpChallenge)
-        .where(
-            PhoneOtpChallenge.phone_subject == subject,
-            PhoneOtpChallenge.consumed_at.is_(None),
-        )
-        .order_by(PhoneOtpChallenge.created_at.desc())
-        .with_for_update()
-    )
-    if challenge is None or challenge.expires_at <= utc_now():
-        raise ApiError(410, "PHONE_OTP_EXPIRED", "验证码已过期，请重新获取。")
-    challenge.attempts += 1
-    expected = credential_hash(settings.session_secret, "phone-otp", command.code.strip())
-    if challenge.attempts > 5 or not secrets.compare_digest(challenge.code_hash, expected):
-        session.commit()
-        raise ApiError(401, "PHONE_OTP_INVALID", "验证码不正确。")
-    challenge.consumed_at = utc_now()
+    if settings.password_login_enabled:
+        raise ApiError(409, "PASSWORD_LOGIN_REQUIRED", "请使用密码登录，或先通过验证码注册、重置密码。")
     organization_id = lock_learner_organization(session)
+    challenge = consume_phone_code(session, subject, command.code, "login")
     identity = session.scalar(
         select(ExternalIdentity)
         .where(ExternalIdentity.provider == "PHONE", ExternalIdentity.subject == subject)

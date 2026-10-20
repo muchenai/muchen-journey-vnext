@@ -231,6 +231,18 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 .phone-login-note a:hover, .phone-login-note a:focus-visible { color: #c7fdff; text-decoration: underline; text-underline-offset: 3px; text-shadow: 0 0 13px rgba(77,240,255,.78); }
 .phone-login-mode .launch-button { min-height: 60px; }
 .password-login-mode .launch-button { min-height: 60px; }
+.login-stage .phone-account-panel { gap: 16px !important; padding-top: 28px; padding-bottom: 28px; }
+.login-stage .phone-account-panel .panel-logo { width: 80px; height: 80px; }
+.login-stage .phone-account-panel .panel-title { font-size: 28px; }
+.phone-account-heading { text-align: center; margin: 0 0 4px; }
+.phone-account-heading h2 { margin: 0 0 5px; color: #e6fcff; font-size: 24px; letter-spacing: .12em; }
+.phone-account-heading p { margin: 0; font-size: 13px; color: #a6c9e3; }
+.phone-account-panel .phone-login-note { margin: 4px 0 0; padding-top: 10px; }
+.phone-account-panel .password-login-guidance { min-height: 28px; color: #5b8fac; gap: 24px; }
+.phone-account-panel .forgot-password-button { font-size: 15px; text-decoration: none; }
+.password-visibility { padding: 8px 0 8px 8px; border: 0; color: #7eeaff; font-size: 13px; cursor: pointer; background: transparent; white-space: nowrap; }
+.phone-account-panel button:disabled { cursor: not-allowed; opacity: .55; }
+.phone-account-panel .status-line { margin-top: 0; line-height: 1.5; }
 .login-stage .status-line { min-height: 18px; margin-top: -14px; }
 .login-stage footer { flex-direction: row; text-align: initial; font-size: 17px; white-space: nowrap; gap: 1rem; }
 .login-stage .brand-mark img { width: 64px; height: 64px; }
