@@ -114,7 +114,7 @@ def test_http_request_rejects_invalid_local_api_port(monkeypatch):
         ops.http_request("/health/ready")
 
 
-def test_migration_check_rehearses_the_exact_phone_login_release_range(
+def test_migration_check_rehearses_the_exact_ai_release_range(
     monkeypatch, tmp_path
 ):
     calls: list[tuple[str, ...]] = []
@@ -128,6 +128,7 @@ def test_migration_check_rehearses_the_exact_phone_login_release_range(
             "phone_otp_challenges": 0,
             "completion_codes": 0,
             "phone_password_credentials": 0,
+            "ai_self_checks": 0,
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -135,8 +136,11 @@ def test_migration_check_rehearses_the_exact_phone_login_release_range(
     }
     base_facts = {
         **current_facts,
-        "migration_revision": ops.PHONE_LOGIN_BASE_REVISION,
+        "migration_revision": ops.AI_BASE_REVISION,
         "counts": {
+            "phone_otp_challenges": 0,
+            "completion_codes": 0,
+            "phone_password_credentials": 0,
             "enrollments": 1,
             "coaching_feedback": 0,
             "ai_advisory_records": 0,
@@ -169,17 +173,17 @@ def test_migration_check_rehearses_the_exact_phone_login_release_range(
     assert api_steps == [
         ("alembic", "upgrade", "head"),
         ("python", "-m", "journey_api.seed"),
-        ("alembic", "downgrade", "0032_shared_learner_review"),
+        ("alembic", "downgrade", "0035_phone_password_login"),
         ("alembic", "upgrade", "head"),
     ]
     assert report["production_release_range_rehearsed"] is True
-    assert report["upgrade_0032_to_0035"] == "PASS"
-    assert report["downgrade_0035_to_0032"] == "PASS"
+    assert report["upgrade_0035_to_0037"] == "PASS"
+    assert report["downgrade_0037_to_0035"] == "PASS"
     assert report["business_facts_preserved"] is True
 
 
-def test_current_ops_contract_tracks_0035_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0035_phone_password_login"
+def test_current_ops_contract_tracks_0037_head_and_all_protected_fact_tables():
+    assert ops.EXPECTED_MIGRATION_HEAD == "0037_ai_self_check_revisions"
     assert ops.SAFE_ROLLBACK_REVISION == "0025_formal_result_gate"
     assert {
         "submission_versions",
@@ -202,6 +206,7 @@ def test_current_ops_contract_tracks_0035_head_and_all_protected_fact_tables():
         "phone_otp_challenges",
         "completion_codes",
         "phone_password_credentials",
+        "ai_self_checks",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
         "coaching_feedback",
@@ -210,12 +215,13 @@ def test_current_ops_contract_tracks_0035_head_and_all_protected_fact_tables():
         "phone_otp_challenges",
         "completion_codes",
         "phone_password_credentials",
+        "ai_self_checks",
     }
 
 
-def test_schema_rollback_only_accepts_the_current_phone_login_head():
+def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0035_phone_password_login",
+        "migration_revision": "0037_ai_self_check_revisions",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -224,13 +230,14 @@ def test_schema_rollback_only_accepts_the_current_phone_login_head():
             "phone_otp_challenges": 0,
             "completion_codes": 0,
             "phone_password_credentials": 0,
+            "ai_self_checks": 0,
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0035_phone_password_login",
+            "migration_revision": "0037_ai_self_check_revisions",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -238,6 +245,7 @@ def test_schema_rollback_only_accepts_the_current_phone_login_head():
                 "phone_otp_challenges": 0,
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
+            "ai_self_checks": 0,
                 protected_fact: 1,
             },
         }
@@ -255,7 +263,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0035_phone_password_login",
+        "migration_revision": "0037_ai_self_check_revisions",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []

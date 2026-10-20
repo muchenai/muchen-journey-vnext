@@ -338,6 +338,23 @@ export type ReviewDetail = ReviewItem & {
     advisory_only: true;
   } | null;
   submission_history: SubmissionVersion[];
+  document_ai_checks: Array<{
+    history: Array<{
+      record_id: string | null;
+      result: string | null;
+      generated_at: string | null;
+      model: string | null;
+      document_revision: string | null;
+    }>;
+    document_url: string;
+    status: "NOT_FOUND" | "RUNNING" | "SENDING" | "UNCERTAIN" | "FAILED" | "COMPLETED";
+    record_id: string | null;
+    result: string | null;
+    generated_at: string | null;
+    model: string | null;
+    document_revision: string | null;
+    comment_id: string | null;
+  }>;
 };
 
 export type Result = {

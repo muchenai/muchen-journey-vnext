@@ -352,7 +352,7 @@ export function ExecutionDetail({ task, panelDecoration, backDecoration, openedM
   );
 }
 
-export function ExecutionView({ task, panelDecoration, backDecoration, record, setRecord, readOnly = false, canRevise = false, canCancelRevision = false, revisionBusy = false, submitting = false, submitDisabled = false, submitLabel = "提交任务证据" }: ExecutionProps & { record: string; setRecord: (value: string) => void; readOnly?: boolean; canRevise?: boolean; canCancelRevision?: boolean; revisionBusy?: boolean; submitting?: boolean; submitDisabled?: boolean; submitLabel?: string }) {
+export function ExecutionView({ selfCheckRecovering = false, selfCheckBusy = false, task, panelDecoration, backDecoration, record, setRecord, readOnly = false, canRevise = false, canCancelRevision = false, revisionBusy = false, submitting = false, submitDisabled = false, submitLabel = "提交任务证据" }: ExecutionProps & { selfCheckRecovering?: boolean; selfCheckBusy?: boolean; record: string; setRecord: (value: string) => void; readOnly?: boolean; canRevise?: boolean; canCancelRevision?: boolean; revisionBusy?: boolean; submitting?: boolean; submitDisabled?: boolean; submitLabel?: string }) {
   return (
     <div className="content-stretch flex flex-col items-start relative size-full" data-node-id="2038:3524" data-name="day1 查看任务以及任务提交界面">
       <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid leading-[0] place-items-start relative shrink-0" data-node-id="2038:3525">
@@ -413,16 +413,16 @@ export function ExecutionView({ task, panelDecoration, backDecoration, record, s
                 </p>
                 <div className="absolute bg-[rgba(3,21,42,0.45)] border-[#3a9fc6] border-[1.25px] border-solid content-stretch flex flex-col h-[382px] items-start left-[19.4px] min-h-[150px] overflow-clip p-[14px] rounded-[8px] top-[51.05px] w-[1076px]" data-node-id="2038:3549" data-name="Text Area">
                   <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid leading-[0] place-items-start relative shrink-0" data-node-id="2038:3550">
-                    <textarea className="bg-[rgba(39,151,181,0.18)] border-[1.888px] border-[rgba(117,245,255,0.24)] border-solid col-1 h-[349px] ml-0 mt-0 relative rounded-[11.328px] row-1 w-[688px]" data-node-id="2038:3551"  aria-label="当前任务学习记录或云文档链接" value={record} readOnly={submitting || readOnly || revisionBusy} onChange={event => setRecord(event.target.value)} placeholder="填写你的学习记录或云文档链接" />
+                    <textarea className="bg-[rgba(39,151,181,0.18)] border-[1.888px] border-[rgba(117,245,255,0.24)] border-solid col-1 h-[349px] ml-0 mt-0 relative rounded-[11.328px] row-1 w-[688px]" data-node-id="2038:3551"  aria-label="当前任务学习记录或云文档链接" value={record} readOnly={selfCheckBusy || submitting || readOnly || revisionBusy} onChange={event => setRecord(event.target.value)} placeholder="填写你的学习记录或云文档链接" />
                   </div>
                 </div>
                 <div className="absolute contents left-[56.4px] top-[377.05px]" data-node-id="2038:3552">
                   <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-black leading-[21.45px] left-[56.4px] not-italic text-[#b42318] text-[13px] top-[377.05px] whitespace-nowrap" data-node-id="2038:3553">请输入有效飞书链接</p>
                 </div>
                 <div className="absolute contents left-[830.4px] top-[366.05px]" data-node-id="2038:3554">
-                  <button type="button" className="absolute bg-[#2854d7] border-[1.287px] border-[rgba(0,0,0,0)] border-solid content-stretch flex h-[49.428px] items-center justify-center left-[830.4px] min-h-[49.42789077758789px] px-[18.535px] py-[10.297px] rounded-[10.297px] top-[366.05px] w-[240px]" data-action="execution-check" data-node-id="2038:3555" data-name="Button">
+                  <button type="button" className="absolute bg-[#2854d7] border-[1.287px] border-[rgba(0,0,0,0)] border-solid content-stretch flex h-[49.428px] items-center justify-center left-[830.4px] min-h-[49.42789077758789px] px-[18.535px] py-[10.297px] rounded-[10.297px] top-[366.05px] w-[240px]" disabled={selfCheckRecovering || selfCheckBusy || submitting || revisionBusy} aria-busy={selfCheckBusy} data-action="execution-check" data-node-id="2038:3555" data-name="Button">
                     <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[27.185px] not-italic relative shrink-0 text-[16.476px] text-center text-white whitespace-nowrap" data-node-id="2038:3556">
-                      ✦ 开始 AI 自查 →
+                      {selfCheckRecovering ? "正在恢复自查状态…" : selfCheckBusy ? "AI 自查中…" : "✦ 开始 AI 自查 →"}
                     </p>
                   </button>
                 </div>
@@ -430,8 +430,8 @@ export function ExecutionView({ task, panelDecoration, backDecoration, record, s
                   历史AI自查记录↗
                 </p>
               </div>
-              {(canRevise || canCancelRevision) && <button type="button" className="execution-revision-action" disabled={revisionBusy || submitting} data-action={canRevise ? "revise-proof" : "cancel-revision"}>{revisionBusy ? "处理中…" : canRevise ? "重新修改" : "取消本次修改"}</button>}
-              <button type="button" className="-translate-x-1/2 absolute bg-gradient-to-r border-[#75f5ff] border-[2.149px] border-solid from-[#42dced] h-[104px] left-[calc(50%+0.12px)] rounded-[15.042px] shadow-[0px_0px_30.084px_0px_#2edfff,0px_0px_55.871px_0px_rgba(18,195,255,0.55)] to-[#5ceeff] top-[462.05px] via-[#31c9f5] via-[45%] w-[585px]" disabled={submitDisabled} aria-busy={submitting} data-action="review-proof" data-node-id="2038:3558" data-name="Link">
+              {(canRevise || canCancelRevision) && <button type="button" className="execution-revision-action" disabled={selfCheckRecovering || selfCheckBusy || revisionBusy || submitting} data-action={canRevise ? "revise-proof" : "cancel-revision"}>{revisionBusy ? "处理中…" : canRevise ? "重新修改" : "取消本次修改"}</button>}
+              <button type="button" className="-translate-x-1/2 absolute bg-gradient-to-r border-[#75f5ff] border-[2.149px] border-solid from-[#42dced] h-[104px] left-[calc(50%+0.12px)] rounded-[15.042px] shadow-[0px_0px_30.084px_0px_#2edfff,0px_0px_55.871px_0px_rgba(18,195,255,0.55)] to-[#5ceeff] top-[462.05px] via-[#31c9f5] via-[45%] w-[585px]" disabled={submitDisabled || selfCheckBusy || selfCheckRecovering} aria-busy={submitting || selfCheckBusy} data-self-check-waiting={selfCheckBusy || selfCheckRecovering || undefined} data-action="review-proof" data-node-id="2038:3558" data-name="Link">
                 <div className="-translate-x-1/2 -translate-y-1/2 absolute content-stretch flex gap-[14px] items-center justify-center left-[calc(50%+0.5px)] top-[calc(50%+0.5px)]" data-node-id="2038:3559">
                   <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[56.73px] not-italic relative shrink-0 text-[#03245f] text-[34.382px] tracking-[2.7505px] whitespace-nowrap" data-node-id="2038:3560">
                     {submitLabel}

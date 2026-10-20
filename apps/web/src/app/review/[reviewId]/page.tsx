@@ -10,6 +10,14 @@ export const dynamic = "force-dynamic";
 
 const RATING_LABELS = { MEETS: "达标", NEEDS_WORK: "待改进" } as const;
 const DECISION_LABELS = { APPROVE: "通过", REQUEST_REVISION: "要求修订" } as const;
+const AI_CHECK_STATUS_LABELS = {
+  NOT_FOUND: "未找到该链接对应的 AI 自测记录",
+  RUNNING: "AI 正在生成评价，请稍后刷新",
+  SENDING: "正在确认飞书评论发布结果",
+  UNCERTAIN: "评论发布结果待核对，请联系管理员",
+  FAILED: "AI 自测未完成，可由学员重试",
+  COMPLETED: "AI 自测已完成",
+} as const;
 const HTTPS_URL = /(https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+)/gu;
 const TRAILING_URL_PUNCTUATION = /[),.;!?，。；！？、）】》]+$/u;
 
@@ -143,6 +151,30 @@ export default async function ReviewPage({
       <section className="review-section" aria-labelledby="ai-advisory-title">
         <FactLabel kind="ai" />
         <h2 id="ai-advisory-title">AI 自查建议</h2>
+        {(review.document_ai_checks ?? []).length > 0 ? (
+          <>
+            <p className="status-meta">以下评价对应本次提交的答题链接，仅供人工审核参考，不计分。评价针对自测时的文档内容；若之后修改过文档，请结合原文核对。</p>
+            {review.document_ai_checks.map((check, index) => (
+              <div className="review-section" key={check.document_url}>
+                <h3>答题文档 {index + 1} · {AI_CHECK_STATUS_LABELS[check.status]}</h3>
+                <a href={check.document_url} target="_blank" rel="noreferrer">打开对应飞书文档 ↗</a>
+                {check.status === "COMPLETED" && check.result ? (
+                  <>
+                    <p className="status-meta">生成于 {formatProductDateTime(check.generated_at!)} · 模型 {check.model}{check.document_revision ? ` · 自测文档版本 ${check.document_revision}` : ""}</p>
+                    <div className="submission" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{check.result}</div>
+                  </>
+                ) : null}
+                {(check.history ?? []).length > 0 ? <details>
+                  <summary>查看此前 {check.history.length} 次 AI 自查评价</summary>
+                  {check.history.map(entry => <section key={entry.record_id}>
+                    <p className="status-meta">生成于 {formatProductDateTime(entry.generated_at!)} · 模型 {entry.model}{entry.document_revision ? ` · 自测文档版本 ${entry.document_revision}` : ""}</p>
+                    <div className="submission" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{entry.result}</div>
+                  </section>)}
+                </details> : null}
+              </div>
+            ))}
+          </>
+        ) : null}
         {review.ai_advisory ? (
           <>
             <p>已生成不可变建议记录；仅供 Reviewer 参考，不能改变任何正式状态。</p>
@@ -150,7 +182,7 @@ export default async function ReviewPage({
             <p className="status-meta">输入摘要 SHA-256 <code>{review.ai_advisory.input_sha256}</code> · 生成于 {formatProductDateTime(review.ai_advisory.generated_at)}</p>
             <pre className="submission">{JSON.stringify(review.ai_advisory.result, null, 2)}</pre>
           </>
-        ) : <p className="status-meta">AI 自查未运行 / 当前不可用；未生成空记录或评价。</p>}
+        ) : !(review.document_ai_checks ?? []).length ? <p className="status-meta">当前提交暂无可展示的 AI 自测评价。</p> : null}
       </section>
 
       <details className="fixed-references">

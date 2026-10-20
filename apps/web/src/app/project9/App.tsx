@@ -8,7 +8,8 @@ import { ExecutionDetail, ExecutionView, TaskCards, executionTasks } from "./Exe
 import { DashboardMain } from "./DashboardMain";
 import { SelfCheckHistoryDialog } from "./SelfCheckHistoryDialog";
 import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
-import { readSelfCheckHistory, saveSelfCheck, selfCheckHistoryKey, type SelfCheckRecord } from "./self-check-history";
+import { useWorkspaceRecovery } from "./useWorkspaceRecovery";
+import { runAiSelfCheck, type AISelfCheckRecord } from "../actions";
 import { JourneyProvider, useJourney, useTaskStatus, type JourneyContextValue } from "./journey-context";
 import { ProjectResourceLoader } from "./ProjectResourceLoader";
 import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment, loginWithPassword, migrateCompletionCode } from "../actions";
@@ -30,15 +31,14 @@ function ExperienceScreen() {
  const viewportRef = useRef<HTMLElement>(null);
  const [notice, setNotice] = useState(initialNotice ?? "");
  const [burst, setBurst] = useState<{ x: number; y: number; key: number } | null>(null);
- const [record, setRecord] = useState(experience?.allowedCommands.some(command => command.startsWith("submit"))
-   ? experience?.draftBody || experience?.latestSubmissionBody || ""
-   : experience?.latestSubmissionBody || "");
+ const { record, updateRecord, selfCheckBusy, selfCheckRecovering, selfCheckInFlight, beginSelfCheck, finishSelfCheck,
+   workspaceMessage } = useWorkspaceRecovery(experience, screen === "view" || screen === "detail");
  const [choice, setChoice] = useState("");
  const [checked, setChecked] = useState(false);
  const [historyOpen, setHistoryOpen] = useState(false);
  const [feedbackAssignmentId, setFeedbackAssignmentId] = useState<string | null>(null);
  const selectedFeedback = experience?.reviewFeedback?.find(item => item.assignmentId === feedbackAssignmentId);
- const [historyRecords, setHistoryRecords] = useState<SelfCheckRecord[]>([]);
+ const [historyRecords, setHistoryRecords] = useState<AISelfCheckRecord[]>([]);
  const [historyError, setHistoryError] = useState("");
  const [submitting, setSubmitting] = useState(false);
  const submissionInFlight = useRef(false);
@@ -46,7 +46,9 @@ function ExperienceScreen() {
  const revisionInFlight = useRef(false);
  const canSubmit = Boolean(experience?.allowedCommands.some(command => command.startsWith("submit")));
  const submissionStatus = experience?.status;
- const submitLabel = submitting ? "正在提交…"
+ const submitLabel = selfCheckBusy ? "待 AI 自查完成后即可提交"
+   : selfCheckRecovering && canSubmit ? "正在恢复自查状态…"
+   : submitting ? "正在提交…"
    : ["SUBMITTED", "IN_REVIEW"].includes(submissionStatus ?? "") ? "已提交，等待审核"
    : submissionStatus === "NEEDS_REVISION" ? "待修改，请点击重新修改"
    : submissionStatus === "COMPLETED" ? "审核已通过"
@@ -61,7 +63,7 @@ function ExperienceScreen() {
  const openedMaterials: Record<string, boolean> = Object.fromEntries(experience?.materials.map((item, index) => [`${executionTasks[taskIndex]?.id}-material-${index + 1}`, materialCompleted(item)]) ?? []);
  const task = executionTasks[taskIndex];
  const updateExecutionRecord = (value: string) => {
-   setRecord(value);
+   updateRecord(value);
    setChecked(false);
  };
  useLayoutEffect(() => {
@@ -152,7 +154,7 @@ function ExperienceScreen() {
  }
  if (action === "revise-proof" || action === "cancel-revision") {
    const command = action === "revise-proof" ? "start_evidence_revision" : "cancel_evidence_revision";
-   if (!experience?.allowedCommands.includes(command) || revisionInFlight.current || submissionInFlight.current) return;
+   if (!experience?.allowedCommands.includes(command) || revisionInFlight.current || submissionInFlight.current || selfCheckInFlight.current) return;
    if (action === "cancel-revision" && !window.confirm("取消本次修改？未提交的修改将被放弃，任务恢复到修改前的审核结果，历史提交会保留。")) return;
    revisionInFlight.current = true;
    setRevisionBusy(true);
@@ -172,7 +174,7 @@ function ExperienceScreen() {
    return;
  }
  if (action === "review-proof") {
-   if (submissionInFlight.current || !canSubmit) return;
+   if (submissionInFlight.current || selfCheckInFlight.current || revisionInFlight.current || !canSubmit) return;
    if (effectiveCharacterCount(record) < 40 || effectiveCharacterCount(record) > 8000) { setNotice("请填写 40–8000 个有效字符的学习记录或答案链接"); return; }
    if (taskStatus(taskIndex) === "locked") { setNotice("需要提交上一任务"); return; }
    const data = assignmentForm("submit");
@@ -232,21 +234,24 @@ function ExperienceScreen() {
    return;
  }
  if (action === "execution-check") {
-   if (!experience) return;
-   if (record.trim().length < 10 || record.length > 8000) setNotice("请填写 10–8000 个有效字符");
-   else {
-     const result = "本地格式自查完成，请复核内容与链接访问权限。尚未连接 AI 服务。";
-     try {
-       const records = saveSelfCheck(window.localStorage,
-         selfCheckHistoryKey(experience.assignmentId, experience.taskVersion),
-         { id: crypto.randomUUID(), createdAt: new Date().toISOString(), body: record, result });
-       setHistoryRecords(records);
-       setHistoryError("");
-       setChecked(true);
-       setNotice(`${result} 已保存至历史 AI 自查记录。`);
-     } catch {
-       setNotice("本地格式自查已完成，但历史记录保存失败。请检查浏览器存储权限或空间后重试。");
+   if (!experience || selfCheckInFlight.current || submissionInFlight.current || revisionInFlight.current) return;
+   if (!record.trim() || record.length > 2000) { setNotice("请输入一个有效飞书文档链接。"); return; }
+   beginSelfCheck();
+   setNotice("正在读取飞书文档并进行 AI 自查，请稍候…");
+   try {
+     const result = await runAiSelfCheck(experience.assignmentId, record.trim(), canSubmit ? experience.revision : undefined, crypto.randomUUID());
+     setHistoryError(result.error ?? "");
+     setHistoryRecords(result.records ?? []);
+     if (result.record) {
+       setChecked(result.record.status === "COMPLETED");
      }
+     setHistoryOpen(true);
+   } catch {
+     setHistoryError("暂未确认自查结果，请查看历史记录，避免重复操作。");
+     setHistoryOpen(true);
+   } finally {
+     finishSelfCheck();
+     setNotice("");
    }
    return;
  }
@@ -255,10 +260,12 @@ function ExperienceScreen() {
    setHistoryRecords([]);
    setHistoryError("");
    try {
-     setHistoryRecords(readSelfCheckHistory(window.localStorage,
-       selfCheckHistoryKey(experience.assignmentId, experience.taskVersion)));
+     const response = await fetch(`/api/learner/tasks/${experience.assignmentId}/self-checks`, { cache: "no-store" });
+     const result = await response.json() as { records?: AISelfCheckRecord[]; error?: string };
+     setHistoryRecords(result.records ?? []);
+     setHistoryError(result.error ?? "");
    } catch {
-     setHistoryError("历史记录读取失败，请检查浏览器存储权限后重试。原有记录未被覆盖。");
+     setHistoryError("历史记录读取失败，请检查网络后重试。");
    }
    button.focus();
    setHistoryOpen(true);
@@ -277,7 +284,7 @@ function ExperienceScreen() {
  else if (text.includes("点击提交")) navigate("view");
  else if (text.includes("打开材料")) setNotice("设计稿未提供材料正文，请接入实际材料链接后阅读。");
  else if (text.includes("保存草稿")) { const data = assignmentForm("draft"); if (data) { const result = await saveSubmissionDraft({}, data); setNotice(result.error ?? "草稿已保存"); } }
- else if (text.includes("开始 AI 自查")) { const minimum = executing ? 10 : 40; if (record.trim().length < minimum) setNotice(`请先填写至少 ${minimum} 个有效字符`); else { setChecked(true); setNotice("本地自查完成：请确认记录包含问题、答案来源和下一步行动。尚未连接 AI 服务。"); } }
+ else if (text.includes("开始 AI 自查")) setNotice("请登录后在自己的任务中使用 AI 自查。");
  else if (["方向很多", "有判断", "遇到不确定", "知道很多"].some(word => text.includes(word))) {
    const value = button.dataset.nodeId || "";
    setChoice(value);
@@ -304,12 +311,12 @@ function ExperienceScreen() {
  {screen === "dashboard" && <Dashboard submitted={submitted} identity={identity} />}
  {screen === "tasks" && <Tasks />}
  {screen === "detail" && (executing ? <ExecutionDetail task={task} openedMaterials={[Boolean(openedMaterials[`${task.id}-material-1`]), Boolean(openedMaterials[`${task.id}-material-2`])]} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} /> : <Detail />)}
- {screen === "view" && <ExecutionView task={task} record={record} setRecord={updateExecutionRecord} readOnly={!canSubmit} revisionBusy={revisionBusy} canRevise={!submitting && experience?.allowedCommands.includes("start_evidence_revision")} canCancelRevision={!submitting && experience?.allowedCommands.includes("cancel_evidence_revision")} submitting={submitting} submitDisabled={submitting || revisionBusy || !canSubmit} submitLabel={submitLabel} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} />}
+ {screen === "view" && <ExecutionView selfCheckRecovering={selfCheckRecovering} selfCheckBusy={selfCheckBusy} task={task} record={record} setRecord={updateExecutionRecord} readOnly={!canSubmit} revisionBusy={revisionBusy} canRevise={!submitting && experience?.allowedCommands.includes("start_evidence_revision")} canCancelRevision={!submitting && experience?.allowedCommands.includes("cancel_evidence_revision")} submitting={submitting} submitDisabled={selfCheckRecovering || selfCheckBusy || submitting || revisionBusy || !canSubmit} submitLabel={submitLabel} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} />}
  </div>
  {historyOpen && task && <SelfCheckHistoryDialog title={task.title} records={historyRecords} error={historyError} onClose={() => setHistoryOpen(false)} />}
  {selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position - 1]?.title ?? selectedFeedback.title} onClose={() => setFeedbackAssignmentId(null)} />}
  {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={() => setBurst(null)} />}
- {notice && <div role="status" className="fixed bottom-6 left-1/2 z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-cyan-300 bg-[#041a35]/95 px-6 py-3 text-center text-sm text-cyan-100 shadow-lg">{notice}</div>}
+ {(notice || ((screen === "view" || screen === "detail") && workspaceMessage)) && <div role="status" className="fixed bottom-6 left-1/2 z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-cyan-300 bg-[#041a35]/95 px-6 py-3 text-center text-sm text-cyan-100 shadow-lg">{notice || workspaceMessage}</div>}
  </main>;
 }
 
