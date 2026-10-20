@@ -16,9 +16,9 @@ from journey_api.config import Settings, get_settings
 from journey_api.db import SessionLocal
 from journey_api.errors import ApiError
 from journey_api.main import app
-from journey_api.models import AISelfCheck, Assignment, AssignmentStatus, Enrollment
-from test_phone_password_flow import password_provider, register
-from test_learner_feishu_login import learner_provider
+from journey_api.models import AISelfCheck, Assignment, AssignmentStatus, Enrollment, Organization, User, Role, RoleAssignment
+from journey_api.journey_service import publish_catalog_journey
+from test_phone_password_flow import register
 from test_wp09_feishu_identity import oauth_provider, assert_ok
 
 
@@ -167,7 +167,26 @@ class Reviewer:
 
 
 @pytest.fixture
-def integration(password_provider, monkeypatch):
+def integration(oauth_provider, monkeypatch):
+    # Keep the seeded organization's unpublished catalog intact for the
+    # formal-journey publication suite. Each AI scenario owns its tenant.
+    organization_id, operator_id, reviewer_id = (uuid.uuid4() for _ in range(3))
+    with SessionLocal.begin() as session:
+        session.add(Organization(id=organization_id, name="AI scenario"))
+        session.flush()
+        for user_id, role in [(operator_id, Role.OPERATOR), (reviewer_id, Role.REVIEWER)]:
+            session.add(User(id=user_id, organization_id=organization_id, display_name=role.value))
+        session.flush()
+        for user_id, role in [(operator_id, Role.OPERATOR), (reviewer_id, Role.REVIEWER)]:
+            session.add(RoleAssignment(id=uuid.uuid4(), organization_id=organization_id,
+                                       user_id=user_id, role=role))
+        session.flush()
+        publish_catalog_journey(session, operator_id=operator_id, reviewer_id=reviewer_id,
+                                organization_id=organization_id, expected_current_version=0)
+    monkeypatch.setenv("PASSWORD_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("FEISHU_LEARNER_REGISTRATION_ENABLED", "true")
+    monkeypatch.setenv("FEISHU_LEARNER_ORGANIZATION_ID", str(organization_id))
+    monkeypatch.setenv("FEISHU_LEARNER_REVIEWER_ID", str(reviewer_id))
     monkeypatch.setenv("AI_SELF_CHECK_ENABLED", "true")
     monkeypatch.setenv("AI_BASE_URL", "https://configured-provider.example/v1")
     monkeypatch.setenv("AI_API_KEY", "fake-test-key")

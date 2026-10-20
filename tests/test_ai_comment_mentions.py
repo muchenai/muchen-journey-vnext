@@ -5,8 +5,6 @@ from journey_api.ai_self_check_clients import Document, FeishuDocuments, HumanRe
 from journey_api.config import get_settings
 from journey_api.errors import ApiError
 from test_ai_self_check import integration, run
-from test_phone_password_flow import password_provider
-from test_learner_feishu_login import learner_provider
 from test_wp09_feishu_identity import assert_ok, oauth_provider
 
 
