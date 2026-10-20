@@ -221,6 +221,7 @@ def create_submission(
     reviewer_id: uuid.UUID = REVIEWER_ID,
     *,
     ai_use: dict[str, object] | None = None,
+    body: str | None = None,
 ):
     operator = client_for(f"operator-{label}")
     invite = assert_ok(
@@ -278,7 +279,7 @@ def create_submission(
             },
             json={
                 "expected_revision": started["revision"],
-                "body": submission_body(label),
+                "body": body if body is not None else submission_body(label),
                 "attachment_ids": [],
                 **({"ai_use": ai_use} if ai_use is not None else {}),
             },

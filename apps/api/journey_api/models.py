@@ -1077,6 +1077,34 @@ class Assignment(Base):
     )
 
 
+class AISelfCheck(Base):
+    __tablename__ = "ai_self_checks"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "document_token", name="uq_ai_self_check_document"),
+        CheckConstraint("status IN ('RUNNING','SENDING','COMPLETED','FAILED','UNCERTAIN')", name="ck_ai_self_check_status"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"))
+    learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assignments.id"), index=True)
+    document_token: Mapped[str] = mapped_column(String(100))
+    document_url: Mapped[str] = mapped_column(Text)
+    document_revision: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    status: Mapped[str] = mapped_column(String(20))
+    attempt_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    model: Mapped[str] = mapped_column(String(160))
+    rule_version: Mapped[str] = mapped_column(String(80))
+    input_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    result: Mapped[str] = mapped_column(Text, default="", server_default="")
+    error_message: Mapped[str] = mapped_column(Text, default="", server_default="")
+    comment_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    comment_reply_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    document_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    archived_results: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Submission(Base):
     __tablename__ = "submissions"
     __table_args__ = (

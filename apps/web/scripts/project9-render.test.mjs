@@ -37,6 +37,7 @@ const { default: App, Login } = load(path.join(root, "app/project9/App.tsx"));
 const { JourneyProvider } = load(path.join(root, "app/project9/journey-context.tsx"));
 const { TaskCards, ExecutionDetail, executionTasks } = load(path.join(root, "app/project9/ExecutionPages.tsx"));
 const { TaskFeedbackDialog } = load(path.join(root, "app/project9/TaskFeedbackDialog.tsx"));
+const { SelfCheckHistoryDialog } = load(path.join(root, "app/project9/SelfCheckHistoryDialog.tsx"));
 const experience = (overrides = {}) => ({
   assignmentId: "a1", status: "IN_PROGRESS", revision: 1, taskVersion: 1,
   title: "Day 1", purpose: "学习", shortDescription: "学习", learnerOutcome: "记录",
@@ -51,6 +52,19 @@ const experience = (overrides = {}) => ({
   })), ...overrides,
 });
 const render = (props = {}) => renderToStaticMarkup(React.createElement(App, { initialScreen: "dashboard", learnerName: "测试同学", experience: experience(), ...props }));
+test("self-check history displays old and new entries even when the latest action fails", () => {
+  const html = renderToStaticMarkup(React.createElement(SelfCheckHistoryDialog, {
+    title: "测评三", error: "本轮自查失败", onClose() {},
+    records: [
+      { id: "new", createdAt: "2026-10-20T04:00:00Z", result: "本轮失败原因", status: "FAILED", body: "新链接" },
+      { id: "old", createdAt: "2026-10-19T04:00:00Z", result: "先前保存的成功评价", status: "COMPLETED", body: "旧链接" },
+    ],
+  }));
+  assert.match(html, /本轮自查失败/);
+  assert.match(html, /先前保存的成功评价/);
+  assert.match(html, /第 2 次自查/);
+  assert.match(html, /第 1 次自查/);
+});
 const inside = (element, data = experience()) => renderToStaticMarkup(React.createElement(JourneyProvider, { value: { learnerName: "测试同学", experience: data } }, element));
 const renderLogin = (joinError = "") => renderToStaticMarkup(React.createElement(JourneyProvider, {
   value: {

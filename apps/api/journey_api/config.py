@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -64,6 +65,51 @@ class Settings(BaseSettings):
     phone_otp_ttl_minutes: int = 5
     phone_otp_resend_cooldown_seconds: int = 60
     password_login_enabled: bool = False
+    ai_self_check_enabled: bool = False
+    # Verify the current human owner before the one-shot title comment.
+    ai_comment_mention_owner: bool = False
+    ai_base_url: str = ""
+    ai_api_key: str = Field(default="", repr=False)
+    ai_api_key_file: str = ""
+    ai_model: str = "deepseek-v4-pro"
+    ai_feishu_app_id: str = ""
+    ai_feishu_app_secret: str = Field(default="", repr=False)
+    ai_feishu_app_secret_file: str = ""
+
+    @model_validator(mode="after")
+    def validate_ai(self) -> "Settings":
+        for value_field in ("ai_api_key", "ai_feishu_app_secret"):
+            filename = getattr(self, value_field + "_file")
+            if not filename:
+                continue
+            if getattr(self, value_field):
+                raise ValueError("Configure an AI secret value or file, not both")
+            path = Path(filename)
+            try:
+                if not path.is_absolute() or not path.is_file() or path.is_symlink():
+                    raise ValueError("AI secret file must be an absolute regular file")
+                if path.stat().st_size > 4096:
+                    raise ValueError("AI secret file is too large")
+                value = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                raise ValueError("AI secret file is unavailable") from None
+            if not value or any(char.isspace() for char in value):
+                raise ValueError("AI secret file must contain one nonempty credential")
+            setattr(self, value_field, value)
+        if bool(self.ai_feishu_app_id) != bool(self.ai_feishu_app_secret):
+            raise ValueError("AI Feishu app ID and secret must be configured together")
+        if self.ai_self_check_enabled:
+            if self.app_env in {"production", "staging"}:
+                if (not self.ai_api_key_file or not self.ai_feishu_app_secret_file
+                        or not self.ai_feishu_app_id or not self.ai_comment_mention_owner):
+                    raise ValueError("Production AI requires mounted secrets, a dedicated document app and owner mentions")
+            endpoint = urlsplit(self.ai_base_url)
+            if (endpoint.scheme != "https" or not endpoint.hostname or endpoint.username
+                    or endpoint.password or endpoint.query or endpoint.fragment
+                    or not self.ai_api_key or not self.ai_model):
+                raise ValueError("AI configuration requires an HTTPS endpoint, key and model")
+        return self
+
     volcengine_sms_access_key_id: str = ""
     volcengine_sms_secret_access_key: str = ""
     volcengine_sms_account: str = ""

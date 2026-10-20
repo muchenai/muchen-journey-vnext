@@ -1,0 +1,130 @@
+name: AI Self-check Schema and Application Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed operations commit
+        type: string
+        required: true
+      package_run:
+        description: Successful Mainline Candidate Gate run for this exact commit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Read the reviewed build pin
+        id: pin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re,urllib.request
+          p={'candidate':os.environ['GITHUB_SHA'],'package_run_id':os.environ['PACKAGE_RUN']}
+          assert re.fullmatch('[0-9]+',p['package_run_id'])
+          assert re.fullmatch('[0-9a-f]{40}',p['candidate'])
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+p['package_run_id']
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response:
+            run=json.load(response)
+          assert run['status']=='completed' and run['conclusion']=='success'
+          assert run['head_sha']==p['candidate'] and run['head_branch']=='main' and run['event']=='push'
+          assert run['name']=='Mainline Candidate Gate'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+            f.write('run='+p['package_run_id']+'\ncandidate='+p['candidate']+'\n')
+          PY
+      - name: Download the successful pinned application build
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: wp07-candidate-${{ steps.pin.outputs.candidate }}
+          run-id: ${{ steps.pin.outputs.run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/application-build
+      - name: Validate candidate binding, SBOMs and image archives
+        env:
+          BUILD_DIR: ${{ runner.temp }}/application-build
+          PACKAGE_DIR: ${{ runner.temp }}/offline-package
+          CANDIDATE: ${{ steps.pin.outputs.candidate }}
+          PACKAGE_RUN: ${{ steps.pin.outputs.run }}
+        run: python3 deploy/ai-self-check/package.py
+      - name: Identify temporary runner ingress
+        id: runner
+        run: |
+          set -euo pipefail
+          cidr="$(curl -fsS --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress,sys
+          n=ipaddress.ip_network(sys.argv[1],strict=True)
+          assert n.version==4 and n.prefixlen==32 and n.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only the temporary runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Transfer verified images, prove backup, migrate and activate Journey
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          JOURNEY_HOST: ${{ secrets.TALENT_HOST }}
+          MIGRATION_PASSWORD: ${{ secrets.WP08_MIGRATION_DB_PASSWORD }}
+          BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_FEISHU_APP_SECRET: ${{ secrets.AI_FEISHU_APP_SECRET }}
+          PACKAGE_DIR: ${{ runner.temp }}/offline-package
+        run: |
+          set -euo pipefail
+          umask 077
+          export SSH_KEY="$RUNNER_TEMP/journey-activation-key"
+          export SSH_KNOWN="$RUNNER_TEMP/journey-activation-known"
+          export ACTIVATION_PAYLOAD="$RUNNER_TEMP/journey-activation-payload.json"
+          export REMOTE_PACKAGE="/srv/journey-next-production/canary/exploration-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-activate"
+          trap 'rm -f "$SSH_KEY" "$SSH_KNOWN" "$ACTIVATION_PAYLOAD"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$SSH_KEY"
+          python3 - <<'PY'
+          import json,os,pathlib
+          pathlib.Path(os.environ['ACTIVATION_PAYLOAD']).write_text(json.dumps({
+            'migration_password':os.environ['MIGRATION_PASSWORD'],'backup_key':os.environ['BACKUP_KEY'],
+            'ai_api_key':os.environ['AI_API_KEY'],'ai_feishu_app_secret':os.environ['AI_FEISHU_APP_SECRET']}))
+          PY
+          opts=(-i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_KNOWN")
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$REMOTE_PACKAGE' && install -d -m 0700 '$REMOTE_PACKAGE'"
+          python3 deploy/exploration-release/transfer_package.py | tee "$RUNNER_TEMP/journey-activation.txt"
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "cd '$REMOTE_PACKAGE' && sha256sum -c SHA256SUMS && python3 activate.py" < "$ACTIVATION_PAYLOAD" | tee -a "$RUNNER_TEMP/journey-activation.txt"
+      - name: Close and verify the exact runner SSH rule
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Preserve safe activation progress on success or failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-activation-${{ github.run_id }}
+          path: ${{ runner.temp }}/journey-activation.txt
+          retention-days: 7

@@ -1551,6 +1551,18 @@ class AiAdvisoryRecordOut(StrictModel):
     advisory_only: Literal[True] = True
 
 
+class ReviewDocumentAiCheckOut(StrictModel):
+    document_url: str
+    status: Literal["NOT_FOUND", "RUNNING", "SENDING", "UNCERTAIN", "FAILED", "COMPLETED"]
+    record_id: UUID | None = None
+    result: str | None = None
+    generated_at: datetime | None = None
+    model: str | None = None
+    document_revision: str | None = None
+    comment_id: str | None = None
+    history: list["ReviewDocumentAiCheckOut"] = Field(default_factory=list)
+
+
 class ReviewDetailOut(ReviewQueueItemOut):
     submission_body: str
     submission_ai_use: AiUseDisclosure
@@ -1563,6 +1575,7 @@ class ReviewDetailOut(ReviewQueueItemOut):
     evaluation: EvaluationOut | None
     coaching_feedback: CoachingFeedbackOut | None = None
     ai_advisory: AiAdvisoryRecordOut | None = None
+    document_ai_checks: list[ReviewDocumentAiCheckOut] = Field(default_factory=list)
     submission_history: list[SubmissionVersionOut] = Field(default_factory=list)
 
 

@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import create_engine, delete, func
+from sqlalchemy import create_engine, delete, func, or_, and_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
@@ -16,7 +16,8 @@ from journey_api.errors import ApiError
 from journey_api.identity import credential_hash
 from journey_api.models import AuthRateLimit
 
-POLICIES = {"draft": ((10, 20), (60, 90)), "submit": ((10, 5), (60, 20))}
+POLICIES = {"draft": ((10, 20), (60, 90)), "submit": ((10, 5), (60, 20)),
+            "ai": ((60, 3), (3600, 20))}
 SCOPES = tuple(f"learner.write.{kind}.{seconds}" for kind, windows in POLICIES.items()
                for seconds, _limit in windows)
 # Auth dependencies already hold a business connection. A separate bounded pool
@@ -32,7 +33,7 @@ def database_now(counter) -> datetime:
     return counter.scalar(func.clock_timestamp())
 
 
-def enforce_learner_write_limit(actor: Actor, kind: Literal["draft", "submit"]) -> None:
+def enforce_learner_write_limit(actor: Actor, kind: Literal["draft", "submit", "ai"]) -> None:
     subject = credential_hash(
         get_settings().session_secret, "learner-write-limit",
         f"{actor.organization_id}:{actor.id}",
@@ -61,7 +62,11 @@ def enforce_learner_write_limit(actor: Actor, kind: Literal["draft", "submit"]) 
             counter.execute(delete(AuthRateLimit).where(
                 AuthRateLimit.subject_hash == subject,
                 AuthRateLimit.scope.in_(SCOPES),
-                AuthRateLimit.window_started_at < now - timedelta(minutes=10),
+                or_(
+                    AuthRateLimit.window_started_at < now - timedelta(hours=2),
+                    and_(~AuthRateLimit.scope.like("learner.write.ai.%"),
+                         AuthRateLimit.window_started_at < now - timedelta(minutes=10)),
+                ),
             ))
     except SQLAlchemyError as exc:
         raise ApiError(
@@ -71,6 +76,7 @@ def enforce_learner_write_limit(actor: Actor, kind: Literal["draft", "submit"]) 
     if waits:
         raise ApiError(
             429, "RATE_LIMITED",
-            "保存过于频繁，请稍后重试。" if kind == "draft" else "提交过于频繁，请稍后重试。",
+            {"draft": "保存过于频繁，请稍后重试。", "submit": "提交过于频繁，请稍后重试。",
+             "ai": "AI 自查请求过于频繁，请稍后重试。"}[kind],
             details={"retry_after_seconds": max(waits)}, retryable=True,
         )

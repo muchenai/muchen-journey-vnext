@@ -36,8 +36,9 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0035_phone_password_login"
-PHONE_LOGIN_BASE_REVISION = "0032_shared_learner_review"
+EXPECTED_MIGRATION_HEAD = "0037_ai_self_check_revisions"
+AI_BASE_REVISION = "0035_phone_password_login"
+AI_TABLES = ("ai_self_checks",)
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 PHONE_LOGIN_TABLES = (
     "phone_otp_challenges",
@@ -49,9 +50,11 @@ ROLLBACK_OWNED_FACT_TABLES = (
     "ai_advisory_records",
     "assignment_bound_reentry_invites",
     *PHONE_LOGIN_TABLES,
+    *AI_TABLES,
 )
 CURRENT_FACT_TABLES = (
     *PHONE_LOGIN_TABLES,
+    *AI_TABLES,
     "organizations",
     "users",
     "role_assignments",
@@ -471,32 +474,32 @@ def migration_check() -> Path:
         require_safe_schema_rollback(before)
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
-            "api", "alembic", "downgrade", PHONE_LOGIN_BASE_REVISION,
+            "api", "alembic", "downgrade", AI_BASE_REVISION,
         )
         baseline_tables = tuple(
-            table for table in CURRENT_FACT_TABLES if table not in PHONE_LOGIN_TABLES
+            table for table in CURRENT_FACT_TABLES if table not in AI_TABLES
         )
         after_downgrade = database_facts(
             "db-test", database, tables=baseline_tables
         )
         before_business = {
             **before,
-            "migration_revision": PHONE_LOGIN_BASE_REVISION,
+            "migration_revision": AI_BASE_REVISION,
             "counts": {
                 table: count
                 for table, count in before["counts"].items()
-                if table not in PHONE_LOGIN_TABLES
+                if table not in AI_TABLES
             },
         }
         if after_downgrade != before_business:
-            raise OpsError("phone login downgrade changed pre-existing business facts")
+            raise OpsError("AI schema downgrade changed pre-existing business facts")
         compose(
             "run", "--rm", "--no-deps", "-e", f"DATABASE_URL={database_url}",
             "api", "alembic", "upgrade", "head",
         )
         reupgraded = database_facts("db-test", database)
         if reupgraded != before:
-            raise OpsError("phone login re-upgrade changed persistent business facts")
+            raise OpsError("AI schema re-upgrade changed persistent business facts")
         directory = make_run_directory()
         report = directory / "persistent-migration-report.json"
         write_private_json(
@@ -505,8 +508,8 @@ def migration_check() -> Path:
                     "schema_version": 1,
                     "completed_at": utc_now().isoformat(),
                     "scope": "ISOLATED_LOCAL_PERSISTENT_DRILL",
-                    "upgrade_0032_to_0035": "PASS",
-                    "downgrade_0035_to_0032": "PASS",
+                    "upgrade_0035_to_0037": "PASS",
+                    "downgrade_0037_to_0035": "PASS",
                     "reupgrade_to_head": "PASS",
                     "production_release_range_rehearsed": True,
                     "business_facts_preserved": True,

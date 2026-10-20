@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { SelfCheckRecord } from "./self-check-history";
+import type { AISelfCheckRecord } from "../actions";
 
 export function SelfCheckHistoryDialog({ title, records, error, onClose }: {
   title: string;
-  records: SelfCheckRecord[];
+  records: AISelfCheckRecord[];
   error: string;
   onClose: () => void;
 }) {
@@ -29,21 +29,22 @@ export function SelfCheckHistoryDialog({ title, records, error, onClose }: {
       <div><h2 id="self-check-history-title">历史 AI 自查记录</h2><p>{title}</p></div>
       <button type="button" autoFocus onClick={onClose}>关闭</button>
     </header>
-    <p className="self-check-history-notice">本地格式自查 · 尚未连接 AI 服务，不包含真实 AI 评分。</p>
-    {error ? <p className="self-check-history-error" role="alert">{error}</p>
-      : records.length === 0 ? <div className="self-check-history-empty">
+    <p className="self-check-history-notice">AI 自查只提供评价和建议，不计分、不代替人工审核。修改文档后可再次自查，最新评价更新至原标题评论，历次评价保留在此处。</p>
+    {error && <p className="self-check-history-error" role="alert">{error}</p>}
+    {records.length === 0 ? !error && <div className="self-check-history-empty">
         <strong>暂无自查记录</strong>
-        <p>填写学习记录后，点击「开始 AI 自查」，结果会保存在这里。</p>
+        <p>填写自己的飞书答题文档链接后，点击「开始 AI 自查」。</p>
       </div> : <ol className="self-check-history-list">
         {records.map((entry, index) => <li key={entry.id}>
           <div className="self-check-history-meta"><strong>第 {records.length - index} 次自查</strong>
             <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString("zh-CN", { hour12: false })}</time></div>
-          <p>{entry.result}</p>
-          <details><summary>查看本次学习记录（{entry.body.trim().length} 个有效字符）</summary><p>{entry.body}</p></details>
+          <p>{entry.status === "COMPLETED" ? "已完成自查；飞书标题评论展示最近一次成功评价" : "自查状态待处理"}{entry.documentRevision ? ` · 文档版本 ${entry.documentRevision}` : ""}</p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{entry.result}</p>
+          <details><summary>查看本次文档链接</summary><p>{entry.body}</p></details>
         </li>)}
       </ol>}
-    <footer>{error ? "记录读取失败" : `共 ${records.length} 条记录`} · 仅显示当前身份、当前任务的自查记录
-      <span>记录保存在当前浏览器，清除浏览器数据后将无法找回。</span>
+    <footer>{error ? "本次操作未完成，原因见上方提示" : `共 ${records.length} 条记录`} · 仅显示当前身份、当前任务的自查记录
+      <span>记录保存在服务器，刷新页面或更换浏览器后仍可查看。</span>
     </footer>
   </dialog>;
 }

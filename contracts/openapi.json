@@ -725,6 +725,122 @@
         }
       }
     },
+    "/api/v1/me/assignments/{assignment_id}/ai-self-checks": {
+      "get": {
+        "summary": "History",
+        "operationId": "history_api_v1_me_assignments__assignment_id__ai_self_checks_get",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Self Check",
+        "operationId": "self_check_api_v1_me_assignments__assignment_id__ai_self_checks_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfCheckCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/attachments/presign": {
       "post": {
         "summary": "Presign Attachment",
@@ -13854,6 +13970,13 @@
               }
             ]
           },
+          "document_ai_checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewDocumentAiCheckOut"
+            },
+            "type": "array",
+            "title": "Document Ai Checks"
+          },
           "submission_history": {
             "items": {
               "$ref": "#/components/schemas/SubmissionVersionOut"
@@ -13915,6 +14038,108 @@
           "request_id"
         ],
         "title": "ReviewDetailResponse"
+      },
+      "ReviewDocumentAiCheckOut": {
+        "properties": {
+          "document_url": {
+            "type": "string",
+            "title": "Document Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND",
+              "RUNNING",
+              "SENDING",
+              "UNCERTAIN",
+              "FAILED",
+              "COMPLETED"
+            ],
+            "title": "Status"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "document_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Revision"
+          },
+          "comment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment Id"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewDocumentAiCheckOut"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_url",
+          "status"
+        ],
+        "title": "ReviewDocumentAiCheckOut"
       },
       "ReviewHistoryItemOut": {
         "properties": {
@@ -15205,6 +15430,34 @@
           "expected_revision"
         ],
         "title": "SaveSubmissionDraftCommand"
+      },
+      "SelfCheckCommand": {
+        "properties": {
+          "document_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Document Url"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_url"
+        ],
+        "title": "SelfCheckCommand"
       },
       "SessionLogoutOut": {
         "properties": {

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
 from journey_api.reviewer_access import review_visibility
+from journey_api.review_ai_self_checks import review_document_ai_checks
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.formal_assignment_workflow import (
@@ -733,6 +734,7 @@ def review_detail(
                 else None
             ),
             submission_history=submission_out(session, context.submission).versions,
+            document_ai_checks=review_document_ai_checks(session, context),
         ),
     )
 

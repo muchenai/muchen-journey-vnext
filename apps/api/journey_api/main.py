@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from journey_api.config import get_settings
+from journey_api.ai_self_check_routes import router as ai_self_check_router
 from journey_api.content_routes import router as content_router
 from journey_api.controlled_task_routes import router as controlled_task_router
 from journey_api.construction_module_routes import router as construction_module_router
@@ -114,6 +115,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 
 app.include_router(router)
+app.include_router(ai_self_check_router)
 app.include_router(submission_router)
 app.include_router(identity_router)
 app.include_router(next_stage_review_router)

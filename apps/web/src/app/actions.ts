@@ -26,6 +26,51 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
 
+export type AISelfCheckRecord = {
+  id: string;
+  createdAt: string;
+  body: string;
+  result: string;
+  status: "RUNNING" | "SENDING" | "COMPLETED" | "FAILED" | "UNCERTAIN";
+  commentId: string | null;
+  documentRevision?: string;
+};
+
+export async function runAiSelfCheck(assignmentId: string, documentUrl: string, draftRevision?: number, requestId?: string): Promise<{ record?: AISelfCheckRecord; records?: AISelfCheckRecord[]; error?: string }> {
+  if (!UUID_PATTERN.test(assignmentId)) return { error: "任务标识无效，请刷新页面。" };
+  if (!requestId || !UUID_PATTERN.test(requestId)) return { error: "自查请求标识无效，请刷新页面后重试。" };
+  try {
+    // Persist the submitted link before the long-running request. This executes
+    // on the server even if the learner leaves the page while AI is working.
+    if (draftRevision !== undefined) {
+      if (!Number.isSafeInteger(draftRevision) || draftRevision < 1) return { error: "任务版本无效，请刷新页面。" };
+      await apiRequest(`/api/v1/me/assignments/${assignmentId}/draft`, "LEARNER", {
+        method: "PUT", headers: { "Idempotency-Key": randomUUID() },
+        body: JSON.stringify({ expected_revision: draftRevision, body: documentUrl, attachment_ids: [] }),
+      });
+    }
+    const record = await apiRequest<AISelfCheckRecord>(`/api/v1/me/assignments/${assignmentId}/ai-self-checks`, "LEARNER", {
+      method: "POST", body: JSON.stringify({ document_url: documentUrl, request_id: requestId }),
+    });
+    const history = await loadAiSelfChecks(assignmentId);
+    return { record, records: history.records,
+      error: history.error ? "自查请求已处理，但完整历史读取失败，请重新打开历史记录。" : undefined };
+  } catch (error) {
+    const history = await loadAiSelfChecks(assignmentId);
+    return { records: history.records,
+      error: error instanceof ApiRequestError ? error.message : "暂未确认自查结果，请查看历史记录后再试。" };
+  }
+}
+
+export async function loadAiSelfChecks(assignmentId: string): Promise<{ records?: AISelfCheckRecord[]; error?: string }> {
+  if (!UUID_PATTERN.test(assignmentId)) return { error: "任务标识无效，请刷新页面。" };
+  try {
+    return { records: await apiRequest<AISelfCheckRecord[]>(`/api/v1/me/assignments/${assignmentId}/ai-self-checks`, "LEARNER") };
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "历史记录读取失败，请稍后重试。" };
+  }
+}
+
 function requiredUuid(data: FormData, key: string): string {
   const value = data.get(key);
   if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
