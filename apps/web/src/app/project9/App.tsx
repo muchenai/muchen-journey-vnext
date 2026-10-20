@@ -12,7 +12,7 @@ import { useWorkspaceRecovery } from "./useWorkspaceRecovery";
 import { runAiSelfCheck, type AISelfCheckRecord } from "../actions";
 import { JourneyProvider, useJourney, useTaskStatus, type JourneyContextValue } from "./journey-context";
 import { ProjectResourceLoader } from "./ProjectResourceLoader";
-import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment, loginWithPassword, migrateCompletionCode } from "../actions";
+import { recordOpenedLearningMaterial, confirmIdentity, exchangeInvite, saveSubmissionDraft, startAssignment, startEvidenceRevision, cancelEvidenceRevision, submitAssignment, loginWithPassword, registerWithPassword, resetPhonePassword, requestPhoneCode, migrateCompletionCode } from "../actions";
  type Screen = "login" | "welcome" | "dashboard" | "tasks" | "detail" | "view";
 type PreviewIdentity = string;
 export default function App(props: Partial<JourneyContextValue>) {
@@ -331,15 +331,54 @@ export function Login() {
   const [scale, setScale] = useState<number | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [loginMode, setLoginMode] = useState<'feishu' | 'password'>('feishu')
+  const [loginMode, setLoginMode] = useState<'feishu' | 'password'>('password')
+  const [phoneMode, setPhoneMode] = useState<'login' | 'register' | 'reset'>('login')
   const [passwordPhone, setPasswordPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [smsCode, setSmsCode] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [smsCountdown, setSmsCountdown] = useState(0)
+  const phoneRequestInFlight = useRef(false)
   const [graduationCode, setGraduationCode] = useState('')
   const graduationCodeRef = useRef('')
   const [message, setMessage] = useState(joinError)
   const [isLaunched, setIsLaunched] = useState(false)
   const [countdown, setCountdown] = useState(10)
   const launchStarted = useRef(false)
+  useEffect(() => {
+    if (smsCountdown <= 0) return;
+    const timer = window.setTimeout(() => setSmsCountdown(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [smsCountdown]);
+  const switchPhoneMode = (mode: 'login' | 'register' | 'reset') => {
+    if (phoneRequestInFlight.current) return;
+    setPhoneMode(mode);
+    setPassword('');
+    setConfirmPassword('');
+    setSmsCode('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setMessage('');
+  };
+  const sendCode = async () => {
+    if (phoneRequestInFlight.current || smsCountdown > 0 || phoneMode === 'login') return;
+    if (!/^1[3-9]\d{9}$/.test(passwordPhone)) { setMessage('请输入正确的手机号'); return; }
+    phoneRequestInFlight.current = true;
+    setSendingCode(true);
+    try {
+      const result = await requestPhoneCode(passwordPhone, phoneMode);
+      setMessage(result.error ?? result.message ?? '');
+      if (result.ok) setSmsCountdown(result.retryAfterSeconds ?? 60);
+    } catch {
+      setMessage('暂未确认短信发送结果，请稍后再试。');
+    } finally {
+      phoneRequestInFlight.current = false;
+      setSendingCode(false);
+    }
+  };
   useEffect(() => {
     if (joinPhase !== 'feishu' || loginMode !== 'feishu' || joinError || !isFeishuClient(navigator.userAgent)) return;
     let active = true;
@@ -397,13 +436,36 @@ export function Login() {
       return;
     }
     if (joinPhase === 'feishu' && loginMode === 'password') {
+      if (phoneRequestInFlight.current) return;
       if (!/^1[3-9]\d{9}$/.test(passwordPhone)) { setMessage('请输入正确的手机号'); return; }
       if (password.length < 6 || password.length > 11 || /\s/.test(password)) { setMessage('密码需为 6–11 个字符，且不能包含空格'); return; }
-      if (isLaunched) return;
+      if (phoneMode !== 'login' && !/^\d{6}$/.test(smsCode)) { setMessage('请输入收到的 6 位短信验证码'); return; }
+      if (phoneMode !== 'login' && password !== confirmPassword) { setMessage('两次输入的密码不一致，请重新确认'); return; }
+      phoneRequestInFlight.current = true;
       setIsLaunched(true);
-      setMessage('正在验证你的探索身份…');
-      const result = await loginWithPassword(passwordPhone, password);
-      if (result?.error) { setMessage(result.error); setIsLaunched(false); }
+      setMessage(phoneMode === 'reset' ? '正在重置密码…' : phoneMode === 'register' ? '正在验证并注册…' : '正在验证你的探索身份…');
+      try {
+        if (phoneMode === 'reset') {
+          const result = await resetPhonePassword(passwordPhone, smsCode, password);
+          if (result.ok) {
+            setPhoneMode('login');
+            setPassword('');
+            setConfirmPassword('');
+            setSmsCode('');
+            setShowPassword(false);
+            setShowConfirmPassword(false);
+          }
+          setMessage(result.error ?? result.message ?? '');
+        } else {
+          const result = phoneMode === 'register'
+            ? await registerWithPassword(passwordPhone, smsCode, password)
+            : await loginWithPassword(passwordPhone, password);
+          if (result?.error) setMessage(result.error);
+        }
+      } finally {
+        phoneRequestInFlight.current = false;
+        setIsLaunched(false);
+      }
       return;
     }
     if (joinPhase === 'invite' && !code.trim()) {
@@ -470,31 +532,49 @@ export function Login() {
           </button>
         </div>
 
-        <form className={`login-panel login-gradient-border ${joinPhase === 'feishu' && loginMode === 'password' ? 'password-login-mode' : ''}`} onSubmit={launch}>
+        <form className={`login-panel login-gradient-border ${joinPhase === 'feishu' && loginMode === 'password' ? 'password-login-mode phone-account-panel' : ''}`} onSubmit={launch}>
           <GradientStroke variant="back" strokeWidth={1} animated={false} />
           <div className="panel-glow" aria-hidden="true" />
           <img className="panel-logo" src={logo} alt="" />
           <p className="panel-title">MUCHEN JOURNEY</p>
           {joinPhase === 'feishu' && <div className="login-method-tabs" role="tablist" aria-label="登录方式">
-            <button type="button" role="tab" aria-selected={loginMode === 'feishu'} className={loginMode === 'feishu' ? 'active' : ''} onClick={() => { setLoginMode('feishu'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5 18 12 7 18.5Z" /></svg>飞书登录</button>
-            <button type="button" role="tab" aria-selected={loginMode === 'password'} className={loginMode === 'password' ? 'active' : ''} onClick={() => { setLoginMode('password'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2" /><path d="M10 17.5h4" /></svg>手机号密码登录</button>
+            <button disabled={isLaunched || sendingCode} type="button" role="tab" aria-selected={loginMode === 'feishu'} className={loginMode === 'feishu' ? 'active' : ''} onClick={() => { setLoginMode('feishu'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5 18 12 7 18.5Z" /></svg>飞书登录</button>
+            <button disabled={isLaunched || sendingCode} type="button" role="tab" aria-selected={loginMode === 'password'} className={loginMode === 'password' ? 'active' : ''} onClick={() => { setLoginMode('password'); setMessage(''); }}><svg className="login-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2" /><path d="M10 17.5h4" /></svg>手机号登录</button>
           </div>}
           {joinPhase === 'feishu' && loginMode === 'feishu' ? <div className="feishu-login-fields"><label className={`graduation-code-field ${graduationCode ? 'filled' : ''}`}>
               <span className="sr-only">探索营毕业码（选填）</span>
               <input value={graduationCode} onChange={(event) => { const value = event.target.value.toUpperCase().slice(0, 20); graduationCodeRef.current = value; setGraduationCode(value); }} placeholder="探索营毕业码（选填）" autoComplete="off" />
             </label></div> : joinPhase === 'feishu' ? <div className="password-login-fields">
+            {phoneMode !== 'login' && <div className="phone-account-heading">
+              <h2>{phoneMode === 'register' ? '注册账号' : '重置密码'}</h2>
+              <p>{phoneMode === 'register' ? '验证手机号，开启你的成长旅程' : '验证本人手机号，学习记录完整保留'}</p>
+            </div>}
             <label className={`password-input-row ${passwordPhone ? 'filled' : ''}`}>
               <span className="phone-prefix">+86</span>
-              <input value={passwordPhone} onChange={(event) => setPasswordPhone(event.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="请输入手机号" inputMode="tel" autoComplete="tel" maxLength={11} />
+              <input aria-label="手机号" disabled={isLaunched || sendingCode} value={passwordPhone} onChange={(event) => { setPasswordPhone(event.target.value.replace(/\D/g, '').slice(0, 11)); setSmsCode(''); }} placeholder="请输入手机号" inputMode="tel" autoComplete="tel" maxLength={11} />
             </label>
+            {phoneMode !== 'login' && <div className="otp-row">
+              <label className="password-input-row">
+                <input aria-label="短信验证码" disabled={isLaunched} value={smsCode} onChange={event => setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 位短信验证码" inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
+              </label>
+              <button className="otp-button" type="button" disabled={isLaunched || sendingCode || smsCountdown > 0} onClick={sendCode}>{sendingCode ? '正在发送…' : smsCountdown > 0 ? `${smsCountdown} 秒后重发` : '获取验证码'}</button>
+            </div>}
             <label className={`password-input-row ${password ? 'filled' : ''}`}>
-              <input value={password} onChange={(event) => setPassword(event.target.value.slice(0, 11))} placeholder="请输入密码（6–11位）" type="password" autoComplete="current-password" maxLength={11} />
+              <input aria-label={phoneMode === 'login' ? '密码' : phoneMode === 'register' ? '设置密码' : '设置新密码'} disabled={isLaunched} value={password} onChange={(event) => setPassword(event.target.value.slice(0, 11))} placeholder={phoneMode === 'login' ? '请输入密码（6–11位）' : phoneMode === 'register' ? '设置密码（6–11位）' : '设置新密码（6–11位）'} type={showPassword ? 'text' : 'password'} autoComplete={phoneMode === 'login' ? 'current-password' : 'new-password'} maxLength={11} />
+              <button type="button" className="password-visibility" aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? '隐藏' : '显示'}</button>
             </label>
+            {phoneMode !== 'login' && <label className="password-input-row">
+              <input aria-label={phoneMode === 'register' ? '确认密码' : '确认新密码'} disabled={isLaunched} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value.slice(0, 11))} placeholder={phoneMode === 'register' ? '请再次输入密码' : '请再次输入新密码'} type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={11} />
+              <button type="button" className="password-visibility" aria-label={showConfirmPassword ? '隐藏确认密码' : '显示确认密码'} aria-pressed={showConfirmPassword} onClick={() => setShowConfirmPassword(value => !value)}>{showConfirmPassword ? '隐藏' : '显示'}</button>
+            </label>}
             <div className="password-login-guidance">
-              <p className="password-login-hint">首次登录将自动注册该手机号并设置密码</p>
-              <button type="button" className="forgot-password-button" onClick={() => setMessage('请联系管理员李鑫波重置密码。密码重置完成后，再使用手机号和新密码登录。')}>忘记密码？</button>
+              {phoneMode === 'login' ? <>
+                <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('register')}>注册账号</button>
+                <span aria-hidden="true">|</span>
+                <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('reset')}>忘记密码？</button>
+              </> : <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('login')}>← 返回登录</button>}
             </div>
-            <p className="phone-login-note">登录即代表您已阅读并同意
+            <p className="phone-login-note">{phoneMode === 'register' ? '注册' : phoneMode === 'reset' ? '继续' : '登录'}即代表您已阅读并同意
               <a href="https://zx6w57w0j34.feishu.cn/docx/Oxexd1UMdoHg2YxEOYVcx5fonkd" target="_blank" rel="noreferrer">《用户服务协议》</a>
               与
               <a href="https://zx6w57w0j34.feishu.cn/docx/Oxexd1UMdoHg2YxEOYVcx5fonkd" target="_blank" rel="noreferrer">《隐私政策》</a>
@@ -503,13 +583,13 @@ export function Login() {
             <span className="sr-only">{joinPhase === 'invite' ? '邀请码' : '昵称'}</span>
             {joinPhase === 'invite' ? <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入邀请码" autoComplete="one-time-code" /> : <input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入昵称" autoComplete="nickname" />}
           </label>}
-          <button className="launch-button" type="submit" onMouseMove={magneticMove} onMouseLeave={resetMagnet}>
+          <button disabled={isLaunched || sendingCode} className="launch-button" type="submit" onMouseMove={magneticMove} onMouseLeave={resetMagnet}>
             <img src={loginArrow} alt="" />
-            <span>{joinPhase === 'feishu' ? '登录并开始探索' : joinPhase === 'invite' ? '解锁探索航线' : '进入探索营'}</span>
+            <span>{isLaunched ? '正在处理…' : joinPhase === 'feishu' ? loginMode === 'password' ? phoneMode === 'register' ? '注册并登录' : phoneMode === 'reset' ? '重置密码' : '登录并开始探索' : '登录并开始探索' : joinPhase === 'invite' ? '解锁探索航线' : '进入探索营'}</span>
             <b aria-hidden="true" />
           </button>
           <div className="status-line" role="status">{message}</div>
-          {joinPhase === 'feishu' && !joinError && !isLaunched && isFeishuClient(typeof navigator === 'undefined' ? '' : navigator.userAgent) && <span className="login-auto-countdown" aria-hidden="true">{countdown}</span>}
+          {joinPhase === 'feishu' && loginMode === 'feishu' && !joinError && !isLaunched && isFeishuClient(typeof navigator === 'undefined' ? '' : navigator.userAgent) && <span className="login-auto-countdown" aria-hidden="true">{countdown}</span>}
         </form>
       </section>
 

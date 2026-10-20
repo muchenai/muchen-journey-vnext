@@ -184,6 +184,8 @@ def integration(oauth_provider, monkeypatch):
         publish_catalog_journey(session, operator_id=operator_id, reviewer_id=reviewer_id,
                                 organization_id=organization_id, expected_current_version=0)
     monkeypatch.setenv("PASSWORD_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("PHONE_OTP_ENABLED", "true")
+    monkeypatch.setenv("PHONE_OTP_PROVIDER", "LOCAL_TEST")
     monkeypatch.setenv("FEISHU_LEARNER_REGISTRATION_ENABLED", "true")
     monkeypatch.setenv("FEISHU_LEARNER_ORGANIZATION_ID", str(organization_id))
     monkeypatch.setenv("FEISHU_LEARNER_REVIEWER_ID", str(reviewer_id))

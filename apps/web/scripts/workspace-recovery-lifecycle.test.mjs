@@ -143,3 +143,24 @@ test("ordinary edits autosave and an intentionally cleared link does not resurre
   assert.equal(returned.value.record, "");
   returned.unmount();
 });
+
+test("historical evaluations never fill or autosave a fresh empty task", async () => {
+  for (const status of ["COMPLETED", "FAILED", "UNCERTAIN"]) {
+    const page = mount({ storage: storage(), records: { value: [row(status)] } });
+    await page.flush();
+    assert.equal(page.value.record, "");
+    assert.equal(page.value.selfCheckBusy, false);
+    await page.timer(3000);
+    assert.equal(page.value.record, "");
+    assert.deepEqual(page.saves, []);
+    page.unmount();
+  }
+});
+
+test("a learner's saved draft survives even when history contains a different link", async () => {
+  const draft = "https://test.feishu.cn/docx/currentlearnerdraft";
+  const page = mount({ storage: storage(), draft, records: { value: [row("COMPLETED")] } });
+  await page.flush();
+  assert.equal(page.value.record, draft);
+  page.unmount();
+});

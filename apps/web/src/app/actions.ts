@@ -135,6 +135,7 @@ export type PhoneCodeState = {
   message?: string;
   debugCode?: string;
   error?: string;
+  retryAfterSeconds?: number;
 };
 
 export type PasswordLoginState = {
@@ -142,16 +143,18 @@ export type PasswordLoginState = {
   error?: string;
 };
 
-export async function loginWithPassword(phone: string, password: string): Promise<PasswordLoginState> {
+async function passwordSession(
+  phone: string, password: string, code?: string,
+): Promise<PasswordLoginState> {
   try {
     const registration = await anonymousApiRequest<{
       safe_entry: string;
       expires_at: string;
       csrf_token: string;
       display_name: string;
-    }>("/api/v1/auth/password/login", {
+    }>(code === undefined ? "/api/v1/auth/password/login" : "/api/v1/auth/password/register", {
       method: "POST",
-      body: JSON.stringify({ phone, password }),
+      body: JSON.stringify({ phone, password, ...(code === undefined ? {} : { code }) }),
     });
     const sessionToken = cookieValue(registration.setCookies, SESSION_COOKIE);
     if (!sessionToken) return { error: "登录会话创建失败，请重试。" };
@@ -167,20 +170,41 @@ export async function loginWithPassword(phone: string, password: string): Promis
   redirect("/app");
 }
 
-export async function requestPhoneCode(phone: string): Promise<PhoneCodeState> {
+export async function loginWithPassword(phone: string, password: string): Promise<PasswordLoginState> {
+  return passwordSession(phone, password);
+}
+
+export async function registerWithPassword(phone: string, code: string, password: string): Promise<PasswordLoginState> {
+  return passwordSession(phone, password, code);
+}
+
+export async function resetPhonePassword(phone: string, code: string, password: string): Promise<PhoneCodeState> {
+  try {
+    const response = await anonymousApiRequest<{ message: string }>("/api/v1/auth/password/reset", {
+      method: "POST", body: JSON.stringify({ phone, code, password }),
+    });
+    return { ok: true, message: response.data.message };
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "密码重置失败，请稍后重试。" };
+  }
+}
+
+export async function requestPhoneCode(phone: string, purpose: "login" | "register" | "reset" = "login"): Promise<PhoneCodeState> {
   try {
     const response = await anonymousApiRequest<{
       expires_in_seconds: number;
       phone_mask: string;
       debug_code?: string;
+      retry_after_seconds: number;
     }>("/api/v1/auth/phone/request-code", {
       method: "POST",
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, purpose }),
     });
     return {
       ok: true,
       message: `验证码已发送至 ${response.data.phone_mask}`,
       debugCode: response.data.debug_code,
+      retryAfterSeconds: response.data.retry_after_seconds,
     };
   } catch (error) {
     return { error: error instanceof ApiRequestError ? error.message : "验证码发送失败，请稍后重试。" };

@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "base_candidate": "1e50a5bc627d242ec3053a62e59ad465f2e4c5a1",
+  "base_release": "/srv/journey-next-production/canary/releases/1e50a5bc627d242ec3053a62e59ad465f2e4c5a1-ai-self-check",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0037_ai_self_check_revisions",
+    "to": "0037_ai_self_check_revisions"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {
+    "api": "sha256:67a1e87539aa9bebf2919ea3eca6c1ccad1fdc5c056b72b012344decac122aa6",
+    "web": "sha256:d210e2854c87c8161c2b84467703acdbe036f615d871818aae3b6293b21f1c00"
+  }
+}

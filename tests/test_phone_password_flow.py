@@ -14,6 +14,8 @@ from test_wp09_feishu_identity import oauth_provider, client_for, assert_ok
 @pytest.fixture
 def password_provider(learner_provider, monkeypatch):
     monkeypatch.setenv("PASSWORD_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("PHONE_OTP_ENABLED", "true")
+    monkeypatch.setenv("PHONE_OTP_PROVIDER", "LOCAL_TEST")
     get_settings.cache_clear()
     yield learner_provider
     get_settings.cache_clear()
@@ -22,7 +24,8 @@ def password_provider(learner_provider, monkeypatch):
 def register(label):
     client = client_for(label + uuid.uuid4().hex)
     credentials = {"phone": "139" + str(secrets.randbelow(10**8)).zfill(8), "password": "test1234"}
-    assert assert_ok(client.post("/api/v1/auth/password/login", json=credentials))["is_new_user"]
+    assert_ok(client.post("/api/v1/auth/phone/request-code", json={"phone": credentials["phone"], "purpose": "register"}))
+    assert assert_ok(client.post("/api/v1/auth/password/register", json={**credentials, "code": "123456"}))["is_new_user"]
     return client, credentials
 
 
