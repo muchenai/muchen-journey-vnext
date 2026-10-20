@@ -18,7 +18,9 @@ def allow_resend(phone):
         for row in session.scalars(select(PhoneOtpChallenge).where(
             PhoneOtpChallenge.phone_subject == phone_subject(phone),
         )):
-            row.created_at = utc_now() - timedelta(minutes=2)
+            # Age all challenges equally: retain their original ordering so a
+            # consumed registration code cannot appear newer than a reset code.
+            row.created_at -= timedelta(minutes=2)
 
 
 def request_code(client, phone, purpose):
