@@ -44,7 +44,7 @@ function mount({ storage, records, draft = "" }) {
     const compiled = ts.transpileModule(readFileSync(new URL(file, import.meta.url), "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText;
-    const module = { exports: {} };
+    const compiledModule = { exports: {} };
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(specifier => {
       if (specifier === "react") return react;
       if (specifier === "../actions") return { saveSubmissionDraft: async (_state, data) => {
@@ -52,18 +52,21 @@ function mount({ storage, records, draft = "" }) {
       } };
       if (specifier === "./workspace-recovery") return load("../src/app/project9/workspace-recovery.ts");
       throw new Error(`Unexpected dependency ${specifier}`);
-    }, module, module.exports);
-    return module.exports;
+    }, compiledModule, compiledModule.exports);
+    return compiledModule.exports;
   };
   const { useWorkspaceRecovery } = load("../src/app/project9/useWorkspaceRecovery.ts");
   const experience = { assignmentId: "task-a", taskVersion: 1, revision: 3, allowedCommands: ["submit"], draftBody: draft, latestSubmissionBody: null };
+  function TestComponent() {
+    return useWorkspaceRecovery(experience, true);
+  }
   return {
     get value() { return output; }, saves,
     async flush() {
       for (let i = 0; i < 20; i++) {
         if (dirty) {
           dirty = false; cursor = 0;
-          output = useWorkspaceRecovery(experience, true);
+          output = TestComponent();
           effects.splice(0).forEach(fn => fn());
         }
         await new Promise(resolve => setImmediate(resolve));

@@ -37,6 +37,9 @@ export function useWorkspaceRecovery(experience: ProjectExperienceData | null, e
     try { cached = key && canSubmit ? readWorkspace(localStorage, key) : null; } catch { /* Server draft remains available. */ }
     const body = cached ? cached.body : initialBody;
     bodyRef.current = body;
+    // Hydrate browser-only persisted input after SSR; this is external storage,
+    // not state derived from the current render's props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecord(body);
     pendingSince.current = cached?.pendingSince ?? null;
     savedBody.current = experience?.draftBody ?? "";

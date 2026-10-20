@@ -12,14 +12,14 @@ function actions(apiRequest) {
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const module = { exports: {} };
+  const compiledModule = { exports: {} };
   vm.runInNewContext(compiled, {
-    module, exports: module.exports,
+    module: compiledModule, exports: compiledModule.exports,
     require: name => name === "@/lib/server/api" ? { apiRequest, ApiRequestError }
       : name.startsWith("node:") ? require(name) : {},
     console, FormData, URL,
   });
-  return module.exports;
+  return compiledModule.exports;
 }
 const assignment = "00000000-0000-4000-8000-000000000001";
 const click = "00000000-0000-4000-8000-000000000002";
