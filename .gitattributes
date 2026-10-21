@@ -4,3 +4,15 @@
 # Approved baseline packages are hash-bound and may retain intentional EOF spacing.
 docs/baselines/** whitespace=-trailing-space,-blank-at-eof
 apps/web/public/vendor/feishu/*.js -text
+
+# Preserve designer assets byte-for-byte across Windows preview and Linux release.
+apps/web/public/review-native/academy.css -text
+apps/web/public/review-native/favicon.svg -text
+apps/web/public/review-native/journey-logo-119.svg -text
+apps/web/public/review-native/journey-logo.svg -text
+apps/web/public/review-native/login.css -text
+apps/web/public/review-native/review-camps.css -text
+apps/web/public/review-native/review-status.css -text
+apps/web/public/review-native/style.css -text
+apps/web/public/review-native/theme-init.js -text
+apps/web/public/review-native/theme.css -text

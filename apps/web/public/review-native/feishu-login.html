@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <base href="/review-native/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f7f7">
+  <title>登录管理系统 · JOURNEY</title>
+  <script src="./theme-init.js?v=20261019-creator-blue"></script>
+  <link rel="icon" href="./journey-logo-119.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./theme.css?v=20261021-brand-npc">
+  <link rel="stylesheet" href="./login.css?v=20261021-brand-npc">
+  <link rel="stylesheet" href="./feishu-login.css?v=20261021-button-layout">
+</head>
+<body class="login-screen">
+  <div id="app">
+    <main class="login-page">
+      <header class="login-header">
+        <a href="/review/login" class="login-brand" aria-label="JOURNEY 管理系统"><img src="./journey-logo-119.svg" alt="" width="34" height="34"><span>JOURNEY<small>管理系统</small></span></a>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换为深色模式"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 13a8.8 8.8 0 0 1-9.8-9.8A9 9 0 1 0 20.8 13Z"/></svg><span>深色</span></button>
+      </header>
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="login-symbol"><img src="./journey-logo-119.svg" alt="" width="48" height="48"></div>
+        <h1 id="login-title">登录管理系统</h1>
+        <p class="login-intro">使用飞书进入 JOURNEY</p>
+        <div id="invite-login-form">
+          <p class="login-error" role="status" aria-live="polite"><!--AUTH_NOTICE--></p>
+          <a class="btn btn-primary login-submit" href="/auth/feishu?return_to=%2Freview">使用飞书进入</a>
+        </div>
+        <p class="login-note">仅限受邀导师与管理员</p>
+      </section>
+      <footer class="login-footer">JOURNEY 管理系统</footer>
+    </main>
+  </div>
+  <script src="./feishu-login.js?v=20261021"></script>
+</body>
+</html>

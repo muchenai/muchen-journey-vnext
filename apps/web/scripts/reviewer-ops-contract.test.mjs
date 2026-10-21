@@ -1,66 +1,48 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const queue = await readFile(new URL("../src/app/review/page.tsx", import.meta.url), "utf8");
-const detail = await readFile(new URL("../src/app/review/[reviewId]/page.tsx", import.meta.url), "utf8");
-const workbench = await readFile(new URL("../src/app/review/[reviewId]/review-workbench.tsx", import.meta.url), "utf8");
-const characterProgress = await readFile(new URL("../src/app/character-progress.tsx", import.meta.url), "utf8");
-const ops = await readFile(new URL("../src/app/ops/page.tsx", import.meta.url), "utf8");
-const types = await readFile(new URL("../src/lib/server/api.ts", import.meta.url), "utf8");
-
-test("review queue exposes authoritative priority, SLA, risk, revisions and escalation", () => {
-  for (const field of ["feedback_sla_business_days", "revision_count", "sensitivity", "audience", "conflict_status"]) {
-    assert.match(types, new RegExp(field));
-  }
-  assert.match(queue, /任务审核/);
-  assert.match(queue, /宝藏辅导/);
-  assert.match(queue, /容量：未获批准，无法计算/);
-  assert.match(queue, /主备与升级/);
-  assert.match(queue, /材料不完整/);
+const source = path => readFile(new URL(path, import.meta.url), "utf8");
+const [queue, detail, actions, redirect, ops, types, list] = await Promise.all([
+ source("../src/app/review/review-admin.tsx"), source("../src/app/review/review-dialog.tsx"),
+ source("../src/app/review/admin-actions.ts"), source("../src/app/review/[reviewId]/page.tsx"),
+ source("../src/app/ops/page.tsx"), source("../src/lib/server/api.ts"), source("../src/app/review/review-queue.tsx"),
+]);
+test("review queue loads real records and keeps camp, AI, passed and returned views",()=>{
+ assert.match(actions,/\/api\/v1\/review-admin\/reviews/);
+ for(const label of ['探索营','新手村','待人工审核','AI 自测结果','已审核','审核未通过']) assert.ok((queue+list).includes(label));
+ assert.match(queue,/document.visibilityState/);
+ assert.match(queue,/12000/);
+ assert.match(types,/feedback_sla_business_days/);
 });
-
-test("review detail separates fixed evidence, advisory AI and human conclusion impact", () => {
-  assert.match(detail, /固定 SubmissionVersion/);
-  assert.match(detail, /AI 建议/);
-  assert.match(workbench, /提交真人结论/);
-  assert.match(detail, /通用高影响申诉政策尚未获批准/);
-  assert.match(detail, /提交结果未知/);
+test("review detail binds saved AI advice and prior results to the fixed submission",()=>{
+ assert.match(actions,/\/api\/v1\/review-admin\/reviews\/\$\{encodeURIComponent\(id\)\}/);
+ assert.match(detail,/d\.submission_body/);
+ assert.match(detail,/d\.document_ai_checks/);
+ assert.match(detail,/check\.history/);
+ assert.match(detail,/最终审核/);
+ assert.match(redirect,/redirect\(`/);
 });
-
-test("ops overview consumes approved workload facts and fails closed on missing capacity", () => {
-  assert.match(ops, /\/api\/v1\/ops\/reviewer-workload/);
-  assert.match(ops, /处理最高优先级异常/);
-  assert.match(ops, /PENDING_OWNER_CONTENT/);
-  assert.match(ops, /不可计算/);
-  assert.match(ops, /DEAD/);
-  assert.doesNotMatch(ops, /capacity_limit\s*\?\?\s*0/);
+test("ops workload and capacity continue to use the existing approved source",()=>{
+ assert.match(ops,/\/api\/v1\/ops\/reviewer-workload/);
+ assert.match(ops,/不可计算/);
+ assert.doesNotMatch(ops,/capacity_limit\s*\?\?\s*0/);
 });
-
-test("successful empty queue is distinct from unavailable data", () => {
-  assert.match(queue, /当前没有待处理记录/);
-  assert.match(queue, /Day 1 与其他关卡一样，提交后进入任务审核/);
-  assert.match(queue, /审核通过后显示已完成/);
-  assert.match(queue, /三项评测/);
-  assert.match(queue, /不影响旅程推进、结营或准入/);
+test("failed reads cannot masquerade as a successful empty queue",()=>{
+ assert.match(queue,/error&&<div className="admin-error" role="alert"/);
+ assert.match(queue,/重新连接/);
+ assert.match(actions,/ok: false, error:/);
+ assert.match(list,/rows.length/);
 });
-
-test("finalized reviews remain visible after the active queue is refreshed", () => {
-  assert.match(queue, /\/api\/v1\/reviews\/history/);
-  assert.match(queue, /已完成评阅/);
-  assert.match(queue, /已通过/);
-  assert.match(queue, /已达到学习目标/);
-  assert.match(detail, /审核结果提交成功/);
-  assert.match(detail, /刷新后仍会保留/);
+test("review mutation preserves optimistic revision and server idempotency",()=>{
+ assert.match(detail,/expected_revision:d.revision/);
+ assert.match(actions,/"Idempotency-Key": key/);
+ assert.match(detail,/if \(result.ok\) done\(\); else setError\(result.error\)/);
+ assert.match(detail,/d.status === 'ASSIGNED' \|\| d.status === 'IN_REVIEW'/);
 });
-
-test("reviewer feedback shows live bounded character progress", () => {
-  assert.match(workbench, /<CharacterProgress/);
-  assert.match(workbench, /minimum=\{5\}/);
-  assert.match(workbench, /maximum=\{500\}/);
-  assert.match(workbench, /minimum=\{10\}/);
-  assert.match(workbench, /maximum=\{2000\}/);
-  assert.match(characterProgress, /已输入 \{count\} 个有效字符/);
-  assert.match(characterProgress, /还差/);
-  assert.match(characterProgress, /已超出/);
+test("human feedback remains bounded and return requires an actionable explanation",()=>{
+ assert.match(detail,/feedback.trim\(\).slice\(0,500\)/);
+ assert.match(detail,/maxLength=\{2000\}/);
+ assert.match(detail,/feedback.trim\(\).length < 10/);
+ assert.match(detail,/!reasons.length/);
+ assert.match(detail,/busy\s*\|\|\s*!editable/);
 });

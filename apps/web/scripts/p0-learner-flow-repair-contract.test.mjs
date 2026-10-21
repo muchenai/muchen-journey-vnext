@@ -15,10 +15,6 @@ const submissionComposer = await readFile(
 const actions = await readFile(new URL("../src/app/actions.ts", import.meta.url), "utf8");
 const feishuUrl = await readFile(new URL("../src/lib/feishu-url.ts", import.meta.url), "utf8");
 const learnerHome = await readFile(new URL("../src/app/app/page.tsx", import.meta.url), "utf8");
-const reviewerQueue = await readFile(
-  new URL("../src/app/review/page.tsx", import.meta.url),
-  "utf8",
-);
 const liveStatusSignal = await readFile(
   new URL("../src/app/live-status-signal.tsx", import.meta.url),
   "utf8",

@@ -1,12 +1,13 @@
 import { useJourney, useTaskStatus } from "./journey-context";
 import { useState, type ReactNode } from 'react';
 import { explorationLinks } from "@/app/project-ui/exploration-links";
+import { learnerTaskTitles } from "../../../public/review-native/task-titles.js";
 
 const taskDefinitions = [
   {
     "id": "3059",
     "taskLink": explorationLinks["DAY-0"].taskDetails,
-    "title": "Day 1｜启程-公司基础介绍材料",
+    "title": learnerTaskTitles["DAY-0"],
     "label": "DAY 1",
     "name": "启程",
     "description": " 建立业务范围、发展历程与经营理念的基础认知。阅读材料后，可以填写读后感或文档链接作为任务证据。",
@@ -24,7 +25,7 @@ const taskDefinitions = [
   {
     "id": "3117",
     "taskLink": explorationLinks["ASM-001-RULE-BREAKDOWN"].taskDetails,
-    "title": "评测一/规则拆解",
+    "title": learnerTaskTitles["ASM-001-RULE-BREAKDOWN"],
     "label": "评测一",
     "name": "规则拆解",
     "description": "规则不是用来背诵的，是用来拆解的 —— 看清任务目标，拆出判断维度，认出不能碰的红线，也知道哪里必须停下来问。",
@@ -42,7 +43,7 @@ const taskDefinitions = [
   {
     "id": "3175",
     "taskLink": explorationLinks["ASM-002-MODEL-JUDGEMENT"].taskDetails,
-    "title": "评测二/模型判断",
+    "title": learnerTaskTitles["ASM-002-MODEL-JUDGEMENT"],
     "label": "评测二",
     "name": "模型判断",
     "description": "拒绝 \"我觉得\"。在 A 与 B 之间，按维度比较、拿证据说话，把判断写成别人能复核的理由。",
@@ -60,7 +61,7 @@ const taskDefinitions = [
   {
     "id": "3233",
     "taskLink": explorationLinks["ASM-003-DATA-CONSTRUCTION"].taskDetails,
-    "title": "评测三/数据构造",
+    "title": learnerTaskTitles["ASM-003-DATA-CONSTRUCTION"],
     "label": "评测三",
     "name": "数据构造",
     "description": "从约束出发，亲手构造一份结构清晰、内容扎实的数据；做完不是结束 —— 自检、记录、再修正，才算交付。",
@@ -78,7 +79,7 @@ const taskDefinitions = [
   {
     "id": "3291",
     "taskLink": explorationLinks["TRE-001-COMPANY-VALUES"].taskDetails,
-    "title": "宝藏一｜公司价值",
+    "title": learnerTaskTitles["TRE-001-COMPANY-VALUES"],
     "label": "宝藏一",
     "name": "公司价值",
     "description": "系统了解沐晨AI的业务版图、服务对象及在AI数据服务领域的战略定位，深入理解公司以真实客户需求为导向、以AI数据服务与人才培养为核心的发展理念。",
@@ -96,7 +97,7 @@ const taskDefinitions = [
   {
     "id": "3349",
     "taskLink": explorationLinks["TRE-002-AI-DATA-BASICS"].taskDetails,
-    "title": "宝藏二/AI与数据基础",
+    "title": learnerTaskTitles["TRE-002-AI-DATA-BASICS"],
     "label": "宝藏二",
     "name": "AI与数据基础",
     "description": "在大模型流利回答一切之前，先学会看见它的边界 —— 理解为什么 AI 时代，人的判断与证据不可替代",
@@ -114,7 +115,7 @@ const taskDefinitions = [
   {
     "id": "3407",
     "taskLink": explorationLinks["TRE-004-DELIVERY-FIT"].taskDetails,
-    "title": "宝藏四/交付边界",
+    "title": learnerTaskTitles["TRE-004-DELIVERY-FIT"],
     "label": "宝藏四",
     "name": "交付边界",
     "description": "规则之内独立判断，规则之外及时提报 —— 这是你与团队协作的第一份专业",
@@ -132,7 +133,7 @@ const taskDefinitions = [
   {
     "id": "3465",
     "taskLink": explorationLinks["TRE-003-PROJECT-AWARENESS"].taskDetails,
-    "title": "宝藏三/项目认知",
+    "title": learnerTaskTitles["TRE-003-PROJECT-AWARENESS"],
     "label": "宝藏三",
     "name": "项目认知",
     "description": "从客户的真实问题出发，看清 AI 数据如何在业务里创造价值，也找到你在这条质量链条上的位置",
