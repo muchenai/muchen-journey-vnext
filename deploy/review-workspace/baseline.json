@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "base_candidate": "3b339e8e276aa16888b2a6fd2ce6196f91ac341c",
+  "base_release": "/srv/journey-next-production/canary/releases/3b339e8e276aa16888b2a6fd2ce6196f91ac341c-phone-registration",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0037_ai_self_check_revisions",
+    "to": "0038_review_admin_workspace"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {
+    "api": "sha256:91cb725f62eb4ebe13cfb93bd1c6af55b220c354213cfc2705d67817ddcb5fb5",
+    "web": "sha256:da5eb0b1afcc119de0500190fbeaf904779544e6d6405c8ba8be505fe2548269"
+  }
+}

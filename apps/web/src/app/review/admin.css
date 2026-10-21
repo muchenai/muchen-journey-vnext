@@ -1,0 +1,22 @@
+.review-admin{min-height:100vh;background:var(--bg);color:var(--ink)}
+/* Isolate the reference controls from the learner application's global helpers. */
+.review-admin input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]),.review-admin select,.review-admin textarea{margin:0}
+.review-admin label,.review-admin legend{font-weight:400}
+.review-admin [hidden]{display:none!important}
+.review-admin fieldset{border-radius:0}
+.review-admin input[type="range"].ratio-slider{min-height:0;height:6px;padding:0;border:0;margin:4px 0 10px}
+.review-admin .brand img{max-width:none}
+.review-admin .editor-fieldset{border:0;padding:0;margin:0;min-width:0;display:block}
+.review-admin .admin-tags{display:flex;gap:8px;margin-top:12px}
+.review-admin .admin-error{padding:14px;border:1px solid var(--red-border);background:var(--red-soft);color:var(--red);border-radius:8px;margin-bottom:16px}
+.review-admin .admin-details{padding:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;margin:18px 0}
+.review-admin .admin-details summary{cursor:pointer;font-weight:600;margin-bottom:10px}
+.review-admin .answer-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.review-admin .admin-ai-result{border:1px solid var(--border);padding:18px;border-radius:10px;margin-top:14px;background:var(--surface-alt)}
+.review-admin .admin-ai-result h4{margin-bottom:10px}
+.review-admin .admin-ai-history{border-top:1px solid var(--border);margin-top:14px;padding-top:14px}
+.review-admin .review-detail-task{padding:18px 0;border-bottom:1px solid var(--border)}
+.review-admin .admin-reasons{display:flex;flex-wrap:wrap;gap:10px 16px}.review-admin .admin-reasons label{display:flex;align-items:center;gap:7px}
+.review-admin .admin-check-link{display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.review-admin .topbar-right form{margin:0}
+.review-admin .main-content .card{min-width:0}.review-admin .material-info{min-width:0}.review-admin .material-info span{overflow:hidden;text-overflow:ellipsis}

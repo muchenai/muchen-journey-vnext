@@ -22,6 +22,7 @@ from journey_api.ops_routes import router as ops_router
 from journey_api.oauth_routes import router as oauth_router
 from journey_api.phone_auth_routes import router as phone_auth_router
 from journey_api.review_routes import router as review_router
+from journey_api.review_admin_routes import router as review_admin_router
 from journey_api.routes import router
 from journey_api.submission_routes import router as submission_router
 
@@ -120,6 +121,7 @@ app.include_router(submission_router)
 app.include_router(identity_router)
 app.include_router(next_stage_review_router)
 app.include_router(review_router)
+app.include_router(review_admin_router)
 app.include_router(outcome_router)
 app.include_router(ops_router)
 app.include_router(oauth_router)

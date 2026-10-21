@@ -1,0 +1,14 @@
+/* Keep long AI feedback inside its own scroll area without changing typography. */
+.review-modal .ai-result .ai-answer-scroll {
+  max-height: min(420px, 50vh);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding-inline-end: 8px;
+}
+
+.review-modal .ai-result .ai-answer-scroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}

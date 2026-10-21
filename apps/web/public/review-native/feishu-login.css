@@ -1,0 +1,14 @@
+/* OAuth uses a link; give it the same full-width layout as the original button. */
+.login-screen a.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 46px;
+  text-align: center;
+}
+
+/* Without an invitation field, empty validation space is no longer needed. */
+.login-screen .login-error:empty {
+  display: none;
+}

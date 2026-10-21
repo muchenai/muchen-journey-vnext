@@ -20,7 +20,7 @@ const contentLoginSource = readFileSync(
   "utf8",
 );
 const reviewLoginSource = readFileSync(
-  new URL("../src/app/review/login/page.tsx", import.meta.url),
+  new URL("../public/review-native/feishu-login.html", import.meta.url),
   "utf8",
 );
 const localReviewEntrySource = readFileSync(
@@ -61,14 +61,13 @@ test("anonymous and wrong-role review entry recover through a dedicated login pa
     proxySource,
     /NextResponse\.redirect\(new URL\("\/review\/login", request\.url\), 303\)/,
   );
-  assert.match(reviewLoginSource, />\s*进入主管评审\s*</);
+  assert.match(reviewLoginSource, />\s*登录管理系统\s*</);
   assert.match(reviewLoginSource, />\s*使用飞书进入\s*</);
   assert.match(
     reviewLoginSource,
     /href="\/auth\/feishu\?return_to=%2Freview"/,
   );
-  assert.match(reviewLoginSource, /href="\/review\/local"/);
-  assert.match(reviewLoginSource, />\s*使用本地审核身份进入\s*</);
+  assert.doesNotMatch(reviewLoginSource, /<input\b|src="\.\/login\.js|href="\/review\/local"/);
   assert.match(localReviewEntrySource, /process\.env\.APP_ENV === "local"/);
   assert.match(localReviewEntrySource, /process\.env\.ALLOW_FIXTURE_IDENTITY === "true"/);
   assert.doesNotMatch(localReviewEntrySource, /cookies\.delete/);

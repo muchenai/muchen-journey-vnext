@@ -210,7 +210,7 @@
       "implementation_phase": 4,
       "audit_finding": "服务端队列按组织和指定 Reviewer 裁剪并排序，现显示模块/任务、安全标识、提交时间、版本、返工次数、TaskVersion SLA、敏感/受众和材料风险；冲突检查明确为 NOT_EVALUATED，队列接口无批准主备/升级映射时失败关闭，故保持 PARTIAL。",
       "trace_paths": [
-        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/route.ts",
         "apps/web/src/app/review/[reviewId]/page.tsx",
         "apps/api/journey_api/review_routes.py",
         "apps/api/journey_api/schemas.py",
@@ -252,7 +252,7 @@
       "audit_finding": "共享空态及 Reviewer 队列现区分查询成功空结果、检查范围和最近检查时间，运营 workload 空结果也明确主备/SLA/容量不可计算；其他运营列表仍未统一同步时间、模块与帮助入口，故保持 PARTIAL。",
       "trace_paths": [
         "apps/web/src/app/human-experience.tsx",
-        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/route.ts",
         "apps/web/src/app/app/page.tsx",
         "apps/web/src/app/ops/page.tsx",
         "apps/web/scripts/reviewer-ops-contract.test.mjs"
@@ -841,7 +841,7 @@
         "apps/web/src/app/app/tasks/[assignmentId]/page.tsx",
         "apps/web/src/app/app/tasks/[assignmentId]/submission-composer.tsx",
         "apps/api/journey_api/submission_routes.py",
-        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/route.ts",
         "apps/web/src/app/review/[reviewId]/page.tsx",
         "apps/api/journey_api/review_routes.py",
         "apps/web/src/app/app/result/page.tsx",
@@ -859,7 +859,7 @@
       "implementation_phase": 4,
       "audit_finding": "Reviewer 队列/详情与运营总览现呈现权威优先级、固定证据、批准 SLA、主备、逾期、通知失败和异常入口；容量无批准值时为 PENDING_OWNER_CONTENT/不可计算，冲突检查为 NOT_EVALUATED，缺完整回避和升级合同，故保持 PARTIAL。",
       "trace_paths": [
-        "apps/web/src/app/review/page.tsx",
+        "apps/web/src/app/review/route.ts",
         "apps/web/src/app/review/[reviewId]/page.tsx",
         "apps/web/src/app/ops/page.tsx",
         "apps/api/journey_api/review_routes.py",

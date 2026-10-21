@@ -261,6 +261,7 @@ export type ReviewHistory = {
 };
 
 export type ReviewDetail = ReviewItem & {
+  task_learning_materials?: LearningMaterial[];
   submission_body: string;
   submission_ai_use: AiUseDisclosure;
   task_purpose: string;
@@ -851,7 +852,7 @@ export async function apiRequest<T>(
     requestHeaders.set("Content-Type", "application/json");
   }
   const useLocalReviewerFixture =
-    role === "REVIEWER"
+    (role === "REVIEWER" || (role === "OPERATOR" && path.startsWith("/api/v1/review-admin/")))
     && process.env.ALLOW_FIXTURE_IDENTITY === "true"
     && ["local", "test"].includes(process.env.APP_ENV ?? "local");
   if (useLocalReviewerFixture) {
@@ -866,6 +867,9 @@ export async function apiRequest<T>(
       requestHeaders.set("X-CSRF-Token", csrfToken);
     }
   } else {
+    if (process.env.ALLOW_FIXTURE_IDENTITY !== "true" || !["local", "test"].includes(process.env.APP_ENV ?? "local")) {
+      throw new ApiRequestError("UNAUTHENTICATED", "登录已失效，请重新使用飞书登录。", "", 401);
+    }
     assertFixtureBoundary();
     requestHeaders.set("X-Fixture-Role", role);
   }

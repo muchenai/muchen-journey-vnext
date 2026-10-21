@@ -1,0 +1,2 @@
+/* The retained publication confirmation is the only additional dialog style. */
+.native-publish-confirm .admin-check-link{display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
