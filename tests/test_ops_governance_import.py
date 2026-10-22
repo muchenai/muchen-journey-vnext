@@ -36,6 +36,7 @@ from journey_api.models import (
     RoleAssignment,
     Submission,
     SubmissionVersion,
+    TaskDefinition,
     TaskVersion,
     User,
     UserStatus,
@@ -159,11 +160,19 @@ def test_multiple_open_reviews_are_readable_without_enrollment_wide_mutation(dif
         submission = session.get(Submission, first.submission_id)
         learner_id = session.get(Enrollment, enrollment_id).learner_id
         if different_task:
-            task_version = session.scalar(select(TaskVersion).where(
-                TaskVersion.task_definition_id != TASK_DEFINITION_ID,
-                TaskVersion.organization_id == ORGANIZATION_ID,
-            ))
-            assert task_version is not None
+            original_definition = session.get(TaskDefinition, TASK_DEFINITION_ID)
+            definition = TaskDefinition(id=uuid.uuid4(), organization_id=ORGANIZATION_ID,
+                                        stable_key=f"ops-multiple-{uuid.uuid4()}",
+                                        status=original_definition.status, revision=1, created_by=OPERATOR_ID)
+            session.add(definition)
+            session.flush()
+            original_version = session.get(TaskVersion, TASK_VERSION_ID)
+            values = {column.key: getattr(original_version, column.key)
+                      for column in TaskVersion.__table__.columns
+                      if column.key not in {"id", "task_definition_id"}}
+            task_version = TaskVersion(id=uuid.uuid4(), task_definition_id=definition.id, **values)
+            session.add(task_version)
+            session.flush()
             assignment_id = uuid.uuid4()
             session.add(Assignment(id=assignment_id, organization_id=ORGANIZATION_ID,
                                    enrollment_id=enrollment_id, task_definition_id=task_version.task_definition_id,
