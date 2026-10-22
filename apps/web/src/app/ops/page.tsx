@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { opsModuleRequest } from "@/app/ops/ops-data";
 import {
   assignEnrollmentReviewer,
   cancelEnrollment,
@@ -8,7 +10,6 @@ import {
   revokeNotificationEndpoint,
 } from "@/app/actions";
 import {
-  identityPageRequest,
   ContentDraft,
   OpsAuditEntry,
   OpsEnrollment,
@@ -38,6 +39,10 @@ function formatTime(value: string | null): string {
   return formatProductDateTime(value, "medium");
 }
 
+function ModuleUnavailable() {
+  return <p className="notice" role="alert">本模块读取失败，相关操作暂不可用。其他已加载模块可正常使用。 <Link href="/ops" prefetch={false}>重新加载</Link></p>;
+}
+
 export default async function OpsPage({
   searchParams,
 }: {
@@ -60,55 +65,55 @@ export default async function OpsPage({
     inviteTargets,
   ] = await Promise.all([
     searchParams,
-    identityPageRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
-    identityPageRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
-    identityPageRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
-    identityPageRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
-    identityPageRequest<{
+    opsModuleRequest<{ items: OpsTaskDefinition[] }>("/api/v1/ops/task-definitions", "OPERATOR"),
+    opsModuleRequest<{ items: OpsEnrollment[] }>("/api/v1/ops/enrollments", "OPERATOR"),
+    opsModuleRequest<{ items: OpsAuditEntry[] }>("/api/v1/ops/audit?limit=20", "OPERATOR"),
+    opsModuleRequest<RuntimeStatus>("/api/v1/ops/runtime-status", "OPERATOR"),
+    opsModuleRequest<{
       items: OpsIdentityAccess[];
       revoked_transfer_candidates: OpsRevokedIdentityTransferCandidate[];
     }>("/api/v1/ops/identity-access", "OPERATOR"),
-    identityPageRequest<{ items: OpsInvite[] }>("/api/v1/ops/invites", "OPERATOR"),
-    identityPageRequest<OpsInvitationControl>("/api/v1/ops/invitation-control", "OPERATOR"),
-    identityPageRequest<{ items: OpsNotificationEndpoint[] }>(
+    opsModuleRequest<{ items: OpsInvite[] }>("/api/v1/ops/invites", "OPERATOR"),
+    opsModuleRequest<OpsInvitationControl>("/api/v1/ops/invitation-control", "OPERATOR"),
+    opsModuleRequest<{ items: OpsNotificationEndpoint[] }>(
       "/api/v1/ops/notification-endpoints",
       "OPERATOR",
     ),
-    identityPageRequest<{ items: OpsNotificationDelivery[] }>(
+    opsModuleRequest<{ items: OpsNotificationDelivery[] }>(
       "/api/v1/ops/notification-deliveries?status=DEAD",
       "OPERATOR",
     ),
-    identityPageRequest<{ items: OpsFormalJourney[] }>(
+    opsModuleRequest<{ items: OpsFormalJourney[] }>(
       "/api/v1/ops/formal-journeys",
       "OPERATOR",
     ),
-    identityPageRequest<{ items: ContentDraft[] }>(
+    opsModuleRequest<{ items: ContentDraft[] }>(
       "/api/v1/ops/content-drafts",
       "OPERATOR",
     ),
-    identityPageRequest<{ items: ReviewerWorkload[] }>(
+    opsModuleRequest<{ items: ReviewerWorkload[] }>(
       "/api/v1/ops/reviewer-workload",
       "OPERATOR",
     ),
-    identityPageRequest<OpsInviteTargets>("/api/v1/ops/invite-targets", "OPERATOR"),
+    opsModuleRequest<OpsInviteTargets>("/api/v1/ops/invite-targets", "OPERATOR"),
   ]);
-  const overdueReviewCount = reviewerWorkload.items.reduce(
+  const overdueReviewCount = reviewerWorkload?.items.reduce(
     (total, item) => total + item.overdue_review_count,
     0,
   );
-  const highestExceptionHref = notificationDeliveries.items.length > 0
+  const highestExceptionHref = notificationDeliveries && notificationDeliveries.items.length > 0
     ? "#notification-operations"
     : "#reviewer-operations";
-  const environmentNotice = {
+  const environmentNotice = runtime ? {
     production: "当前为 production；仅已发布的固定旅程和受控邀请对真实用户生效，staging 继续用于后续验证。",
     staging: "当前为 Alpha staging；用于真人验证与后续修复，不代表 production 当前运行状态。",
     test: "当前为测试环境；这里的身份、邀请和业务事实不代表真实运营数据。",
     local: "当前为本地环境；这里的身份、邀请和业务事实不代表真实运营数据。",
-  }[runtime.environment] ?? "当前环境标识异常，请停止写入并联系工程支持。";
+  }[runtime.environment] : "运行状态读取失败；请以各模块的实际加载结果为准。";
 
   return (
     <section className="ops-page">
-      <p className="eyebrow">Operator · {runtime.environment}</p>
+      <p className="eyebrow">Operator · {runtime?.environment ?? "环境状态暂不可用"}</p>
       <h1>受控运营与运行状态</h1>
       <p className="lede">
         这里没有通用状态编辑器。所有写入都绑定组织、对象、角色、expected revision、幂等键与理由。
@@ -123,12 +128,13 @@ export default async function OpsPage({
       </a>
       <a className="button secondary" href="#learner-invites">邀请新人</a>
 
+      {reviewerWorkload ? (
       <section className="panel ops-section" id="reviewer-operations" aria-labelledby="reviewer-operations-heading">
         <p className="section-label">REVIEWER / SLA / CAPACITY / BACKUP</p>
         <h2 id="reviewer-operations-heading">Reviewer 运行事实</h2>
         <p>
           当前接口仅覆盖已绑定内容包，不能代表四模块完整分母；缺少模块显示为“不可计算”，不会显示误导性 0。
-          已知逾期 Review 共 {overdueReviewCount} 条，DEAD 通知共 {notificationDeliveries.items.length} 条。
+          已知逾期 Review 共 {overdueReviewCount} 条，DEAD 通知共 {notificationDeliveries ? notificationDeliveries.items.length : "未知"} 条。
         </p>
         {reviewerWorkload.items.length === 0 ? (
           <p className="notice">查询已成功，但尚无已绑定 Reviewer workload；容量、主备和 SLA 均不可计算。</p>
@@ -149,7 +155,14 @@ export default async function OpsPage({
         )}
         <p className="status-meta">未覆盖模块：探索营、新手村及任何无 ModuleContentPackageBinding 的范围均不可计算；需 Owner 完成绑定，不自动补值。</p>
       </section>
+      ) : (
+      <section className="panel ops-section" id="reviewer-operations" aria-labelledby="reviewer-operations-heading">
+        <h2 id="reviewer-operations-heading">Reviewer 运行事实</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {inviteTargets && invites && invitationControl && identityAccess && tasks && formalJourneys ? (
       <section className="panel ops-section" id="learner-invites" aria-labelledby="invite-heading">
         <p className="section-label">LEARNER INVITE / FIRST REAL LOOP</p>
         <h2 id="invite-heading">邀请新人进入当前行动</h2>
@@ -166,7 +179,14 @@ export default async function OpsPage({
           observedAt={new Date().toISOString()}
         />
       </section>
+      ) : (
+      <section className="panel ops-section" id="learner-invites" aria-labelledby="invite-heading">
+        <h2 id="invite-heading">邀请新人进入当前行动</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {runtime ? (
       <section className="panel ops-section" aria-labelledby="runtime-heading">
         <div className="section-heading-row">
           <div>
@@ -189,11 +209,18 @@ export default async function OpsPage({
           <div><dt>Observability</dt><dd>{runtime.observability_mode} · external=false</dd></div>
         </dl>
       </section>
+      ) : (
+      <section className="panel ops-section" aria-labelledby="runtime-heading">
+        <h2 id="runtime-heading">运行快照</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {tasks ? (
       <section className="panel ops-section" aria-labelledby="task-heading">
         <p className="section-label">VERSIONED TASK / CONFIG</p>
         <h2 id="task-heading">不可变 TaskVersion 清单</h2>
-        <p>配置合同固定为 V{runtime.config_schema_version}；任务发布仍使用现有 create/publish 意图命令，Assignment 永远固定原版本。</p>
+        <p>配置合同版本：{runtime ? `V${runtime.config_schema_version}` : "暂不可用"}；任务发布仍使用现有 create/publish 意图命令，Assignment 永远固定原版本。</p>
         <ul className="ops-list">
           {tasks.items.map((task) => (
             <li key={task.id}>
@@ -218,7 +245,14 @@ export default async function OpsPage({
           ))}
         </ul>
       </section>
+      ) : (
+      <section className="panel ops-section" aria-labelledby="task-heading">
+        <h2 id="task-heading">不可变 TaskVersion 清单</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {contentDrafts && tasks && identityAccess ? (
       <section className="panel ops-section" id="content-drafts" aria-labelledby="content-draft-heading">
         <p className="section-label">CONTENT DRAFT / EXACT SNAPSHOT</p>
         <h2 id="content-draft-heading">待发布内容</h2>
@@ -230,7 +264,14 @@ export default async function OpsPage({
           )}
         />
       </section>
+      ) : (
+      <section className="panel ops-section" id="content-drafts" aria-labelledby="content-draft-heading">
+        <h2 id="content-draft-heading">待发布内容</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {tasks && formalJourneys && identityAccess ? (
       <section className="panel ops-section" id="journey-v3" aria-labelledby="journey-v3-heading">
         <p className="section-label">DAY 1 / 4 TREASURES / 3 ASSESSMENTS</p>
         <h2 id="journey-v3-heading">固定 Journey V3</h2>
@@ -242,7 +283,14 @@ export default async function OpsPage({
           )}
         />
       </section>
+      ) : (
+      <section className="panel ops-section" id="journey-v3" aria-labelledby="journey-v3-heading">
+        <h2 id="journey-v3-heading">固定 Journey V3</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {enrollments ? (
       <section className="panel ops-section" id="admission-decisions" aria-labelledby="enrollment-heading">
         <p className="section-label">ENROLLMENT COMMANDS</p>
         <h2 id="enrollment-heading">Enrollment 受控处置</h2>
@@ -256,7 +304,11 @@ export default async function OpsPage({
                 </div>
                 <span className="badge">主管：{enrollment.reviewer_display_name}</span>
               </div>
-              {enrollment.open_review_status ? (
+              {enrollment.open_review_count > 1 ? (
+                <p className="notice" role="status">
+                  当前有 {enrollment.open_review_count} 条待审记录，请在审核任务中逐条处理；暂不提供整条学习记录的主管更换、取消或评审移交。
+                </p>
+              ) : enrollment.open_review_status ? (
                 <p className="inline-error">
                   已有 {enrollment.open_review_status} Review；仅尚未开始的 ASSIGNED 评审允许受控移交，其他状态继续阻断。
                 </p>
@@ -290,7 +342,7 @@ export default async function OpsPage({
                   <button className="button secondary compact" type="submit">受控分配 Reviewer</button>
                 </form>
               ) : null}
-              {enrollment.allowed_commands.includes("handoff_assigned_review") && enrollment.open_review_revision ? (
+              {identityAccess && enrollment.allowed_commands.includes("handoff_assigned_review") && enrollment.open_review_revision ? (
                 <form action={handoffAssignedReview} className="ops-command-form">
                   <input type="hidden" name="enrollment_id" value={enrollment.id} />
                   <input type="hidden" name="revision" value={enrollment.revision} />
@@ -328,7 +380,14 @@ export default async function OpsPage({
           ))}
         </ul>
       </section>
+      ) : (
+      <section className="panel ops-section" id="admission-decisions" aria-labelledby="enrollment-heading">
+        <h2 id="enrollment-heading">Enrollment 受控处置</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {enrollments && notificationEndpoints && notificationDeliveries ? (
       <section className="panel ops-section" id="notification-operations" aria-labelledby="notification-heading">
         <p className="section-label">RECIPIENT / DELIVERY / REDRIVE</p>
         <h2 id="notification-heading">飞书通知受控处置</h2>
@@ -413,7 +472,14 @@ export default async function OpsPage({
           ))}
         </ul>
       </section>
+      ) : (
+      <section className="panel ops-section" id="notification-operations" aria-labelledby="notification-heading">
+        <h2 id="notification-heading">飞书通知受控处置</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {identityAccess ? (
       <section className="panel ops-section" id="identity-access" aria-labelledby="identity-heading">
         <p className="section-label">REAL IDENTITY / MINIMUM ACCESS</p>
         <h2 id="identity-heading">飞书身份访问</h2>
@@ -434,7 +500,14 @@ export default async function OpsPage({
           revokedCandidates={identityAccess.revoked_transfer_candidates}
         />
       </section>
+      ) : (
+      <section className="panel ops-section" id="identity-access" aria-labelledby="identity-heading">
+        <h2 id="identity-heading">飞书身份访问</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
 
+      {audit ? (
       <section className="panel ops-section" aria-labelledby="audit-heading">
         <p className="section-label">SAFE AUDIT VIEW</p>
         <h2 id="audit-heading">最近审计元数据</h2>
@@ -456,6 +529,12 @@ export default async function OpsPage({
           </table>
         </div>
       </section>
+      ) : (
+      <section className="panel ops-section" aria-labelledby="audit-heading">
+        <h2 id="audit-heading">最近审计元数据</h2>
+        <ModuleUnavailable />
+      </section>
+      )}
     </section>
   );
 }

@@ -9910,6 +9910,12 @@
             "type": "array",
             "title": "Assignment Statuses"
           },
+          "open_review_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Open Review Count",
+            "default": 0
+          },
           "open_review_status": {
             "anyOf": [
               {

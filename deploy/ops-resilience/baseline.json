@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "base_candidate": "fae27b2b52655c0e560b48b6d6854de6cd6d2b6a",
+  "base_release": "/srv/journey-next-production/canary/releases/fae27b2b52655c0e560b48b6d6854de6cd6d2b6a-review-workspace",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0038_review_admin_workspace",
+    "to": "0038_review_admin_workspace"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {
+    "api": "sha256:3a95c24f7ee1bf9c4461044ff43a48a134803364ae7e8cf11086fbd7d46652b7",
+    "web": "sha256:c8028c5e17c64262699f3bef9512bc89df575b4b335f7e1bb4463584fc554ea7"
+  }
+}

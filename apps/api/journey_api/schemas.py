@@ -1086,6 +1086,7 @@ class EnrollmentOpsOut(StrictModel):
     revision: int
     journey_version_id: UUID | None
     assignment_statuses: list[str]
+    open_review_count: int = Field(default=0, ge=0)
     open_review_status: str | None
     open_review_revision: int | None
     evidence_retest_in_progress: bool = False
