@@ -645,6 +645,7 @@ export type OpsEnrollment = {
   revision: number;
   journey_version_id: string | null;
   assignment_statuses: string[];
+  open_review_count: number;
   open_review_status: string | null;
   open_review_revision: number | null;
   evidence_retest_in_progress: boolean;

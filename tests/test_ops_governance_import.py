@@ -36,6 +36,7 @@ from journey_api.models import (
     RoleAssignment,
     Submission,
     SubmissionVersion,
+    TaskVersion,
     User,
     UserStatus,
 )
@@ -145,6 +146,61 @@ def create_enrollment(
 
 def command_headers(key: str) -> dict[str, str]:
     return {**operator_headers, "Idempotency-Key": key}
+
+
+@pytest.mark.parametrize("different_task", [False, True])
+def test_multiple_open_reviews_are_readable_without_enrollment_wide_mutation(different_task):
+    enrollment_id, assignment_id, first_review_id = create_enrollment(
+        assignment_status=AssignmentStatus.SUBMITTED, review_status=ReviewStatus.ASSIGNED,
+    )
+    second_review_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        first = session.get(Review, first_review_id)
+        submission = session.get(Submission, first.submission_id)
+        learner_id = session.get(Enrollment, enrollment_id).learner_id
+        if different_task:
+            task_version = session.scalar(select(TaskVersion).where(
+                TaskVersion.task_definition_id != TASK_DEFINITION_ID,
+                TaskVersion.organization_id == ORGANIZATION_ID,
+            ))
+            assert task_version is not None
+            assignment_id = uuid.uuid4()
+            session.add(Assignment(id=assignment_id, organization_id=ORGANIZATION_ID,
+                                   enrollment_id=enrollment_id, task_definition_id=task_version.task_definition_id,
+                                   task_version_id=task_version.id, position=2,
+                                   status=AssignmentStatus.SUBMITTED, revision=1))
+            session.flush()
+            submission = Submission(id=uuid.uuid4(), organization_id=ORGANIZATION_ID,
+                                    assignment_id=assignment_id, current_version_no=1)
+            session.add(submission)
+            session.flush()
+        version = SubmissionVersion(id=uuid.uuid4(), submission_id=submission.id,
+                                    version_no=1 if different_task else 2,
+                                    body="另一条尚未完成的合成评审记录。", created_by=learner_id)
+        session.add(version)
+        session.flush()
+        submission.current_version_no = version.version_no
+        session.add(Review(id=second_review_id, organization_id=ORGANIZATION_ID,
+                           assignment_id=assignment_id, submission_id=submission.id,
+                           submission_version_id=version.id, reviewer_id=REVIEWER_ID,
+                           status=ReviewStatus.IN_REVIEW, revision=2, started_at=datetime.now(UTC)))
+
+    listed = assert_ok(client.get("/api/v1/ops/enrollments", headers=operator_headers))
+    row = next(item for item in listed["items"] if item["id"] == str(enrollment_id))
+    assert row["open_review_count"] == 2
+    assert row["open_review_status"] is None and row["open_review_revision"] is None
+    assert row["allowed_commands"] == ["create_learner_reentry"]
+    # Other modules can be read, and reads neither resolve nor delete reviews.
+    assert_ok(client.get("/api/v1/ops/identity-access", headers=operator_headers))
+    cancelled = client.post(f"/api/v1/ops/enrollments/{enrollment_id}/cancel",
+                            headers=command_headers(f"multi-review-{uuid.uuid4()}"),
+                            json={"expected_revision": 1, "reason": "多条待审记录不可通过整条学习记录的取消命令处理。"})
+    assert cancelled.status_code == 409
+    assert cancelled.json()["error"]["code"] == "VERSION_CONFLICT"
+    with SessionLocal() as session:
+        assert session.get(Review, first_review_id).status == ReviewStatus.ASSIGNED
+        assert session.get(Review, second_review_id).status == ReviewStatus.IN_REVIEW
+        assert session.get(Enrollment, enrollment_id).revision == 1
 
 
 def test_ops_enrollment_commands_are_scoped_reasoned_idempotent_and_audited():

@@ -152,9 +152,9 @@ def scoped_enrollment(
     return enrollment
 
 
-def open_review_for_enrollment(
+def open_reviews_for_enrollment(
     session: Session, enrollment: Enrollment, *, for_update: bool
-) -> Review | None:
+) -> list[Review]:
     query = (
         select(Review)
         .join(Assignment, Assignment.id == Review.assignment_id)
@@ -168,7 +168,14 @@ def open_review_for_enrollment(
     )
     if for_update:
         query = query.with_for_update()
-    reviews = session.scalars(query).all()
+    return list(session.scalars(query).all())
+
+
+def open_review_for_enrollment(
+    session: Session, enrollment: Enrollment, *, for_update: bool
+) -> Review | None:
+    # Mutations addressed only by enrollment cannot choose an arbitrary review.
+    reviews = open_reviews_for_enrollment(session, enrollment, for_update=for_update)
     if len(reviews) > 1:
         raise ApiError(409, "VERSION_CONFLICT", "Enrollment 存在多个开放评审，需要先隔离处理。")
     return reviews[0] if reviews else None
@@ -572,11 +579,16 @@ def list_enrollments(
             )
             .order_by(Assignment.position)
         ).all()
-        open_review = open_review_for_enrollment(session, enrollment, for_update=False)
+        open_reviews = open_reviews_for_enrollment(session, enrollment, for_update=False)
+        open_review = open_reviews[0] if len(open_reviews) == 1 else None
         evidence_retest = active_post_completion_evidence_retest(session, enrollment)
         coaching_revision = outstanding_coaching_revision_assignment(session, enrollment)
         allowed: list[str] = []
-        if evidence_retest is not None or coaching_revision is not None:
+        if len(open_reviews) > 1:
+            # Listing is safe; enrollment-wide mutations remain blocked below
+            # and by the existing command handlers until a review is unambiguous.
+            allowed = []
+        elif evidence_retest is not None or coaching_revision is not None:
             allowed = ["create_learner_reentry"]
         elif enrollment.status in {
             EnrollmentStatus.PENDING_IDENTITY,
@@ -603,6 +615,7 @@ def list_enrollments(
                 revision=enrollment.revision,
                 journey_version_id=enrollment.journey_version_id,
                 assignment_statuses=[item.status.value for item in assignments],
+                open_review_count=len(open_reviews),
                 open_review_status=open_review.status.value if open_review else None,
                 open_review_revision=open_review.revision if open_review else None,
                 evidence_retest_in_progress=evidence_retest is not None,
