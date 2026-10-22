@@ -18,13 +18,18 @@ def test_extracts_error_identifiers_without_private_values():
     private = "private-token-should-never-appear"
     result = classifier()(f'''TypeError: Cannot read properties of undefined
 digest: '3941254938'
+code: 'VALIDATION_FAILED', status: 422
+code: '{private}', status: 200
 psycopg.errors.InsufficientPrivilege: permission denied for table notification_endpoints
 SQL parameters: {private}
 File "/app/apps/api/journey_api/ops_routes.py", line 123
-{{"path":"/api/v1/ops/identity-access","status":500,"cookie":"{private}"}}
+{{"route":"/api/v1/ops/identity-access","status":500,"cookie":"{private}"}}
 {{"path":"/api/v1/private/{private}","status":500}}
+INFO: 127.0.0.1 - "GET /api/v1/ops/identity-access?private={private} HTTP/1.1" 500 Internal Server Error
 ''')
     assert result["digest_found"]
+    assert result["error_codes"] == ["VALIDATION_FAILED"]
+    assert result["error_statuses"] == [422]
     assert result["denied_tables"] == ["notification_endpoints"]
     assert result["api_frames"] == [("ops_routes.py", "123")]
     assert result["ops_responses"] == [{"path": "/api/v1/ops/identity-access", "status": 500}]
