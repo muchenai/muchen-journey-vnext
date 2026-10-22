@@ -21,6 +21,9 @@ def safe_application_errors(raw):
     identifiers = r"[A-Za-z_][A-Za-z0-9_]{0,127}"
     result = {
         "digest_found": "3941254938" in raw,
+        "error_codes": [name for name in ("VALIDATION_FAILED", "INVALID_RESPONSE", "UNAUTHENTICATED", "FORBIDDEN", "NOT_FOUND", "INTERNAL_ERROR", "RATE_LIMITED", "SERVICE_UNAVAILABLE")
+                        if re.search(r"\bcode:\s*['\"]" + name + r"['\"]", raw)],
+        "error_statuses": sorted(set(int(value) for value in re.findall(r"\bstatus:\s*([45][0-9]{2})\b", raw))),
         "exception_classes": [name for name in classes if re.search(r"\b" + name + r"\b", raw)],
         "markers": [label for phrase, label in (
             ("permission denied", "PERMISSION_DENIED"),
@@ -35,6 +38,11 @@ def safe_application_errors(raw):
         "ops_responses": [],
     }
     for line in raw.splitlines():
+        access = re.search(r'GET (/api/v1/ops/(?:' + '|'.join(paths) + r'))(?:\?[^\s"]*)? HTTP/[^\s"]+" ([45][0-9]{2})\b', line)
+        if access:
+            entry = {"path": access.group(1), "status": int(access.group(2))}
+            if entry not in result["ops_responses"]:
+                result["ops_responses"].append(entry)
         # Only the logger's JSON request metadata is considered. No headers,
         # query strings, exception input values or arbitrary paths are returned.
         start = line.find('{"')
@@ -46,7 +54,7 @@ def safe_application_errors(raw):
             continue
         if not isinstance(item, dict):
             continue
-        path, status = item.get("path"), item.get("status")
+        path, status = item.get("route", item.get("path")), item.get("status")
         if path in {"/api/v1/ops/" + suffix for suffix in paths} and isinstance(status, int) and status >= 400:
             entry = {"path": path, "status": status}
             if entry not in result["ops_responses"]:
