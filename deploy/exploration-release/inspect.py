@@ -1,8 +1,58 @@
 """Read-only release inventory. No secret values, learner text or DB writes."""
 import json
 from pathlib import Path
+import re
 import socket
 import subprocess
+
+
+def safe_application_errors(raw):
+    """Return technical identifiers only; never raw messages, SQL or values."""
+    if len(raw.encode("utf-8")) > 4 * 1024 * 1024:
+        return {"status": "LOG_LIMIT_EXCEEDED"}
+    classes = ("TypeError", "ReferenceError", "RangeError", "ApiRequestError",
+               "ResponseValidationError", "ValidationError", "ProgrammingError",
+               "OperationalError", "InsufficientPrivilege", "UndefinedTable",
+               "UndefinedColumn", "InvalidTextRepresentation")
+    paths = ("task-definitions", "enrollments", "audit", "runtime-status",
+             "identity-access", "invites", "invitation-control", "notification-endpoints",
+             "notification-deliveries", "formal-journeys", "content-drafts",
+             "reviewer-workload", "invite-targets")
+    identifiers = r"[A-Za-z_][A-Za-z0-9_]{0,127}"
+    result = {
+        "digest_found": "3941254938" in raw,
+        "exception_classes": [name for name in classes if re.search(r"\b" + name + r"\b", raw)],
+        "markers": [label for phrase, label in (
+            ("permission denied", "PERMISSION_DENIED"),
+            ("Invalid URL", "INVALID_URL"),
+            ("Cannot read properties", "MISSING_PROPERTY"),
+            ("is not a function", "NOT_CALLABLE"),
+            ("fetch failed", "FETCH_FAILED"),
+        ) if phrase in raw],
+        "denied_tables": sorted(set(re.findall(r"permission denied for table [\"']?(" + identifiers + r")", raw))),
+        "missing_relations": sorted(set(re.findall(r'relation "(' + identifiers + r')" does not exist', raw))),
+        "api_frames": sorted(set(re.findall(r'File "/app/apps/api/journey_api/([a-zA-Z0-9_./-]+\.py)", line ([0-9]{1,6})', raw))),
+        "ops_responses": [],
+    }
+    for line in raw.splitlines():
+        # Only the logger's JSON request metadata is considered. No headers,
+        # query strings, exception input values or arbitrary paths are returned.
+        start = line.find('{"')
+        if start < 0:
+            continue
+        try:
+            item = json.loads(line[start:])
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(item, dict):
+            continue
+        path, status = item.get("path"), item.get("status")
+        if path in {"/api/v1/ops/" + suffix for suffix in paths} and isinstance(status, int) and status >= 400:
+            entry = {"path": path, "status": status}
+            if entry not in result["ops_responses"]:
+                result["ops_responses"].append(entry)
+    return result
+
 
 assert socket.gethostname() == "journey-next-staging", "UNEXPECTED_HOST"
 PROJECT = "journey-next-greenfield-canary"
@@ -19,6 +69,7 @@ def run(args, input=None):
 
 
 containers = {}
+application_errors = {}
 for service in ("api", "web"):
     ids = run(["docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + PROJECT,
                "--filter", "label=com.docker.compose.service=" + service]).split()
@@ -33,6 +84,12 @@ for service in ("api", "web"):
                            "learner_reviewer_configured": bool(env.get("FEISHU_LEARNER_REVIEWER_ID"))}
     if service == "api":
         api = ids[0]
+    try:
+        logs = subprocess.run(["docker", "logs", "--since", "24h", "--tail", "5000", ids[0]],
+                              text=True, capture_output=True, timeout=30)
+        application_errors[service] = safe_application_errors(logs.stdout + logs.stderr) if logs.returncode == 0 else {"status": "UNAVAILABLE"}
+    except subprocess.TimeoutExpired:
+        application_errors[service] = {"status": "TIMEOUT"}
 
 probe = '''
 import json
@@ -76,4 +133,4 @@ except (RuntimeError, subprocess.TimeoutExpired):
     diagnostics["docker_error_counts"] = "UNAVAILABLE"
 print(json.dumps({"current_release": str(current), "containers": containers, "database": database,
                   "cached_journey_images": images, "preparation_paths": paths,
-                  "docker_diagnostics": diagnostics}, indent=2))
+                  "docker_diagnostics": diagnostics, "application_errors": application_errors}, indent=2))
