@@ -15,9 +15,12 @@ OWNERS = [
     ('李鑫波', 'e10822a0', '934d4bab-2494-4ed3-ac15-9378913b9c01'),
     ('刘默文', 'f20eef44', 'fc74182c-048c-41de-bae6-c7ccd95f0a93'),
 ]
+CHECKPOINT = 'IMPORTS'
 
 
 def main():
+    global CHECKPOINT
+    CHECKPOINT = 'CONFIGURATION'
     assert sys.argv[1:] in [['--check'], ['--apply']]
     apply = sys.argv[1] == '--apply'
     settings = get_settings()
@@ -27,16 +30,19 @@ def main():
     org = settings.feishu_learner_organization_id
     assert str(org) == '10000000-0000-4000-8000-000000000001'
     directory = FeishuDirectory(settings)
+    CHECKPOINT = 'DIRECTORY_READ'
     profiles = directory.read_profiles()
     verified = []
     for name, suffix, user_id in OWNERS:
+        CHECKPOINT = 'DIRECTORY_OWNER_' + str(len(verified) + 1)
         matches = [p for p in profiles if p['name'] == name]
         assert len(matches) == 1 and matches[0]['open_id'].endswith(suffix), 'OWNER_DIRECTORY_MISMATCH'
         person = directory.get_user(matches[0]['open_id'])
         assert person['name'] == name and person['open_id'].endswith(suffix)
         verified.append((uuid.UUID(user_id), person))
     with SessionLocal() as session:
-        for user_id, person in verified:
+        for position, (user_id, person) in enumerate(verified, 1):
+            CHECKPOINT = 'DATABASE_OWNER_' + str(position)
             query = select(User).where(User.id == user_id, User.organization_id == org)
             user = session.scalar(query.with_for_update() if apply else query)
             assert user and user.status == UserStatus.ACTIVE and user.display_name == person['name'], 'OWNER_USER_MISMATCH'
@@ -56,6 +62,7 @@ def main():
                         provider='FEISHU', subject=subject, revision=1))
             if not apply:
                 continue
+            CHECKPOINT = 'GRANT_OWNER'
             row = session.get(ReviewAdminAccess, user_id)
             assert row is None or (row.access_role == 'super_admin' and row.can_grant_super_admin and row.revoked_at is None), 'OWNER_ACCESS_CONFLICT'
             if row is None:
@@ -67,6 +74,7 @@ def main():
                     resource_type='review_admin', resource_id=user_id, result='SUCCESS',
                     details={'release':settings.app_release, 'can_grant_super_admin':True})
         if apply:
+            CHECKPOINT = 'COMMIT_OWNERS'
             session.flush()
             actual = set(session.scalars(select(ReviewAdminAccess.user_id).where(
                 ReviewAdminAccess.organization_id == org, ReviewAdminAccess.can_grant_super_admin.is_(True))))
