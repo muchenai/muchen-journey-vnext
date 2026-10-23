@@ -1,9 +1,11 @@
 import contextlib
 import importlib.util
 import io
+import hashlib
 import json
 from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location('admin_resume', Path(__file__).resolve().parents[1] / 'deploy/admin-directory/resume.py')
@@ -12,6 +14,29 @@ spec.loader.exec_module(resume)
 
 
 class ResumeTests(unittest.TestCase):
+    def test_real_package_file_set_including_wp31_is_verified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            hashes = {}
+            for name in resume.SOURCE_FILES:
+                raw = ('original ' + name).encode()
+                (root / name).write_bytes(raw)
+                hashes[name] = hashlib.sha256(raw).hexdigest()
+            self.assertIn('wp31_database_snapshot.py', hashes)
+            resume.verify_source_files(root, hashes)
+            (root / 'wp31_database_snapshot.py').write_bytes(b'modified')
+            with self.assertRaisesRegex(AssertionError, 'SOURCE_CHANGED'):
+                resume.verify_source_files(root, hashes)
+
+    def test_missing_extra_and_traversal_source_names_are_rejected(self):
+        hashes = dict.fromkeys(resume.SOURCE_FILES, 'a' * 64)
+        invalid = [{k:v for k,v in hashes.items() if k != 'activate.py'},
+                   {**hashes, 'unexpected.py':'a'*64},
+                   {**hashes, '../activate.py':'a'*64}]
+        for values in invalid:
+            with self.assertRaisesRegex(AssertionError, 'SOURCE_FILE_SET_CHANGED'):
+                resume.verify_source_files(Path('nonexistent'), values)
+
     def probe(self, source):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), patch('sys.argv', []):
