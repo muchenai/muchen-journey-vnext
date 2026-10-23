@@ -21,6 +21,8 @@ export function reviewView(item, task) {
     camp: item.camp, reviewMode: 'manual', status: item.decision === 'PASS' ? 'passed' : item.decision === 'REVISION_REQUIRED' ? 'returned' : 'pending',
     finalScore: item.score, reviewComment: item.feedback, failureReasons: (item.reasons || []).map(name => Object.keys(reasonNames).find(key => reasonNames[key] === name) || name),
     submittedAt: item.submitted_at, attempt: item.submission_version_no, revision: item.revision,
+    actualReviewer: item.actual_reviewer ?? null, reviewedAt: item.reviewed_at ?? null,
+    claim: item.claim ?? null, aiStatus: checkStatus[item.ai_status] || '暂无自查记录', aiCheckedAt: item.ai_checked_at ?? null,
     hasAi: (item.ai_statuses || []).some(s => s !== 'NOT_FOUND'), canReview: ['ASSIGNED','IN_REVIEW'].includes(item.status) && (item.allowed_commands || []).some(c => ['start', 'approve', 'request_revision'].includes(c)),
     taskSnapshot: { title: learnerTaskTitle(task?.stableKey, item.task_title), domain: item.domain, reviewMode: 'manual', camp: item.camp, badges: [], xp: 0, taskPoints: 0 },
   };
@@ -42,6 +44,8 @@ export function aiComment(checks) {
 export function detailView(base, detail, task, origin) {
   const evaluation = detail.evaluation || detail.coaching_feedback;
   return { ...base, revision: detail.revision, detail, answer: detail.submission_body,
+    actualReviewer: detail.actual_reviewer ?? null, reviewedAt: detail.reviewed_at ?? null,
+    claim: detail.claim ?? null,
     status: evaluation?.decision === 'PASS' ? 'passed' : evaluation?.decision === 'REVISION_REQUIRED' ? 'returned' : base.status,
     canReview: ['ASSIGNED','IN_REVIEW'].includes(detail.status) && (detail.allowed_commands || []).some(c => ['start', 'approve', 'request_revision'].includes(c)),
     reviewComment: evaluation?.overall_feedback || base.reviewComment || '',

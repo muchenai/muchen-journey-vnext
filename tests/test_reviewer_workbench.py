@@ -73,10 +73,15 @@ def test_reviewer_transition_locks_context_in_one_scoped_postgres_query():
         uuid.uuid4(),
     )
     sql = str(statement.compile(dialect=postgresql.dialect()))
-    assert sql.count("SELECT ") == 1
+    # Correlated permission checks are subqueries in one SQL statement, not
+    # additional round trips. The transition still locks both rows together.
+    assert sql.startswith("SELECT reviews.")
+    assert ";" not in sql
+    assert sql.count("FOR UPDATE") == 1
     assert "FOR UPDATE OF reviews, assignments" in sql
     assert "reviews.organization_id =" in sql
-    assert "reviews.reviewer_id =" in sql
+    assert "task_definitions.created_by =" in sql
+    assert "review_admin_access.access_role =" in sql
     assert "assignments.organization_id =" in sql
     assert "enrollments.status =" in sql
     assert "enrollments.reviewer_id = reviews.reviewer_id" in sql
@@ -222,7 +227,24 @@ def create_submission(
     *,
     ai_use: dict[str, object] | None = None,
     body: str | None = None,
+    publisher_id: uuid.UUID | None = None,
 ):
+    # Each scenario owns a published task, so review authority is explicit and
+    # no test mutates the shared seed task's author.
+    task_version_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        source = session.get(TaskVersion, TASK_VERSION_V2_ID)
+        task_id = uuid.uuid4()
+        author_id = publisher_id or reviewer_id
+        session.add(TaskDefinition(id=task_id, organization_id=ORGANIZATION_ID,
+            stable_key="TEST-" + task_id.hex, status=TaskDefinitionStatus.PUBLISHED,
+            revision=1, created_by=author_id))
+        session.flush()
+        values = {c.name: getattr(source, c.name) for c in TaskVersion.__table__.columns
+                  if c.name not in {"id", "task_definition_id", "published_at"}}
+        values.update(id=task_version_id, task_definition_id=task_id,
+                      published_by=author_id, reviewed_by=author_id)
+        session.add(TaskVersion(**values))
     operator = client_for(f"operator-{label}")
     invite = assert_ok(
         operator.post(
@@ -236,7 +258,7 @@ def create_submission(
                 "expires_in_hours": 24,
                 "role": "LEARNER",
                 "reviewer_id": str(reviewer_id),
-                "task_version_id": str(TASK_VERSION_V2_ID),
+                "task_version_id": str(task_version_id),
                 "target_user_id": None,
             },
         )
@@ -543,42 +565,17 @@ def test_operator_can_handoff_only_unstarted_assigned_review_with_audit_history(
         assert audit.details["previous_reviewer_id"] == str(previous_reviewer_id)
         assert audit.details["reviewer_id"] == str(new_reviewer_id)
 
+    # Legacy handoff keeps its audit/lineage but cannot grant access to another
+    # author's novice submissions. The publisher retains access after handoff.
     delegated_reviewer, csrf_token = client_for_linked_reviewer(new_reviewer_id)
     queue = assert_ok(delegated_reviewer.get("/api/v1/reviews"))
-    assert str(flow["review_id"]) in {item["id"] for item in queue["items"]}
-    started = assert_ok(
-        delegated_reviewer.post(
-            f"/api/v1/reviews/{flow['review_id']}/start",
-            headers={
-                "Idempotency-Key": f"delegated-start-{uuid.uuid4()}",
-                "X-CSRF-Token": csrf_token,
-            },
-            json={"expected_revision": 1},
-        )
-    )
-    finalized = assert_ok(
-        delegated_reviewer.post(
-            f"/api/v1/reviews/{flow['review_id']}/finalize",
-            headers={
-                "Idempotency-Key": f"delegated-finalize-{uuid.uuid4()}",
-                "X-CSRF-Token": csrf_token,
-            },
-            json=finalize_payload(started["review_revision"], decision="APPROVE"),
-        )
-    )
-    assert finalized["review_status"] == "FINALIZED"
-    delegated_history = assert_ok(delegated_reviewer.get("/api/v1/reviews/history"))
-    assert str(flow["review_id"]) in {
-        item["id"] for item in delegated_history["items"]
-    }
-    with SessionLocal() as session:
-        evaluation = session.scalar(
-            select(Evaluation).where(Evaluation.review_id == flow["review_id"])
-        )
-        assert evaluation is not None
-        assert evaluation.reviewer_id == previous_reviewer_id
-        assert evaluation.executor_id == new_reviewer_id
-        assert evaluation.created_by == new_reviewer_id
+    assert str(flow["review_id"]) not in {item["id"] for item in queue["items"]}
+    assert delegated_reviewer.get(f"/api/v1/reviews/{flow['review_id']}").status_code == 404
+    assert delegated_reviewer.post(f"/api/v1/reviews/{flow['review_id']}/start",
+        headers={"X-CSRF-Token":csrf_token, "Idempotency-Key":str(uuid.uuid4())},
+        json={"expected_revision":1}).status_code == 404
+    author = client_for("author-after-handoff")
+    assert_ok(author.get(f"/api/v1/reviews/{flow['review_id']}", headers=REVIEWER_HEADERS))
 
 
 def test_operator_cannot_handoff_review_after_reviewer_started_it():

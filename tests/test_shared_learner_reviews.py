@@ -85,7 +85,8 @@ def test_shared_peer_can_review_new_oauth_learner_and_actual_executor_is_retaine
     excluded, _ = client_for_linked_reviewer(excluded_id)
     assert excluded.get('/api/v1/reviews').status_code in (401,403)
     outsider, _ = client_for_linked_reviewer(outsider_id)
-    assert outsider.get(f'/api/v1/reviews/{review_id}').status_code == 404
+    # Exploration is available to every authorized Review account, not just the pool.
+    assert outsider.get(f'/api/v1/reviews/{review_id}').status_code == 200
 
 
 def test_shared_scope_does_not_expose_old_assigned_or_other_organization_reviews(shared_pool):
@@ -135,11 +136,11 @@ def test_excluded_staff_cannot_oauth_into_review_but_can_still_use_learner_entry
     assert learner.get('/api/v1/reviews').status_code == 403
 
 
-def test_disabling_shared_mode_returns_to_assigned_visibility(shared_pool, monkeypatch):
+def test_exploration_remains_available_when_legacy_shared_pool_is_disabled(shared_pool, monkeypatch):
     provider, peer_id, _, _ = shared_pool
     review_id = new_submission(provider)
     peer, _ = client_for_linked_reviewer(peer_id)
     assert peer.get(f'/api/v1/reviews/{review_id}').status_code == 200
     monkeypatch.setenv('FEISHU_LEARNER_SHARED_REVIEWER_IDS', '')
     get_settings.cache_clear()
-    assert peer.get(f'/api/v1/reviews/{review_id}').status_code == 404
+    assert peer.get(f'/api/v1/reviews/{review_id}').status_code == 200

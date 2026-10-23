@@ -1,10 +1,12 @@
-"""Explicit staff exclusions and opt-in shared reviews for new OAuth learners."""
+"""Organization-scoped review access by camp, task author and admin authority."""
 from uuid import UUID
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 
 from journey_api.config import get_settings
-from journey_api.models import Enrollment, JourneyStageVersion, Review, ReviewDelegation, ReviewKind, Role
+from journey_api.models import Role, TaskDefinition
+from journey_api.review_camps import exploration_task_scope
+from journey_api.review_admin_models import ReviewAdminAccess
 
 
 def effective_roles(user_id: UUID, roles: frozenset[Role]) -> frozenset[Role]:
@@ -14,18 +16,16 @@ def effective_roles(user_id: UUID, roles: frozenset[Role]) -> frozenset[Role]:
 
 
 def review_visibility(actor):
-    not_own_migrated_work = Enrollment.learner_id != actor.learner_record_id if actor.inherited_learner_id is not None else True
-    assigned = or_(Review.reviewer_id == actor.id, ReviewDelegation.reviewer_id == actor.id)
-    settings = get_settings()
-    pool = settings.feishu_learner_shared_reviewer_ids
-    if actor.id not in pool or actor.organization_id != settings.feishu_learner_organization_id:
-        return and_(assigned, not_own_migrated_work)
-    # A durable enrollment setting opts in only new learner registrations.
-    # Existing enrollment/reviewer lineage and immutable review ownership stay intact.
-    shared = and_(
-        Review.review_kind == ReviewKind.FORMAL_EVALUATION,
-        Review.reviewer_id.in_(pool),
-        JourneyStageVersion.id.is_not(None),
-        Enrollment.review_assignment_mode == "SHARED",
+    # All callers additionally enforce organization and immutable task/submission
+    # lineage. Assignment, delegation and historical shared pools never grant
+    # access to another author's novice task submissions.
+    super_admin = select(ReviewAdminAccess.user_id).where(
+        ReviewAdminAccess.user_id == actor.id,
+        ReviewAdminAccess.organization_id == actor.organization_id,
+        ReviewAdminAccess.revoked_at.is_(None),
+        ReviewAdminAccess.access_role == "super_admin",
+    ).exists()
+    return and_(
+        actor.has_role(Role.REVIEWER),
+        or_(super_admin, exploration_task_scope(), TaskDefinition.created_by == actor.id),
     )
-    return and_(or_(assigned, shared), not_own_migrated_work)

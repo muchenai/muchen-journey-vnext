@@ -169,6 +169,9 @@ def test_authenticated_learner_session_cannot_bypass_canary_scope(
             return [Role.LEARNER]
 
     class Session:
+        def scalar(self, _query):
+            return None  # No administrator grant for this learner.
+
         def execute(self, _query):
             return Result()
 

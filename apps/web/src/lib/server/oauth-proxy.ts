@@ -22,9 +22,17 @@ export function appendSetCookies(source: Response, target: NextResponse): void {
   for (const value of values) target.headers.append("Set-Cookie", value);
 }
 
-function safeErrorRedirect(code: string): NextResponse {
+function safeErrorRedirect(code: string, upstream: Response): NextResponse {
   const safeCode = SAFE_ERROR.test(code) ? code : "IDENTITY_LOGIN_FAILED";
-  return sameOriginIdentityRedirect(`/?auth_error=${safeCode}`);
+  // Only the API's browser-bound OAuth state may select the failed login entry.
+  const loginEntries = new Map([
+    ["/review", "/review/login"],
+    ["/ops", "/ops/login"],
+    ["/content", "/content/login"],
+    ["/app", "/join"],
+  ]);
+  const login = loginEntries.get(upstream.headers.get("X-Identity-Return-To") ?? "") ?? "/";
+  return sameOriginIdentityRedirect(`${login}?auth_error=${safeCode}`);
 }
 
 export async function postIdentityApi<T>(
@@ -50,10 +58,10 @@ export async function postIdentityApi<T>(
   try {
     payload = (await response.json()) as { data?: T } & ApiErrorEnvelope;
   } catch {
-    return safeErrorRedirect("IDENTITY_PROVIDER_UNAVAILABLE");
+    return safeErrorRedirect("IDENTITY_PROVIDER_UNAVAILABLE", response);
   }
   if (!response.ok || !payload.data) {
-    return safeErrorRedirect(payload.error?.code ?? "IDENTITY_LOGIN_FAILED");
+    return safeErrorRedirect(payload.error?.code ?? "IDENTITY_LOGIN_FAILED", response);
   }
   return { data: payload.data, response };
 }

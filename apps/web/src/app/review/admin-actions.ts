@@ -1,6 +1,6 @@
 "use server";
 import { apiRequest, ApiRequestError, type ReviewDetail } from "@/lib/server/api";
-import type { AdminState, AdminReview, AdminTask, Member, Result } from "./admin-types";
+import type { AdminState, AdminReview, AdminTask, Member, Result, AdminCapabilities } from "./admin-types";
 async function safely<T>(work: () => Promise<T>): Promise<Result<T>> {
  try { return { ok: true, data: await work() }; }
  catch (error) { return { ok: false, error: error instanceof ApiRequestError ? error.message : "连接暂时失败，请重试。",
@@ -8,19 +8,23 @@ async function safely<T>(work: () => Promise<T>): Promise<Result<T>> {
 }
 export async function loadAdmin(): Promise<Result<AdminState>> {
  return safely(async () => {
-  const [reviews, tasks, members] = await Promise.all([
+  const rights = await apiRequest<AdminCapabilities>("/api/v1/review-admin/capabilities", "REVIEWER");
+  const [reviews, tasks, members, reviewers] = await Promise.all([
    apiRequest<{ items: AdminReview[]; actor: AdminState["actor"] }>("/api/v1/review-admin/reviews", "REVIEWER"),
    apiRequest<{ items: AdminTask[] }>("/api/v1/review-admin/tasks", "REVIEWER"),
-   apiRequest<{ items: Member[]; actor_id: string }>("/api/v1/review-admin/members", "OPERATOR").catch(error => {
-    if (error instanceof ApiRequestError && error.status === 403) return null;
-    throw error;
-   }),
+   rights.isSuperAdmin ? apiRequest<{ items: Member[]; actor_id: string }>("/api/v1/review-admin/members", "REVIEWER") : null,
+   rights.canPublish ? apiRequest<{ items: Member[] }>("/api/v1/review-admin/reviewers", "REVIEWER") : null,
   ]);
-  return { reviews: reviews.items, tasks: tasks.items, actor: reviews.actor, members: members?.items ?? [], operatorId: members?.actor_id ?? null };
+  return { reviews: reviews.items, tasks: tasks.items, actor: reviews.actor, members: reviewers?.items ?? [], administrators: members?.items ?? [], capabilities: rights, operatorId: rights.canPublish ? reviews.actor.id : null };
  });
 }
 export async function loadReview(id: string): Promise<Result<ReviewDetail>> {
  return safely(() => apiRequest<ReviewDetail>(`/api/v1/review-admin/reviews/${encodeURIComponent(id)}`, "REVIEWER"));
+}
+export async function updateReviewClaim(id: string, command: { action: string; expected_revision: number; token?: string }): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/reviews/${encodeURIComponent(id)}/claim`, "REVIEWER", {
+  method: "POST", body: JSON.stringify(command),
+ }));
 }
 export async function saveAdminTask(task: AdminTask): Promise<Result<AdminTask>> {
  return safely(() => apiRequest<AdminTask>(`/api/v1/review-admin/tasks/${encodeURIComponent(task.id)}`, "OPERATOR", {
@@ -52,4 +56,19 @@ export async function testAdminTask(task: AdminTask, answer: string): Promise<Re
  return safely(() => apiRequest<{ result: string; model: string }>("/api/v1/review-admin/sandbox", "OPERATOR", {
   method: "POST", body: JSON.stringify({ task, answer }),
  }));
+}
+
+export async function searchCompanyMembers(query: string): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/directory?q=${encodeURIComponent(query)}`, "REVIEWER"));
+}
+export async function bulkAdministratorAction(action: "departments" | "preview" | "apply", payload?: unknown): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/bulk/${action}`, "REVIEWER", action === "departments" ? undefined : {
+  method: "POST", body: JSON.stringify(payload),
+ }));
+}
+export async function grantAdministrator(payload: { open_id: string; expected_revision: number; domain: string; level: string; access_role?: "admin" | "super_admin" }): Promise<Result<unknown>> {
+ return safely(() => apiRequest("/api/v1/review-admin/members/grant", "REVIEWER", { method: "POST", body: JSON.stringify(payload) }));
+}
+export async function revokeAdministrator(id: string, revision: number): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/members/${encodeURIComponent(id)}/revoke`, "REVIEWER", { method: "POST", body: JSON.stringify({expected_revision: revision, confirmed: true}) }));
 }

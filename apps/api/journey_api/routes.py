@@ -399,7 +399,8 @@ def publish_task_version(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
-    require_role(actor, Role.OPERATOR)
+    from journey_api.review_admin_access import require_version_publisher
+    require_version_publisher(session, actor, task_definition_id)
     payload = {
         **command.model_dump(mode="json"),
         "task_definition_id": str(task_definition_id),

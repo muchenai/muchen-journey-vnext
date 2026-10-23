@@ -13,11 +13,13 @@ export function proxy(request: NextRequest) {
   const isLocal = process.env.APP_ENV === "local";
   const developmentEval = isDevelopment ? " 'unsafe-eval'" : "";
   const stylePolicy = isLocal ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`;
+  const reviewAvatars = request.nextUrl.pathname === "/review" || request.nextUrl.pathname.startsWith("/review/")
+    ? " https://*.feishucdn.com https://*.larksuitecdn.com https://*.byteimg.com" : "";
   const policy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentEval}`,
     stylePolicy,
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob:${reviewAvatars}`,
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",

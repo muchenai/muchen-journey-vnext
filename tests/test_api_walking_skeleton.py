@@ -16,7 +16,7 @@ def assert_ok(response):
     return response.json()["data"]
 
 
-def test_standard_walking_skeleton_and_idempotency():
+def test_standard_walking_skeleton_and_idempotency(system_task_reviewer):
     assert client.get("/api/v1/reviews", headers=learner_headers).status_code == 403
     assert client.get("/api/v1/me/current-action", headers=reviewer_headers).status_code == 403
 

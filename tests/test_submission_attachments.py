@@ -434,7 +434,7 @@ def test_disabled_attachment_runtime_is_fail_closed(monkeypatch):
         get_settings.cache_clear()
 
 
-def test_draft_first_submit_revision_history_and_database_immutability():
+def test_draft_first_submit_revision_history_and_database_immutability(system_task_reviewer):
     learner, csrf_token, assignment_id, started = new_attachment_learner("history")
     attachment = upload_attachment(
         learner,

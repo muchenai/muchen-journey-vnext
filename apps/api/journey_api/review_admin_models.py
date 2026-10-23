@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from typing import Any
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, ForeignKeyConstraint, CheckConstraint, String, Uuid, func, false
 from sqlalchemy.orm import Mapped, mapped_column
 from journey_api.db import Base
 
@@ -24,9 +24,42 @@ class ReviewAdminDecision(Base):
     content: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
+class ReviewClaim(Base):
+    """Renewable exclusive lease for one immutable submission's review."""
+    __tablename__ = "review_claims"
+    review_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviews.id"), primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    token: Mapped[uuid.UUID] = mapped_column(Uuid)
+    version: Mapped[int] = mapped_column(default=1)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ReviewAdminCertification(Base):
     __tablename__ = "review_admin_certifications"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     revision: Mapped[int] = mapped_column(default=1)
     content: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class ReviewAdminAccess(Base):
+    """Explicit Review administration grants; never infer super admin from a name/role."""
+    __tablename__ = "review_admin_access"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id", "organization_id"], ["users.id", "users.organization_id"]),
+        CheckConstraint("access_role IN ('super_admin', 'admin')"),
+        CheckConstraint("level IN ('初级', '中级', '高级')"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    access_role: Mapped[str] = mapped_column(String(20), default="admin")
+    # Bootstrap-only authority, never accepted by the grant API or inherited.
+    can_grant_super_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    level: Mapped[str] = mapped_column(String(10), default="初级")
+    domain: Mapped[str] = mapped_column(String(40), default="产品开发")
+    revision: Mapped[int] = mapped_column(default=1)
+    granted_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

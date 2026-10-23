@@ -149,17 +149,20 @@ def test_wp19_to_wp22_formal_journey_is_one_locked_vertical_slice():
         },
     )
     assert unacknowledged.status_code == 422
-    published = post(
-        operator,
-        "/api/v1/ops/formal-journeys/publish",
-        json={
-            "reviewed_by": str(REVIEWER_ID),
-            "catalog_version": 2,
-            "expected_current_version": 0,
-            "review_acknowledged": True,
-        },
-        role_headers=OPERATOR_HEADERS,
-    )
+    existing = ok(operator.get("/api/v1/ops/formal-journeys", headers=OPERATOR_HEADERS))["items"]
+    published = next((item for item in existing if any(stage["stable_key"] == "ASM-003-DATA-CONSTRUCTION" for stage in item["stages"])), None)
+    if published is None:
+        published = post(
+            operator,
+            "/api/v1/ops/formal-journeys/publish",
+            json={
+                "reviewed_by": str(REVIEWER_ID),
+                "catalog_version": 2,
+                "expected_current_version": 0,
+                "review_acknowledged": True,
+            },
+            role_headers=OPERATOR_HEADERS,
+        )
     assert [item["stage_kind"] for item in published["stages"]] == [
         "DAY_0",
         "TREASURE",

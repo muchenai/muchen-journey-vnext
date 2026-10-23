@@ -36,11 +36,15 @@ def test_feishu_review_operator_session_without_fixture_and_logout(shared_pool, 
     queue = assert_ok(reviewer.get('/api/v1/review-admin/reviews'))
     assert queue['actor']['id'] == str(reviewer_id)
     row = next(r for r in queue['items'] if r['id'] == str(review_id))
-    assert assert_ok(reviewer.get('/api/v1/review-admin/members'))['actor_id'] == str(reviewer_id)
+    assert reviewer.get('/api/v1/review-admin/members').status_code == 403
+    assert assert_ok(reviewer.get('/api/v1/review-admin/capabilities'))['isSuperAdmin'] is False
     payload = {'expected_revision': row['revision'], 'decision':'APPROVE',
         'feedback':'已核对本次任务的具体证据和行动记录，符合完成要求。', 'reasons':[]}
     url = f'/api/v1/review-admin/reviews/{review_id}/decision'
     assert reviewer.post(url, json=payload, headers={'Idempotency-Key':str(uuid.uuid4())}).status_code == 403
+    lease = assert_ok(reviewer.post(f'/api/v1/review-admin/reviews/{review_id}/claim',
+        json={'action':'acquire','expected_revision':row['revision']}, headers={'X-CSRF-Token':session['csrf_token']}))
+    payload.update(claim_token=lease['token'], expected_revision=lease['revision'])
     headers = {'X-CSRF-Token':session['csrf_token'], 'Idempotency-Key':str(uuid.uuid4())}
     assert assert_ok(reviewer.post(url, json=payload, headers=headers))['assignment_status'] in {'PASSED','COMPLETED'}
     task_id = str(uuid.uuid4())

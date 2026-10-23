@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { apiRequest, ApiRequestError } from "@/lib/server/api";
 import { SESSION_COOKIE, CSRF_COOKIE } from "@/lib/auth/cookies";
-import { loadAdmin, loadReview, saveAdminTask, archiveAdminTask, publishAdminTask, decideAdminReview, certifyMember, testAdminTask } from "@/app/review/admin-actions";
+import { loadAdmin, loadReview, saveAdminTask, archiveAdminTask, publishAdminTask, decideAdminReview, certifyMember, testAdminTask, searchCompanyMembers, grantAdministrator, revokeAdministrator } from "@/app/review/admin-actions";
 import type { AdminTask, Member } from "@/app/review/admin-types";
+import { updateReviewClaim } from "@/app/review/admin-actions";
+import { bulkAdministratorAction } from "@/app/review/admin-actions";
 
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => {
@@ -32,6 +34,36 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== "object") return reply({ ok: false, error: "请求格式不正确。" }, 400);
     const { command, task, id, key, payload } = body;
     switch (command) {
+      case "directoryStatus":
+      case "refreshDirectory":
+        try {
+          const data = await apiRequest(`/api/v1/review-admin/directory/${command === "directoryStatus" ? "status" : "refresh"}`, "REVIEWER",
+            command === "refreshDirectory" ? { method: "POST" } : undefined);
+          return reply({ ok: true, data });
+        } catch (error) {
+          if (error instanceof ApiRequestError) return reply({ ok: false, error: error.message, status: error.status });
+          throw error;
+        }
+      case "bulkDepartments":
+        return reply(await bulkAdministratorAction("departments"));
+      case "bulkPreview":
+        if (!Array.isArray(payload?.rules)) break;
+        return reply(await bulkAdministratorAction("preview", payload));
+      case "bulkApply":
+        if (typeof payload?.preview_token !== "string" || !Array.isArray(payload?.open_ids) || payload?.confirmed !== true) break;
+        return reply(await bulkAdministratorAction("apply", payload));
+      case "reviewClaim":
+        if (!uuid(id) || !payload || !["acquire", "renew", "release", "force_release"].includes(payload.action) || !Number.isInteger(payload.expected_revision) || (payload.token && !uuid(payload.token))) break;
+        return reply(await updateReviewClaim(id, payload));
+      case "searchMembers":
+        if (typeof payload?.query !== "string" || payload.query.trim().length < 1 || payload.query.length > 60) break;
+        return reply(await searchCompanyMembers(payload.query));
+      case "grantAdmin":
+        if (typeof payload?.open_id !== "string" || !Number.isInteger(payload.expected_revision)) break;
+        return reply(await grantAdministrator(payload));
+      case "revokeAdmin":
+        if (!uuid(id) || !Number.isInteger(payload?.revision) || payload.confirmed !== true) break;
+        return reply(await revokeAdministrator(id, payload.revision));
       case "saveTask":
       case "archiveTask":
       case "publishTask":

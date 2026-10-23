@@ -14,7 +14,7 @@ from journey_api.feishu_oauth import (
     OAuthProviderError,
     get_feishu_oauth_client,
 )
-from journey_api.fixtures import OPERATOR_ID, ORGANIZATION_ID
+from journey_api.fixtures import OPERATOR_ID, ORGANIZATION_ID, REVIEWER_ID
 from journey_api import identity
 from journey_api.identity import (
     OAUTH_COOKIE,
@@ -430,6 +430,8 @@ def test_existing_mapping_login_rotates_old_session_and_rejects_wrong_role(
     denied = callback(wrong_role, "wrong-role-code", wrong_state)
     assert denied.status_code == 403
     assert denied.json()["error"]["code"] == "FORBIDDEN"
+    assert denied.headers["X-Identity-Return-To"] == "/review"
+    assert SESSION_COOKIE not in wrong_role.cookies
 
 
 def test_oauth_rejects_open_redirect_browser_mismatch_unlinked_and_provider_failure(
@@ -446,15 +448,17 @@ def test_oauth_rejects_open_redirect_browser_mismatch_unlinked_and_provider_fail
     oauth_provider.subjects["unlinked-code"] = f"ou_unlinked_{uuid.uuid4().hex}"
     mismatched = client_for("wp09-browser-mismatch").post(
         "/api/v1/auth/feishu/callback",
-        headers={"Cookie": f"{OAUTH_COOKIE}=wrong-browser-token"},
+        headers={"Cookie": f"{OAUTH_COOKIE}=wrong-browser-token", "X-Identity-Return-To": "/review"},
         json={"code": "unlinked-code", "state": state},
     )
     assert mismatched.status_code == 401
+    assert "X-Identity-Return-To" not in mismatched.headers
     assert oauth_provider.exchange_count == 0
 
     unlinked = callback(owner, "unlinked-code", state)
     assert unlinked.status_code == 403
     assert unlinked.json()["error"]["code"] == "IDENTITY_NOT_LINKED"
+    assert unlinked.headers["X-Identity-Return-To"] == "/review"
     assert SESSION_COOKIE not in owner.cookies
 
     provider_down = client_for("wp09-provider-down")
@@ -463,8 +467,24 @@ def test_oauth_rejects_open_redirect_browser_mismatch_unlinked_and_provider_fail
     assert failed.status_code == 502
     assert failed.json()["error"]["code"] == "IDENTITY_PROVIDER_UNAVAILABLE"
     assert failed.json()["error"]["retryable"] is True
+    assert failed.headers["X-Identity-Return-To"] == "/review"
     replay = callback(provider_down, "provider-failure", failed_state)
     assert replay.status_code == 409
+    assert replay.headers["X-Identity-Return-To"] == "/review"
+
+
+@pytest.mark.parametrize("entry", ["/review", "/ops", "/content", "/app"])
+def test_oauth_failure_preserves_only_verified_entry(oauth_provider, monkeypatch, entry):
+    monkeypatch.setenv("FEISHU_LEARNER_REGISTRATION_ENABLED", "true")
+    monkeypatch.setenv("FEISHU_LEARNER_ORGANIZATION_ID", str(ORGANIZATION_ID))
+    monkeypatch.setenv("FEISHU_LEARNER_REVIEWER_ID", str(REVIEWER_ID))
+    get_settings.cache_clear()
+    browser = client_for("failure-entry-" + uuid.uuid4().hex)
+    state = begin_oauth(browser, entry)
+    response = callback(browser, "provider-unavailable", state)
+    assert response.status_code == 502
+    assert response.headers["X-Identity-Return-To"] == entry
+    assert SESSION_COOKIE not in browser.cookies
 
 
 def test_external_identity_revocation_immediately_invalidates_session(
