@@ -14,10 +14,24 @@ import re
 import socket
 import sys
 import time
+import traceback
 
 CANDIDATE = 'f8afcb5c865c3a6a44b68af49ed347c6e593a3ad'
 ROOT = Path('/srv/journey-next-production/canary')
 SOURCE = ROOT / 'exploration-runs/39926387464-1-activate'
+SOURCE_FILES = frozenset({'activate.py','prepare.py','canary_schema_upgrade.py',
+    'wp31_database_snapshot.py','db_facts.py','db_facts_control.py','grant_runtime.py',
+    'facts_guard.py','verify_ready.py','bootstrap_owners.py'})
+
+
+def verify_source_files(root, hashes):
+    # The exact allowlist permits the real wp31 script without permitting
+    # arbitrary paths or broadening which historical code can execute.
+    assert set(hashes) == SOURCE_FILES, 'SOURCE_FILE_SET_CHANGED'
+    for name, expected in hashes.items():
+        path = root / name
+        assert path.is_file() and not path.is_symlink(), 'SOURCE_FILE_UNSAFE'
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, 'SOURCE_CHANGED'
 
 
 def probe_program(source, mode):
@@ -91,13 +105,8 @@ def main():
     payload = json.loads(sys.stdin.read(100_000))
     assert set(payload) == {'backup_key', 'bootstrap_source', 'source_hashes'}
     # The workflow computes these from the exact original released commit.
-    for name, expected in payload['source_hashes'].items():
-        assert re.fullmatch(r'[a-z_]+\.py', name)
-        path = SOURCE / name
-        assert path.is_file() and not path.is_symlink()
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, 'SOURCE_CHANGED'
-    assert set(payload['source_hashes']) == {'activate.py','prepare.py','canary_schema_upgrade.py',
-        'wp31_database_snapshot.py','db_facts.py','db_facts_control.py','grant_runtime.py','facts_guard.py','verify_ready.py','bootstrap_owners.py'}
+    print(json.dumps({'step':'VERIFY_ORIGINAL_PACKAGE_SCRIPTS'}), flush=True)
+    verify_source_files(SOURCE, payload['source_hashes'])
     sys.path.insert(0, str(SOURCE))
     spec = importlib.util.spec_from_file_location('original_activation', SOURCE / 'activate.py')
     module = importlib.util.module_from_spec(spec)
@@ -145,6 +154,9 @@ if __name__ == '__main__':
     try:
         main()
     except (Exception, KeyboardInterrupt) as exc:
+        locations = [line for frame, line in traceback.walk_tb(exc.__traceback__)
+                     if frame.f_code.co_filename == __file__]
         print(json.dumps({'result':'STOP','error_type':type(exc).__name__,
+                          'resume_line':locations[-1] if locations else None,
                           'do_not_retry_blindly':True}), flush=True)
         raise SystemExit(1)
