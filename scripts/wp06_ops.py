@@ -36,9 +36,14 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0038_review_admin_workspace"
+EXPECTED_MIGRATION_HEAD = "0044_task_author_review"
 AI_BASE_REVISION = "0035_phone_password_login"
 AI_TABLES = ("ai_self_checks",)
+REVIEW_TABLES = (
+    "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
+    "review_admin_access", "review_claims", "directory_sync", "directory_members",
+)
+POST_AI_BASE_TABLES = (*AI_TABLES, *REVIEW_TABLES)
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 PHONE_LOGIN_TABLES = (
     "phone_otp_challenges",
@@ -51,10 +56,12 @@ ROLLBACK_OWNED_FACT_TABLES = (
     "assignment_bound_reentry_invites",
     *PHONE_LOGIN_TABLES,
     *AI_TABLES,
+    *REVIEW_TABLES,
 )
 CURRENT_FACT_TABLES = (
     *PHONE_LOGIN_TABLES,
     *AI_TABLES,
+    *REVIEW_TABLES,
     "organizations",
     "users",
     "role_assignments",
@@ -477,7 +484,7 @@ def migration_check() -> Path:
             "api", "alembic", "downgrade", AI_BASE_REVISION,
         )
         baseline_tables = tuple(
-            table for table in CURRENT_FACT_TABLES if table not in AI_TABLES
+            table for table in CURRENT_FACT_TABLES if table not in POST_AI_BASE_TABLES
         )
         after_downgrade = database_facts(
             "db-test", database, tables=baseline_tables
@@ -488,7 +495,7 @@ def migration_check() -> Path:
             "counts": {
                 table: count
                 for table, count in before["counts"].items()
-                if table not in AI_TABLES
+                if table not in POST_AI_BASE_TABLES
             },
         }
         if after_downgrade != before_business:
@@ -508,8 +515,10 @@ def migration_check() -> Path:
                     "schema_version": 1,
                     "completed_at": utc_now().isoformat(),
                     "scope": "ISOLATED_LOCAL_PERSISTENT_DRILL",
-                    "upgrade_0035_to_0037": "PASS",
-                    "downgrade_0037_to_0035": "PASS",
+                    "upgrade_to_head": "PASS",
+                    "downgrade_to_base": "PASS",
+                    "base_revision": AI_BASE_REVISION,
+                    "head_revision": EXPECTED_MIGRATION_HEAD,
                     "reupgrade_to_head": "PASS",
                     "production_release_range_rehearsed": True,
                     "business_facts_preserved": True,
