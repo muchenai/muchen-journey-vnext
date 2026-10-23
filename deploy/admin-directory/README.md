@@ -42,3 +42,17 @@ do not blindly rerun the workflow. The prior release and encrypted backup remain
 
 Migration 0044 changes the final-outcome authorization trigger while preserving
 existing outcomes and evidence checks. It does not rewrite submission history.
+
+## Known pre-migration recovery
+
+Run 39926387464 uploaded and verified the complete f8afcb5 release, staged the
+configuration, then stopped during the read-only owner check. It never reached
+backup, database migration or service replacement. `admin-directory-resume.yml`
+reuses only that prepared candidate and package run 39925261076; it refuses any
+state with an existing backup or activation receipt, changed current release,
+changed original scripts, changed prepared configuration, or a migrated schema.
+The recovery rechecks imported image configs and emits bounded owner diagnostics
+without exception messages, secrets or personnel data. Only a transient read-only
+directory failure may be retried once; identity mismatches always stop. If checks
+pass, the original backup/restore rehearsal and activation sequence still apply.
+The workflow retains the same mandatory human production environment approval.
