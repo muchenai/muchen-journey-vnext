@@ -56,3 +56,13 @@ without exception messages, secrets or personnel data. Only a transient read-onl
 directory failure may be retried once; identity mismatches always stop. If checks
 pass, the original backup/restore rehearsal and activation sequence still apply.
 The workflow retains the same mandatory human production environment approval.
+
+Run 39937421647 identified an owner identity conflict for the second approved
+owner. Resolve 刘默文 through the verified application's existing Feishu subject
+when present, requiring the same organization, an active user, the exact verified
+name and a non-revoked identity. Preserve that user ID, identity and existing
+roles; add Reviewer with the approved super-admin grant if needed. Retain the
+historical unbound reviewer record without merging or moving any business data.
+Only if no such Feishu identity exists may the pinned historical record be linked.
+李鑫波 remains pinned to the original approved user ID. Revoked explicit admin
+access still blocks bootstrap, and both owner grants commit in one transaction.
