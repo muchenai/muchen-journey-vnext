@@ -5,13 +5,90 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { taskView, taskWrite, reviewView, detailView, aiComment, reviewFeedbackError } from '../public/review-native/native-model.js';
-import { renderReview, openSubmission } from '../public/review-native/review.js';
+import { renderReview, openSubmission, bindReview } from '../public/review-native/review.js';
 import { ApiStore, createJourneyService } from '../public/review-native/native-api.js';
 import { learnerTaskTitles, learnerTaskTitle } from '../public/review-native/task-titles.js';
 const id = '00000000-0000-4000-8000-000000000001';
 const task = { id, title: '测评三', domain: '产品开发', reviewMode: 'ai', badges: [{ id: 'tech', weight: 100 }], revision: 4, materials: [], status: 'published' };
 const row = { id, task_id: id, learner_id: 'learner', learner_name: '<script>私密</script>', camp: 'exploration', task_title: '提交时任务名称', domain: '探索营', status: 'ASSIGNED', allowed_commands: ['start'], decision: null, ai_statuses: ['COMPLETED'], submitted_at: '2026-10-21T00:00:00Z', submission_version_no: 2, revision: 6 };
 const detail = { id, revision: 7, status: 'IN_REVIEW', allowed_commands: ['approve','request_revision'], submission_body: '当前学员自己的链接', task_title: '固定版本名称', task_purpose: '固定要求', completion_criteria: ['必须完整'], task_learning_materials: [{ title: '本次材料', body: '固定文本' }], materials: { attachments: [{ id: 'clean', original_filename: '安全文件', status: 'READY', scan_status: 'CLEAN' }, { id: 'bad', original_filename: '未扫描', status: 'READY', scan_status: 'PENDING' }] }, document_ai_checks: [{ document_url: 'https://example.com/docx/own', status: 'COMPLETED', record_id: 'r2', result: '最新建议', generated_at: 'today', history: [{ record_id: 'r2', result: '最新建议' }, { record_id: 'r1', result: '上次建议' }] }] };
+function selectReviewTab(store, tab) {
+  const page = { querySelector() { return null; } };
+  bindReview({querySelector: () => page}, store, {reviewCamp:'exploration', refresh() {}});
+  page.onclick({target:{closest: selector => selector === '[data-review-tab]' ? {dataset:{reviewTab:tab}} : null}});
+}
+test('actual reviewer and server time render safely, without falling back to an assignee', async () => {
+  const credit = { id: 'executor', name: '<b>实际审核员</b>' };
+  const at = '2026-10-22T08:09:10Z';
+  const base = reviewView({ ...row, decision: 'PASS', actual_reviewer: credit, reviewed_at: at });
+  const store = { data: { submissions: [base], claims: {}, learners: [] }, getTask: () => task, async loadSubmission() {} };
+  selectReviewTab(store, 'reviewed');
+  const html = renderReview(store, { reviewCamp: 'exploration' });
+  assert.ok(html.includes('<th>实际审核人</th><th>审核时间</th>'));
+  assert.ok(html.includes('&lt;b&gt;实际审核员&lt;/b&gt;'));
+  assert.ok(html.includes('16:09:10'));
+  const final = detailView(base, { ...detail, status: 'FINALIZED', allowed_commands: [],
+    actual_reviewer: credit, reviewed_at: at, evaluation: { decision: 'PASS', overall_feedback: '已完成' } }, task, 'http://localhost');
+  store.data.submissions = [final];
+  let modalHtml;
+  await openSubmission(store, { reviewCamp: 'exploration', openModal(html) { modalHtml = html; }, toast(message) { assert.fail(message); } }, id);
+  assert.match(modalHtml, /实际审核人：<strong>&lt;b&gt;实际审核员&lt;\/b&gt;<\/strong>/);
+  assert.match(modalHtml, /审核时间：[\s\S]*16:09:10/);
+  const pending = detailView(base, detail, task, 'http://localhost');
+  assert.equal(pending.actualReviewer, null);
+  assert.equal(pending.reviewedAt, null);
+  assert.equal(reviewView({ ...row, reviewer_name: '原负责人' }).actualReviewer, null);
+  selectReviewTab(store, 'pending');
+});
+
+test('each review tab has only relevant columns and claims separate pending from in-progress', () => {
+  const pending = reviewView(row), active = { ...reviewView(row), id:'active', claim:{owner_name:'另一审核员', mine:false, started_at:'2026-10-22T08:00:00Z'} };
+  const store = { data:{submissions:[pending,active]}, getTask: () => task };
+  const expected = {
+    pending:['学员','任务','提交时间','状态','操作'],
+    reviewing:['学员','任务','提交时间','正在审核人','开始审核时间','操作'],
+    ai:['学员','任务','自测状态','自测时间','操作'],
+    reviewed:['学员','任务','评分','提交时间','实际审核人','审核时间','操作'],
+    failed:['学员','任务','提交时间','未通过原因','实际审核人','审核时间','操作'],
+  };
+  for (const [tab, columns] of Object.entries(expected)) {
+    selectReviewTab(store, tab);
+    const html = renderReview(store,{reviewCamp:'exploration'});
+    assert.deepEqual([...html.matchAll(/<th>(.*?)<\/th>/g)].map(m=>m[1]), columns);
+    if (tab === 'pending') { assert.ok(html.includes('去审核')); assert.ok(!html.includes('data-review-open="active"')); }
+    if (tab === 'reviewing') { assert.ok(html.includes('另一审核员')); assert.ok(html.includes('他人审核中')); }
+  }
+  selectReviewTab(store, 'pending');
+});
+
+test('failed exclusive claim prevents opening submission or loading its document', async () => {
+  let reads=0, opened=0, notice;
+  const store = {data:{submissions:[reviewView(row)]}, async updateReviewClaim() {throw new Error('该文档正在被其他人审核');}, async loadSubmission(){reads++;}};
+  await openSubmission(store,{reviewCamp:'exploration',openModal(){opened++;},toast(text){notice=text;}}, id);
+  assert.equal(reads,0); assert.equal(opened,0); assert.match(notice,/正在被其他人审核/);
+});
+
+test('historical submissions retain their own reviewer and never inherit current attribution', async () => {
+  const originalFetch = globalThis.fetch, originalLocation = globalThis.location;
+  const oldReviewer = { id: 'old', name: '上次审核员' }, currentReviewer = { id: 'current', name: '本次审核员' };
+  const history = [
+    { id: 'v1', version_no: 1, review_id: 'r1', decision: 'REVISION_REQUIRED', actual_reviewer: oldReviewer, reviewed_at: '2026-10-20T02:00:00Z' },
+    { id: 'v2', version_no: 2, review_id: null },
+  ];
+  try {
+    globalThis.location = { origin: 'http://localhost' };
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: true, data: {
+      ...detail, submission_version_id: 'v3', actual_reviewer: currentReviewer, reviewed_at: '2026-10-22T02:00:00Z', submission_history: history,
+    } }) });
+    const store = new ApiStore(); store.data = { tasks: [task], submissions: [reviewView(row)] };
+    await store.loadSubmission(id);
+    const older = store.data.submissions.filter(s => s.historical);
+    assert.deepEqual(older[0].actualReviewer, oldReviewer);
+    assert.equal(older[0].reviewedAt, history[0].reviewed_at);
+    assert.equal(older[1].actualReviewer, null);
+    assert.equal(older[1].reviewedAt, null);
+  } finally { globalThis.fetch = originalFetch; globalThis.location = originalLocation; }
+});
 test('badge IDs round-trip without changing revision or task identity', () => {
   const view = taskView(task); assert.equal(view.badges[0].id, 'dev');
   const payload = taskWrite(view); assert.equal(payload.badges[0].id, 'tech'); assert.equal(payload.revision,4); assert.equal(payload.id,id);
@@ -120,7 +197,7 @@ test('real API adapter rejects approval with return reasons without sending a re
     const service = createJourneyService({ store: { data: { submissions: [reviewView(row)] } } });
     await assert.rejects(() => service.submissions.review(id, { decision: 'passed', comment: '', reasonCodes: ['incorrect_answer'] }), /取消勾选/);
     assert.equal(calls, 0);
-    assert.match(renderReview({ data: { submissions: [reviewView(row)] }, getTask: () => task }, { reviewCamp: 'exploration' }), /td class="review-reason-cell"/);
+    assert.doesNotMatch(renderReview({ data: { submissions: [reviewView(row)] }, getTask: () => task }, { reviewCamp: 'exploration' }), /<th>未通过原因<\/th>/);
   } finally { globalThis.fetch = originalFetch; }
 });
 test('publication requires a chosen reviewer and every material confirmation', async () => {

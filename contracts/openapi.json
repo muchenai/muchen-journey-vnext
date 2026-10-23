@@ -3199,6 +3199,70 @@
         }
       }
     },
+    "/api/v1/review-admin/reviews/{review_id}/claim": {
+      "post": {
+        "summary": "Claim Review",
+        "operationId": "claim_review_api_v1_review_admin_reviews__review_id__claim_post",
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/review-admin/reviews/{review_id}/decision": {
       "post": {
         "summary": "Decide",
@@ -3316,6 +3380,355 @@
         }
       }
     },
+    "/api/v1/review-admin/capabilities": {
+      "get": {
+        "summary": "Capabilities",
+        "operationId": "capabilities_api_v1_review_admin_capabilities_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/reviewers": {
+      "get": {
+        "summary": "Publication Reviewers",
+        "operationId": "publication_reviewers_api_v1_review_admin_reviewers_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/directory/status": {
+      "get": {
+        "summary": "Directory Status",
+        "operationId": "directory_status_api_v1_review_admin_directory_status_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/directory/refresh": {
+      "post": {
+        "summary": "Refresh Directory",
+        "operationId": "refresh_directory_api_v1_review_admin_directory_refresh_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/directory": {
+      "get": {
+        "summary": "Search Directory",
+        "operationId": "search_directory_api_v1_review_admin_directory_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/members/grant": {
+      "post": {
+        "summary": "Grant Administrator",
+        "operationId": "grant_administrator_api_v1_review_admin_members_grant_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantAdministrator"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/members/{user_id}/revoke": {
+      "post": {
+        "summary": "Revoke Administrator",
+        "operationId": "revoke_administrator_api_v1_review_admin_members__user_id__revoke_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeAdministrator"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/review-admin/members/{user_id}/certification": {
       "put": {
         "summary": "Certify",
@@ -3408,6 +3821,158 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SandboxCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/bulk/departments": {
+      "get": {
+        "summary": "Departments",
+        "operationId": "departments_api_v1_review_admin_bulk_departments_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/bulk/preview": {
+      "post": {
+        "summary": "Preview",
+        "operationId": "preview_api_v1_review_admin_bulk_preview_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Preview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/bulk/apply": {
+      "post": {
+        "summary": "Apply",
+        "operationId": "apply_api_v1_review_admin_bulk_apply_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Apply"
               }
             }
           }
@@ -7165,6 +7730,46 @@
         ],
         "title": "AiUseDisclosure"
       },
+      "Apply": {
+        "properties": {
+          "preview_token": {
+            "type": "string",
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Preview Token"
+          },
+          "open_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Open Ids"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmed"
+          },
+          "choices": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 20,
+            "title": "Choices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_token",
+          "open_ids",
+          "confirmed"
+        ],
+        "title": "Apply"
+      },
       "ArchiveTask": {
         "properties": {
           "expected_revision": {
@@ -7817,6 +8422,54 @@
           "level"
         ],
         "title": "Certification"
+      },
+      "ClaimCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "acquire",
+              "renew",
+              "release",
+              "force_release"
+            ],
+            "title": "Action"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "expected_claim_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Claim Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "expected_revision"
+        ],
+        "title": "ClaimCommand"
       },
       "CoachingFeedbackOut": {
         "properties": {
@@ -10279,6 +10932,51 @@
           "request_id"
         ],
         "title": "FormalJourneyVersionResponse"
+      },
+      "GrantAdministrator": {
+        "properties": {
+          "open_id": {
+            "type": "string",
+            "pattern": "^ou_[A-Za-z0-9_-]{1,170}$",
+            "title": "Open Id"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "default": 0
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "default": "产品开发"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "初级",
+              "中级",
+              "高级"
+            ],
+            "title": "Level",
+            "default": "初级"
+          },
+          "access_role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "super_admin"
+            ],
+            "title": "Access Role",
+            "default": "admin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "open_id"
+        ],
+        "title": "GrantAdministrator"
       },
       "GrantReviewerRoleCommand": {
         "properties": {
@@ -13697,6 +14395,25 @@
         ],
         "title": "PresignedAttachmentResponse"
       },
+      "Preview": {
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Rules"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "title": "Preview"
+      },
       "PublishConstructionModulePackageCommand": {
         "properties": {
           "package": {
@@ -14583,6 +15300,18 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "Expected Revision"
+          },
+          "claim_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Token"
           },
           "decision": {
             "type": "string",
@@ -15714,6 +16443,27 @@
         ],
         "title": "RevisionCommand"
       },
+      "RevokeAdministrator": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "confirmed"
+        ],
+        "title": "RevokeAdministrator"
+      },
       "RevokeControlledTaskAuthorizationCommand": {
         "properties": {
           "expected_revision": {
@@ -16160,6 +16910,46 @@
           "dimensions"
         ],
         "title": "RubricVersionInput"
+      },
+      "Rule": {
+        "properties": {
+          "department_id": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 1,
+            "title": "Department Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "all",
+              "title"
+            ],
+            "title": "Mode"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "default": "产品开发"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "初级",
+              "中级",
+              "高级"
+            ],
+            "title": "Level",
+            "default": "初级"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department_id",
+          "mode"
+        ],
+        "title": "Rule"
       },
       "RuntimeComponentOut": {
         "properties": {

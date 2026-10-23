@@ -17,7 +17,8 @@ export type AdminTask = {
 };
 export type AdminReview = ReviewItem & { learner_id: string; task_id: string; camp: string; domain: string; review_mode: string;
  decision: string | null; feedback: string; score: number | null; reasons: string[]; ai_statuses: string[] };
-export type Member = { id: string; name: string; roles: string[]; revision: number; certification: { domain: string; level: string } | null };
-export type AdminState = { tasks: AdminTask[]; reviews: AdminReview[]; members: Member[]; actor: { id: string; name: string }; operatorId: string | null };
+export type Member = { id: string; name: string; employee_no?: string; departments?: string[]; department_paths?: string[]; roles: string[]; revision: number; accessRole?: string; status?: string; certification: { domain: string; level: string } | null };
+export type AdminCapabilities = { isSuperAdmin: boolean; canGrantSuperAdmins: boolean; canPublish: boolean; level: string; allowedDifficulties: string[] };
+export type AdminState = { tasks: AdminTask[]; reviews: AdminReview[]; members: Member[]; administrators?: Member[]; capabilities?: AdminCapabilities; actor: { id: string; name: string }; operatorId: string | null };
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number; code?: string };
 export function blankTask(): AdminTask { return { id: crypto.randomUUID(), title: "", summary: "", camp: "novice", domain: DOMAINS[0], difficulty: "入门", badges: [{ id: "product", weight: 100 }], materials: [], reviewMode: "manual", passScore: 60, rubric: [], rubricAttachments: [], revision: 0, status: "draft" }; }

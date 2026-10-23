@@ -24,8 +24,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0038_review_admin_workspace",
-        "revision_count": 40,
+        "head": "0044_task_author_review",
+        "revision_count": 46,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -95,15 +95,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0038_review_admin_workspace",
-        "revision_count": 40,
+        "head": "0044_task_author_review",
+        "revision_count": 46,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_form_one_connected_migration_graph():
-    assert migration()["head"] == "0038_review_admin_workspace"
+    assert migration()["head"] == "0044_task_author_review"
     assert config_schema() == 3
 
 

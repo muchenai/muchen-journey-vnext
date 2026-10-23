@@ -1052,6 +1052,9 @@ def complete_feishu_oauth(
         state_row.browser_token_hash, expected_browser_hash
     ):
         raise ApiError(401, "OAUTH_BROWSER_MISMATCH", "身份登录上下文不存在或已过期。")
+    # Preserve the entry only after verifying the server-side state and browser binding.
+    # Failed staff logins must return to their login page, not the learner entry.
+    request.state.identity_return_to = state_row.return_to
     if command.authorization_method == "client" and state_row.return_to != "/app":
         raise ApiError(422, "VALIDATION_FAILED", "客户端登录仅用于学员入口。")
     now = utc_now()
@@ -1184,6 +1187,8 @@ def complete_feishu_oauth(
         ).all()
     )
     active_roles = effective_roles(user.id, active_roles)
+    from journey_api.review_admin_access import filter_staff_roles
+    active_roles = filter_staff_roles(session, user.id, user.organization_id, active_roles)
     if role not in active_roles:
         raise ApiError(403, "FORBIDDEN", "当前身份没有该入口的有效权限。")
 

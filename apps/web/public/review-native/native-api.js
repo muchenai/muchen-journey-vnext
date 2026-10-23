@@ -9,14 +9,14 @@ export async function request(body, reviewId) {
   });
   let result;
   try { result = await response.json(); } catch { throw new Error('登录或连接已失效，请刷新页面重新登录。'); }
-  if (response.status === 401 || result.status === 401) {
-    location.assign('/review/login?auth_error=SESSION_EXPIRED');
+  if (response.status === 401 || result.status === 401 || (!body && (response.status === 403 || result.status === 403))) {
+    location.assign('/review/login?auth_error=' + (response.status === 403 || result.status === 403 ? 'FORBIDDEN' : 'SESSION_EXPIRED'));
     throw new Error('登录已失效，请重新使用飞书登录。');
   }
   if (!response.ok || !result.ok) throw new Error(result.error || '操作未完成，请稍后重试。');
   return result.data;
 }
-export const getCurrentInviteUser = () => activeStore ? { id: activeStore.actor.id, name: activeStore.actor.name, accessRole: activeStore.operatorId ? 'super_admin' : 'reviewer' } : null;
+export const getCurrentInviteUser = () => activeStore ? { id: activeStore.actor.id, name: activeStore.actor.name, accessRole: activeStore.capabilities?.isSuperAdmin ? 'super_admin' : activeStore.operatorId ? 'admin' : 'reviewer' } : null;
 export const isInviteLoggedIn = () => !!getCurrentInviteUser();
 export const onInviteSessionChange = () => {};
 export const renderInviteLogin = () => '';
@@ -26,6 +26,16 @@ export function newDraft() {
   return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp: 'novice', domain: '产品开发', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
 }
 export class ApiStore {
+  reviewLeases = new Map();
+  async updateReviewClaim(id, action, expectedClaimVersion) {
+    const base = this.data.submissions.find(s => s.id === id);
+    if (!base) throw new Error('记录已更新，请刷新列表。');
+    const token = this.reviewLeases.get(id)?.token;
+    const result = await request({ command: 'reviewClaim', id, payload: { action, expected_revision: base.revision, expected_claim_version: expectedClaimVersion ?? base.claim?.version, ...(token ? {token} : {}) } });
+    base.revision = result.revision; base.claim = result.claim;
+    if (result.token) this.reviewLeases.set(id, result); else this.reviewLeases.delete(id);
+    return result;
+  }
   static async create() {
     const store = new ApiStore();
     store.data = { tasks: [], submissions: [], learners: [], claims: {}, certifications: [] };
@@ -40,6 +50,8 @@ export class ApiStore {
     const snapshot = await request();
     if (this.actor && this.actor.id !== snapshot.actor.id) { location.reload(); throw new Error('登录身份已变更，请刷新。'); }
     this.actor = snapshot.actor; this.operatorId = snapshot.operatorId; this.members = snapshot.members;
+    this.capabilities = snapshot.capabilities;
+    this.administrators = snapshot.administrators || [];
     this.data.tasks = snapshot.tasks.map(taskView);
     const tasksById = new Map(this.data.tasks.map(task => [task.id, task]));
     this.data.submissions = snapshot.reviews.map(item => reviewView(item, tasksById.get(item.task_id)));
@@ -79,6 +91,7 @@ export class ApiStore {
       this.data.submissions.push({ ...value, id: historyId, currentReviewId: id, historical: true, canReview: false,
         realReviewId: h.review_id, status: h.decision === 'PASS' ? 'passed' : h.decision === 'REVISION_REQUIRED' ? 'returned' : 'historical',
         reviewComment: h.feedback || '历史提交，仅供查看。', finalScore: null, answer: h.body, hasAi: false, ai: null,
+        actualReviewer: h.actual_reviewer ?? null, reviewedAt: h.reviewed_at ?? null, claim: null,
         attachments: (h.attachments || []).map(a => ({ name: a.original_filename, url: h.review_id && a.status === 'READY' && a.scan_status === 'CLEAN' ? `${location.origin}/review/${h.review_id}/attachments/${a.id}` : '' })),
         attempt: h.version_no, submittedAt: h.created_at, supersededBy: id, previousSubmissionId: previous });
       previous = historyId;
@@ -109,7 +122,7 @@ export function createJourneyService({ store }) {
       const feedbackError = reviewFeedbackError(input.decision, input.comment);
       if (feedbackError) throw new Error(feedbackError);
       if (submission.detail?.rubric?.dimensions?.some(d => d.max_points)) throw new Error('这份历史任务要求逐项评分，资源包目前没有对应输入项，暂不能在此完成审核。');
-      const payload = { expected_revision: submission.revision, decision: input.decision === 'passed' ? 'APPROVE' : 'REQUEST_REVISION', feedback: input.comment,
+      const payload = { expected_revision: submission.revision, claim_token: store.reviewLeases?.get(id)?.token, decision: input.decision === 'passed' ? 'APPROVE' : 'REQUEST_REVISION', feedback: input.comment,
         score: input.score, reasons: (input.reasonCodes || []).map(key => reasonNames[key]).filter(Boolean) };
       const signature = JSON.stringify({ id, payload });
       if (!decisionKeys.has(signature)) decisionKeys.set(signature, crypto.randomUUID());
@@ -118,17 +131,30 @@ export function createJourneyService({ store }) {
       submission.status = input.decision === 'passed' ? 'passed' : 'returned'; submission.canReview = false;
       submission.reviewComment = input.comment; submission.finalScore = input.score;
       submission.failureReasons = input.reasonCodes || [];
+      store.reviewLeases?.delete(id); submission.claim = null;
       try { await store.refresh(); } catch { /* Polling will retry the read. */ }
       return result;
     } },
-    certifications: { grant: async input => {
-      const matches = store.members.filter(m => input.id ? m.id === input.id : m.name === input.name);
-      if (matches.length !== 1) throw new Error('请填写已有成员的准确姓名；此处不能创建新账号。');
-      const member = matches[0];
-      if (!member.roles.includes(input.role === 'NPC' ? 'REVIEWER' : 'OPERATOR')) throw new Error('所选身份与该成员现有权限不一致，认证不能更改账号权限。');
-      const result = await request({ command: 'certify', payload: { member, domain: input.domain, level: ({ 1: '初级', 2: '中级', 3: '高级' })[input.level] } });
-      await store.refresh(); return result;
-    } },
+    certifications: {
+      directoryStatus: () => request({ command: 'directoryStatus' }),
+      refreshDirectory: () => request({ command: 'refreshDirectory' }),
+      departments: () => request({ command: 'bulkDepartments' }),
+      previewBulk: payload => request({ command: 'bulkPreview', payload }),
+      applyBulk: payload => request({ command: 'bulkApply', payload }),
+      search: query => request({ command: 'searchMembers', payload: {query} }),
+      grant: async input => {
+        const result = await request({ command: 'grantAdmin', payload: input });
+        await store.refresh(); return result;
+      },
+      update: async (member, domain, level) => {
+        const result = await request({command:'certify',payload:{member,domain,level}});
+        await store.refresh(); return result;
+      },
+      revoke: async member => {
+        const result = await request({command:'revokeAdmin',id:member.id,payload:{revision:member.revision,confirmed:true}});
+        await store.refresh(); return result;
+      },
+    },
     evaluations: { run: async (task, answer) => {
       const result = await request({ command: 'sandbox', task: taskWrite(task), payload: { answer } });
       return { advisory: true, score: null, dimensions: [], comment: result.result, source: result.model };

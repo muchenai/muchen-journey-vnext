@@ -120,6 +120,14 @@ def get_actor(
         if row is None:
             raise ApiError(401, "UNAUTHENTICATED", "vNext 会话无效或已过期。")
         identity_session, user = row
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and identity_session.role in {Role.REVIEWER, Role.OPERATOR, Role.CONTENT_EDITOR}:
+            # Serialize staff writes with permission revocation. A request that
+            # waited for the user lock must not continue using an old session.
+            session.scalar(select(User.id).where(User.id == user.id).with_for_update())
+            identity_session = session.scalar(select(IdentitySession).where(
+                IdentitySession.id == identity_session.id).execution_options(populate_existing=True))
+            if identity_session is None or identity_session.revoked_at is not None:
+                raise ApiError(401, "UNAUTHENTICATED", "管理端会话已失效，请重新登录。")
         roles = frozenset(
             session.scalars(
                 select(RoleAssignment.role).where(
@@ -129,6 +137,8 @@ def get_actor(
             ).all()
         )
         roles = effective_roles(user.id, roles)
+        from journey_api.review_admin_access import filter_staff_roles
+        roles = filter_staff_roles(session, user.id, user.organization_id, roles)
         if not roles:
             raise ApiError(401, "UNAUTHENTICATED", "当前会话已不具备任何有效权限。")
         if request.method not in {"GET", "HEAD", "OPTIONS"}:

@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+pytestmark = pytest.mark.usefixtures("system_task_reviewer")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import DBAPIError

@@ -2,7 +2,8 @@ import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionS
 import { ApiStore, newDraft, createJourneyService } from './native-api.js';
 import { createSandboxController } from './sandbox.js?v=20261021-brand-npc';
 import { renderReview, bindReview, openSubmission } from './review.js?v=20261021-review-decision';
-import { renderLibrary, bindLibrary, openCertification } from './library.js?v=20261021-admin-certification';
+import { renderLibrary, bindLibrary } from './library.js?v=20261021-admin-certification';
+import { openCertification } from './member-access.js';
 import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js';
 import { createAcademyStore } from './native-api.js';
 import { createAcademyController } from './academy.js?v=20261021-academy-management';
@@ -13,7 +14,7 @@ let page = location.hash === '#academy' ? 'academy' : 'publish';
 let reviewCamp = 'novice';
 try { const savedCamp = localStorage.getItem('journey_admin_review_camp'); if (REVIEW_CAMPS.some(camp => camp.id === savedCamp)) reviewCamp = savedCamp; } catch {}
 const $ = (s, root = document) => root.querySelector(s);
-const ui = { toast, refresh: render, openModal, closeModal, navigate, editTask, icon, service, get currentUser() { return getCurrentInviteUser(); }, get reviewCamp() { return reviewCamp; }, get isSuperAdmin() { return getCurrentInviteUser()?.accessRole === 'super_admin'; }, newTask: () => { navigate('publish'); $('#new-task').click(); } };
+const ui = { toast, refresh: render, openModal, closeModal, navigate, editTask, icon, service, get currentUser() { return getCurrentInviteUser(); }, get reviewCamp() { return reviewCamp; }, get isSuperAdmin() { return getCurrentInviteUser()?.accessRole === 'super_admin'; }, get canGrantSuperAdmins() { return store.capabilities?.canGrantSuperAdmins === true; }, newTask: () => { navigate('publish'); $('#new-task').click(); } };
 const academyStore = createAcademyStore({ getCurrentUser: getCurrentInviteUser });
 const academy = createAcademyController({ academy: academyStore, ui });
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);
@@ -55,6 +56,7 @@ function toast(message, type = 'success') {
 
 let returnFocus;
 function openModal(html, onReady) {
+  $('.modal')?.dispatchEvent(new Event('review-close'));
   returnFocus = document.activeElement;
   $('#modal-root').innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="详情"><button class="modal-close icon-btn" aria-label="关闭">${icon('close')}</button><div class="modal-content">${html}</div></section></div>`;
   document.body.classList.add('modal-open');
@@ -65,6 +67,7 @@ function openModal(html, onReady) {
 }
 function closeModal() {
   if ($('.modal[data-operation-pending="true"]')) return;
+  $('.modal')?.dispatchEvent(new Event('review-close'));
   $('#modal-root').innerHTML = '';
   document.body.classList.remove('modal-open');
   returnFocus?.focus?.();
@@ -155,7 +158,7 @@ function renderBasics() {
     <label class="form-field full"><span class="field-label">任务简述 <i>*</i></span><textarea data-field="summary" rows="3" maxlength="400" placeholder="简要介绍任务背景与学习目标">${e(d.summary)}</textarea><span class="field-hint">让学员快速了解：要做什么，以及为什么做。</span></label>
     <fieldset class="form-field full camp-field"><legend class="field-label">所属营地</legend><div class="camp-options">${REVIEW_CAMPS.map(camp=>`<label class="camp-option"><input type="radio" name="task-camp" data-field="camp" value="${camp.id}" ${getReviewCamp({},d)===camp.id?'checked':''}><span>${camp.label}</span></label>`).join('')}</div></fieldset>
     <label class="form-field"><span class="field-label">任务方向</span><select data-field="domain">${['产品开发','数据交付','技术开发','PMO','AI评测','质量检测','项目管理','AI 能力'].map(x=>`<option ${x===d.domain?'selected':''}>${x}</option>`).join('')}</select></label>
-    <label class="form-field"><span class="field-label">难度 <i>*</i></span><select data-field="difficulty">${DIFFICULTY_PRESETS.map(({name})=>`<option ${name===d.difficulty?'selected':''}>${name}</option>`).join('')}</select></label>
+    <label class="form-field"><span class="field-label">难度 <i>*</i></span><select data-field="difficulty">${DIFFICULTY_PRESETS.map(({name})=>`<option ${name===d.difficulty?'selected':''} ${store.capabilities?.allowedDifficulties.includes(name)?'':'disabled'}>${name}</option>`).join('')}</select>${store.capabilities?.isSuperAdmin?'':`<span class="field-hint">当前认证：${e(store.capabilities?.level||'初级')}，可发布${e((store.capabilities?.allowedDifficulties||[]).join('、'))}任务</span>`}</label>
   </div></section>
   <section class="card" id="task-badges" tabindex="-1" aria-label="关联徽章">${cardHeader('关联徽章',`<span class="subtle-label">已选 ${d.badges.length}/2</span>`)}<div class="card-body"><div class="badge-selector">${badgeList().map(b=>{const chosen=d.badges.some(x=>x.id===b.id);return `<button class="badge-option ${chosen?'selected':''}" data-badge="${b.id}" aria-pressed="${chosen}" ${!chosen&&d.badges.length>=2?'disabled':''}>${icon('award',16)}<span>${e(b.name)}</span>${chosen?icon('check',14):''}</button>`}).join('')}</div>${renderRatio()}</div></section>`;
 }
@@ -311,9 +314,9 @@ render();
 
 let refreshing = false;
 async function refreshRecords() {
-  if (refreshing || document.hidden || document.querySelector('.modal') || ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+  if (refreshing || document.hidden) return;
   refreshing = true;
-  try { await store.refresh(); if (page === 'review' || page === 'library') render(); }
+  try { await store.refresh(); if (!document.querySelector('.modal') && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) && (page === 'review' || page === 'library')) render(); }
   catch (error) { toast(error.message, 'error'); }
   finally { refreshing = false; }
 }

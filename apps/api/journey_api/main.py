@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import logging
 import json
 import re
@@ -23,6 +24,7 @@ from journey_api.oauth_routes import router as oauth_router
 from journey_api.phone_auth_routes import router as phone_auth_router
 from journey_api.review_routes import router as review_router
 from journey_api.review_admin_routes import router as review_admin_router
+from journey_api.review_bulk_access import router as review_bulk_router
 from journey_api.routes import router
 from journey_api.submission_routes import router as submission_router
 
@@ -31,8 +33,19 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("journey_api")
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,100}$")
 
+@asynccontextmanager
+async def lifespan(app):
+    from journey_api.directory_cache import start_worker
+    close = start_worker(settings)
+    try:
+        yield
+    finally:
+        close()
+
+
 docs_enabled = settings.app_env in {"local", "test"}
 app = FastAPI(
+    lifespan=lifespan,
     title="Muchen Journey vNext API",
     version="0.2.0-local",
     docs_url="/docs" if docs_enabled else None,
@@ -81,11 +94,15 @@ async def request_context(request: Request, call_next):
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     retry_after = exc.details.get("retry_after_seconds")
+    headers = {}
+    if exc.status_code == 429 and isinstance(retry_after, int) and retry_after > 0:
+        headers["Retry-After"] = str(retry_after)
+    identity_return_to = getattr(request.state, "identity_return_to", None)
+    if identity_return_to in {"/review", "/ops", "/content", "/app"}:
+        headers["X-Identity-Return-To"] = identity_return_to
     return JSONResponse(
         status_code=exc.status_code,
-        headers={"Retry-After": str(retry_after)}
-        if exc.status_code == 429 and isinstance(retry_after, int) and retry_after > 0
-        else None,
+        headers=headers or None,
         content={
             "error": {
                 "code": exc.code,
@@ -122,6 +139,7 @@ app.include_router(identity_router)
 app.include_router(next_stage_review_router)
 app.include_router(review_router)
 app.include_router(review_admin_router)
+app.include_router(review_bulk_router)
 app.include_router(outcome_router)
 app.include_router(ops_router)
 app.include_router(oauth_router)

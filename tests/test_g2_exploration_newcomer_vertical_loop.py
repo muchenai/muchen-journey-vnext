@@ -1,4 +1,7 @@
 import uuid
+import pytest
+
+pytestmark = pytest.mark.usefixtures("system_task_reviewer")
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select

@@ -14,6 +14,12 @@ def content():
         'reviewMode':'manual','passScore':60,'rubric':[],'rubricAttachments':[]}
 
 
+def claim(c, review_id, revision=1):
+    result = assert_ok(c.post(f'/api/v1/review-admin/reviews/{review_id}/claim', headers=REVIEWER_HEADERS,
+        json={'action': 'acquire', 'expected_revision': revision}))
+    return {'claim_token': result['token'], 'expected_revision': result['revision']}
+
+
 def test_real_learner_submission_appears_and_review_syncs_back():
     flow=create_submission('new-admin-'+uuid.uuid4().hex[:8])
     c=client_for('admin-review-'+uuid.uuid4().hex)
@@ -23,6 +29,7 @@ def test_real_learner_submission_appears_and_review_syncs_back():
     assert item['decision'] is None
     key=str(uuid.uuid4())
     payload={'expected_revision':item['revision'],'decision':'APPROVE','feedback':'已逐项核对提交中的事实与行动，本次任务符合完成要求。','reasons':[],'score':None}
+    payload.update(claim(c, item['id'], item['revision']))
     result=assert_ok(c.post(f"/api/v1/review-admin/reviews/{item['id']}/decision",headers={**REVIEWER_HEADERS,'Idempotency-Key':key},json=payload))
     assert result['assignment_status'] in {'PASSED','COMPLETED'}
     assert_ok(c.post(f"/api/v1/review-admin/reviews/{item['id']}/decision",headers={**REVIEWER_HEADERS,'Idempotency-Key':key},json=payload))
@@ -44,6 +51,7 @@ def test_invalid_return_keeps_review_pending():
     with SessionLocal() as session:
         assert session.get(Review,flow['review_id']).status==ReviewStatus.ASSIGNED
     payload.update(feedback='请补充事实依据及验证方案，以便我们核对实际效果。',reasons=['依据或论证不足'])
+    payload.update(claim(c, flow['review_id']))
     result=assert_ok(c.post(f"/api/v1/review-admin/reviews/{flow['review_id']}/decision",headers={**REVIEWER_HEADERS,'Idempotency-Key':str(uuid.uuid4())},json=payload))
     assert result['assignment_status']=='NEEDS_REVISION'
 
@@ -64,6 +72,7 @@ def test_approval_with_return_reason_is_rejected_before_any_review_write():
         assert session.get(ReviewAdminDecision,flow['review_id']) is None
     assert assert_ok(flow['learner'].get(f"/api/v1/me/assignments/{flow['assignment_id']}"))==before
     payload['reasons']=[]
+    payload.update(claim(c, flow['review_id']))
     result=assert_ok(c.post(url,headers=headers,json=payload))
     assert result['assignment_status'] in {'PASSED','COMPLETED'}
 
@@ -84,6 +93,7 @@ def test_short_approval_feedback_returns_validation_error_without_starting_revie
         assert review.status==ReviewStatus.ASSIGNED and review.revision==1
         assert session.get(ReviewAdminDecision,flow['review_id']) is None
     payload['feedback']=corrected_feedback
+    payload.update(claim(c, flow['review_id']))
     result=assert_ok(c.post(url,headers=headers,json=payload))
     assert result['assignment_status'] in {'PASSED','COMPLETED'}
 
@@ -106,7 +116,7 @@ def test_task_draft_publish_and_archive_use_real_version():
     c=client_for('admin-editor')
     task_id=str(uuid.uuid4())
     body={'id':task_id,'expected_revision':0,'content':content()}
-    assert c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=REVIEWER_HEADERS,json=body).status_code==403
+    assert c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=REVIEWER_HEADERS,json={**body,'content':{**content(),'difficulty':'挑战'}}).status_code==403
     draft=assert_ok(c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=OPERATOR_HEADERS,json=body))
     assert draft['revision']==1 and draft['status']=='draft'
     assert c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=OPERATOR_HEADERS,json=body).status_code==409
@@ -124,11 +134,10 @@ def test_learner_cannot_read_admin_data_or_save_certification():
     for path in ('tasks','reviews','members'):
         assert flow['learner'].get('/api/v1/review-admin/'+path).status_code==403
     c=client_for('admin-certification')
-    members=assert_ok(c.get('/api/v1/review-admin/members',headers=OPERATOR_HEADERS))
-    member=next(m for m in members['items'] if m['id']==str(REVIEWER_ID))
-    command={'expected_revision':member['revision'],'domain':'产品开发','level':'中级'}
+    assert c.get('/api/v1/review-admin/members',headers=OPERATOR_HEADERS).status_code==403
+    command={'expected_revision':0,'domain':'产品开发','level':'中级'}
     assert c.put(f'/api/v1/review-admin/members/{REVIEWER_ID}/certification',headers=REVIEWER_HEADERS,json=command).status_code==403
-    assert_ok(c.put(f'/api/v1/review-admin/members/{REVIEWER_ID}/certification',headers=OPERATOR_HEADERS,json=command))
+    assert c.put(f'/api/v1/review-admin/members/{REVIEWER_ID}/certification',headers=OPERATOR_HEADERS,json=command).status_code==403
 
 def test_admin_detail_and_queue_use_only_saved_ai_for_current_document():
     from test_review_ai_self_checks import seed_check

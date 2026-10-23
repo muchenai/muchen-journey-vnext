@@ -700,6 +700,8 @@ def review_detail(
 ) -> dict[str, object]:
     require_role(actor, Role.REVIEWER)
     context = get_scoped_context(session, actor, review_id)
+    from journey_api.review_claims import check_read
+    check_read(session, context.review, actor)
     materials = review_materials(session, context)
     base = queue_item(session, context, materials=materials).model_dump()
     return envelope(
@@ -763,6 +765,8 @@ def start_review(
     )
     if replay is not None:
         return envelope(request, ReviewMutationOut(**replay))
+    from journey_api.review_claims import check_write
+    check_write(session, context.review, actor, token=getattr(request.state, 'review_claim_token', None) or request.headers.get('X-Review-Claim-Token'))
     ensure_revision(context.review.revision, command.expected_revision)
     if context.review.status != ReviewStatus.ASSIGNED:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前评审不能开始。")
@@ -850,6 +854,8 @@ def finalize_review(
     )
     if replay is not None:
         return envelope(request, ReviewMutationOut(**replay))
+    from journey_api.review_claims import check_write
+    check_write(session, context.review, actor, token=getattr(request.state, 'review_claim_token', None) or request.headers.get('X-Review-Claim-Token'))
     ensure_revision(context.review.revision, command.expected_revision)
     if context.review.status != ReviewStatus.IN_REVIEW:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "当前评审不能提交最终结论。")

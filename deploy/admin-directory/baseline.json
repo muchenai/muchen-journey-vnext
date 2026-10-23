@@ -1,0 +1,17 @@
+{
+  "schema_version": 3,
+  "base_candidate": "3729336320fcf1ce6bfd3bd8da94dc5af19ecf86",
+  "base_release": "/srv/journey-next-production/canary/releases/3729336320fcf1ce6bfd3bd8da94dc5af19ecf86-ops-resilience",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0038_review_admin_workspace",
+    "to": "0044_task_author_review"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {
+    "api": "sha256:8473bdca56b889b7bd9af1b035bf184eb5f021c42124f25f3d784f48eed99f1c",
+    "web": "sha256:140dc684ca95c6bbf539858f66085720276df92a31159ace01b1f5b736d70435"
+  }
+}

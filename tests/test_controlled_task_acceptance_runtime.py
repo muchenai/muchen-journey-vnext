@@ -15,7 +15,7 @@ from journey_api.controlled_task_runtime import (
 )
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
-from journey_api.fixtures import ORGANIZATION_ID
+from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
 from journey_api.main import app
 from journey_api.models import (
@@ -93,7 +93,7 @@ def _task(
         stable_key=key,
         status=TaskDefinitionStatus.PUBLISHED,
         revision=1,
-        created_by=actor_id,
+        created_by=reviewer_id,
         created_at=now,
     )
     task = TaskVersion(
@@ -184,7 +184,7 @@ def build_synthetic_ready_handoff_and_authorization() -> dict[str, object]:
         reviewer = session.scalar(
             select(User)
             .join(RoleAssignment, RoleAssignment.user_id == User.id)
-            .where(RoleAssignment.role == Role.REVIEWER)
+            .where(RoleAssignment.role == Role.REVIEWER, User.id == REVIEWER_ID)
             .order_by(User.id)
         )
         assert reviewer is not None
