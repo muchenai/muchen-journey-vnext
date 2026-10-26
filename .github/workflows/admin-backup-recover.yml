@@ -1,0 +1,99 @@
+name: Recover Verified Administrator Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed recovery operations commit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Identify temporary runner ingress
+        id: runner
+        run: |
+          set -euo pipefail
+          cidr="$(curl -fsS --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress,sys
+          n=ipaddress.ip_network(sys.argv[1],strict=True)
+          assert n.version==4 and n.prefixlen==32 and n.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only the temporary runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Reverify prepared administrator release and recover backup with TCP readiness
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          JOURNEY_HOST: ${{ secrets.TALENT_HOST }}
+          BACKUP_KEY: ${{ secrets.WP15_BACKUP_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export SSH_KEY="$RUNNER_TEMP/journey-admin-recovery-key"
+          export SSH_KNOWN="$RUNNER_TEMP/journey-admin-recovery-known"
+          export RESUME_PAYLOAD="$RUNNER_TEMP/journey-admin-recovery-payload.json"
+          export REMOTE_PACKAGE="/srv/journey-next-production/canary/exploration-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-resume"
+          trap 'rm -f "$SSH_KEY" "$SSH_KNOWN" "$RESUME_PAYLOAD"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$SSH_KEY"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,subprocess
+          candidate='86c9cfd610f07c5ed3d0881339014f9ed1aec090'
+          files={
+            'activate.py':'deploy/admin-reviewed/activate.py',
+            'prepare.py':'deploy/exploration-release/prepare.py',
+            'canary_schema_upgrade.py':'scripts/canary_schema_upgrade.py',
+            'wp31_database_snapshot.py':'scripts/wp31_database_snapshot.py',
+            'db_facts.py':'deploy/production/db_facts.py',
+            'db_facts_control.py':'deploy/production/db_facts.py',
+            'grant_runtime.py':'deploy/admin-reviewed/grant_runtime.py',
+            'facts_guard.py':'deploy/admin-reviewed/facts_guard.py',
+          }
+          hashes={name:hashlib.sha256(subprocess.check_output(['git','show',candidate+':'+path])).hexdigest() for name,path in files.items()}
+          pathlib.Path(os.environ['RESUME_PAYLOAD']).write_text(json.dumps({
+            'backup_key':os.environ['BACKUP_KEY'],'source_hashes':hashes,
+            'operations_commit':os.environ['GITHUB_SHA']}))
+          PY
+          opts=(-i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_KNOWN")
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$REMOTE_PACKAGE' && install -d -m 0700 '$REMOTE_PACKAGE'"
+          scp "${opts[@]}" deploy/admin-reviewed/recover_backup.py deploy/admin-reviewed/restore_backup.py deploy/admin-reviewed/diagnose_backup.py "root@$JOURNEY_HOST:$REMOTE_PACKAGE/"
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "python3 '$REMOTE_PACKAGE/recover_backup.py'" < "$RESUME_PAYLOAD" | tee "$RUNNER_TEMP/journey-admin-recovery.txt"
+      - name: Close and verify the exact runner SSH rule
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Preserve safe recovery result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-admin-recovery-${{ github.run_id }}
+          path: ${{ runner.temp }}/journey-admin-recovery.txt
+          retention-days: 7
