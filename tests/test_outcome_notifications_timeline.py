@@ -260,6 +260,8 @@ def test_result_handoff_timeline_scope_immutability_and_get_purity():
         ("/api/v1/ops/users/{user_id}/notification-endpoint", "put"),
         ("/api/v1/ops/notification-endpoints/{endpoint_id}/revoke", "post"),
         ("/api/v1/ops/notification-deliveries/{delivery_id}/redrive", "post"),
+        ("/api/v1/me/notifications/{review_id}/read", "post"),
+        ("/api/v1/me/notifications/read-all", "post"),
     }
 
     result_first = wp04.assert_ok(first["learner"].get("/api/v1/me/result"))

@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     ai_api_key: str = Field(default="", repr=False)
     ai_api_key_file: str = ""
     ai_model: str = "deepseek-v4-pro"
+    ai_fallback_model: str = Field(default="", max_length=160)
     ai_feishu_app_id: str = ""
     ai_feishu_app_secret: str = Field(default="", repr=False)
     ai_feishu_app_secret_file: str = ""

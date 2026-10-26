@@ -50,12 +50,12 @@ function mount({ storage, records, draft = "" }) {
       if (specifier === "../actions") return { saveSubmissionDraft: async (_state, data) => {
         saves.push(data.get("body")); return { savedAt: "now" };
       } };
-      if (specifier === "./workspace-recovery") return load("../src/app/project9/workspace-recovery.ts");
+      if (specifier === "./workspace-recovery") return load("../src/app/project29/workspace-recovery.ts");
       throw new Error(`Unexpected dependency ${specifier}`);
     }, compiledModule, compiledModule.exports);
     return compiledModule.exports;
   };
-  const { useWorkspaceRecovery } = load("../src/app/project9/useWorkspaceRecovery.ts");
+  const { useWorkspaceRecovery } = load("../src/app/project29/useWorkspaceRecovery.ts");
   const experience = { assignmentId: "task-a", taskVersion: 1, revision: 3, allowedCommands: ["submit"], draftBody: draft, latestSubmissionBody: null };
   function TestComponent() {
     return useWorkspaceRecovery(experience, true);

@@ -1,4 +1,4 @@
-import ProjectExperience from "@/app/project9/App";
+import ProjectExperience from "@/app/project29/App";
 import { loadProjectExperience } from "@/app/project-ui/experience-data";
 
 export const dynamic = "force-dynamic";

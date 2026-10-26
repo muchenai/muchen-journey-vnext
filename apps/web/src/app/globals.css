@@ -1,3 +1,5 @@
+/* Keep legacy route styles outside the supplied learner design. */
+@scope (:root) to (.login-viewport, .design-viewport, .app-loader-viewport) {
 :root {
   --surface-base: #f6f7fb;
   --surface-raised: #ffffff;
@@ -1728,4 +1730,6 @@ body:has(.journey-console-shell) > .page-shell { width: 100%; max-width: none; m
 @media (max-width: 430px) {
   .join-language-icon { font-size: 18px; }
   .join-intro > h1 { max-width: 100%; }
+}
+
 }

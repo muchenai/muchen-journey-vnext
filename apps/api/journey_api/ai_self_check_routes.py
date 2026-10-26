@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from journey_api.ai_self_check_clients import (
-    AIReviewer, FeishuDocuments, document_ref, get_documents, get_reviewer,
+    AI_UNAVAILABLE_MESSAGE, AIReviewer, FeishuDocuments, document_ref, get_documents, get_reviewer,
 )
 from journey_api.ai_self_check_rules import (
     RULE_VERSION, SYSTEM_PROMPT, evidence_for, protected_urls, references_for, render_feedback,
@@ -23,7 +23,7 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.journey_service import lock_active_learner_assignment
 from journey_api.learner_write_limits import enforce_learner_write_limit
-from journey_api.models import AISelfCheck, Assignment, Enrollment, TaskDefinition
+from journey_api.models import AISelfCheck, Assignment, AuditEntry, Enrollment, TaskDefinition
 
 router = APIRouter(prefix="/api/v1/me/assignments")
 
@@ -37,11 +37,14 @@ class SelfCheckCommand(BaseModel):
 
 
 def public_record(row: AISelfCheck) -> dict:
+    error_message = row.error_message
+    if error_message == "AI 接口暂时不可用，请联系管理员检查模型、额度和网络。":
+        error_message = AI_UNAVAILABLE_MESSAGE
     labels = {
         "RUNNING": "AI 正在读取文档并生成评价，请稍后查看历史记录。",
         "SENDING": "正在确认飞书标题评论结果，请勿重复提交。若长时间未更新，请联系管理员核对。",
         "UNCERTAIN": "飞书评论结果尚未确认，已暂停重发。请联系管理员核对文档标题评论。",
-        "FAILED": row.error_message or "自查未完成，尚未发表评论，可重试。",
+        "FAILED": error_message or "自查未完成，尚未发表评论，可重试。",
     }
     return {"id": str(row.id), "createdAt": row.created_at.isoformat(),
             "body": row.document_url, "status": row.status,
@@ -117,6 +120,26 @@ def claim(session: Session, actor: Actor, assignment_id: uuid.UUID, token: str, 
     ).with_for_update())
     assert row is not None
     if row.learner_id != actor.id or row.assignment_id != assignment_id:
+        if reuse_authorized_local_test_document(session, row, actor, assignment_id):
+            # Release only the unique claim, retaining the original record,
+            # owner, URL and evaluations for learner/reviewer history reads.
+            previous = row
+            previous.document_token = f"local-archive:{previous.id}"
+            session.flush()
+            row = AISelfCheck(
+                id=new_id, organization_id=actor.organization_id,
+                learner_id=actor.id, assignment_id=assignment_id,
+                document_token=token, document_url=url, status="RUNNING",
+                attempt_id=request_id or uuid.uuid4(), archived_results=[],
+                model=get_settings().ai_model, rule_version=RULE_VERSION,
+                created_at=now, updated_at=now,
+                comment_id=previous.comment_id, comment_reply_id=previous.comment_reply_id,
+                # Needed only to resolve legacy comments lacking a reply ID.
+                result=previous.result if previous.comment_id and not previous.comment_reply_id else "",
+            )
+            session.add(row)
+            session.commit()
+            return row, True
         session.rollback()
         raise ApiError(409, "DOCUMENT_ALREADY_CLAIMED", "该文档已用于其他任务或账号的自查，请使用自己的当前任务文档。")
     if row.id == new_id:
@@ -129,12 +152,45 @@ def claim(session: Session, actor: Actor, assignment_id: uuid.UUID, token: str, 
     if row.status == "FAILED" or (row.status == "RUNNING" and row.updated_at < now - timedelta(minutes=10)):
         row.status, row.attempt_id, row.updated_at = "RUNNING", request_id or uuid.uuid4(), now
         row.created_at = now
-        row.error_message, row.result = "", ""
+        row.error_message = ""
+        # A retry may still need the prior comment text to resolve its reply.
+        # Never lose that anchor before the reply ID has been saved.
+        if not row.comment_id or row.comment_reply_id:
+            row.result = ""
         row.model, row.rule_version = get_settings().ai_model, RULE_VERSION
         session.commit()
         return row, True
     session.commit()
     return row, False
+
+
+def reuse_authorized_local_test_document(
+    session: Session, row: AISelfCheck, actor: Actor, assignment_id: uuid.UUID,
+) -> bool:
+    """Honor only an explicit administrator-created LOCAL test reset receipt."""
+    if get_settings().app_env != "local" or row.status != "COMPLETED":
+        return False
+    authorization = session.scalar(select(AuditEntry).where(
+        AuditEntry.organization_id == actor.organization_id,
+        AuditEntry.resource_id == row.id,
+        AuditEntry.action == "local_test.self_check_reuse_authorized",
+        AuditEntry.result == "SUCCESS",
+    ).order_by(AuditEntry.occurred_at.desc()).limit(1))
+    if authorization is None:
+        return False
+    expected = {
+        "previous_learner_id": str(row.learner_id),
+        "previous_assignment_id": str(row.assignment_id),
+        "new_learner_id": str(actor.id),
+        "new_assignment_id": str(assignment_id),
+    }
+    if any(authorization.details.get(key) != value for key, value in expected.items()):
+        return False
+    source = session.get(Assignment, row.assignment_id)
+    target = session.get(Assignment, assignment_id)
+    return bool(source and target and source.organization_id == actor.organization_id
+                and target.organization_id == actor.organization_id
+                and source.task_version_id == target.task_version_id)
 
 
 @router.post("/{assignment_id}/ai-self-checks")
@@ -197,7 +253,7 @@ def self_check(assignment_id: uuid.UUID, command: SelfCheckCommand, request: Req
         owner = documents.human_owner(document) if get_settings().ai_comment_mention_owner else None
         # Resolve the original root reply before model work. Missing/deleted
         # comments or permissions must never fall back to creating a second one.
-        if row.comment_id:
+        if row.comment_id and not row.comment_reply_id:
             previous = row.archived_results[-1]["result"] if row.archived_results else row.result
             row.comment_reply_id = documents.original_reply(document, row.comment_id, previous)
             session.commit()
@@ -214,6 +270,7 @@ def self_check(assignment_id: uuid.UUID, command: SelfCheckCommand, request: Req
             session.rollback()
             raise ApiError(409, "AI_ATTEMPT_SUPERSEDED", "自查状态已更新，请查看历史记录。")
         row.status, row.result = "SENDING", feedback
+        row.model = getattr(reviewer, "last_model", None) or get_settings().ai_model
         row.document_revision = document.revision
         row.document_hash = document_hash(document)
         row.input_hash = hashlib.sha256(serialized.encode()).hexdigest()

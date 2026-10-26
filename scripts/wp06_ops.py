@@ -36,14 +36,14 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0044_task_author_review"
+EXPECTED_MIGRATION_HEAD = "0047_learner_notification_reads"
 AI_BASE_REVISION = "0035_phone_password_login"
 AI_TABLES = ("ai_self_checks",)
 REVIEW_TABLES = (
     "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
     "review_admin_access", "review_claims", "directory_sync", "directory_members",
 )
-POST_AI_BASE_TABLES = (*AI_TABLES, *REVIEW_TABLES)
+POST_AI_BASE_TABLES = (*AI_TABLES, *REVIEW_TABLES, "learner_notification_reads")
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 PHONE_LOGIN_TABLES = (
     "phone_otp_challenges",
@@ -51,6 +51,7 @@ PHONE_LOGIN_TABLES = (
     "phone_password_credentials",
 )
 ROLLBACK_OWNED_FACT_TABLES = (
+    "learner_notification_reads",
     "coaching_feedback",
     "ai_advisory_records",
     "assignment_bound_reentry_invites",
@@ -59,6 +60,7 @@ ROLLBACK_OWNED_FACT_TABLES = (
     *REVIEW_TABLES,
 )
 CURRENT_FACT_TABLES = (
+    "learner_notification_reads",
     *PHONE_LOGIN_TABLES,
     *AI_TABLES,
     *REVIEW_TABLES,

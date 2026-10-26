@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import "./globals.css";
-import "./project9/project9.css";
+
 
 export const metadata: Metadata = {
   title: {
