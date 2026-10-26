@@ -115,7 +115,7 @@ def main():
         '-v',str(app.new/'secrets/volcengine-rds-ca.pem')+':/run/secrets/volcengine-rds-ca.pem:ro',
         app.images['dbrestore'],'pg_dump','-h',parsed.hostname,'-p',str(parsed.port or 5432),
         '-U',unquote(parsed.username or ''),'-d',DATABASE,
-        '--format=custom','--no-owner','--no-acl','--file=/dev/null']
+        '--format=custom','--no-owner','--no-acl','--no-sync','--file=/dev/null']
     probe('READ_ONLY_DUMP_TO_NULL',pg,env=env,timeout=600)
     app.verify_base()
     print(json.dumps({'diagnosis_complete':True,'business_writes':0,'services_switched':False}), flush=True)
