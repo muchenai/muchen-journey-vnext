@@ -129,7 +129,7 @@ def test_migration_check_rehearses_ai_and_review_release_range(
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in ops.REVIEW_TABLES},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -215,6 +215,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES,
+        "learner_notification_reads",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
         "coaching_feedback",
@@ -225,6 +226,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES,
+        "learner_notification_reads",
     }
 
 
@@ -240,7 +242,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in ops.REVIEW_TABLES},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
         },
     }
     ops.require_safe_schema_rollback(facts)
@@ -256,7 +258,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in ops.REVIEW_TABLES},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
                 protected_fact: 1,
             },
         }
