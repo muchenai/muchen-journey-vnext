@@ -15,7 +15,7 @@ export type AdminTask = {
  revision: number; status: string; author?: string; authorId?: string; stableKey?: string;
  participants?: number; completions?: number; version?: number;
 };
-export type AdminReview = ReviewItem & { learner_id: string; task_id: string; camp: string; domain: string; review_mode: string;
+export type AdminReview = ReviewItem & { learner_id: string; learner_is_feishu?: boolean; learner_employee_no?: string; learner_phone?: string; task_id: string; camp: string; domain: string; review_mode: string;
  decision: string | null; feedback: string; score: number | null; reasons: string[]; ai_statuses: string[] };
 export type Member = { id: string; name: string; employee_no?: string; departments?: string[]; department_paths?: string[]; roles: string[]; revision: number; accessRole?: string; status?: string; certification: { domain: string; level: string } | null };
 export type AdminCapabilities = { isSuperAdmin: boolean; canGrantSuperAdmins: boolean; canPublish: boolean; level: string; allowedDifficulties: string[] };

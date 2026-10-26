@@ -50,7 +50,8 @@ function submissionsInTab(store, tab) {
     if (tab === 'pending') return status === 'pending' && !submission.claim && modeOf(store, submission) === 'manual';
     if (tab === 'reviewing') return status === 'pending' && !!submission.claim && modeOf(store, submission) === 'manual';
     if (tab === 'ai') return submission.hasAi === true;
-    if (tab === 'reviewed') return status === 'passed';
+    if (tab === 'reviewed') return status === 'passed' || failedStatus(status);
+    if (tab === 'passed') return status === 'passed';
     return tab === 'failed' && failedStatus(status);
   });
 }
@@ -62,7 +63,8 @@ const tableColumns = {
   pending: ['学员', '任务', '提交时间', '状态', '操作'],
   reviewing: ['学员', '任务', '提交时间', '正在审核人', '开始审核时间', '操作'],
   ai: ['学员', '任务', '自测状态', '自测时间', '操作'],
-  reviewed: ['学员', '任务', '评分', '提交时间', '实际审核人', '审核时间', '操作'],
+  reviewed: ['学员', '任务', '评分', '提交时间', '状态', '实际审核人', '审核时间', '操作'],
+  passed: ['学员', '任务', '评分', '提交时间', '实际审核人', '审核时间', '操作'],
   failed: ['学员', '任务', '提交时间', '未通过原因', '实际审核人', '审核时间', '操作'],
 };
 function renderRows(store) {
@@ -74,7 +76,7 @@ function renderRows(store) {
     const status = statusOf(store, submission);
     const action = submission.claim ? (submission.claim.mine ? '继续审核' : '他人审核中') : status === 'pending' && state.tab !== 'ai' ? '去审核' : '查看详情';
     const cells = {
-      '学员': `<div class="student-cell"><span class="avatar avatar-small">${e((submission.studentName || '学员').slice(-2))}</span><div><strong>${e(submission.studentName || '未命名学员')}</strong><span class="cell-subtext">${e(submission.studentId || submission.id)}</span></div></div>`,
+      '学员': `<div class="student-cell"><span class="avatar avatar-small">${e((submission.studentName || '学员').slice(-2))}</span><div><strong>${e(submission.studentName || '未命名学员')}</strong><span class="cell-subtext">${e(submission.studentIsFeishu ? (submission.studentEmployeeNo ? `工号：${submission.studentEmployeeNo}` : '工号未填写') : (submission.studentPhone ? `手机号：${submission.studentPhone}` : '手机号未补充'))}</span></div></div>`,
       '任务': `<span class="table-task-title">${e(task.title)}</span><span class="cell-subtext">${e(task.domain || '综合能力')} · ${aiMode ? 'AI 自测' : '人工审核'}</span>${num(submission.attempt) > 1 ? `<span class="review-attempt">第 ${fmt(submission.attempt)} 次提交</span>` : ''}`,
       '评分': hasScore(submission.finalScore) ? `${fmt(submission.finalScore)} / 100` : '—',
       '提交时间': e(dateLabel(submission.submittedAt)),
@@ -98,14 +100,15 @@ export function renderReview(store, ui) {
   const reviewing = submissionsInTab(store, 'reviewing').length;
   const aiResults = submissionsInTab(store, 'ai').length;
   const reviewed = submissionsInTab(store, 'reviewed').length;
+  const passed = submissionsInTab(store, 'passed').length;
   const failed = submissionsInTab(store, 'failed').length;
-  const tabs = [{ id: 'pending', label: '待人工审核', count: pending }, { id: 'reviewing', label: '正在审核', count: reviewing }, { id: 'ai', label: 'AI 自测结果', count: aiResults }, { id: 'reviewed', label: '已审核', count: reviewed }, { id: 'failed', label: '审核未通过', count: failed }];
-  const notes = { pending: '查看学员答案，确认通过或退回修改。', reviewing: '已领取的提交仅允许当前审核人处理。关闭后最多 2 分钟自动释放，也可主动退出审核。', ai: '查看 AI 自测结果与评测进度。', reviewed: '查看已审核通过的提交。', failed: '查看未通过原因和具体修改建议。' };
+  const tabs = [{ id: 'pending', label: '待人工审核', count: pending }, { id: 'reviewing', label: '正在审核', count: reviewing }, { id: 'ai', label: 'AI 自测结果', count: aiResults }, { id: 'reviewed', label: '已审核', count: reviewed }, { id: 'passed', label: '审核通过', count: passed }, { id: 'failed', label: '审核未通过', count: failed }];
+  const notes = { pending: '查看学员答案，确认通过或退回修改。', reviewing: '已领取的提交仅允许当前审核人处理。关闭后最多 2 分钟自动释放，也可主动退出审核。', ai: '查看 AI 自测结果与评测进度。', reviewed: '查看已审核的提交，包括审核通过和审核未通过。', passed: '查看已审核通过的提交。', failed: '查看未通过原因和具体修改建议。' };
   return `<div class="page-content review-page" data-review-page>
     <div class="stats-grid">
       <div class="stat-card"><span class="stat-label">待人工审核</span><div class="stat-value">${pending}<span class="stat-unit">份</span></div><span class="stat-note">等待导师审核学员答案</span></div>
       <div class="stat-card"><span class="stat-label">AI 自测结果</span><div class="stat-value">${aiResults}<span class="stat-unit">份</span></div><span class="stat-note">自测结果与评测进度</span></div>
-      <div class="stat-card"><span class="stat-label">已审核</span><div class="stat-value">${reviewed}<span class="stat-unit">份</span></div><span class="stat-note">已审核通过的提交</span></div>
+      <div class="stat-card"><span class="stat-label">已审核</span><div class="stat-value">${reviewed}<span class="stat-unit">份</span></div><span class="stat-note">包含审核通过与审核未通过</span></div>
       <div class="stat-card"><span class="stat-label">审核未通过</span><div class="stat-value">${failed}<span class="stat-unit">份</span></div><span class="stat-note">等待学员修改重提</span></div>
     </div>
     <section class="card review-card">
@@ -194,7 +197,7 @@ function renderDetail(store, submission) {
         <section class="detail-section review-rewards"><h3>任务奖励配置</h3><div class="reward-inline"><span><strong>+${fmt(rewards.xp)}</strong> 经验值</span><span><strong>+${fmt(rewards.taskPoints)}</strong> 任务点</span></div><div class="review-badge-rewards">${badges.map(badge => `<div><span>${e(badge.name || badgeName(badge.id))}</span><strong>+${fmt(badge.points ?? badge.value)} 徽章点</strong></div>`).join('')}</div><p class="small muted">以上为任务配置，实际奖励发放记录尚未接入此页面。</p></section>
       </div>
     </div>
-    ${editable ? `<section class="review-final-section"><div class="section-title-row"><h3>最终审核</h3><span class="muted">审核结果将同步到学员端</span></div><div class="review-final-grid"><label class="form-field"><span>审核得分 <span class="muted">选填</span></span><div class="input-suffix"><input class="form-input" data-review-score type="number" min="0" max="100" step="1" value="" placeholder="可不填写" aria-label="审核得分（选填）"><span>/ 100</span></div><small>由导师直接决定是否通过，不设通过分数线。</small></label><label class="form-field"><span>审核评语 <span class="muted">退回时必填</span></span><textarea class="form-textarea" data-review-comment rows="3" maxlength="2000" placeholder="退回时请写明具体修改建议">${e(submission.reviewComment || '')}</textarea></label></div><fieldset class="return-reason-options"><legend>退回原因 <span class="muted">退回时至少选择一项</span></legend>${FAILURE_REASONS.map(reason => `<label><input type="checkbox" value="${e(reason.id)}" data-review-reason-code><span>${e(reason.label)}</span></label>`).join('')}</fieldset><p class="inline-error" data-review-error role="alert" hidden></p></section><div class="modal-footer"><button class="btn btn-secondary" type="button" data-review-exit>退出审核</button><div class="button-group"><button class="btn btn-danger" type="button" data-review-decision="returned">退回修改</button><button class="btn btn-primary" type="button" data-review-decision="passed">${iconFor('check')}确认通过</button></div></div>` : status === 'pending' ? '<section class="review-final-section"><h3>尚未完成人工审核</h3><p>AI 自测仅供参考，请从审核列表领取后进行人工审核。</p></section><div class="modal-footer"><button class="btn btn-secondary" data-review-close>关闭</button></div>' : `<section class="review-final-section"><h3>${manual ? '最终审核结果' : '自动评测结果'}</h3>${manual ? `<p class="review-attribution">实际审核人：<strong>${e(submission.actualReviewer?.name || '未记录')}</strong><br>审核时间：${e(submission.reviewedAt ? dateFull(submission.reviewedAt) : '未记录')}</p>` : ''}<div class="review-result-line">${statusBadge(store, submission)}<span>${manual ? `导师评分 <strong>${hasScore(submission.finalScore) ? `${fmt(submission.finalScore)} / 100` : '—'}</strong>` : `最终得分 <strong>${fmt(submission.finalScore ?? ai.score)}</strong> / 100`}</span></div><p class="answer-text">${e(manual ? (submission.reviewComment || '审核人未补充评语。') : (ai.comment || 'AI 已根据评分标准完成自测。'))}</p><p class="small muted">${manual ? '该记录由导师完成审核，仅供查看。' : 'AI 自测由系统自动判定，无需人工审核。本原型使用模拟 AI 数据。'}</p></section><div class="modal-footer"><span></span><button class="btn btn-secondary" type="button" data-review-close>关闭</button></div>`}
+    ${editable ? `<section class="review-final-section"><div class="section-title-row"><h3>最终审核</h3><span class="muted">审核结果将同步到学员端</span></div><div class="review-final-grid"><label class="form-field"><span>审核得分 <span class="muted">选填</span></span><div class="input-suffix"><input class="form-input" data-review-score type="number" min="0" max="100" step="1" value="" placeholder="可不填写" aria-label="审核得分（选填）"><span>/ 100</span></div><small>由导师直接决定是否通过，不设通过分数线。</small></label><label class="form-field"><span>审核评语 <span class="muted">通过时选填，退回时至少 5 个字</span></span><textarea class="form-textarea" data-review-comment rows="3" maxlength="2000" placeholder="通过时可不填写；退回时请填写至少 5 个字的修改建议，空格和换行不计入">${e(submission.reviewComment || '')}</textarea></label></div><fieldset class="return-reason-options"><legend>退回原因 <span class="muted">退回时至少选择一项</span></legend>${FAILURE_REASONS.map(reason => `<label><input type="checkbox" value="${e(reason.id)}" data-review-reason-code><span>${e(reason.label)}</span></label>`).join('')}</fieldset><p class="inline-error" data-review-error role="alert" hidden></p></section><div class="modal-footer"><button class="btn btn-secondary" type="button" data-review-exit>退出审核</button><div class="button-group"><button class="btn btn-danger" type="button" data-review-decision="returned">退回修改</button><button class="btn btn-primary" type="button" data-review-decision="passed">${iconFor('check')}确认通过</button></div></div>` : status === 'pending' ? '<section class="review-final-section"><h3>尚未完成人工审核</h3><p>AI 自测仅供参考，请从审核列表领取后进行人工审核。</p></section><div class="modal-footer"><button class="btn btn-secondary" data-review-close>关闭</button></div>' : `<section class="review-final-section"><h3>${manual ? '最终审核结果' : '自动评测结果'}</h3>${manual ? `<p class="review-attribution">实际审核人：<strong>${e(submission.actualReviewer?.name || '未记录')}</strong><br>审核时间：${e(submission.reviewedAt ? dateFull(submission.reviewedAt) : '未记录')}</p>` : ''}<div class="review-result-line">${statusBadge(store, submission)}<span>${manual ? `导师评分 <strong>${hasScore(submission.finalScore) ? `${fmt(submission.finalScore)} / 100` : '—'}</strong>` : `最终得分 <strong>${fmt(submission.finalScore ?? ai.score)}</strong> / 100`}</span></div><p class="answer-text">${e(manual ? (submission.reviewComment || '审核人未补充评语。') : (ai.comment || 'AI 已根据评分标准完成自测。'))}</p><p class="small muted">${manual ? '该记录由导师完成审核，仅供查看。' : 'AI 自测由系统自动判定，无需人工审核。本原型使用模拟 AI 数据。'}</p></section><div class="modal-footer"><span></span><button class="btn btn-secondary" type="button" data-review-close>关闭</button></div>`}
   </div>`;
 }
 

@@ -1,7 +1,7 @@
 import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261021-review-decision';
 import { ApiStore, newDraft, createJourneyService } from './native-api.js';
 import { createSandboxController } from './sandbox.js?v=20261021-brand-npc';
-import { renderReview, bindReview, openSubmission } from './review.js?v=20261021-review-decision';
+import { renderReview, bindReview, openSubmission } from './review.js?v=20261026-passed-tab';
 import { renderLibrary, bindLibrary } from './library.js?v=20261021-admin-certification';
 import { openCertification } from './member-access.js';
 import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js';

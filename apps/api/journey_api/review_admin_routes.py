@@ -24,6 +24,7 @@ from journey_api.review_camps import task_camp
 from journey_api.review_routes import (ReviewContext, scoped_context_query, get_scoped_context,
     queue_item, review_detail, start_review, finalize_review, effective_review_rubric, lock_scoped_context)
 from journey_api.review_ai_self_checks import review_document_ai_checks
+from journey_api.learner_phone import read_verified_phone
 from journey_api.schemas import FinalizeReviewCommand, RevisionCommand, PublishTaskVersionCommand
 
 router = APIRouter(prefix="/api/v1/review-admin")
@@ -115,7 +116,24 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
         .order_by(Review.assigned_at.desc())).unique().all()]
     credits = review_credits(session, [(ctx.review, ctx.evaluation or ctx.coaching_feedback) for ctx in contexts])
     claims = claim_views(session, [ctx.review for ctx in contexts], actor)
+    learner_ids = {ctx.learner.id for ctx in contexts}
+    profiles = cached_directory_profiles(session, actor, learner_ids)
+    feishu_ids = set(session.scalars(select(ExternalIdentity.user_id).where(
+        ExternalIdentity.organization_id == actor.organization_id,
+        ExternalIdentity.user_id.in_(learner_ids), ExternalIdentity.provider == 'FEISHU',
+        ExternalIdentity.revoked_at.is_(None)))) if learner_ids else set()
     items = []
+    phones = {}
+    if learner_ids - feishu_ids:
+        identities = session.scalars(select(ExternalIdentity).where(
+            ExternalIdentity.organization_id == actor.organization_id,
+            ExternalIdentity.user_id.in_(learner_ids - feishu_ids),
+            ExternalIdentity.provider.in_(["PHONE", "PHONE_PASSWORD"]),
+            ExternalIdentity.revoked_at.is_(None)).order_by(ExternalIdentity.verified_at.desc(), ExternalIdentity.id))
+        for identity in identities:
+            phone = read_verified_phone(identity)
+            if phone:
+                phones.setdefault(identity.user_id, phone)
     for ctx in contexts:
         if (ctx.review.status != ReviewStatus.FINALIZED and ctx.enrollment.status != EnrollmentStatus.ACTIVE
             and not (ctx.review.review_kind == ReviewKind.LEARNING_COACHING and ctx.enrollment.status == EnrollmentStatus.COMPLETED)):
@@ -126,6 +144,9 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
         decision = ctx.evaluation or ctx.coaching_feedback
         checks = review_document_ai_checks(session, ctx)
         item.update(learner_id=str(ctx.learner.id), task_id=str(ctx.definition.id),
+            learner_is_feishu=ctx.learner.id in feishu_ids,
+            learner_employee_no=profiles.get(ctx.learner.id, {}).get("employee_no") or "",
+            learner_phone=phones.get(ctx.learner.id, ""),
             camp=task_camp(ctx.definition, profile),
             domain=profile.content.get("domain", "产品开发") if profile else "探索营",
             review_mode=profile.content.get("reviewMode", "manual") if profile else "manual",
@@ -407,6 +428,17 @@ def claim_review(review_id: uuid.UUID, command: ClaimCommand, request: Request,
         "claim": claim_views(session, [review], actor).get(str(review.id))})
 
 
+class AdminFinalizeReviewCommand(FinalizeReviewCommand):
+    """Admin review allows optional approval comments and five-character returns."""
+    overall_feedback: str = Field(max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_return_feedback(self):
+        if self.overall_decision == "REQUEST_REVISION" and len("".join(self.overall_feedback.split())) < 5:
+            raise ValueError("Return feedback requires at least five non-whitespace characters")
+        return self
+
+
 class ReviewDecision(BaseModel):
     expected_revision: int = Field(ge=1)
     claim_token: uuid.UUID | None = None
@@ -434,10 +466,8 @@ def decide(review_id: uuid.UUID, command: ReviewDecision, request: Request,
     feedback = command.feedback.strip()
     if command.decision == "APPROVE" and command.reasons:
         raise ApiError(422,"VALIDATION_FAILED","已选择退回原因，请取消勾选后再确认通过。")
-    if command.decision == "REQUEST_REVISION" and (not command.reasons or len(feedback)<10):
-        raise ApiError(422,"VALIDATION_FAILED","退回时请至少选择一项原因，并填写 10 字以上具体评语。")
-    if feedback and len(feedback) < 10:
-        raise ApiError(422,"VALIDATION_FAILED","审核评语至少需要 10 个字，请补充后再提交。")
+    if command.decision == "REQUEST_REVISION" and (not command.reasons or len("".join(feedback.split())) < 5):
+        raise ApiError(422,"VALIDATION_FAILED","退回时请至少选择一项原因，并填写至少 5 个字的具体修改建议（空格和换行不计入）。")
     feedback = feedback or "已核对本次提交，达到任务要求，审核通过。"
     rubric = effective_review_rubric(context.definition.stable_key, context.task.rubric, context.task.completion_criteria)
     dims = rubric.get("dimensions",[])
@@ -445,10 +475,10 @@ def decide(review_id: uuid.UUID, command: ReviewDecision, request: Request,
         raise ApiError(422,"VALIDATION_FAILED","这个历史任务需要逐项填写固定评分维度。")
     evaluations = command.rubric_evaluations if command.rubric_evaluations is not None else [
         {"dimension_key":d["dimension_key"],"rating":"MEETS" if command.decision=="APPROVE" else "NEEDS_WORK",
-         "feedback":feedback[:500]} for d in dims if d.get("required")]
+         "feedback":feedback[:500] if len(feedback) >= 5 else "审核通过，符合任务要求。"} for d in dims if d.get("required")]
     # Validate before starting, so an invalid form never advances review state.
     try:
-        final_command = FinalizeReviewCommand(expected_revision=context.review.revision,
+        final_command = AdminFinalizeReviewCommand(expected_revision=context.review.revision,
             overall_decision=command.decision, overall_feedback=feedback, rubric_evaluations=evaluations)
     except ValidationError as exc:
         raise ApiError(422,"VALIDATION_FAILED","审核内容不符合要求，请检查评语和各评分维度。") from exc
@@ -465,7 +495,7 @@ def decide(review_id: uuid.UUID, command: ReviewDecision, request: Request,
     return finalize_review(review_id,final_command,request,idempotency_key="final-"+idempotency_key,actor=actor,session=session)
 
 
-def administrator_directory_profiles(session, actor, user_ids):
+def cached_directory_profiles(session, actor, user_ids):
     """Join cached personnel by bound Feishu identity, never by display name."""
     from journey_api.config import get_settings
     from journey_api.directory_cache_models import DirectoryMember, DirectorySync
@@ -495,7 +525,7 @@ def members(request: Request, actor: Actor=Depends(get_actor), session: Session=
         .outerjoin(ReviewAdminAccess, ReviewAdminAccess.user_id == User.id).where(
         User.organization_id==actor.organization_id,User.status==UserStatus.ACTIVE,
         or_(RoleAssignment.role.in_(STAFF_ROLES), ReviewAdminAccess.user_id.is_not(None))).distinct()).all()
-    profiles = administrator_directory_profiles(session, actor, [u.id for u in users])
+    profiles = cached_directory_profiles(session, actor, [u.id for u in users])
     result=[]
     for u in users:
         roles=[r.value for r in session.scalars(select(RoleAssignment.role).where(RoleAssignment.user_id==u.id,

@@ -77,25 +77,49 @@ def test_approval_with_return_reason_is_rejected_before_any_review_write():
     assert result['assignment_status'] in {'PASSED','COMPLETED'}
 
 
-@pytest.mark.parametrize('corrected_feedback', ['已核对全部要求符合标准', ''])
-def test_short_approval_feedback_returns_validation_error_without_starting_review(corrected_feedback):
-    flow=create_submission('short-approval-'+uuid.uuid4().hex[:8])
-    c=client_for('short-approval-reviewer-'+uuid.uuid4().hex)
+@pytest.mark.parametrize('feedback', ['', ' \n\t', '好', '请继续努力', ' 写得好写得好写得好 '])
+def test_approval_accepts_optional_and_short_feedback(feedback):
+    flow=create_submission('optional-approval-'+uuid.uuid4().hex[:8])
+    c=client_for('optional-approval-reviewer-'+uuid.uuid4().hex)
     url=f"/api/v1/review-admin/reviews/{flow['review_id']}/decision"
     headers={**REVIEWER_HEADERS,'Idempotency-Key':str(uuid.uuid4())}
-    payload={'expected_revision':1,'decision':'APPROVE','feedback':' 写得好写得好写得好 ','score':85,'reasons':[]}
-    response=c.post(url,headers=headers,json=payload)
-    assert response.status_code==422
-    assert response.json()['error']['code']=='VALIDATION_FAILED'
-    assert '10' in response.json()['error']['message']
-    with SessionLocal() as session:
-        review=session.get(Review,flow['review_id'])
-        assert review.status==ReviewStatus.ASSIGNED and review.revision==1
-        assert session.get(ReviewAdminDecision,flow['review_id']) is None
-    payload['feedback']=corrected_feedback
+    payload={'decision':'APPROVE','feedback':feedback,'score':85,'reasons':[]}
     payload.update(claim(c, flow['review_id']))
     result=assert_ok(c.post(url,headers=headers,json=payload))
     assert result['assignment_status'] in {'PASSED','COMPLETED'}
+    detail=assert_ok(c.get(f"/api/v1/review-admin/reviews/{flow['review_id']}",headers=REVIEWER_HEADERS))
+    assert detail['evaluation']['overall_feedback'] == (feedback.strip() or '已核对本次提交，达到任务要求，审核通过。')
+    # A replay must not add a second result or change the saved comment.
+    assert_ok(c.post(url,headers=headers,json=payload))
+
+
+@pytest.mark.parametrize('feedback', ['', ' \n\t', '请补材料', '请 \n补\t材 料', '🙂' * 4])
+def test_return_rejects_fewer_than_five_non_whitespace_characters_without_writes(feedback):
+    flow=create_submission('short-return-'+uuid.uuid4().hex[:8])
+    c=client_for('short-return-reviewer-'+uuid.uuid4().hex)
+    url=f"/api/v1/review-admin/reviews/{flow['review_id']}/decision"
+    headers={**REVIEWER_HEADERS,'Idempotency-Key':str(uuid.uuid4())}
+    payload={'expected_revision':1,'decision':'REQUEST_REVISION','feedback':feedback,'reasons':['提交材料不完整']}
+    response=c.post(url,headers=headers,json=payload)
+    assert response.status_code == 422
+    assert '至少 5' in response.json()['error']['message']
+    with SessionLocal() as session:
+        review=session.get(Review,flow['review_id'])
+        assert review.status == ReviewStatus.ASSIGNED and review.revision == 1
+        assert session.get(ReviewAdminDecision,flow['review_id']) is None
+
+
+@pytest.mark.parametrize('feedback', ['请补充材料', '请 \n补\t充 材料', '🙂' * 5])
+def test_return_accepts_exactly_five_non_whitespace_characters(feedback):
+    flow=create_submission('five-char-return-'+uuid.uuid4().hex[:8])
+    c=client_for('five-char-return-reviewer-'+uuid.uuid4().hex)
+    payload={'decision':'REQUEST_REVISION','feedback':feedback,'reasons':['提交材料不完整']}
+    payload.update(claim(c, flow['review_id']))
+    result=assert_ok(c.post(f"/api/v1/review-admin/reviews/{flow['review_id']}/decision",
+        headers={**REVIEWER_HEADERS,'Idempotency-Key':str(uuid.uuid4())},json=payload))
+    assert result['assignment_status'] == 'NEEDS_REVISION'
+    detail=assert_ok(c.get(f"/api/v1/review-admin/reviews/{flow['review_id']}",headers=REVIEWER_HEADERS))
+    assert detail['evaluation']['overall_feedback'] == feedback.strip()
 
 
 def test_invalid_dimension_form_returns_validation_error_before_review_start():
