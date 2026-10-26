@@ -24,3 +24,15 @@ new table. On a failure before business changes, the previous application images
 and pointer are restored with the compatible additive schema retained. If business
 writes are detected, automatic rollback stops for diagnosis. Do not blindly rerun
 a failed deployment; staged release and backup paths are intentionally exclusive.
+
+The initial run `40307327520` stopped before production migration: the external
+identity fingerprint passed JSONB to `md5` because its cast lacked parentheses.
+The corrected expression casts the complete JSONB subtraction to text. PostgreSQL
+tests prove the new phone column is ignored while existing field changes are caught.
+
+`learner-project29-resume.yml` is restricted to that exact pre-migration stop and
+the already approved application candidate `6fbc42e`. It verifies the original
+scripts, prepared manifest and immutable image configurations; it rejects an
+activated release, changed schema or completed backup. Original failure evidence
+is retained. A new backup, restore and 0044 → 0047 rehearsal must pass before the
+existing activation and rollback guards run. No application images are re-uploaded.

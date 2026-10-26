@@ -4,7 +4,13 @@ import re
 from sqlalchemy import create_engine, text
 from journey_api.config import get_settings
 
-with create_engine(get_settings().database_url).connect() as connection:
+def fingerprint_query(table):
+    assert re.fullmatch(r"[a-z][a-z0-9_]*", table)
+    value = "to_jsonb(t) - 'phone_ciphertext'" if table == "external_identities" else "to_jsonb(t)"
+    return text(f'SELECT count(*), md5(COALESCE(string_agg(md5(({value})::text), \'\' ORDER BY md5(({value})::text)), \'\')) FROM "{table}" t')
+
+
+def snapshot(connection):
     connection.execute(text("SET TRANSACTION READ ONLY"))
     connection.execute(text("SET LOCAL TIME ZONE 'UTC'"))
     tables = connection.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name")).scalars().all()
@@ -16,7 +22,11 @@ with create_engine(get_settings().database_url).connect() as connection:
         if table == "learner_notification_reads":
             assert connection.execute(text(f'SELECT count(*) FROM "{table}"')).scalar_one() == 0, "NEW_NOTIFICATION_WRITES"
             continue
-        value = "to_jsonb(t) - 'phone_ciphertext'" if table == "external_identities" else "to_jsonb(t)"
-        row = connection.execute(text(f'SELECT count(*), md5(COALESCE(string_agg(md5({value}::text), \'\' ORDER BY md5({value}::text)), \'\')) FROM "{table}" t')).one()
+        row = connection.execute(fingerprint_query(table)).one()
         result[table] = list(row)
-    print(json.dumps(result, sort_keys=True))
+    return result
+
+
+if __name__ == "__main__":
+    with create_engine(get_settings().database_url).connect() as connection:
+        print(json.dumps(snapshot(connection), sort_keys=True))
