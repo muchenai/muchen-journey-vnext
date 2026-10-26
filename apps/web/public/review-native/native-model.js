@@ -4,10 +4,10 @@ const toBadge = { tech: 'dev', 'ai-eval': 'evaluation' };
 const fromBadge = { dev: 'tech', evaluation: 'ai-eval' };
 export const reasonNames = { materials_incomplete: '提交材料不完整', incorrect_answer: '答案错误', requirements_not_met: '未达到任务要求', insufficient_evidence: '依据或论证不足', other: '其他' };
 export function reviewFeedbackError(decision, value) {
-  const count = Array.from(String(value || '').trim()).length;
-  if (decision === 'returned' && count < 10) return '退回时请填写至少 10 个字的具体修改建议。';
-  if (count > 0 && count < 10) return `审核评语至少需要 10 个字，当前 ${count} 个字，请补充后再提交。`;
-  if (count > 2000) return '审核评语不能超过 2000 个字。';
+  const text = String(value || '');
+  const count = Array.from(text.replace(/\s/gu, '')).length;
+  if (decision === 'returned' && count < 5) return `退回时请填写至少 5 个字的具体修改建议（空格和换行不计入），当前 ${count} 个字。`;
+  if (Array.from(text).length > 2000) return '审核评语不能超过 2000 个字。';
   return '';
 }
 export function taskView(task) {
@@ -18,6 +18,7 @@ export function taskWrite(task) {
 }
 export function reviewView(item, task) {
   return { id: item.id, taskId: item.task_id, taskStableKey: task?.stableKey, studentId: item.learner_id, studentName: item.learner_name,
+    studentIsFeishu: item.learner_is_feishu === true, studentEmployeeNo: item.learner_employee_no || '', studentPhone: item.learner_phone || '',
     camp: item.camp, reviewMode: 'manual', status: item.decision === 'PASS' ? 'passed' : item.decision === 'REVISION_REQUIRED' ? 'returned' : 'pending',
     finalScore: item.score, reviewComment: item.feedback, failureReasons: (item.reasons || []).map(name => Object.keys(reasonNames).find(key => reasonNames[key] === name) || name),
     submittedAt: item.submitted_at, attempt: item.submission_version_no, revision: item.revision,

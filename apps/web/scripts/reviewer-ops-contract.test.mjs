@@ -42,7 +42,7 @@ test("review mutation preserves optimistic revision and server idempotency",()=>
 test("human feedback remains bounded and return requires an actionable explanation",()=>{
  assert.match(detail,/feedback.trim\(\).slice\(0,500\)/);
  assert.match(detail,/maxLength=\{2000\}/);
- assert.match(detail,/feedback.trim\(\).length < 10/);
+ assert.match(detail,/length < 5/);
  assert.match(detail,/!reasons.length/);
  assert.match(detail,/busy\s*\|\|\s*!editable/);
 });

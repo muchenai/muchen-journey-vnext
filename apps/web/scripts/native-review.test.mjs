@@ -12,11 +12,48 @@ const id = '00000000-0000-4000-8000-000000000001';
 const task = { id, title: '测评三', domain: '产品开发', reviewMode: 'ai', badges: [{ id: 'tech', weight: 100 }], revision: 4, materials: [], status: 'published' };
 const row = { id, task_id: id, learner_id: 'learner', learner_name: '<script>私密</script>', camp: 'exploration', task_title: '提交时任务名称', domain: '探索营', status: 'ASSIGNED', allowed_commands: ['start'], decision: null, ai_statuses: ['COMPLETED'], submitted_at: '2026-10-21T00:00:00Z', submission_version_no: 2, revision: 6 };
 const detail = { id, revision: 7, status: 'IN_REVIEW', allowed_commands: ['approve','request_revision'], submission_body: '当前学员自己的链接', task_title: '固定版本名称', task_purpose: '固定要求', completion_criteria: ['必须完整'], task_learning_materials: [{ title: '本次材料', body: '固定文本' }], materials: { attachments: [{ id: 'clean', original_filename: '安全文件', status: 'READY', scan_status: 'CLEAN' }, { id: 'bad', original_filename: '未扫描', status: 'READY', scan_status: 'PENDING' }] }, document_ai_checks: [{ document_url: 'https://example.com/docx/own', status: 'COMPLETED', record_id: 'r2', result: '最新建议', generated_at: 'today', history: [{ record_id: 'r2', result: '最新建议' }, { record_id: 'r1', result: '上次建议' }] }] };
-function selectReviewTab(store, tab) {
+function selectReviewTab(store, tab, camp = 'exploration') {
   const page = { querySelector() { return null; } };
-  bindReview({querySelector: () => page}, store, {reviewCamp:'exploration', refresh() {}});
+  bindReview({querySelector: () => page}, store, {reviewCamp:camp, refresh() {}});
   page.onclick({target:{closest: selector => selector === '[data-review-tab]' ? {dataset:{reviewTab:tab}} : null}});
 }
+
+test('Feishu learners show a real employee number in every camp and review tab', () => {
+  const base = reviewView({...row, learner_is_feishu:true, learner_employee_no:'MCE0000042'});
+  const store = {data:{submissions:[base]},getTask:()=>task};
+  for (const camp of ['exploration','novice']) {
+    for (const tab of ['pending','reviewing','ai','reviewed','passed','failed']) {
+      store.data.submissions = [{...base,camp,status:['reviewed','passed'].includes(tab) ? 'passed' : tab === 'failed' ? 'returned' : 'pending',
+        claim:tab === 'reviewing' ? {owner_name:'审核员',mine:false} : null}];
+      selectReviewTab(store,tab,camp);
+      const html = renderReview(store,{reviewCamp:camp});
+      assert.ok(html.includes('工号：MCE0000042'), `${camp}/${tab}`);
+      assert.ok(!html.includes('class="cell-subtext">learner</span>'));
+    }
+  }
+  selectReviewTab(store,'pending');
+  store.data.submissions = [{...base, studentEmployeeNo:''}];
+  assert.match(renderReview(store,{reviewCamp:'exploration'}), /工号未填写/);
+  store.data.submissions = [{...base, studentEmployeeNo:'<b>123</b>'}];
+  assert.match(renderReview(store,{reviewCamp:'exploration'}), /工号：&lt;b&gt;123&lt;\/b&gt;/);
+  store.data.submissions = [reviewView(row)];
+  assert.match(renderReview(store,{reviewCamp:'exploration'}), /手机号未补充/);
+  selectReviewTab(store,'pending','novice');
+  selectReviewTab(store,'pending','exploration');
+});
+test('phone learners show name and phone, while Feishu keeps its employee number', () => {
+  const phone = reviewView({...row, learner_phone:'13900000042'});
+  const store = {data:{submissions:[phone]},getTask:()=>task};
+  selectReviewTab(store,'pending');
+  const html = renderReview(store,{reviewCamp:'exploration'});
+  assert.match(html,/手机号：13900000042/);
+  assert.doesNotMatch(html,/class="cell-subtext">learner<\/span>/);
+  store.data.submissions = [{...phone,studentIsFeishu:true,studentEmployeeNo:'MCE0042'}];
+  const corporate = renderReview(store,{reviewCamp:'exploration'});
+  assert.match(corporate,/工号：MCE0042/);
+  assert.doesNotMatch(corporate,/13900000042/);
+});
+
 test('actual reviewer and server time render safely, without falling back to an assignee', async () => {
   const credit = { id: 'executor', name: '<b>实际审核员</b>' };
   const at = '2026-10-22T08:09:10Z';
@@ -48,7 +85,8 @@ test('each review tab has only relevant columns and claims separate pending from
     pending:['学员','任务','提交时间','状态','操作'],
     reviewing:['学员','任务','提交时间','正在审核人','开始审核时间','操作'],
     ai:['学员','任务','自测状态','自测时间','操作'],
-    reviewed:['学员','任务','评分','提交时间','实际审核人','审核时间','操作'],
+    reviewed:['学员','任务','评分','提交时间','状态','实际审核人','审核时间','操作'],
+    passed:['学员','任务','评分','提交时间','实际审核人','审核时间','操作'],
     failed:['学员','任务','提交时间','未通过原因','实际审核人','审核时间','操作'],
   };
   for (const [tab, columns] of Object.entries(expected)) {
@@ -59,6 +97,29 @@ test('each review tab has only relevant columns and claims separate pending from
     if (tab === 'reviewing') { assert.ok(html.includes('另一审核员')); assert.ok(html.includes('他人审核中')); }
   }
   selectReviewTab(store, 'pending');
+});
+
+test('reviewed combines both decisions while passed and failed remain separate within each camp', () => {
+  const base=reviewView(row);
+  for(const camp of ['exploration','novice']) {
+    const store={data:{submissions:[
+      {...base,id:'pass-result',camp,status:'passed'},
+      {...base,id:'return-result',camp,status:'returned'},
+      {...base,id:'pending-result',camp,status:'pending'},
+      {...base,id:'old-result',camp,status:'passed',supersededBy:'pass-result'},
+      {...base,id:'other-camp',camp:camp==='exploration'?'novice':'exploration',status:'passed'},
+    ]},getTask:()=>task};
+    for(const [tab,expected] of [['reviewed',['pass-result','return-result']],['passed',['pass-result']],['failed',['return-result']]]) {
+      selectReviewTab(store,tab,camp);
+      const html=renderReview(store,{reviewCamp:camp});
+      assert.deepEqual([...html.matchAll(/data-review-tab="([^"]+)"/g)].map(m=>m[1]),['pending','reviewing','ai','reviewed','passed','failed']);
+      assert.deepEqual([...html.matchAll(/data-review-open="([^"]+)"/g)].map(m=>m[1]),expected);
+      assert.match(html,/data-review-tab="reviewed">已审核<span class="count-badge">2<\/span>/);
+      assert.match(html,/data-review-tab="passed">审核通过<span class="count-badge">1<\/span>/);
+      assert.match(html,/data-review-tab="failed">审核未通过<span class="count-badge">1<\/span>/);
+    }
+    selectReviewTab(store,'pending',camp);
+  }
 });
 
 test('failed exclusive claim prevents opening submission or loading its document', async () => {
@@ -140,13 +201,20 @@ test('AI history is per document and retains prior evaluations', () => {
   const text = aiComment([...detail.document_ai_checks,{document_url:'https://example.com/docx/second',status:'RUNNING',history:[]}]);
   assert.ok(text.includes('上次建议')); assert.ok(text.includes('/second')); assert.ok(text.includes('自查中'));
 });
-test('approval and return feedback validation counts characters and agrees with server limits', () => {
-  assert.match(reviewFeedbackError('passed',' 写得好写得好写得好 '),/当前 9 个字/);
-  assert.equal(reviewFeedbackError('passed','已核对全部要求符合标准'),'');
-  assert.equal(reviewFeedbackError('passed',''),'');
-  assert.match(reviewFeedbackError('returned',''),/至少 10/);
-  assert.match(reviewFeedbackError('passed','🙂'.repeat(9)),/当前 9 个字/);
-  assert.match(reviewFeedbackError('passed','字'.repeat(2001)),/2000/);
+test('approval comments are optional and returns need five non-whitespace characters', () => {
+  for (const value of ['', '  \n\t', '好', '写得好写得好写得好', '🙂']) {
+    assert.equal(reviewFeedbackError('passed', value), '');
+  }
+  for (const value of ['', '  \n\t', '请补材料', '请 \n补\t材 料', '🙂'.repeat(4)]) {
+    assert.match(reviewFeedbackError('returned', value), /至少 5/);
+  }
+  for (const value of ['请补充材料', '请 \n补\t充 材料', '🙂'.repeat(5)]) {
+    assert.equal(reviewFeedbackError('returned', value), '');
+  }
+  for (const decision of ['passed', 'returned']) {
+    assert.equal(reviewFeedbackError(decision, '字'.repeat(2000)), '');
+    assert.match(reviewFeedbackError(decision, '字'.repeat(2001)), /2000/);
+  }
 });
 
 test('designer decision controls disable approval for checked reasons and restore correctly after failure', async () => {
@@ -180,11 +248,18 @@ test('designer decision controls disable approval for checked reasons and restor
     reason.checked = true; reason.change();
     assert.equal(pass.disabled, true); assert.equal(returned.disabled, false); assert.equal(hint.hidden, false);
     await pass.onclick(); assert.equal(calls, 0);
+    for (const value of ['', '请补材料', '请 \n补\t材 料']) {
+      comment.value = value;
+      await returned.onclick(); assert.equal(calls, 0);
+      assert.match(error.textContent, /至少 5/);
+    }
+    comment.value = '请补充材料';
     await returned.onclick(); assert.equal(calls, 1);
     assert.equal(pass.disabled, true); assert.equal(returned.disabled, false); assert.equal(reason.disabled, false);
     assert.equal(modal.dataset.operationPending, 'false');
     reason.checked = false; reason.change();
     assert.equal(pass.disabled, false); assert.equal(hint.hidden, true);
+    comment.value = '';
     await pass.onclick(); assert.equal(calls, 2); assert.equal(closed, 1);
   } finally { globalThis.document = originalDocument; }
 });
