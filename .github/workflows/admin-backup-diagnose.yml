@@ -1,0 +1,73 @@
+name: Diagnose Administrator Backup Read Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed operations commit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Identify temporary runner ingress
+        id: runner
+        run: |
+          set -euo pipefail
+          cidr="$(curl -fsS --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress,sys
+          n=ipaddress.ip_network(sys.argv[1],strict=True)
+          assert n.version==4 and n.prefixlen==32 and n.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only the temporary runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Diagnose the stopped backup without switching services
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          JOURNEY_HOST: ${{ secrets.TALENT_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/journey-inspect-key"
+          known="$RUNNER_TEMP/journey-inspect-known"
+          trap 'rm -f "$key" "$known"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          ssh -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known" "root@$JOURNEY_HOST" 'python3 -' < deploy/admin-reviewed/diagnose_backup.py | tee "$RUNNER_TEMP/journey-admin-backup-diagnostic.json"
+      - name: Close and verify the exact runner SSH rule
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Preserve bounded metadata without credentials or submission contents
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-admin-backup-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/journey-admin-backup-diagnostic.json
+          retention-days: 7
