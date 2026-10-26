@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import ssl
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
@@ -12,6 +15,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from journey_api.config import Settings, get_settings
 from journey_api.errors import ApiError
 
+AI_UNAVAILABLE_MESSAGE = "AI 接口暂时不可用，请联系管理员进行检查"
+logger = logging.getLogger(__name__)
+
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -19,7 +25,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def request_json(url: str, *, token: str = "", body: dict | None = None,
-                 timeout: int = 20, service: str = "FEISHU", method: str | None = None) -> dict:
+                 timeout: float = 20, service: str = "FEISHU", method: str | None = None) -> dict:
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -46,10 +52,15 @@ def request_json(url: str, *, token: str = "", body: dict | None = None,
                 pass
         # Provider bodies may contain credentials or private input. Do not echo them.
         status = exc.code if isinstance(exc, HTTPError) else None
+        reason = exc.reason if isinstance(exc, URLError) else exc
+        transient = (status in {408, 429, 500, 502, 503, 504} if status is not None else
+                     isinstance(exc, (URLError, TimeoutError, OSError))
+                     and not isinstance(reason, ssl.SSLCertVerificationError))
         raise ApiError(502, f"{service}_REQUEST_FAILED",
-                       ("AI 接口暂时不可用，请联系管理员检查模型、额度和网络。" if service == "AI"
+                       (AI_UNAVAILABLE_MESSAGE if service == "AI"
                         else "飞书接口未返回可确认的结果，请稍后重试或联系管理员。"),
-                       details={"upstream_status": status}, retryable=True) from exc
+                       details={"upstream_status": status},
+                       retryable=transient if service == "AI" else True) from exc
 
 
 TOKEN = re.compile(r"^[A-Za-z0-9]{10,100}$")
@@ -392,17 +403,45 @@ class AIReviewer:
         self.settings = settings
 
     def review(self, system: str, evidence: dict) -> str:
-        response = request_json(self.settings.ai_base_url.rstrip("/") + "/chat/completions",
-                                token=self.settings.ai_api_key, timeout=180, service="AI", body={
+        self.last_model = None
+        body = {
             "model": self.settings.ai_model, "stream": False, "max_tokens": 3500,
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": json.dumps(evidence, ensure_ascii=False)}],
-        })
+        }
+        # Retry generation only; document/comment operations remain outside this loop.
+        # Share the existing 180-second request budget rather than tripling it.
+        deadline = time.monotonic() + 180
+        fallback = self.settings.ai_fallback_model.strip()
+        models = [self.settings.ai_model, self.settings.ai_model, fallback or self.settings.ai_model]
+        for attempt, model in enumerate(models, 1):
+            body = {**body, "model": model}
+            try:
+                response = request_json(self.settings.ai_base_url.rstrip("/") + "/chat/completions",
+                                        token=self.settings.ai_api_key,
+                                        timeout=max(0.001, min(60 if fallback else 180,
+                                                              deadline - time.monotonic())),
+                                        service="AI", body=body)
+                break
+            except ApiError as exc:
+                delay = float(attempt)
+                retry = (exc.code == "AI_REQUEST_FAILED" and exc.retryable
+                         and attempt < 3 and deadline - time.monotonic() > delay + 1)
+                # Never log provider bodies, credentials, prompts or learner evidence.
+                logger.warning(json.dumps({"event": "ai.request_failed", "attempt": attempt,
+                                           "model": model,
+                                           "upstream_status": exc.details.get("upstream_status"),
+                                           "error_type": type(exc.__cause__).__name__,
+                                           "will_retry": retry}))
+                if not retry:
+                    raise
+                time.sleep(delay)
         choices = response.get("choices", [])
         choice = choices[0] if choices else {}
         content = choice.get("message", {}).get("content")
         if choice.get("finish_reason") != "stop" or not isinstance(content, str):
             raise ApiError(502, "AI_INCOMPLETE_RESULT", "AI 未返回完整评价，尚未发表评论，请稍后重试。")
+        self.last_model = model
         return content
 
 

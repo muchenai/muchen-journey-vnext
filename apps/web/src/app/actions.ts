@@ -26,6 +26,25 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const MATERIAL_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 const FEISHU_EVIDENCE_PREFIX = "飞书文档：";
 
+export async function markLearnerNotificationRead(id: string): Promise<{ error?: string }> {
+  if (!UUID_PATTERN.test(id)) return { error: "通知标识无效。" };
+  try {
+    await apiRequest(`/api/v1/me/notifications/${id}/read`, "LEARNER", { method: "POST" });
+    return {};
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "标记已读失败，请重试。" };
+  }
+}
+
+export async function markAllLearnerNotificationsRead(): Promise<{ error?: string }> {
+  try {
+    await apiRequest("/api/v1/me/notifications/read-all", "LEARNER", { method: "POST" });
+    return {};
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "标记已读失败，请重试。" };
+  }
+}
+
 export type AISelfCheckRecord = {
   id: string;
   createdAt: string;
@@ -172,6 +191,20 @@ async function passwordSession(
 
 export async function loginWithPassword(phone: string, password: string): Promise<PasswordLoginState> {
   return passwordSession(phone, password);
+}
+
+export async function saveLearnerNickname(displayName: string): Promise<PasswordLoginState> {
+  const name = displayName.trim();
+  if (!name || Array.from(name).length > 120) return { error: "请输入 1–120 个字符的昵称。" };
+  try {
+    await apiRequest("/api/v1/me/learner-profile", "LEARNER", {
+      method: "PUT", body: JSON.stringify({ display_name: name }),
+    });
+  } catch (error) {
+    return { error: error instanceof ApiRequestError ? error.message : "昵称保存失败，请稍后重试。" };
+  }
+  revalidatePath("/app");
+  redirect("/app?view=dashboard");
 }
 
 export async function registerWithPassword(phone: string, code: string, password: string): Promise<PasswordLoginState> {

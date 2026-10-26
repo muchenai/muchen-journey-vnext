@@ -1,0 +1,86 @@
+.execution-revision-action { position: absolute; top: 449px; right: 12px; z-index: 2; padding: 3px 12px; min-height: 0; border: 1px solid #3a9fc6; border-radius: 6px; background: #0d233a; color: #bfeaf4; font: 14px/1.5 "Source Han Sans SC", sans-serif; cursor: pointer; }
+.execution-revision-action:disabled { cursor: wait; }
+
+[data-action="execution-history"] { cursor: pointer; z-index: 2; }
+[data-action="execution-history"]:focus-visible { outline: 2px solid #70fbff; outline-offset: 4px; }
+.self-check-history {
+  position: fixed; inset: 0; margin: auto; box-sizing: border-box;
+  width: 680px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 40px);
+  padding: 24px; overflow-y: auto; color: #eaf3ff;
+  border: 1px solid #294d70; border-radius: 20px;
+  background: linear-gradient(120deg, #0b1c2c, #182942 55%, #0d1a2d);
+  box-shadow: 0 20px 70px #020b20b3, inset 0 -2px 0 #294d70;
+  font-family: "Source Han Sans SC", sans-serif; font-size: 14px; line-height: 1.65;
+  scrollbar-width: thin; scrollbar-color: #8398ae #182638;
+}
+.self-check-history::backdrop { background: rgb(1 10 27 / 72%); backdrop-filter: blur(4px); }
+.self-check-history .self-check-history-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.self-check-history h2 { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.4; color: #eaf3ff; }
+.self-check-history .self-check-history-header p { margin: 4px 0 0; color: #9edff5; font-size: 14px; }
+.self-check-history .self-check-history-header button {
+  flex: none; min-height: 0; margin: 0; padding: 3px 8px; width: auto;
+  border: 1px solid #477eaa; border-radius: 5px; background: #123658;
+  color: #c9e8fa; font: inherit; font-size: 12px; line-height: 1.5; cursor: pointer;
+}
+.self-check-history button:focus-visible, .self-check-history summary:focus-visible { outline: 2px solid #70fbff; outline-offset: 3px; }
+.self-check-history .self-check-history-notice { margin: 18px 0 0; padding: 12px; border: 1px solid #294d70; border-radius: 8px; background: #12365b; color: #a4bfd5; font-size: 13px; }
+.self-check-history .self-check-history-empty { display: flex; flex-direction: column; justify-content: center; min-height: 162px; text-align: center; }
+.self-check-history .self-check-history-empty strong { font-size: 18px; color: #d9f3ff; }
+.self-check-history .self-check-history-empty p { margin: 4px 0 0; color: #a4bfd5; }
+.self-check-history footer { display: block; margin-top: 0; padding-top: 13px; border-top: 1px solid #294d70; color: #7f9fb9; font-size: 12px; letter-spacing: .08em; }
+.self-check-history footer span { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 0; }
+.self-check-history .self-check-history-list { list-style: none; padding: 0; margin: 20px 0; }
+.self-check-history .self-check-history-list li { margin: 12px 0; padding: 14px; background: #0d233a; border: 1px solid #294d70; border-radius: 8px; }
+.self-check-history .self-check-history-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: #bfeaf4; }
+.self-check-history time { color: #8eacc5; font-size: 12px; }
+.self-check-history .self-check-history-list p { margin: 8px 0; color: #a4bfd5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.self-check-history summary { color: #7cdef5; cursor: pointer; }
+.self-check-history .self-check-history-error { padding: 40px 0; color: #ffd5a7; }
+.task-feedback-dialog { overflow-x: hidden; }
+.task-feedback-dialog .self-check-history-header { position: sticky; top: -24px; z-index: 1; padding-top: 12px; padding-bottom: 12px; background: #102138; }
+.task-feedback-dialog .task-feedback-dimension { margin-top: 12px; padding-top: 10px; border-top: 1px solid #294d70; }
+.task-feedback-entry { display: block; width: 100%; margin: 0; border: 0; border-bottom: 1px solid #274c73; border-radius: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.task-feedback-entry:focus-visible { outline: 2px solid #70fbff; outline-offset: -2px; }
+.task-feedback-entry:hover .dashboard-record-title { color: #70fbff; }
+.task-feedback-hint { color: #a0b7d1; font-size: 12px; line-height: 1.6; }
+
+
+
+.phone-login-mode { gap: 21px !important; }
+.password-login-mode { gap: 24px !important; }
+.password-login-fields { position: relative; z-index: 1; width: 100%; display: grid; gap: 13px; }
+.password-input-row { min-height: 56px; margin: 0; padding: 0 20px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(154,202,240,.5); border-radius: 13px; background: linear-gradient(135deg, rgba(115,151,204,.38), rgba(62,103,160,.3)); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.password-input-row:focus-within { border-color: #70fbff; background: rgba(71,142,206,.38); box-shadow: 0 0 18px rgba(46,223,255,.28); }
+.login-stage form.login-panel .password-input-row input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; flex: 1; border: 0; outline: 0; border-radius: 0; background: transparent; color: #f5ffff; font-size: 17px; letter-spacing: .06em; text-align: left; }
+.password-input-row input::placeholder { color: rgba(226,241,255,.7); opacity: 1; }
+.password-login-hint { margin: 0; color: rgba(178,211,235,.72); font-size: 12px; letter-spacing: .04em; text-align: center; }
+.password-login-guidance { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.phone-login-fields { position: relative; z-index: 1; width: 100%; display: grid; gap: 18px; }
+.phone-input-row { min-height: 54px; margin: 0; padding: 0 18px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(154,202,240,.5); border-radius: 13px; background: linear-gradient(135deg, rgba(115,151,204,.38), rgba(62,103,160,.3)); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.phone-input-row:focus-within { border-color: #70fbff; background: rgba(71,142,206,.38); box-shadow: 0 0 18px rgba(46,223,255,.28); }
+.login-stage form.login-panel .phone-input-row input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) { width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; flex: 1; border: 0; outline: 0; border-radius: 0; background: transparent; color: #f5ffff; font-size: 16px; letter-spacing: .06em; }
+.phone-input-row input::placeholder { color: rgba(226,241,255,.7); opacity: 1; }
+.phone-prefix { padding-right: 15px; border-right: 1px solid rgba(198,232,255,.35); color: #eefaff; font-size: 16px; font-weight: 700; }
+.phone-login-note { margin: 48px 0 -8px; padding-top: 2px; color: rgba(170,197,218,.58); border-top: 1px solid rgba(112,196,233,.22); font-size: 11px; line-height: 1.5; text-align: center; }
+.phone-login-note a { margin: 0 2px; color: #63eaff; font-weight: 700; text-decoration: none; text-shadow: 0 0 9px rgba(77,240,255,.42); transition: color .2s ease, text-shadow .2s ease; }
+.phone-login-note a:hover, .phone-login-note a:focus-visible { color: #c7fdff; text-decoration: underline; text-underline-offset: 3px; text-shadow: 0 0 13px rgba(77,240,255,.78); }
+.phone-login-mode .launch-button { min-height: 60px; }
+.password-login-mode .launch-button { min-height: 60px; }
+.login-stage .phone-account-panel { gap: 16px !important; padding-top: 28px; padding-bottom: 28px; }
+.login-stage .phone-account-panel .panel-logo { width: 80px; height: 80px; }
+.login-stage .phone-account-panel .panel-title { font-size: 28px; }
+.phone-account-heading { text-align: center; margin: 0 0 4px; }
+.phone-account-heading h2 { margin: 0 0 5px; color: #e6fcff; font-size: 24px; letter-spacing: .12em; }
+.phone-account-heading p { margin: 0; font-size: 13px; color: #a6c9e3; }
+.phone-account-panel .phone-login-note { margin: 4px 0 0; padding-top: 10px; }
+.phone-account-panel .password-login-guidance { min-height: 28px; color: #5b8fac; gap: 24px; }
+.phone-account-panel .forgot-password-button { font-size: 15px; text-decoration: none; }
+.password-visibility { padding: 8px 0 8px 8px; border: 0; color: #7eeaff; font-size: 13px; cursor: pointer; background: transparent; white-space: nowrap; }
+.phone-account-panel button:disabled { cursor: not-allowed; opacity: .55; }
+.phone-account-panel .status-line { margin-top: 0; line-height: 1.5; }
+
+.login-viewport, .design-viewport, .app-loader-viewport { line-height: 1.5; }
+.phone-account-panel .forgot-password-button { border: 0; padding: 0; background: transparent; color: #63eaff; cursor: pointer; }
+.otp-row { display: flex; gap: 12px; }
+.otp-row .password-input-row { flex: 1; min-width: 0; }
+.otp-button { flex-shrink: 0; padding: 0 18px; border: 1px solid rgba(77,240,255,.48); border-radius: 13px; background: rgba(14,42,86,.75); color: #4df0ff; font-size: 16px; cursor: pointer; }

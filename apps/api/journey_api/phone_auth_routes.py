@@ -26,7 +26,9 @@ from journey_api.identity import (
     utc_now,
 )
 from journey_api.learner_oauth import lock_learner_organization, provision_learner
+from journey_api.learner_phone import remember_verified_phone
 from journey_api.models import (
+    AuditEntry,
     Assignment,
     AssignmentStatus,
     CompletionCode,
@@ -80,6 +82,65 @@ class MigrateCompletionCode(StrictModel):
 
 def envelope(request: Request, data: object) -> dict[str, object]:
     return {"data": data, "request_id": request.state.request_id}
+
+
+class LearnerNickname(StrictModel):
+    display_name: str
+
+
+def phone_profile_allowed(session: Session, actor: Actor) -> bool:
+    identity_session = session.get(IdentitySession, actor.session_id) if actor.session_id else None
+    identity = session.get(ExternalIdentity, identity_session.external_identity_id) if identity_session else None
+    corporate = session.scalar(select(ExternalIdentity.id).where(
+        ExternalIdentity.user_id == actor.id,
+        ExternalIdentity.organization_id == actor.organization_id,
+        ExternalIdentity.provider == "FEISHU", ExternalIdentity.revoked_at.is_(None),
+    ))
+    return bool(identity and identity.user_id == actor.id
+                and identity.provider in (*TEMPORARY_IDENTITY_PROVIDERS, "NICKNAME_PHONE")
+                and corporate is None)
+
+
+def nickname_needed(session: Session, user: User) -> bool:
+    if user.display_name != "探索者":
+        return False
+    # An explicitly chosen placeholder is also a completed nickname setup.
+    return session.scalar(select(AuditEntry.id).where(
+        AuditEntry.organization_id == user.organization_id,
+        AuditEntry.actor_id == user.id,
+        AuditEntry.action == "learner.nickname_saved",
+    ).limit(1)) is None
+
+
+@router.get("/me/learner-profile")
+def learner_profile(request: Request, actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    user = session.get(User, actor.id)
+    return envelope(request, {"display_name": user.display_name,
+        "needs_nickname": phone_profile_allowed(session, actor) and nickname_needed(session, user)})
+
+
+@router.put("/me/learner-profile")
+def save_learner_nickname(payload: LearnerNickname, request: Request,
+                          actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    if not phone_profile_allowed(session, actor):
+        raise ApiError(403, "PHONE_ACCOUNT_REQUIRED", "仅手机号账号可设置昵称。")
+    name = payload.display_name.strip()
+    if not 1 <= len(name) <= 120 or any(ord(char) < 32 for char in name):
+        raise ApiError(422, "VALIDATION_FAILED", "请输入 1–120 个字符的昵称。")
+    user = session.scalar(select(User).where(User.id == actor.id,
+        User.organization_id == actor.organization_id).with_for_update())
+    if not nickname_needed(session, user):
+        if user.display_name != name:
+            raise ApiError(409, "NICKNAME_ALREADY_SET", "昵称已保存，请刷新页面进入探索营。")
+        return envelope(request, {"display_name": user.display_name, "needs_nickname": False})
+    user.display_name = name
+    add_audit(session, request_id=request.state.request_id, action="learner.nickname_saved",
+              resource_type="user", resource_id=user.id, actor_id=user.id,
+              organization_id=actor.organization_id, result="SUCCESS")
+    session.commit()
+    return envelope(request, {"display_name": name, "needs_nickname": False})
 
 
 def normalized_phone(value: str) -> str:
@@ -261,6 +322,7 @@ def login_with_password(
         )
     else:
         raise ApiError(401, "PHONE_OR_PASSWORD_INVALID", "手机号或密码不正确，首次使用请先注册。")
+    remember_verified_phone(identity, phone)
     csrf_token, expires_at = issue_learner_session(
         session,
         response,
@@ -310,6 +372,7 @@ def verified_password_change(
     if identity.provider != "PHONE_PASSWORD":
         identity.provider = "PHONE_PASSWORD"
         identity.revision += 1
+    remember_verified_phone(identity, phone)
     credential = session.scalar(select(PhonePasswordCredential).where(
         PhonePasswordCredential.external_identity_id == identity.id,
     ).with_for_update())
@@ -522,6 +585,7 @@ def verify_phone_code(
         request_id=request.state.request_id,
         provider="PHONE",
     )
+    remember_verified_phone(identity, phone)
     # Keep a stable, privacy-preserving public identity for phone-only learners.
     # Once the journey is migrated to a Feishu account, that account keeps its
     # corporate display name instead.
@@ -537,7 +601,7 @@ def verify_phone_code(
         phone_user = session.scalar(
             select(User).where(User.id == identity.user_id).with_for_update()
         )
-        if phone_user is not None:
+        if phone_user is not None and nickname_needed(session, phone_user):
             phone_user.display_name = "探索者"
     csrf_token, expires_at = issue_learner_session(
         session, response, identity=identity, request_id=request.state.request_id

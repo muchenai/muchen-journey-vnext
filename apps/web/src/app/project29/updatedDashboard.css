@@ -1,0 +1,141 @@
+.updated-dashboard {
+  font-family: "Source Han Sans SC", sans-serif;
+  --dashboard-panel-fill: linear-gradient(265.7399595504239deg, rgba(14,25,43,.86) 1.1026%, rgba(22,39,71,.76) 16.424%, rgba(12,26,44,.86) 62.839%, rgba(10,35,76,.84) 98.83%);
+  --dashboard-text: #eff6ff;
+  --dashboard-muted: #9ab0c6;
+  --dashboard-cyan: #86deec;
+}
+.updated-dashboard .figma-stroke-task {
+  --figma-stroke-width: 1px;
+  --figma-stroke-radius: 10px;
+}
+.updated-dashboard [data-node-id="4043:243"] {
+  --figma-stroke-width: .907px;
+  --figma-stroke-radius: 8.162px;
+}
+.updated-dashboard .figma-stroke-rect { rx: calc(var(--figma-stroke-radius) - var(--figma-stroke-width) / 2); }
+.updated-dashboard .dashboard-nav-frame {
+  --figma-stroke-width: 1.101px;
+  --figma-stroke-radius: 11.011px;
+}
+.updated-dashboard .dashboard-records { font-size: 13px; }
+.updated-dashboard .dashboard-current-task-tag {
+  position: absolute; left: 423.14px; top: 369.38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: max-content; min-width: 76.329px; height: 22.114px; padding: 0 5px;
+  box-sizing: border-box; border-radius: 3.567px;
+  background: linear-gradient(to right, #bff359, #60ed8e); color: #031308;
+  font-family: "Source Han Sans SC", sans-serif; font-size: 10.7px; font-weight: 500; line-height: 1;
+}
+.updated-dashboard .dashboard-current-task-tag,
+.updated-dashboard .dashboard-current-task-tag > span {
+  white-space: nowrap; word-break: normal; overflow-wrap: normal; flex-shrink: 0;
+}
+.updated-dashboard [data-node-id="4043:172"] > .dashboard-records {
+  position: absolute; inset: 44px 14.34px 14.34px; width: auto; margin: 0;
+}
+.dashboard-current-status {
+  position: absolute; left: 520px; top: 370px; color: var(--dashboard-cyan);
+  font: 500 11px/20px "Source Han Sans SC", sans-serif;
+}
+.dashboard-current-status:is([data-status="pending"], [data-status="revision"]) { color: #ffd65d; }
+/* Keep real reviewer names and shorter role labels on the original column's centerline. */
+.updated-dashboard :is([data-node-id="4043:231"], [data-node-id="4043:232"],
+  [data-node-id="4043:233"], [data-node-id="4043:234"]) {
+  left: 851.15px;
+  width: 120px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.updated-dashboard [data-node-id="4043:233"] {
+  max-height: 31px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.dashboard-task-board {
+  position: absolute; top: 673px; left: 276px; width: 1122px; height: 375px;
+  font-family: "Source Han Sans SC", sans-serif;
+  overflow-y: auto; overflow-x: hidden; padding: 0;
+  scrollbar-width: none;
+}
+.dashboard-task-board::-webkit-scrollbar { display: none; }
+.dashboard-task-tiles {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 180px; column-gap: 27px; row-gap: 15px;
+  width: 100%;
+}
+.dashboard-task-tile {
+  position: relative; display: flex; flex-direction: column; align-items: stretch;
+  min-width: 0; padding: 13.639px; border: 1px solid transparent;
+  border-radius: 10px; background: var(--dashboard-panel-fill);
+  color: var(--dashboard-text); text-align: left;
+}
+.dashboard-tile-status { color: var(--dashboard-muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.dashboard-task-tile[data-status="active"] .dashboard-tile-status { color: var(--dashboard-cyan); }
+.dashboard-task-tile:is([data-status="pending"], [data-status="revision"]) .dashboard-tile-status { color: #ffd65d; }
+.dashboard-task-tile[data-status="completed"] .dashboard-tile-status { color: #77ffcf; }
+.dashboard-task-tile[aria-disabled="true"] { cursor: not-allowed; }
+.design-stage .dashboard-task-tile[aria-disabled="true"]:hover { translate: none; transform: none; }
+.dashboard-tile-body { display: flex; align-items: flex-start; gap: 11.69px; padding-top: 13.639px; min-width: 0; }
+.dashboard-tile-icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 37.02px; height: 37.02px;
+  border: .974px solid #3d79aa; border-radius: 7.794px; background: #0f335a;
+  color: #d7f4ff; font-size: 21.433px;
+}
+.dashboard-tile-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8px; }
+.dashboard-tile-copy strong { color: #d7f4ff; font-size: 14px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
+.dashboard-tile-copy > span:not(.dashboard-tile-status) {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; color: var(--dashboard-muted); font-size: 12px; line-height: 1.6;
+}
+.dashboard-tile-clock { flex-shrink: 0; color: var(--dashboard-muted); font-size: 21.433px; }
+
+/* The imported progress row fills its panel without fixed-width grid tracks. */
+.updated-dashboard [data-node-id="4062:592"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: 85px;
+}
+.updated-dashboard [data-node-id="4062:579"] {
+  overflow: visible;
+}
+.updated-dashboard [data-node-id="4062:679"] {
+  --figma-stroke-radius: 8.162px;
+}
+.updated-dashboard [data-node-id="4043:208"] {
+  max-width: 368px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Only the lower sidebar menu uses the new full-row hover treatment. */
+.updated-dashboard .dashboard-sidebar-menu button {
+  width: 207px;
+  border-radius: 5px;
+  transition: background-color .18s ease;
+}
+.updated-dashboard .dashboard-sidebar-menu button:not([data-action="dashboard"]):is(:hover, :focus-visible) {
+  background-color: #18263b;
+}
+.updated-dashboard .dashboard-sidebar-menu button:focus-visible {
+  outline: 1px solid #86deec;
+  outline-offset: 2px;
+}
+.updated-dashboard .dashboard-sidebar-menu button .flex.gap-\[21px\] {
+  gap: 13px;
+}
+.updated-dashboard .dashboard-sidebar-menu [data-node-id="4062:541"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 27.733px;
+}
+.updated-dashboard .dashboard-sidebar-menu [data-node-id="4062:542"] {
+  font-size: 9.6px;
+  line-height: normal;
+}

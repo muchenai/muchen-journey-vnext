@@ -290,6 +290,7 @@ class ExternalIdentity(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     provider: Mapped[str] = mapped_column(String(40))
     subject: Mapped[str] = mapped_column(String(180))
+    phone_ciphertext: Mapped[str] = mapped_column(Text, default="", server_default="")
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     revision: Mapped[int] = mapped_column(default=1)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -1367,6 +1368,20 @@ class Review(Base):
     superseded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class LearnerNotificationRead(Base):
+    """Per-learner read receipt for one immutable finalized review."""
+    __tablename__ = "learner_notification_reads"
+    __table_args__ = (
+        ForeignKeyConstraint(["learner_id", "organization_id"],
+                             ["users.id", "users.organization_id"],
+                             name="fk_learner_notification_read_owner"),
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    learner_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    review_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviews.id"), primary_key=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ReviewDelegation(Base):

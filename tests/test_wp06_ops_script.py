@@ -181,12 +181,12 @@ def test_migration_check_rehearses_ai_and_review_release_range(
     assert report["upgrade_to_head"] == "PASS"
     assert report["downgrade_to_base"] == "PASS"
     assert report["base_revision"] == "0035_phone_password_login"
-    assert report["head_revision"] == "0044_task_author_review"
+    assert report["head_revision"] == "0047_learner_notification_reads"
     assert report["business_facts_preserved"] is True
 
 
 def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0044_task_author_review"
+    assert ops.EXPECTED_MIGRATION_HEAD == "0047_learner_notification_reads"
     assert set(ops.REVIEW_TABLES) == {
         "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
         "review_admin_access", "review_claims", "directory_sync", "directory_members",
@@ -230,7 +230,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
 
 def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0044_task_author_review",
+        "migration_revision": "0047_learner_notification_reads",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -247,7 +247,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0044_task_author_review",
+            "migration_revision": "0047_learner_notification_reads",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -274,7 +274,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0044_task_author_review",
+        "migration_revision": "0047_learner_notification_reads",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []

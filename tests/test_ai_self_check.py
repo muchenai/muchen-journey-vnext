@@ -237,6 +237,84 @@ def test_real_action_path_persists_one_comment_and_does_not_advance_task(integra
     assert history == [first]
 
 
+def test_fallback_records_actual_model_and_writes_one_comment(integration, monkeypatch):
+    from journey_api.ai_self_check_clients import AIReviewer
+    client, assignment_id, url, docs, _ = integration
+    ai = AIReviewer(get_settings().model_copy(update={
+        "ai_model": "deepseek-v4.1-flash", "ai_fallback_model": "deepseek-v4-pro-0813"}))
+    models = []
+
+    def request(*args, **kwargs):
+        models.append(kwargs["body"]["model"])
+        if len(models) < 3:
+            raise ApiError(502, "AI_REQUEST_FAILED", "temporary", retryable=True)
+        return {"choices": [{"finish_reason": "stop", "message": {"content": output()}}]}
+
+    monkeypatch.setattr("journey_api.ai_self_check_clients.request_json", request)
+    monkeypatch.setattr("journey_api.ai_self_check_clients.time.sleep", lambda _: None)
+    app.dependency_overrides[get_reviewer] = lambda: ai
+    result = assert_ok(run(client, assignment_id, url))
+    assert result["status"] == "COMPLETED"
+    assert models == ["deepseek-v4.1-flash", "deepseek-v4.1-flash", "deepseek-v4-pro-0813"]
+    assert len(docs.comments) == 1
+    with SessionLocal() as session:
+        assert session.get(AISelfCheck, uuid.UUID(result["id"])).model == "deepseek-v4-pro-0813"
+
+
+@pytest.mark.parametrize("authorization", ["local", "missing", "wrong_target", "nonlocal"])
+def test_local_reset_reuses_comment_only_after_explicit_self_check(integration, monkeypatch, authorization):
+    from journey_api.identity import add_audit
+    client, assignment_id, url, docs, ai = integration
+    first = assert_ok(run(client, assignment_id, url))
+    newcomer, _ = register("local-retest")
+    target_id = assert_ok(newcomer.get("/api/v1/me/current-action"))["resource_id"]
+    target_user = uuid.UUID(assert_ok(newcomer.get("/api/v1/session"))["user_id"])
+    history_path = f"/api/v1/me/assignments/{target_id}/ai-self-checks"
+    assert assert_ok(newcomer.get(history_path)) == []
+    with SessionLocal.begin() as session:
+        row = session.get(AISelfCheck, uuid.UUID(first["id"]))
+        if authorization != "missing":
+            add_audit(
+                session, request_id="authorized-local-reset", organization_id=row.organization_id,
+                action="local_test.self_check_reuse_authorized", resource_type="ai_self_check",
+                resource_id=row.id, result="SUCCESS", details={
+                    "previous_learner_id": str(row.learner_id),
+                    "previous_assignment_id": str(row.assignment_id),
+                    "new_learner_id": str(target_user if authorization != "wrong_target" else uuid.uuid4()),
+                    "new_assignment_id": target_id,
+                },
+            )
+    monkeypatch.setenv("APP_ENV", "test" if authorization == "nonlocal" else "local")
+    get_settings.cache_clear()
+    response = run(newcomer, target_id, url, str(uuid.uuid4()))
+    if authorization != "local":
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "DOCUMENT_ALREADY_CLAIMED"
+        assert assert_ok(newcomer.get(history_path)) == []
+        assert len(ai.calls) == 1 and len(docs.comments) == 1 and not docs.updates
+        return
+    result = assert_ok(response)
+    assert result["commentId"] == first["commentId"]
+    assert len(ai.calls) == 2 and len(docs.comments) == 1 and len(docs.updates) == 1
+    assert assert_ok(newcomer.get(history_path)) == [result]
+    assert result["id"] != first["id"]
+    assert assert_ok(client.get(f"/api/v1/me/assignments/{assignment_id}/ai-self-checks")) == [first]
+    from types import SimpleNamespace
+    from journey_api.review_ai_self_checks import review_document_ai_checks
+    with SessionLocal() as session:
+        original = session.get(AISelfCheck, uuid.UUID(first["id"]))
+        assert original.document_token == f"local-archive:{original.id}"
+        checks = review_document_ai_checks(session, SimpleNamespace(
+            version=SimpleNamespace(body=url), review=SimpleNamespace(organization_id=original.organization_id),
+            assignment=SimpleNamespace(id=original.assignment_id),
+            enrollment=SimpleNamespace(learner_id=original.learner_id),
+        ))
+        assert len(checks) == 1 and checks[0].result == first["result"]
+    # Replaying the same request remains idempotent after the claim changed hands.
+    assert assert_ok(run(newcomer, target_id, url)) == result
+    assert len(ai.calls) == 2
+
+
 def test_cross_user_and_csrf_are_enforced(integration):
     client, assignment_id, url, docs, ai = integration
     outsider, _ = register("ai-outsider")

@@ -7,10 +7,13 @@ import type { ProjectExperienceData } from "./types";
 import { collectReviewFeedback } from "./review-feedback";
 import { learnerMaterialDestinations } from "./exploration-links";
 
-export async function loadProjectExperience(assignmentId?: string): Promise<{
+export async function loadProjectExperience(assignmentId?: string, allowPendingNickname = false): Promise<{
   learnerName: string;
+  needsNickname: boolean;
   experience: ProjectExperienceData | null;
 }> {
+  const profile = await learnerPageRequest<{ needs_nickname: boolean }>("/api/v1/me/learner-profile");
+  if (profile.needs_nickname && !allowPendingNickname) redirect("/app/profile");
   const [identity, action, completionCode] = await Promise.all([
     learnerPageRequest<{ display_name: string }>("/api/v1/session"),
     learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
@@ -23,14 +26,14 @@ export async function loadProjectExperience(assignmentId?: string): Promise<{
     redirect("/app?view=dashboard&notice=module-designing");
   }
   if (action.journey && !exploration) {
-    return { learnerName: identity.display_name, experience: null };
+    return { learnerName: identity.display_name, needsNickname: profile.needs_nickname, experience: null };
   }
   const resolvedAssignmentId = assignmentId
     ?? (["START_OR_CONTINUE_TASK", "REVISE_SUBMISSION", "WAIT_FOR_REVIEW"].includes(action.action_type)
       ? action.resource_id
       : action.journey?.nodes.find(node => node.status === "CURRENT")?.assignment_id ?? action.journey?.nodes.at(-1)?.assignment_id);
   if (!resolvedAssignmentId) {
-    return { learnerName: identity.display_name, experience: null };
+    return { learnerName: identity.display_name, needsNickname: profile.needs_nickname, experience: null };
   }
   const assignment = await learnerPageRequest<Assignment>(
     `/api/v1/me/assignments/${encodeURIComponent(resolvedAssignmentId)}`,
@@ -52,6 +55,7 @@ export async function loadProjectExperience(assignmentId?: string): Promise<{
   });
   return {
     learnerName: identity.display_name,
+    needsNickname: profile.needs_nickname,
     experience: {
       completionCode,
       assignmentId: assignment.id,

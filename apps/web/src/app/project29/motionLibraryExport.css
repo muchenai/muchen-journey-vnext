@@ -1,0 +1,52 @@
+.motion-export {
+  --me-bg: #0b182a;
+  --me-text: #eff6ff;
+  --me-muted: #91aac5;
+  --me-line: #315775;
+  --me-cyan: #71e9f3;
+  font-family: "Source Han Sans SC", system-ui, sans-serif;
+}
+.motion-export-launcher {
+  position: fixed; right: 18px; bottom: 18px; z-index: 150;
+  padding: 11px 17px; border: 1px solid var(--me-line); border-radius: 9px;
+  background: var(--me-bg); color: var(--me-cyan); font: inherit; font-size: 12px;
+  box-shadow: 0 4px 24px #0006; cursor: pointer;
+}
+.motion-export-dialog {
+  width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 40px);
+  margin: auto; padding: 26px; border: 1px solid var(--me-line); border-radius: 16px;
+  background: var(--me-bg); color: var(--me-text); font: inherit;
+  font-size: 13px; line-height: 1.8; overflow: auto;
+}
+.motion-export-dialog::backdrop { background: #02091cd9; }
+.motion-export-dialog.with-preview { width: min(1280px, calc(100vw - 32px)); }
+.motion-export-dialog header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.motion-export-dialog small { font-size: 10px; letter-spacing: .12em; color: var(--me-cyan); }
+.motion-export-dialog h2 { margin: 5px 0 16px; font-size: 23px; line-height: 1.5; }
+.motion-export-dialog p { margin: 12px 0; color: var(--me-muted); }
+.motion-export-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.motion-export-dialog button {
+  padding: 8px 12px; border: 1px solid var(--me-line); border-radius: 7px;
+  color: var(--me-text); background: #102640; font: inherit; font-size: 12px; cursor: pointer;
+}
+.motion-export-dialog button.primary { color: #052139; background: var(--me-cyan); border-color: var(--me-cyan); font-weight: 700; }
+.motion-export-dialog button:disabled { cursor: default; opacity: .4; }
+.motion-export-dialog .motion-export-status { min-height: 1.8em; color: var(--me-cyan); font-size: 12px; }
+.motion-export-dialog details { border-top: 1px solid var(--me-line); padding-top: 16px; }
+.motion-export-dialog summary { color: var(--me-text); cursor: pointer; }
+.motion-export-dialog ol { margin: 12px 0; padding-left: 20px; color: var(--me-muted); font-size: 12px; }
+.motion-export-dialog code { color: var(--me-cyan); overflow-wrap: anywhere; }
+.motion-export-dialog textarea {
+  display: block; width: 100%; height: 220px; margin-top: 12px; padding: 12px;
+  border: 1px solid var(--me-line); border-radius: 7px; color: #c5dbec;
+  background: #040c1b; font: 11px/1.7 ui-monospace, monospace; resize: vertical;
+}
+.motion-export-preview { display: block; width: 100%; height: 65dvh; margin-top: 20px; border: 1px solid var(--me-line); border-radius: 8px; }
+.motion-export button:focus-visible,
+.motion-export-dialog :is(button, summary, textarea):focus-visible { outline: 2px solid var(--me-cyan); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .motion-export-dialog { padding: 18px; }
+  .motion-export-dialog h2 { font-size: 19px; }
+}

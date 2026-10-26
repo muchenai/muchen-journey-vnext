@@ -1,0 +1,22 @@
+html { background: #02091c; }
+body { margin: 0; }
+.app-loader-viewport { position: fixed; inset: 0; overflow: hidden; display: flex; justify-content: center; align-items: flex-start; background: #02091c; }
+.app-loader { width: 1920px; height: 1080px; flex: none; min-height: 0; display: grid; place-items: center; padding: 32px 24px; box-sizing: border-box; position: relative; isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 78% 22%, rgba(0, 115, 165, .23), transparent 72%), radial-gradient(ellipse at 15% 82%, rgba(75, 58, 158, .24), transparent 74%), radial-gradient(ellipse at 50% 48%, #102a48, #08152d 100%); color: #eff6ff; font-family: system-ui, sans-serif; }
+.app-loader::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .32; background-image: radial-gradient(circle, #8ed8ff 0 .7px, transparent 1px), radial-gradient(circle, #c1bfff 0 .6px, transparent 1px); background-size: 173px 173px, 257px 257px; background-position: 24px 18px, 93px 67px; }
+.app-loader-content { width: min(100%, 580px); text-align: center; }
+.app-loader-brand { margin: 0 0 54px; color: #8ed8ff; font-size: 20px; font-weight: 700; letter-spacing: .24em; }
+.app-loader-ring { width: 250px; aspect-ratio: 1; margin: 0 auto 45px; position: relative; border-radius: 50%; background: radial-gradient(circle, rgba(37, 119, 169, .12), transparent 66%); }
+.app-loader-ring::before { content: ""; position: absolute; inset: -12px; border: 1px solid rgba(106, 144, 175, .16); border-radius: inherit; }
+.app-loader-ring svg { display: block; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+.app-loader-ring-track { fill: none; stroke: rgba(106, 144, 175, .2); stroke-width: 7; }
+.app-loader-ring-fill { fill: none; stroke: url(#loader-ring-gradient); stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(49, 201, 245, .55)); }
+.app-loader-ring-value { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.app-loader-ring-value strong { color: #e9f9ff; font-size: 55px; line-height: 1.1; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.app-loader-ring-value strong span { margin-left: 5px; font-size: 21px; color: #8ed8ff; }
+.app-loader-ring-value > span { color: #8eaac4; font-size: 14px; letter-spacing: .12em; }
+.app-loader h1 { margin: 0; font-size: 31px; font-weight: 500; line-height: 1.5; letter-spacing: .03em; }
+.app-loader-description { margin: 12px 0 24px; color: #a0b7d1; font-size: 13px; }
+.app-loader-status { min-height: 2.8em; margin: 0; color: #8eaac4; font-size: 14px; line-height: 1.7; }
+.app-loader-note { max-width: 310px; margin: 32px auto 0; color: #779ab8; font-size: 11px; line-height: 1.8; }
+.app-loader-retry { margin-top: 15px; padding: 12px 22px; border: 1px solid #3d79aa; border-radius: 8px; background: #0f335a; color: #d7f4ff; font: inherit; font-size: 16px; cursor: pointer; }
+.app-loader-retry:focus-visible { outline: 2px solid #42dced; outline-offset: 4px; }

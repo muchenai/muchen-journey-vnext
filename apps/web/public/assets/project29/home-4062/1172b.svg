@@ -1,0 +1,24 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="41.6839" height="41.7198" viewBox="0 0 41.6839 41.7198" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Rectangle 64" filter="url(#filter0_df_0_10)">
+<path d="M22.8597 8.10989C22.8597 8.10989 22.8597 8.10989 22.8597 8.10989C23.1416 8.94129 23.4262 9.77153 23.7136 10.6006C26.1939 17.7558 28.8807 24.8248 31.7739 31.8076C31.7774 31.8327 31.7792 31.7893 31.7747 31.806C31.7533 31.8176 31.7958 31.8116 31.7722 31.8097C24.8009 29.0425 17.7478 26.4799 10.6127 24.1217C9.77956 23.8464 8.94529 23.5738 8.10989 23.304C8.90063 23.6853 9.69247 24.0639 10.4854 24.4396C17.2763 27.6574 24.149 30.6707 31.1035 33.4796C31.79 33.7827 32.716 33.5377 33.1709 32.9455C33.5844 32.4631 33.6931 31.6868 33.4349 31.1145C30.5062 24.1464 27.3711 17.2645 24.0296 10.4687C23.6424 9.6813 23.2524 8.89502 22.8597 8.10989Z" fill="url(#paint0_linear_0_10)" shape-rendering="crispEdges"/>
+</g>
+<defs>
+<filter id="filter0_df_0_10" x="0" y="0" width="41.6839" height="41.7198" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="4.05494"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 1 0 0 0 0 0.533333 0 0 0 1 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_10"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_10" result="shape"/>
+<feGaussianBlur stdDeviation="1.12637" result="effect2_foregroundBlur_0_10"/>
+</filter>
+<linearGradient id="paint0_linear_0_10" x1="13.4071" y1="15.2599" x2="32.4522" y2="31.8642" gradientUnits="userSpaceOnUse">
+<stop stop-color="#00AD62" stop-opacity="0.54"/>
+<stop offset="0.461538" stop-color="#7CFDEF"/>
+<stop offset="0.903846" stop-color="#70FBE8"/>
+<stop offset="0.961538" stop-color="white"/>
+</linearGradient>
+</defs>
+</svg>

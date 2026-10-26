@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-import ProjectExperience from "@/app/project9/App";
+import ProjectExperience from "@/app/project29/App";
 
 export const dynamic = "force-dynamic";
 
