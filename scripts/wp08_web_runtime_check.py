@@ -74,11 +74,11 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header(
             "Set-Cookie",
-            "journey_next_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
+            "journey_next_staff_session=runtime-only; Path=/; Secure; HttpOnly; SameSite=Lax",
         )
         self.send_header(
             "Set-Cookie",
-            "journey_next_csrf=runtime-csrf; Path=/; Secure; SameSite=Lax",
+            "journey_next_staff_csrf=runtime-csrf; Path=/; Secure; SameSite=Lax",
         )
         self.end_headers()
         self.wfile.write(body)
@@ -91,11 +91,17 @@ class IdentityApiHandler(BaseHTTPRequestHandler):
         if parsed.path not in {"/api/v1/reviews", "/api/v1/reviews/history"}:
             self.send_error(404)
             return
+        if self.headers.get("X-Journey-Session-Scope") != "staff":
+            self.send_error(400, "Reviewer requests must use staff session scope")
+            return
+        if "journey_next_session=" in self.headers.get("Cookie", ""):
+            self.send_error(400, "Learner cookie must not be forwarded to Reviewer")
+            return
         kinds = parse_qs(parsed.query).get("kind", [])
         if kinds and kinds[0] not in {"FORMAL_EVALUATION", "LEARNING_COACHING"}:
             self.send_error(400)
             return
-        wrong_role = "journey_next_session=wrong-role-runtime-only" in self.headers.get(
+        wrong_role = "journey_next_staff_session=wrong-role-runtime-only" in self.headers.get(
             "Cookie", ""
         )
         body = json.dumps(
@@ -358,9 +364,16 @@ def main() -> None:
         ):
             raise RuntimeError("Reviewer OAuth start left the approved Feishu host")
 
+        learner_only_status, _, learner_only_headers = request_without_redirect(
+            f"{base_url}/review",
+            {"Cookie": "journey_next_session=learner-runtime-only"},
+        )
+        if learner_only_status != 303 or learner_only_headers.get("location") != "/review/login":
+            raise RuntimeError("Learner cookie was accepted by the staff route guard")
+
         wrong_role_status, _, wrong_role_headers = request_without_redirect(
             f"{base_url}/review",
-            {"Cookie": "journey_next_session=wrong-role-runtime-only"},
+            {"Cookie": "journey_next_staff_session=wrong-role-runtime-only; journey_next_session=learner-runtime-only"},
         )
         if wrong_role_status not in {303, 307} or wrong_role_headers.get("location") != (
             "/review/login?auth_error=FORBIDDEN"
@@ -372,7 +385,7 @@ def main() -> None:
 
         expired_status, _, expired_headers = request_without_redirect(
             f"{base_url}/review",
-            {"Cookie": "journey_next_session=revoked-runtime-only"},
+            {"Cookie": "journey_next_staff_session=revoked-runtime-only"},
         )
         if expired_status not in {303, 307} or expired_headers.get("location") != (
             "/review/login?auth_error=SESSION_EXPIRED"
@@ -413,9 +426,9 @@ def main() -> None:
                 "OAuth callback did not return a root-relative /content redirect: "
                 f"{callback_headers.get('location')!r}"
             )
-        if "journey_next_session=runtime-only" not in callback_headers.get("set-cookie", ""):
+        if "journey_next_staff_session=runtime-only" not in callback_headers.get("set-cookie", ""):
             raise RuntimeError("OAuth callback did not preserve the upstream session cookie")
-        if "journey_next_csrf=runtime-csrf" not in callback_headers.get("set-cookie", ""):
+        if "journey_next_staff_csrf=runtime-csrf" not in callback_headers.get("set-cookie", ""):
             raise RuntimeError("OAuth callback did not preserve the upstream CSRF cookie")
 
         invalid_status, _, invalid_headers = request_without_redirect(
