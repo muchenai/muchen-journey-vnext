@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { createContentDraft, logoutSessionFromForm } from "@/app/actions";
+import { createContentDraft, logoutStaffSessionFromForm } from "@/app/actions";
 import { ContentDraftForm } from "@/app/content/content-draft-form";
 import {
   ContentDraft,
@@ -56,7 +56,7 @@ export default async function ContentPage() {
         )}
       </section>
 
-      <form action={logoutSessionFromForm}>
+      <form action={logoutStaffSessionFromForm}>
         <button className="button secondary" type="submit">退出内容会话</button>
       </form>
     </section>

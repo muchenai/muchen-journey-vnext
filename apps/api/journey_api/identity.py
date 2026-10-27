@@ -18,6 +18,12 @@ SESSION_COOKIE = "journey_next_session"
 JOIN_COOKIE = "journey_next_join"
 CSRF_COOKIE = "journey_next_csrf"
 OAUTH_COOKIE = "journey_next_oauth"
+STAFF_SESSION_COOKIE = "journey_next_staff_session"
+STAFF_CSRF_COOKIE = "journey_next_staff_csrf"
+
+
+def session_cookie_names(staff: bool = False) -> tuple[str, str]:
+    return (STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE) if staff else (SESSION_COOKIE, CSRF_COOKIE)
 
 
 def utc_now() -> datetime:
@@ -83,10 +89,11 @@ def set_join_cookies(response: Response, join_token: str, csrf_token: str, max_a
     )
 
 
-def set_session_cookies(response: Response, session_token: str, csrf_token: str, max_age: int) -> None:
+def set_session_cookies(response: Response, session_token: str, csrf_token: str, max_age: int, *, staff: bool = False) -> None:
     secure = cookie_secure()
+    session_cookie, csrf_cookie = session_cookie_names(staff)
     response.set_cookie(
-        SESSION_COOKIE,
+        session_cookie,
         session_token,
         max_age=max_age,
         path="/",
@@ -95,7 +102,7 @@ def set_session_cookies(response: Response, session_token: str, csrf_token: str,
         samesite="lax",
     )
     response.set_cookie(
-        CSRF_COOKIE,
+        csrf_cookie,
         csrf_token,
         max_age=max_age,
         path="/",
@@ -103,13 +110,15 @@ def set_session_cookies(response: Response, session_token: str, csrf_token: str,
         httponly=False,
         samesite="lax",
     )
-    response.delete_cookie(JOIN_COOKIE, path="/", secure=secure, httponly=True, samesite="lax")
+    if not staff:
+        response.delete_cookie(JOIN_COOKIE, path="/", secure=secure, httponly=True, samesite="lax")
 
 
-def clear_session_cookies(response: Response) -> None:
+def clear_session_cookies(response: Response, *, staff: bool = False) -> None:
     secure = cookie_secure()
-    response.delete_cookie(SESSION_COOKIE, path="/", secure=secure, httponly=True, samesite="lax")
-    response.delete_cookie(CSRF_COOKIE, path="/", secure=secure, httponly=False, samesite="lax")
+    session_cookie, csrf_cookie = session_cookie_names(staff)
+    response.delete_cookie(session_cookie, path="/", secure=secure, httponly=True, samesite="lax")
+    response.delete_cookie(csrf_cookie, path="/", secure=secure, httponly=False, samesite="lax")
 
 
 def set_oauth_cookie(response: Response, browser_token: str, max_age: int) -> None:

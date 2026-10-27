@@ -3,9 +3,9 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { CSRF_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
+import { CSRF_COOKIE, SESSION_COOKIE, STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE } from "@/lib/auth/cookies";
 
-export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE } from "@/lib/auth/cookies";
+export { CSRF_COOKIE, JOIN_COOKIE, SESSION_COOKIE, STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE } from "@/lib/auth/cookies";
 
 export type Role = "LEARNER" | "REVIEWER" | "OPERATOR" | "CONTENT_EDITOR";
 
@@ -845,13 +845,16 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const baseUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
-  const csrfToken = cookieStore.get(CSRF_COOKIE)?.value;
+  const sessionCookie = role === "LEARNER" ? SESSION_COOKIE : STAFF_SESSION_COOKIE;
+  const csrfCookie = role === "LEARNER" ? CSRF_COOKIE : STAFF_CSRF_COOKIE;
+  const sessionToken = cookieStore.get(sessionCookie)?.value;
+  const csrfToken = cookieStore.get(csrfCookie)?.value;
   const requestHeaders = new Headers(init.headers);
   requestHeaders.set("Accept", "application/json");
   if (!requestHeaders.has("Content-Type")) {
     requestHeaders.set("Content-Type", "application/json");
   }
+  requestHeaders.set("X-Journey-Session-Scope", role === "LEARNER" ? "learner" : "staff");
   const useLocalReviewerFixture =
     (role === "REVIEWER" || (role === "OPERATOR" && path.startsWith("/api/v1/review-admin/")))
     && process.env.ALLOW_FIXTURE_IDENTITY === "true"
@@ -860,8 +863,8 @@ export async function apiRequest<T>(
     assertFixtureBoundary();
     requestHeaders.set("X-Fixture-Role", role);
   } else if (sessionToken) {
-    const cookieParts = [`${SESSION_COOKIE}=${sessionToken}`];
-    if (csrfToken) cookieParts.push(`${CSRF_COOKIE}=${csrfToken}`);
+    const cookieParts = [`${sessionCookie}=${sessionToken}`];
+    if (csrfToken) cookieParts.push(`${csrfCookie}=${csrfToken}`);
     requestHeaders.set("Cookie", cookieParts.join("; "));
     const method = (init.method ?? "GET").toUpperCase();
     if (!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { apiRequest, ApiRequestError } from "@/lib/server/api";
-import { SESSION_COOKIE, CSRF_COOKIE } from "@/lib/auth/cookies";
+import { STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE } from "@/lib/auth/cookies";
 import { loadAdmin, loadReview, saveAdminTask, archiveAdminTask, publishAdminTask, decideAdminReview, certifyMember, testAdminTask, searchCompanyMembers, grantAdministrator, revokeAdministrator } from "@/app/review/admin-actions";
 import type { AdminTask, Member } from "@/app/review/admin-types";
 import { updateReviewClaim } from "@/app/review/admin-actions";
@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
         if (!task || typeof payload?.answer !== "string" || payload.answer.length > 30000) break;
         return reply(await testAdminTask(task as AdminTask, payload.answer));
       case "logout": {
-        try { await apiRequest("/api/v1/session/logout", "LEARNER", { method: "POST" }); }
+        try { await apiRequest("/api/v1/session/logout", "REVIEWER", { method: "POST" }); }
         catch (error) { if (!(error instanceof ApiRequestError && error.status === 401 && error.code === "UNAUTHENTICATED")) throw error; }
-        const jar = await cookies(); jar.delete(SESSION_COOKIE); jar.delete(CSRF_COOKIE);
+        const jar = await cookies(); jar.delete(STAFF_SESSION_COOKIE); jar.delete(STAFF_CSRF_COOKIE);
         return reply({ ok: true, data: null });
       }
     }

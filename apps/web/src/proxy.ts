@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { SESSION_COOKIE } from "@/lib/auth/cookies";
+import { STAFF_SESSION_COOKIE } from "@/lib/auth/cookies";
 
 function withContentSecurityPolicy(response: NextResponse, policy: string) {
   response.headers.set("Content-Security-Policy", policy);
@@ -37,7 +37,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", policy);
 
   const pathname = request.nextUrl.pathname;
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const hasSession = Boolean(request.cookies.get(STAFF_SESSION_COOKIE)?.value);
   const fixtureIdentityAllowed =
     process.env.APP_ENV === "local" &&
     process.env.ALLOW_FIXTURE_IDENTITY === "true";
