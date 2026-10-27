@@ -19,6 +19,7 @@ from journey_api import identity
 from journey_api.identity import (
     OAUTH_COOKIE,
     SESSION_COOKIE,
+    STAFF_SESSION_COOKIE,
     clear_oauth_cookie,
     credential_hash,
     set_oauth_cookie,
@@ -368,7 +369,8 @@ def test_reviewer_link_oauth_callback_hashes_subject_and_creates_scoped_session(
 
     completed = assert_ok(callback(reviewer, "reviewer-code", state))
     assert completed["safe_entry"] == "/review"
-    assert SESSION_COOKIE in reviewer.cookies
+    assert STAFF_SESSION_COOKIE in reviewer.cookies
+    assert SESSION_COOKIE not in reviewer.cookies
     assert assert_ok(reviewer.get("/api/v1/session"))["safe_entry"] == "/review"
     assert reviewer.get("/api/v1/reviews").status_code == 200
     assert reviewer.get("/api/v1/ops/invites").status_code == 403

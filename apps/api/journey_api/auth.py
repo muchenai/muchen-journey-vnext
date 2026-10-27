@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
-from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
+from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE, credential_hash
 from journey_api.reviewer_access import effective_roles
 from journey_api.models import (
     CompletionCode,
@@ -88,7 +88,16 @@ def get_actor(
     session: Session = Depends(get_db),
 ) -> Actor:
     settings = get_settings()
-    session_token = request.cookies.get(SESSION_COOKIE)
+    scope = request.headers.get("X-Journey-Session-Scope")
+    if scope not in {None, "learner", "staff"}:
+        raise ApiError(401, "UNAUTHENTICATED", "无效的登录入口。")
+    learner_path = request.url.path.startswith("/api/v1/me/")
+    if learner_path and scope == "staff":
+        raise ApiError(403, "FORBIDDEN", "请从学员端登录。")
+    staff = scope == "staff" or (scope is None and not learner_path and bool(request.cookies.get(STAFF_SESSION_COOKIE)))
+    session_cookie = STAFF_SESSION_COOKIE if staff else SESSION_COOKIE
+    csrf_cookie_name = STAFF_CSRF_COOKIE if staff else CSRF_COOKIE
+    session_token = request.cookies.get(session_cookie)
     if session_token:
         token_hash = credential_hash(settings.session_secret, "session", session_token)
         row = session.execute(
@@ -120,6 +129,9 @@ def get_actor(
         if row is None:
             raise ApiError(401, "UNAUTHENTICATED", "vNext 会话无效或已过期。")
         identity_session, user = row
+        # A cookie or caller-controlled scope must never turn one entry into the other.
+        if (staff and identity_session.role == Role.LEARNER) or ((scope == "learner" or learner_path) and identity_session.role != Role.LEARNER):
+            raise ApiError(401, "UNAUTHENTICATED", "当前入口的登录已失效，请重新登录。")
         if request.method not in {"GET", "HEAD", "OPTIONS"} and identity_session.role in {Role.REVIEWER, Role.OPERATOR, Role.CONTENT_EDITOR}:
             # Serialize staff writes with permission revocation. A request that
             # waited for the user lock must not continue using an old session.
@@ -142,7 +154,7 @@ def get_actor(
         if not roles:
             raise ApiError(401, "UNAUTHENTICATED", "当前会话已不具备任何有效权限。")
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
-            csrf_cookie = request.cookies.get(CSRF_COOKIE, "")
+            csrf_cookie = request.cookies.get(csrf_cookie_name, "")
             csrf_header = request.headers.get("X-CSRF-Token", "")
             expected_hash = credential_hash(settings.session_secret, "csrf", csrf_header)
             if (

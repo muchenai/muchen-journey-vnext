@@ -1306,5 +1306,5 @@ def logout_session(
         details={},
     )
     session.commit()
-    clear_session_cookies(response)
+    clear_session_cookies(response, staff=identity_session.role != Role.LEARNER)
     return envelope(request, SessionLogoutOut(status="LOGGED_OUT"))

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { apiRequest, ApiRequestError, CSRF_COOKIE, SESSION_COOKIE, type ReviewDetail } from "@/lib/server/api";
+import { apiRequest, ApiRequestError, STAFF_CSRF_COOKIE, STAFF_SESSION_COOKIE, type ReviewDetail } from "@/lib/server/api";
 export const dynamic = "force-dynamic";
 export async function GET(_request:Request,{params}:{params:Promise<{reviewId:string;attachmentId:string}>}) {
  const {reviewId,attachmentId}=await params;
@@ -11,7 +11,8 @@ export async function GET(_request:Request,{params}:{params:Promise<{reviewId:st
   const headers=new Headers();const store=await cookies();
   const local=process.env.ALLOW_FIXTURE_IDENTITY==='true'&&['local','test'].includes(process.env.APP_ENV??'local');
   if(local)headers.set('X-Fixture-Role','REVIEWER');
-  else {const session=store.get(SESSION_COOKIE)?.value;if(!session)return new NextResponse("请重新登录",{status:401});headers.set('Cookie',`${SESSION_COOKIE}=${session}; ${CSRF_COOKIE}=${store.get(CSRF_COOKIE)?.value??''}`);}
+  else {const session=store.get(STAFF_SESSION_COOKIE)?.value;if(!session)return new NextResponse("请重新登录",{status:401});headers.set('Cookie',`${STAFF_SESSION_COOKIE}=${session}; ${STAFF_CSRF_COOKIE}=${store.get(STAFF_CSRF_COOKIE)?.value??''}`);}
+  headers.set('X-Journey-Session-Scope','staff');
   const response=await fetch(new URL(`/api/v1/attachments/${attachmentId}/download`,process.env.API_INTERNAL_URL??'http://localhost:8000'),{headers,cache:'no-store',redirect:'manual'});
   if(response.status===303){const location=response.headers.get('Location');if(!location||!location.startsWith('https://'))return new NextResponse("附件下载暂不可用",{status:502});return NextResponse.redirect(location,303);}
   if(!response.ok)return new NextResponse("附件下载失败",{status:response.status});

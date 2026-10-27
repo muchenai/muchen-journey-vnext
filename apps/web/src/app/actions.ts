@@ -16,6 +16,8 @@ import {
   CSRF_COOKIE,
   JOIN_COOKIE,
   SESSION_COOKIE,
+  STAFF_SESSION_COOKIE,
+  STAFF_CSRF_COOKIE,
   SubmissionDraft,
   TaskContentInput,
   OpsInviteTargets,
@@ -701,6 +703,18 @@ export async function logoutSession(
   cookieStore.delete(SESSION_COOKIE);
   cookieStore.delete(CSRF_COOKIE);
   redirect("/?session=logged_out");
+}
+
+export async function logoutStaffSessionFromForm(_data: FormData): Promise<void> {
+  try {
+    await apiRequest("/api/v1/session/logout", "REVIEWER", { method: "POST" });
+  } catch (error) {
+    if (!(error instanceof ApiRequestError && error.status === 401 && error.code === "UNAUTHENTICATED")) throw error;
+  }
+  const jar = await cookies();
+  jar.delete(STAFF_SESSION_COOKIE);
+  jar.delete(STAFF_CSRF_COOKIE);
+  redirect("/review/login");
 }
 
 export async function logoutSessionFromForm(_data: FormData): Promise<void> {

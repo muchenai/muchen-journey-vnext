@@ -22,6 +22,7 @@ from journey_api.reviewer_access import effective_roles
 from journey_api.identity import (
     OAUTH_COOKIE,
     SESSION_COOKIE,
+    STAFF_SESSION_COOKIE,
     add_audit,
     clear_oauth_cookie,
     credential_hash,
@@ -1217,12 +1218,12 @@ def complete_feishu_oauth(
         )
         .with_for_update()
     ).all()
-    current_token = request.cookies.get(SESSION_COOKIE, "")
+    current_token = request.cookies.get(SESSION_COOKIE if role == Role.LEARNER else STAFF_SESSION_COOKIE, "")
     current_hash = credential_hash(settings.session_secret, "session", current_token) if current_token else None
     for previous in previous_sessions:
         # Learners can keep Feishu and browser sessions simultaneously. Rotate
         # only the session being replaced in this browser; staff policy stays.
-        if role != Role.LEARNER or (
+        if (role != Role.LEARNER and previous.role != Role.LEARNER) or (
             previous.role == Role.LEARNER
             and current_hash is not None
             and compare_digest(previous.token_hash, current_hash)
@@ -1265,6 +1266,7 @@ def complete_feishu_oauth(
         session_token,
         csrf_token,
         max_age=ttl_hours * 3600,
+        staff=role != Role.LEARNER,
     )
     clear_oauth_cookie(response)
     return envelope(
