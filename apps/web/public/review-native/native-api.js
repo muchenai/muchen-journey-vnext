@@ -1,5 +1,5 @@
-import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js';
-import { applyDifficultyPreset } from './core.js?v=20261021-review-decision';
+import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
+import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261028-publication-local';
 let activeStore;
 export async function request(body, reviewId) {
   const response = await fetch('/api/review-native' + (reviewId ? `?review=${encodeURIComponent(reviewId)}` : ''), {
@@ -44,6 +44,7 @@ export class ApiStore {
     let draft;
     try { draft = JSON.parse(localStorage.getItem(store.storageKey)); } catch { /* No actor draft. */ }
     store.data.draft = draft && typeof draft.id === 'string' && Array.isArray(draft.badges) && Array.isArray(draft.materials) ? draft : newDraft();
+    store.data.draft = normalizeBadgeWeights(store.data.draft);
     return store;
   }
   async refresh() {
@@ -51,6 +52,7 @@ export class ApiStore {
     if (this.actor && this.actor.id !== snapshot.actor.id) { location.reload(); throw new Error('登录身份已变更，请刷新。'); }
     this.actor = snapshot.actor; this.operatorId = snapshot.operatorId; this.members = snapshot.members;
     this.capabilities = snapshot.capabilities;
+    this.data.publicationRequests = (snapshot.publicationRequests || []).map(r=>({...r,task:taskView(applyDifficultyPreset(r.task))}));
     this.administrators = snapshot.administrators || [];
     this.data.tasks = snapshot.tasks.map(taskView);
     const tasksById = new Map(this.data.tasks.map(task => [task.id, task]));
@@ -103,7 +105,18 @@ export class ApiStore {
 export function createJourneyService({ store }) {
   const decisionKeys = new Map();
   return {
-    tasks: { publish: async (task, reviewerId, verified, key) => {
+    tasks: {
+    submitPublication: async (task, verified) => {
+      const saved=taskView(await request({command:'submitPublication',id:task.id,payload:{expected_revision:task.revision,verified_material_urls:verified}}));
+      store.data.draft=structuredClone(saved);store.save();await store.refresh();return saved;
+    },
+    reviewPublication: async (id, {decision,comment}) => {
+      const row=store.data.publicationRequests.find(r=>r.id===id);
+      if(!row)throw new Error('申请已更新，请刷新。');
+      const result=await request({command:'reviewPublication',id,payload:{expected_revision:row.revision,decision,comment}});
+      await store.refresh();return result;
+    },
+    publish: async (task, reviewerId, verified, key) => {
       if (!store.members.some(m => m.id === reviewerId && m.roles.includes('REVIEWER'))) throw new Error('请选择内容复核人。');
       const links = [...new Set(task.materials.filter(m => m.type === 'link').map(m => m.url))];
       if (links.some(url => !verified.includes(url))) throw new Error('请确认全部学习材料链接可供学员访问。');

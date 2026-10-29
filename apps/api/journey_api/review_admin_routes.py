@@ -30,7 +30,7 @@ from journey_api.schemas import FinalizeReviewCommand, RevisionCommand, PublishT
 router = APIRouter(prefix="/api/v1/review-admin")
 DOMAINS = ["产品开发", "数据交付", "技术开发", "PMO", "AI评测", "质量检测", "项目管理", "AI 能力"]
 BADGES = dict(zip(["product", "data", "tech", "pmo", "ai-eval", "quality", "project", "ai"], DOMAINS))
-PRESETS = {"入门": (30, 50, 5), "进阶": (60, 100, 10), "挑战": (90, 200, 20)}
+from journey_api.novice_economy import PRESETS
 
 
 def envelope(request, data):
@@ -89,12 +89,19 @@ def task_data(session, definition):
         func.count(Assignment.id).filter(Assignment.status == AssignmentStatus.COMPLETED))
         .where(Assignment.task_definition_id == definition.id, Assignment.organization_id == definition.organization_id)).one()
     minutes, xp, points = PRESETS.get(content.get("difficulty"), PRESETS["入门"])
+    if content.get("rewardRulesVersion", 1) >= 3:
+        points = 0
     content.update(id=str(definition.id), stableKey=definition.stable_key, camp=task_camp(definition, profile),
         revision=profile.revision if profile else 0, definitionRevision=definition.revision,
         status=profile.status if profile else ("archived" if definition.status == TaskDefinitionStatus.WITHDRAWN else "published" if version else "draft"),
         author=owner.display_name if owner else "", authorId=str(definition.created_by),
         participants=count, completions=completed, minutes=minutes, xp=xp, taskPoints=points,
         version=version.version if version else 0, versionId=str(version.id) if version else None)
+    from journey_api.review_admin_models import TaskPublicationRequest
+    publication = session.scalar(select(TaskPublicationRequest).where(TaskPublicationRequest.task_id == definition.id)
+        .order_by(TaskPublicationRequest.created_at.desc()).limit(1))
+    content['publication'] = dict(id=str(publication.id), status=publication.status, comment=publication.comment,
+        taskRevision=publication.task_revision) if publication else None
     return content
 
 
@@ -216,7 +223,7 @@ class Material(BaseModel):
 
 class Badge(BaseModel):
     id: str
-    weight: float = Field(gt=0, le=100)
+    weight: int = Field(ge=20, le=100, multiple_of=20)
 
 
 class Rubric(BaseModel):
@@ -233,6 +240,8 @@ class TaskContent(BaseModel):
     camp: Literal["exploration", "novice"] = "novice"
     domain: str = "产品开发"
     difficulty: Literal["入门", "进阶", "挑战"] = "入门"
+    unlockTaskPoints: int = Field(default=0, strict=True, ge=0, le=1000000)
+    rewardRulesVersion: Literal[1, 2, 3] = 3
     badges: list[Badge] = Field(default_factory=list, max_length=2)
     materials: list[Material] = Field(default_factory=list, max_length=12)
     reviewMode: Literal["manual", "ai"] = "manual"
@@ -242,6 +251,8 @@ class TaskContent(BaseModel):
 
     @model_validator(mode="after")
     def choices(self):
+        self.unlockTaskPoints = 0
+        self.rewardRulesVersion = 3
         if self.domain not in DOMAINS or any(b.id not in BADGES for b in self.badges):
             raise ValueError("未知任务方向或徽章")
         if len({b.id for b in self.badges}) != len(self.badges):
@@ -262,9 +273,11 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
     if task_id != command.id:
         raise ApiError(422, "VALIDATION_FAILED", "任务编号不一致。")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
-    definition = session.get(TaskDefinition, task_id)
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
     if definition and (definition.organization_id != actor.organization_id or definition.created_by != actor.id):
         raise ApiError(403, "FORBIDDEN", "只能编辑当前账号创建的任务；可以复制为新任务。")
+    from journey_api.publication_routes import ensure_editable
+    ensure_editable(session, task_id)
     row = session.get(ReviewAdminTask, task_id)
     if (row.revision if row else 0) != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "草稿已在其他窗口修改，请重新打开。")
@@ -276,9 +289,16 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
     if not row:
         row = ReviewAdminTask(task_definition_id=task_id, organization_id=actor.organization_id, revision=0)
         session.add(row)
+    from journey_api.models import Enrollment
+    if command.content.camp != "novice" and session.scalar(select(Enrollment.id).where(
+        Enrollment.novice_task_id == task_id).limit(1)) is not None:
+        raise ApiError(409, "TASK_ALREADY_CLAIMED", "已有学员领取的新手村任务不能改为探索营任务。")
     row.content = command.content.model_dump(mode="json")
     row.revision += 1
-    row.status = "draft"
+    # Saving editable content must not unpublish the immutable live version.
+    # An explicit archive remains in effect until restore/publish is requested.
+    if row.status != "archived":
+        row.status = "published" if definition.status == TaskDefinitionStatus.PUBLISHED and latest_version(session, definition) else "draft"
     audit(session, request, actor, "review_admin.task_saved", task_id)
     session.commit()
     return envelope(request, task_data(session, definition))
@@ -292,8 +312,12 @@ class PublishTask(BaseModel):
 
 def task_content_for_publish(content):
     d = TaskContent.model_validate(content)
-    if len(d.title.strip()) < 3 or len(d.summary.strip()) < 10 or not d.materials:
-        raise ApiError(422, "VALIDATION_FAILED", "请填写至少 3 字的标题、10 字的简述，并添加学习材料。")
+    if len(d.title.strip()) < 3:
+        raise ApiError(422, "VALIDATION_FAILED", "任务标题至少需要 3 个字。")
+    if len(d.summary.strip()) < 10:
+        raise ApiError(422, "VALIDATION_FAILED", f"任务简述至少需要 10 个字，当前 {len(d.summary.strip())} 个字。")
+    if not d.materials:
+        raise ApiError(422, "VALIDATION_FAILED", "请至少添加一份学习材料。")
     if not d.badges or abs(sum(b.weight for b in d.badges) - 100) > 0.001:
         raise ApiError(422, "VALIDATION_FAILED", "请选择 1–2 个徽章，且总占比为 100%。")
     if d.reviewMode == "ai" and (not d.rubric or any(not r.name.strip() or not r.description.strip() for r in d.rubric)
@@ -320,8 +344,10 @@ def task_content_for_publish(content):
 def publish_task(task_id: uuid.UUID, command: PublishTask, request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"), actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     from journey_api.routes import publish_task_version
-    require_publisher(session, actor)
-    definition = session.get(TaskDefinition, task_id)
+    require_super(session, actor)
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
+    from journey_api.publication_routes import ensure_editable
+    ensure_editable(session, task_id)
     row = session.get(ReviewAdminTask, task_id)
     if not definition or definition.organization_id != actor.organization_id or definition.created_by != actor.id or not row:
         raise ApiError(404, "NOT_FOUND", "任务草稿不存在。")
@@ -357,6 +383,8 @@ def archive_task(task_id: uuid.UUID, command: ArchiveTask, request: Request,
         TaskDefinition.organization_id==actor.organization_id, TaskDefinition.created_by==actor.id).with_for_update())
     if not definition:
         raise ApiError(404, "NOT_FOUND", "无法管理此任务。")
+    from journey_api.publication_routes import ensure_editable
+    ensure_editable(session, task_id)
     data = task_data(session, definition)
     if not command.archived:
         require_publisher(session, actor, data.get("difficulty", "入门"))

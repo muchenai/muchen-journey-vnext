@@ -8,6 +8,87 @@ import { taskView, taskWrite, reviewView, detailView, aiComment, reviewFeedbackE
 import { renderReview, openSubmission, bindReview } from '../public/review-native/review.js';
 import { ApiStore, createJourneyService } from '../public/review-native/native-api.js';
 import { learnerTaskTitles, learnerTaskTitle } from '../public/review-native/task-titles.js';
+import { renderPublishMaterials } from '../public/review-native/publish-materials.js';
+import { createTaskWorkflow, copyAsNewTask, hasUnsavedChanges, isTaskUpdate } from '../public/review-native/task-workflow.js';
+import {rewardBreakdown, applyDifficultyPreset, validateTask} from '../public/review-native/core.js';
+
+test('integer badge allocations preserve total at every ten percent split',()=>{
+  for(const difficulty of ['入门','进阶','挑战']) for(let weight=10;weight<100;weight+=10){
+    const reward=rewardBreakdown({difficulty,badges:[{id:'product',weight},{id:'data',weight:100-weight}]});
+    assert.ok(reward.allocations.every(item=>Number.isInteger(item.points)));
+    assert.equal(reward.allocations.reduce((sum,item)=>sum+item.points,0),reward.totalPoints);
+  }
+  assert.deepEqual(rewardBreakdown({difficulty:'挑战',badges:[{id:'product',weight:50},{id:'data',weight:50}]}).allocations.map(b=>b.points),[8,7]);
+});
+test('new publications are free and use twenty-percent allocations',()=>{
+  const task=applyDifficultyPreset({difficulty:'挑战',unlockTaskPoints:50,badges:[{id:'product',weight:100}]});
+  assert.equal(task.taskPoints,0);assert.equal(task.unlockTaskPoints,0);
+  assert.equal(applyDifficultyPreset({...task,difficulty:'入门'}).unlockTaskPoints,0);
+  assert.ok(validateTask({...task,badges:[{id:'product',weight:55},{id:'data',weight:45}]}).some(e=>e.includes('20%')));
+});
+
+function workflowHarness(dirty=false) {
+  const original={id:'original',version:4,versionId:'v4',revision:7,status:'published',title:'已发布任务',summary:'完整的原任务介绍',materials:[],badges:[],camp:'novice',domain:'产品开发'};
+  const empty={id:'new',revision:0,status:'draft',title:'',summary:'',materials:[],badges:[],camp:'novice',domain:'产品开发'};
+  const controls=Object.fromEntries(['cancel','discard','save','error'].map(key=>[`[data-new-${key}]`,{disabled:false,hidden:true}]));
+  const modal={dataset:{},querySelector:key=>controls[key],querySelectorAll:()=>Object.values(controls)};
+  const store={data:{draft:{...original,title:dirty?'修改后的标题':original.title}},getTask:()=>original,save(){},async saveTask(value){this.writes=(this.writes||0)+1;if(this.fail)throw Error('保存失败');this.data.draft=value;}};
+  const view={opens:0,shows:0,closes:0};
+  const workflow=createTaskWorkflow({store,newDraft:()=>structuredClone(empty),openModal:(html,ready)=>{view.opens++;view.html=html;ready(modal);},closeModal:()=>view.closes++,showEditor:()=>view.shows++,toast(){}});
+  return {workflow,store,view,controls,original,empty};
+}
+test('new task opens immediately when published content is unchanged, without resaving or publishing it',()=>{
+  const h=workflowHarness();h.workflow.start();
+  assert.equal(h.view.opens,0);assert.equal(h.view.shows,1);
+  assert.equal(h.store.writes,undefined);assert.equal(h.store.data.draft.id,'new');
+  assert.equal(h.original.status,'published');
+});
+test('unsaved new-task choices preserve, discard or save current edits explicitly',async()=>{
+  let h=workflowHarness(true);h.workflow.start();h.controls['[data-new-cancel]'].onclick();
+  assert.equal(h.store.data.draft.id,'original');assert.equal(h.view.shows,0);
+  h=workflowHarness(true);h.workflow.start();h.controls['[data-new-discard]'].onclick();
+  assert.equal(h.store.writes,undefined);assert.equal(h.store.data.draft.id,'new');
+  h=workflowHarness(true);h.store.fail=true;h.workflow.start();
+  await h.controls['[data-new-save]'].onclick();
+  assert.equal(h.store.data.draft.id,'original');assert.equal(h.view.shows,0);
+  assert.equal(h.controls['[data-new-error]'].textContent,'保存失败');
+  h.store.fail=false;await h.controls['[data-new-save]'].onclick();
+  assert.equal(h.store.data.draft.id,'new');assert.equal(h.view.shows,1);
+});
+test('copy retains editable content but never carries source identity, release version, or learner statistics',()=>{
+  const h=workflowHarness();const source={...h.original,participants:99,completions:8,authorId:'other',stableKey:'ADMIN-original'};
+  const copy=copyAsNewTask(source,h.empty);
+  assert.equal(copy.id,'new');assert.equal(copy.revision,0);assert.equal(copy.title,source.title);
+  for(const key of ['version','versionId','participants','completions','authorId','stableKey'])assert.equal(copy[key],undefined);
+  assert.equal(isTaskUpdate(copy),false);assert.equal(isTaskUpdate(source),true);
+  assert.equal(hasUnsavedChanges({...source,updatedAt:'later',participants:100},source,h.empty),false);
+  h.workflow.start(source);assert.equal(h.store.data.draft.id,'new');assert.equal(h.store.writes,undefined);
+});
+
+test('publication confirmation retains image and document downloads alongside named external links', () => {
+  const materials = [
+    {type:'image',name:'测试图片.png',mime:'image/png',size:1024,url:'data:image/png;base64,YQ=='},
+    {type:'file',name:'学习资料.pdf',mime:'application/pdf',size:2048,url:'data:application/pdf;base64,Yg=='},
+    {type:'link',name:'公司资料',url:'https://example.com/material'},
+    {type:'link',name:'资料副本',url:'https://example.com/material'},
+  ];
+  const before=JSON.stringify(materials), html=renderPublishMaterials(materials);
+  for(const m of materials) assert.ok(html.includes(m.name));
+  assert.match(html,/学习材料（4）/);
+  assert.match(html,/download="测试图片.png"/);
+  assert.match(html,/download="学习资料.pdf"/);
+  assert.match(html,/<details><summary>查看图片/);
+  assert.match(html,/image\/png · 1 KB/);
+  assert.equal((html.match(/data-verified-link=/g)||[]).length,1);
+  assert.equal(JSON.stringify(materials),before);
+});
+
+test('publication material names are escaped and unsafe links cannot execute', () => {
+  const html=renderPublishMaterials([{type:'link',name:'<img onerror=alert(1)>',url:'javascript:alert(1)'}]);
+  assert.doesNotMatch(html,/<img|href="javascript:/);
+  assert.match(html,/&lt;img/);
+  assert.doesNotMatch(renderPublishMaterials([{type:'file',name:'a.txt',mime:'text/plain',size:1,url:'data:text/plain;base64,YQ=='}]),/data-verified-link/);
+});
 const id = '00000000-0000-4000-8000-000000000001';
 const task = { id, title: '测评三', domain: '产品开发', reviewMode: 'ai', badges: [{ id: 'tech', weight: 100 }], revision: 4, materials: [], status: 'published' };
 const row = { id, task_id: id, learner_id: 'learner', learner_name: '<script>私密</script>', camp: 'exploration', task_title: '提交时任务名称', domain: '探索营', status: 'ASSIGNED', allowed_commands: ['start'], decision: null, ai_statuses: ['COMPLETED'], submitted_at: '2026-10-21T00:00:00Z', submission_version_no: 2, revision: 6 };

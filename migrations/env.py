@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from journey_api.config import get_settings
 from journey_api.db import Base
-from journey_api import models, review_admin_models, directory_cache_models  # noqa: F401
+from journey_api import models, review_admin_models, directory_cache_models, community_models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)

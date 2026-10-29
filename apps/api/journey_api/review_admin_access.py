@@ -42,7 +42,7 @@ def permissions(session, actor):
 def require_super(session, actor):
     access_for(session, actor.id, actor.organization_id, lock=True)
     if not permissions(session, actor)["isSuperAdmin"]:
-        raise ApiError(403, "FORBIDDEN", "仅超级管理员可以管理成员权限和认证。")
+        raise ApiError(403, "FORBIDDEN", "仅超级管理员可以执行此操作。")
 
 
 def require_publisher(session, actor, difficulty=None):
@@ -58,6 +58,7 @@ def require_version_publisher(session, actor, task_id):
     profile = session.get(ReviewAdminTask, task_id)
     # Generic endpoints must not bypass the Review difficulty check.
     if profile and profile.organization_id == actor.organization_id:
+        require_super(session, actor)
         require_publisher(session, actor, profile.content.get("difficulty", "入门"))
     else:
         from journey_api.auth import require_role

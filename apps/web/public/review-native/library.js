@@ -1,4 +1,4 @@
-import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261021-review-decision';
+import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261028-publication-local';
 
 const state = { tab: 'tasks', search: '', domain: 'all', status: 'all' };
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);
@@ -6,6 +6,7 @@ const badgeName = id => badgeList().find(b => b.id === id)?.name || id;
 const badgeColor = id => badgeList().find(b => b.id === id)?.color || '#7771dd';
 const domains = ['数据交付', '产品开发', '技术开发', 'PMO', 'AI评测', '质量检测', '项目管理', 'AI 能力'];
 const statusText = status => ({ published: '已发布', draft: '草稿', archived: '已归档' }[status] || status);
+const publicationLabel = task => task.publication?.status==='pending'?'待发布审核':task.publication?.status==='rejected'?'发布已退回':statusText(task.status);
 const fmt = n => Number(n || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 const pointValue = value => Number(typeof value === 'object' && value !== null ? value.points : value) || 0;
 const badgePoints = (learner, badgeId) => pointValue(learner.badges?.[badgeId]);
@@ -13,7 +14,7 @@ const badgeLevel = points => Math.min(3, Math.floor(points / 100));
 const safeUrl = value => { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
 const modalRoot = root => root?.querySelector ? root : document.querySelector('.modal') || document;
 const taskAuthor = task => typeof task.author === 'object' ? task.author?.name || '未指定' : task.author || '未指定';
-const chip = (badge, showWeight = true) => `<span class="badge-chip"><span class="badge-dot" style="background:${e(badgeColor(badge.id))}"></span>${e(badgeName(badge.id))}${showWeight ? `<span class="muted">${fmt(badge.weight)}%</span>` : ''}</span>`;
+const chip = (badge, showWeight = true) => `<span class="badge-chip"><span class="badge-dot" data-badge="${e(badge.id)}" aria-hidden="true"></span>${e(badgeName(badge.id))}${showWeight ? `<span class="muted">${fmt(badge.weight)}%</span>` : ''}</span>`;
 
 function filteredTasks(store) {
   return (store.data.tasks || []).filter(task => {
@@ -44,8 +45,8 @@ function tasksTable(store) {
     <td><div class="badge-cell">${(task.badges || []).map(b => chip(b, false)).join('') || '<span class="muted">尚未设置</span>'}</div></td>
     <td><span class="tag ${task.reviewMode === 'ai' ? 'tag-purple' : 'tag-neutral'}">${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</span></td>
     <td><strong>${fmt(task.completions)}</strong><span class="muted"> / ${fmt(task.participants)}</span></td>
-    <td><span class="tag ${task.status === 'published' ? 'tag-success' : task.status === 'archived' ? 'tag-neutral' : 'tag-warning'}">${e(statusText(task.status))}</span></td>
-    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button><button class="text-btn" data-task-edit="${e(task.id)}">编辑</button><button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button></div></td>
+    <td><span class="tag ${task.status === 'published' ? 'tag-success' : task.status === 'archived' ? 'tag-neutral' : 'tag-warning'}">${e(publicationLabel(task))}</span></td>
+    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button><button class="text-btn" data-task-edit="${e(task.id)}">编辑</button><button class="text-btn" data-task-copy="${e(task.id)}">复制为新任务</button><button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button></div></td>
   </tr>`).join('')}</tbody></table></div><div class="table-footer">共 ${fmt(tasks.length)} 个任务<span>展示所有 NPC 与导师发布的任务</span></div>`;
 }
 
@@ -79,6 +80,7 @@ export function renderLibrary(store, ui) {
 function attachTaskActions(root, store, ui) {
   root.querySelectorAll('[data-task-view]').forEach(button => button.addEventListener('click', () => openTask(store.getTask(button.dataset.taskView), store, ui)));
   root.querySelectorAll('[data-task-edit]').forEach(button => button.addEventListener('click', () => ui.editTask(store.getTask(button.dataset.taskEdit))));
+  root.querySelectorAll('[data-task-copy]').forEach(button => button.addEventListener('click', () => ui.copyTask(store.getTask(button.dataset.taskCopy))));
   root.querySelectorAll('[data-task-archive]').forEach(button => button.addEventListener('click', async () => {
     const task = store.getTask(button.dataset.taskArchive);
     if (!task || button.disabled) return;
@@ -111,7 +113,7 @@ export function bindLibrary(root, store, ui) {
   root.querySelectorAll('[data-badge-view]').forEach(button => button.addEventListener('click', () => openBadge(button.dataset.badgeView, store, ui)));
 }
 
-function openTask(task, store, ui) {
+export function openTask(task, store, ui) {
   if (!task) { ui.toast('任务不存在', 'error'); return; }
   let rewards;
   try { rewards = rewardBreakdown(task); } catch { rewards = null; }
@@ -122,8 +124,8 @@ function openTask(task, store, ui) {
     return `<div class="detail-material"><span>${icon(material.type === 'image' ? 'image' : 'file')} ${e(material.name || '未命名材料')}</span>${url ? `<a class="text-btn" href="${e(url)}" target="_blank" rel="noopener noreferrer">打开材料 ↗</a>` : uploaded ? `<button class="text-btn" data-material-download="${index}">下载材料</button>` : '<span class="muted">示例附件</span>'}</div>`;
   }).join('');
   const taskSubmissions = (store.data.submissions || []).filter(submission => submission.taskId === task.id);
-  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(statusText(task.status))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body"><p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span><span>任务方向 <strong>${e(task.domain || '未设置')}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span><span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>${task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
-    <section class="detail-section"><h3>奖励与徽章</h3><div class="reward-summary"><span><strong>${fmt(task.xp)}</strong> 经验值</span><span><strong>${fmt(task.taskPoints)}</strong> 任务点</span><span><strong>${fmt(Number(task.xp || 0) / 10)}</strong> 总徽章点</span></div><div class="badge-cell">${badgeRewards.map(badge => `${chip(badge)}<span class="muted">+${fmt(badge.points)} 点</span>`).join('')}</div></section>
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(publicationLabel(task))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body">${task.publication?.status==='rejected'?`<div class="notice">发布退回原因：${e(task.publication.comment)}</div>`:""}<p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span><span>任务方向 <strong>${e(task.domain || '未设置')}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span><span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>${task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
+    <section class="detail-section"><h3>奖励与徽章</h3><div class="reward-summary"><span><strong>${fmt(task.xp)}</strong> 经验值</span><span>直接领取</span><span><strong>${fmt(Number(task.xp || 0) / 10)}</strong> 总徽章点</span></div><div class="badge-cell">${badgeRewards.map(badge => `${chip(badge)}<span class="muted">+${fmt(badge.points)} 点</span>`).join('')}</div></section>
     <section class="detail-section"><h3>学习材料 <span class="count-pill">${(task.materials || []).length}</span></h3>${materialHtml || '<p class="muted">尚未添加学习材料</p>'}</section>
     <section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>
     ${task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt((task.rubric || []).reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${(task.rubric || []).map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${(task.rubricAttachments || []).map((attachment, index) => `<div class="detail-material"><span>${icon('file')} ${e(attachment.name)}</span>${/^data:[^,]*;base64,/i.test(attachment.url || '') ? `<button class="text-btn" data-rubric-download="${index}">下载评分文档</button>` : '<span class="muted">附加评分文档</span>'}</div>`).join('')}</section>` : ''}

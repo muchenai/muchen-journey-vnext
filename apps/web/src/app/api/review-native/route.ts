@@ -34,6 +34,39 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== "object") return reply({ ok: false, error: "请求格式不正确。" }, 400);
     const { command, task, id, key, payload } = body;
     switch (command) {
+      case "knowledge":
+      case "guild":
+        if (!payload || typeof payload.action !== "string") break;
+        try {
+          const data = await apiRequest(`/api/v1/review-admin/community/${command}`, "REVIEWER", {method:"POST",body:JSON.stringify(payload)});
+          return reply({ok:true,data});
+        } catch(error) {
+          if(error instanceof ApiRequestError) return reply({ok:false,error:error.message,status:error.status},error.status);
+          throw error;
+        }
+
+      case "submitPublication":
+      case "reviewPublication":
+        if (!uuid(id) || !payload || !Number.isInteger(payload.expected_revision)) break;
+        try {
+          const path = command === "submitPublication" ? `/tasks/${id}/submit-publication` : `/publications/${id}/decision`;
+          const data = await apiRequest(`/api/v1/review-admin${path}`, "REVIEWER", {method:"POST",body:JSON.stringify(payload)});
+          return reply({ok:true,data});
+        } catch(error) {
+          if(error instanceof ApiRequestError) return reply({ok:false,error:error.message,status:error.status},error.status);
+          throw error;
+        }
+      case "medalCatalog":
+      case "saveMedal":
+        if (command === "saveMedal" && (!uuid(id) || !payload || !Number.isInteger(payload.expected_revision))) break;
+        try {
+          const data = await apiRequest(`/api/v1/review-admin/medals${command === "saveMedal" ? `/${id}` : ""}`, "REVIEWER",
+            command === "saveMedal" ? {method:"PUT",body:JSON.stringify(payload)} : undefined);
+          return reply({ok:true,data});
+        } catch(error) {
+          if(error instanceof ApiRequestError) return reply({ok:false,error:error.message,status:error.status},error.status);
+          throw error;
+        }
       case "directoryStatus":
       case "refreshDirectory":
         try {

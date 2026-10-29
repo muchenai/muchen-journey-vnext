@@ -3,7 +3,7 @@ export const BADGES = Object.freeze([
   { id: 'data', name: '数据交付徽章', category: '数据交付', color: '#648b83' },
   { id: 'dev', name: '技术开发徽章', category: '技术开发', color: '#6b83a0' },
   { id: 'product', name: '产品开发徽章', category: '产品开发', color: '#b68c58' },
-  { id: 'pmo', name: 'PMO勋徽章', category: 'PMO', color: '#9988ad' },
+  { id: 'pmo', name: 'PMO徽章', category: 'PMO', color: '#9988ad' },
   { id: 'evaluation', name: 'AI评测徽章', category: 'AI评测', color: '#748b9a' },
   { id: 'quality', name: '质量检测徽章', category: '质量检测', color: '#a58b74' },
   { id: 'project', name: '项目管理徽章', category: '项目管理', color: '#7d9172' },
@@ -11,9 +11,9 @@ export const BADGES = Object.freeze([
 ]);
 
 export const DIFFICULTY_PRESETS = Object.freeze([
-  Object.freeze({ name: '入门', xp: 50, minutes: 30, taskPoints: 5 }),
-  Object.freeze({ name: '进阶', xp: 100, minutes: 60, taskPoints: 10 }),
-  Object.freeze({ name: '挑战', xp: 200, minutes: 90, taskPoints: 20 }),
+  Object.freeze({ name: '入门', xp: 50, minutes: 30, taskPoints: 0 }),
+  Object.freeze({ name: '进阶', xp: 100, minutes: 60, taskPoints: 0 }),
+  Object.freeze({ name: '挑战', xp: 150, minutes: 90, taskPoints: 0 }),
 ]);
 
 export const FAILURE_REASONS = Object.freeze([
@@ -46,13 +46,13 @@ export function getCertificationLevel(value) {
   return CERTIFICATION_LEVELS.find(level => numeric ? level.value === Number(numeric[1]) : level.name === raw) || null;
 }
 
-const RULES_VERSION = 'difficulty-v1';
+const RULES_VERSION = 'difficulty-v2';
 
 /** Difficulty is the only configurable source of time and reward values. */
 export function applyDifficultyPreset(task = {}) {
   const preset = DIFFICULTY_PRESETS.find(item => item.name === task.difficulty);
   return preset
-    ? { ...task, minutes: preset.minutes, xp: preset.xp, taskPoints: preset.taskPoints, rulesVersion: RULES_VERSION }
+    ? { ...task, minutes: preset.minutes, xp: preset.xp, taskPoints: preset.taskPoints, rulesVersion: RULES_VERSION, rewardRulesVersion:3, unlockTaskPoints: 0 }
     : { ...task };
 }
 
@@ -125,29 +125,36 @@ export function rewardBreakdown(task = {}) {
     };
   }
   const totalPoints = round(xp / 10);
+  const raw = (task.badges || []).map(item => totalPoints * number(item.weight) / 100);
+  const amounts = raw.map(Math.floor);
+  if ((task.badges || []).reduce((sum,b)=>sum+number(b.weight),0) === 100) {
+    const order = raw.map((_,i)=>i).sort((a,b)=>(raw[b]-amounts[b])-(raw[a]-amounts[a]) || a-b);
+    for (const i of order.slice(0,totalPoints-amounts.reduce((sum,n)=>sum+n,0))) amounts[i]++;
+  }
   return {
     xp,
     taskPoints: Math.max(0, number(effective.taskPoints)),
     totalPoints,
-    allocations: (task.badges || []).map(item => ({
+    allocations: (task.badges || []).map((item, index) => ({
       id: item.id,
       name: BADGES.find(badge => badge.id === item.id)?.name || item.id,
       weight: number(item.weight),
-      points: round(totalPoints * number(item.weight) / 100),
+      points: amounts[index],
     })),
   };
 }
 
 export function validateTask(task = {}) {
   const errors = fieldLimits(task);
-  if (!text(task.title)) errors.push('请填写任务标题');
-  if (!text(task.summary)) errors.push('请填写任务简述');
+  if (text(task.title).length < 3) errors.push('任务标题至少需要 3 个字');
+  if (text(task.summary).length < 10) errors.push(`任务简述至少需要 10 个字，当前 ${text(task.summary).length} 个字`);
   if (!text(task.domain)) errors.push('请选择任务方向');
   if (!DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
 
   const badges = Array.isArray(task.badges) ? task.badges : [];
   if (badges.length < 1 || badges.length > 2) errors.push('每个任务需选择 1～2 个徽章');
   if (new Set(badges.map(badge => badge.id)).size !== badges.length) errors.push('不能重复选择同一徽章');
+  if (badges.some(badge => !Number.isInteger(badge.weight) || badge.weight % 20 !== 0)) errors.push('徽章占比请按 20% 设置');
   if (badges.some(badge => !BADGES.some(option => option.id === badge.id))) errors.push('请选择系统已有的徽章');
   if (badges.some(badge => !Number.isFinite(Number(badge.weight)) || Number(badge.weight) <= 0 || Number(badge.weight) > 100)) errors.push('每个徽章的占比需大于 0% 且不超过 100%');
   if (Math.abs(badges.reduce((sum, badge) => sum + number(badge.weight), 0) - 100) > 0.000001) errors.push('徽章占比合计需为 100%');
@@ -602,4 +609,13 @@ const ICONS = {
 export function icon(name, size = 20) {
   const pixels = Math.max(8, Math.min(96, number(size) || 20));
   return `<svg width="${pixels}" height="${pixels}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.grid}</svg>`;
+}
+
+// Normalize only editable drafts; immutable published/reward snapshots are retained.
+export function normalizeBadgeWeights(task) {
+  const result=structuredClone(task);
+  result.unlockTaskPoints=0;result.rewardRulesVersion=3;result.taskPoints=0;
+  if(result.badges?.length===1)result.badges[0].weight=100;
+  if(result.badges?.length===2){const weight=Math.max(20,Math.min(80,Math.round(Number(result.badges[0].weight||60)/20)*20));result.badges[0].weight=weight;result.badges[1].weight=100-weight;}
+  return result;
 }

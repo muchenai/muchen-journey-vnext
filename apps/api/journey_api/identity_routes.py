@@ -195,6 +195,7 @@ def matching_reentry_enrollments(session: Session, invite: Invite) -> list[Enrol
             select(Enrollment).where(
                 Enrollment.organization_id == invite.organization_id,
                 Enrollment.learner_id == invite.target_user_id,
+                Enrollment.novice_task_id.is_(None),
                 Enrollment.status.in_(
                     [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED]
                 ),
@@ -902,6 +903,7 @@ def exchange_invite(
                 select(Enrollment).where(
                     Enrollment.organization_id == invite.organization_id,
                     Enrollment.learner_id == user.id,
+                    Enrollment.novice_task_id.is_(None),
                     Enrollment.status.in_(
                         [EnrollmentStatus.PENDING_IDENTITY, EnrollmentStatus.ACTIVE]
                     ),

@@ -144,8 +144,17 @@ def test_task_draft_publish_and_archive_use_real_version():
     draft=assert_ok(c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=OPERATOR_HEADERS,json=body))
     assert draft['revision']==1 and draft['status']=='draft'
     assert c.put(f'/api/v1/review-admin/tasks/{task_id}',headers=OPERATOR_HEADERS,json=body).status_code==409
-    published=assert_ok(c.post(f'/api/v1/review-admin/tasks/{task_id}/publish',headers={**OPERATOR_HEADERS,'Idempotency-Key':str(uuid.uuid4())},json={
-        'expected_revision':1,'reviewed_by':str(REVIEWER_ID),'verified_material_urls':['https://example.com/material']}))
+    assert c.post(f'/api/v1/review-admin/tasks/{task_id}/publish',headers={**OPERATOR_HEADERS,'Idempotency-Key':str(uuid.uuid4())},json={
+        'expected_revision':1,'reviewed_by':str(REVIEWER_ID),'verified_material_urls':['https://example.com/material']}).status_code==403
+    assert_ok(c.post(f'/api/v1/review-admin/tasks/{task_id}/submit-publication',headers=OPERATOR_HEADERS,json={
+        'expected_revision':1,'verified_material_urls':['https://example.com/material']}))
+    from test_publication_approvals import request_for, decision
+    from test_reviewer_workbench import create_linked_reviewer
+    from test_exploration_review_access import administrator
+    from journey_api.seed import ORGANIZATION_ID
+    boss=administrator(create_linked_reviewer('版本发布审批测试'),ORGANIZATION_ID,'super_admin')
+    assert_ok(decision(boss,request_for(boss,task_id)))
+    published=next(t for t in assert_ok(c.get('/api/v1/review-admin/tasks',headers=OPERATOR_HEADERS))['items'] if t['id']==task_id)
     assert published['version']==1 and published['status']=='published'
     archived=assert_ok(c.post(f'/api/v1/review-admin/tasks/{task_id}/archive',headers=OPERATOR_HEADERS,json={'expected_revision':1,'archived':True}))
     assert archived['status']=='archived' and archived['versionId']==published['versionId']

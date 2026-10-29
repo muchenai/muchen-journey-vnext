@@ -132,11 +132,18 @@ def test_publish_level_is_checked_again_after_downgrade(admin_setup):
     from journey_api.review_admin_routes import task_content_for_publish
     raw={**task_content_for_publish(body),'expected_revision':draft['definitionRevision'],'reviewed_by':str(REVIEWER_ID),'verified_material_urls':['https://example.com/material']}
     assert admin.post('/api/v1/ops/task-definitions/'+task_id+'/publish',headers={**ah,'Idempotency-Key':str(uuid.uuid4())},json=raw).status_code==403
+    assert admin.post(url+'/submit-publication',headers=ah,json={'expected_revision':1,'verified_material_urls':publish['verified_material_urls']}).status_code==403
     assert admin.post(url+'/archive',headers=ah,json={'expected_revision':1,'archived':False}).status_code==403
     with SessionLocal() as s:
         assert s.scalar(select(func.count()).select_from(TaskVersion).where(TaskVersion.task_definition_id==uuid.UUID(task_id)))==0
     assert_ok(c.put(cert,headers=h,json={'expected_revision':3,'domain':'产品开发','level':'高级'}))
-    assert assert_ok(admin.post(url+'/publish',headers={**ah,'Idempotency-Key':str(uuid.uuid4())},json=publish))['version']==1
+    assert admin.post(url+'/publish',headers={**ah,'Idempotency-Key':str(uuid.uuid4())},json=publish).status_code==403
+    submitted=assert_ok(admin.post(url+'/submit-publication',headers=ah,json={'expected_revision':1,'verified_material_urls':publish['verified_material_urls']}))
+    assert submitted['publication']['status']=='pending'
+    request=next(r for r in assert_ok(c.get('/api/v1/review-admin/publications'))['items'] if r['taskId']==task_id)
+    assert_ok(c.post('/api/v1/review-admin/publications/'+request['id']+'/decision',headers=h,json={'expected_revision':request['revision'],'decision':'approved'}))
+    with SessionLocal() as s:
+        assert s.scalar(select(func.count()).select_from(TaskVersion).where(TaskVersion.task_definition_id==uuid.UUID(task_id)))==1
 
 
 def test_revocation_blocks_old_sessions_and_new_oauth_preserves_learner_and_tasks(admin_setup):

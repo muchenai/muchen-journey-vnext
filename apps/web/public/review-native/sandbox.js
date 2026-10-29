@@ -1,4 +1,4 @@
-import { escapeHtml as e, icon } from './core.js?v=20261021-review-decision';
+import { escapeHtml as e, icon } from './core.js?v=20261028-publication-local';
 
 const MAX_ANSWER_LENGTH = 20000;
 const clone = value => JSON.parse(JSON.stringify(value));

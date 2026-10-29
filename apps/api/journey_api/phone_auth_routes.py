@@ -640,6 +640,7 @@ def get_completion_code(
         select(Enrollment)
         .where(
             Enrollment.learner_id == actor.id,
+            Enrollment.novice_task_id.is_(None),
             Enrollment.organization_id == actor.organization_id,
         )
         .order_by(Enrollment.id)
@@ -739,12 +740,14 @@ def migrate_completion_code(
     source_enrollment = session.scalar(
         select(Enrollment).where(
             Enrollment.learner_id == source_user_id,
+            Enrollment.novice_task_id.is_(None),
             Enrollment.organization_id == actor.organization_id,
         ).with_for_update()
     )
     target_enrollment = session.scalar(
         select(Enrollment).where(
             Enrollment.learner_id == actor.id,
+            Enrollment.novice_task_id.is_(None),
             Enrollment.organization_id == actor.organization_id,
         ).with_for_update()
     )

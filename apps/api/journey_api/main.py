@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from journey_api.novice_routes import router as novice_router
 from journey_api.config import get_settings
 from journey_api.ai_self_check_routes import router as ai_self_check_router
 from journey_api.learner_notification_routes import router as learner_notification_router
@@ -149,3 +150,12 @@ app.include_router(phone_auth_router)
 app.include_router(content_router)
 app.include_router(controlled_task_router)
 app.include_router(construction_module_router)
+
+app.include_router(novice_router)
+from journey_api.medal_routes import router as medal_router
+app.include_router(medal_router)
+from journey_api.publication_routes import router as publication_router
+app.include_router(publication_router)
+
+from journey_api.community_routes import router as community_router
+app.include_router(community_router)
