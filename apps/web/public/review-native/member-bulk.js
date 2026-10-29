@@ -1,4 +1,4 @@
-import {escapeHtml as e} from './core.js?v=20261028-publication-local';
+import {escapeHtml as e} from './core.js?v=20261029-reward-types';
 
 const domains=['产品开发','数据交付','技术开发','PMO','AI评测','质量检测','项目管理','AI 能力'];
 const statusName={conflict:'需要确认',new:'待新增',super:'超级管理员',existing:'已有管理员',revoked:'已撤销',unavailable:'不可授权',missing_title:'职位未填写',not_matched:'职位不符合',created:'已新增',skipped:'已跳过',failed:'失败',unknown:'待核实'};

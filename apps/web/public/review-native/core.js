@@ -8,6 +8,16 @@ export const BADGES = Object.freeze([
   { id: 'quality', name: '质量检测徽章', category: '质量检测', color: '#a58b74' },
   { id: 'project', name: '项目管理徽章', category: '项目管理', color: '#7d9172' },
   { id: 'ai', name: 'AI 能力徽章', category: 'AI 能力', color: '#8d85a9' },
+  { id: 'it-service', name: 'IT服务徽章', category: 'IT服务', color: '#738da1' },
+  { id: 'talent-acquisition', name: '人才开发徽章', category: '人才开发', color: '#948aa8' },
+  { id: 'talent-development', name: '人才发展徽章', category: '人才发展', color: '#809a87' },
+  { id: 'customer-growth', name: '客户增长徽章', category: '客户增长', color: '#ba9469' },
+  { id: 'hr-compensation', name: '人事薪酬徽章', category: '人事薪酬', color: '#a78a93' },
+  { id: 'finance-compliance', name: '财法合规徽章', category: '财法合规', color: '#7e919d' },
+  { id: 'organization-development', name: '组织发展徽章', category: '组织发展', color: '#8d9277' },
+  { id: 'intelligent-solutions', name: '智能产品方案徽章', category: '智能产品方案', color: '#818fae' },
+  { id: 'workplace', name: '行政职场徽章', category: '行政职场', color: '#a4927d' },
+  { id: 'business-operations', name: '综合经营徽章', category: '综合经营', color: '#799791' },
 ]);
 
 export const DIFFICULTY_PRESETS = Object.freeze([

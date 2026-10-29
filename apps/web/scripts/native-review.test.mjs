@@ -10,7 +10,22 @@ import { ApiStore, createJourneyService } from '../public/review-native/native-a
 import { learnerTaskTitles, learnerTaskTitle } from '../public/review-native/task-titles.js';
 import { renderPublishMaterials } from '../public/review-native/publish-materials.js';
 import { createTaskWorkflow, copyAsNewTask, hasUnsavedChanges, isTaskUpdate } from '../public/review-native/task-workflow.js';
-import {rewardBreakdown, applyDifficultyPreset, validateTask} from '../public/review-native/core.js';
+import {BADGES, rewardBreakdown, applyDifficultyPreset, validateTask} from '../public/review-native/core.js';
+
+test('all eighteen reward types survive the server adapter and split preview',()=>{
+  assert.equal(BADGES.length,18);
+  assert.equal(new Set(BADGES.map(b=>b.id)).size,18);
+  for (const badge of BADGES) {
+    const task={difficulty:'进阶',badges:[{id:badge.id,weight:100}]};
+    assert.deepEqual(taskView(taskWrite(task)).badges,task.badges);
+    const reward=rewardBreakdown(task);
+    assert.equal(reward.allocations[0].name,badge.name);
+    assert.equal(reward.allocations[0].points,10);
+    assert.ok(!validateTask(task).some(e=>e.includes('系统已有的徽章')));
+  }
+  const reward=rewardBreakdown({difficulty:'挑战',badges:[{id:'it-service',weight:40},{id:'business-operations',weight:60}]});
+  assert.deepEqual(reward.allocations.map(b=>b.points),[6,9]);
+});
 
 test('integer badge allocations preserve total at every ten percent split',()=>{
   for(const difficulty of ['入门','进阶','挑战']) for(let weight=10;weight<100;weight+=10){

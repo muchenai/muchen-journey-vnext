@@ -1,4 +1,4 @@
-import { BADGES, FAILURE_REASONS, getSubmissionStatus, getSubmissionFailureReasons, getReviewCamp, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261028-publication-local';
+import { BADGES, FAILURE_REASONS, getSubmissionStatus, getSubmissionFailureReasons, getReviewCamp, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261029-reward-types';
 import { reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
 
 const campStates = { exploration: { tab: 'pending', query: '' }, novice: { tab: 'pending', query: '' } };

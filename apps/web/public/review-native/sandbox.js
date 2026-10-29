@@ -1,4 +1,4 @@
-import { escapeHtml as e, icon } from './core.js?v=20261028-publication-local';
+import { escapeHtml as e, icon } from './core.js?v=20261029-reward-types';
 
 const MAX_ANSWER_LENGTH = 20000;
 const clone = value => JSON.parse(JSON.stringify(value));

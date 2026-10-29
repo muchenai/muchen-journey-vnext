@@ -8,7 +8,15 @@ from sqlalchemy import select, func
 from journey_api.models import Assignment, AssignmentStatus, Enrollment, Evaluation, Decision
 from journey_api.review_admin_models import PublishedTaskContent, MedalRedemption, NoviceUnlockDebit
 
-POINT_TYPES = {"product", "data", "tech", "pmo", "ai-eval", "quality", "project", "ai"}
+POINT_NAMES = {
+    "product": "产品开发", "data": "数据交付", "tech": "技术开发", "pmo": "PMO",
+    "ai-eval": "AI评测", "quality": "质量检测", "project": "项目管理", "ai": "AI 能力",
+    "it-service": "IT服务", "talent-acquisition": "人才开发", "talent-development": "人才发展",
+    "customer-growth": "客户增长", "hr-compensation": "人事薪酬", "finance-compliance": "财法合规",
+    "organization-development": "组织发展", "intelligent-solutions": "智能产品方案",
+    "workplace": "行政职场", "business-operations": "综合经营",
+}
+POINT_TYPES = frozenset(POINT_NAMES)
 PRESETS = {"入门": (30, 50, 5), "进阶": (60, 100, 10), "挑战": (90, 150, 15)}
 
 def rewards(content):

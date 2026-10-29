@@ -1,4 +1,4 @@
-import { escapeHtml as e, icon } from './core.js?v=20261028-publication-local';
+import { escapeHtml as e, icon } from './core.js?v=20261029-reward-types';
 
 // Keep file previews inside the confirmation so opening one never loses its selections.
 export function renderPublishMaterials(materials = []) {

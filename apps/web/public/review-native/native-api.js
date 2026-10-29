@@ -1,5 +1,5 @@
 import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
-import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261028-publication-local';
+import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261029-reward-types';
 let activeStore;
 export async function request(body, reviewId) {
   const response = await fetch('/api/review-native' + (reviewId ? `?review=${encodeURIComponent(reviewId)}` : ''), {

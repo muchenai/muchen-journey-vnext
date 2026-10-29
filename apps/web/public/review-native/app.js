@@ -7,7 +7,7 @@ import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261028-
 import {createMedalsApi} from './medals-api.js?v=20261028-publication-local';
 import {createMedalsController} from './medals.js?v=20261028-badges-local';
 import { renderPublishMaterials } from './publish-materials.js';
-import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261028-publication-local';
+import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261029-reward-types';
 import { ApiStore, newDraft, createJourneyService } from './native-api.js?v=20261028-publication-local';
 import { createSandboxController } from './sandbox.js?v=20261021-brand-npc';
 import { renderReview, bindReview, openSubmission } from './review.js?v=20261026-passed-tab';
@@ -199,7 +199,7 @@ function renderBasics() {
 }
 function renderRatio() {
   const d=store.data.draft;
-  if (!d.badges.length) return `<div class="notice">请选择至少一个徽章。</div>`;
+  if (!d.badges.length) return `<div class="notice reward-selection-notice">请选择至少一类奖励点数。</div>`;
   return `<div class="ratio-section"><div class="ratio-heading"><span>徽章点占比</span><span class="muted">每档 20% · 合计 100%</span></div><div class="ratio-labels">${d.badges.map((b,i)=>`<div><i class="color-dot color-${i}"></i><span>${e(badgeName(b.id))}</span><strong id="ratio-weight-${i}">${b.weight}%</strong></div>`).join('')}</div>${d.badges.length===2?`<div class="ratio-control" data-ratio="${d.badges[0].weight}"><input class="ratio-slider" aria-label="${e(badgeName(d.badges[0].id))}占比" id="ratio-slider" type="range" min="20" max="80" step="20" value="${d.badges[0].weight}" aria-valuetext="${d.badges[0].weight}%"></div>`:'<div class="single-ratio"><span></span></div>'}</div>`;
 }
 
