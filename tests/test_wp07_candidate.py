@@ -25,7 +25,7 @@ def candidate_manifest(tmp_path, monkeypatch):
     expected_migration = {
         "root": "0001_initial",
         "head": "0051_community_modules",
-        "revision_count": 49,
+        "revision_count": 53,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -96,7 +96,7 @@ def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
         "head": "0051_community_modules",
-        "revision_count": 49,
+        "revision_count": 53,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
