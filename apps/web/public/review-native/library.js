@@ -1,4 +1,4 @@
-import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261028-publication-local';
+import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261029-reward-types';
 
 const state = { tab: 'tasks', search: '', domain: 'all', status: 'all' };
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);

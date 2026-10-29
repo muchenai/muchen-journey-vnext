@@ -1,4 +1,4 @@
-import { escapeHtml as e, rewardBreakdown, BADGES, getReviewCamp } from './core.js?v=20261028-publication-local';
+import { escapeHtml as e, rewardBreakdown, BADGES, getReviewCamp } from './core.js?v=20261029-reward-types';
 
 const labels = { pending: '待审核', approved: '已通过', rejected: '已退回' };
 const text = value => String(value ?? '');

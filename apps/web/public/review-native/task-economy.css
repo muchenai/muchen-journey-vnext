@@ -23,7 +23,7 @@
 .publication-editor-note {margin-bottom:18px;}
 
 /* Uniform, centered badge labels in the task library. */
-.library-table .badge-chip { box-sizing: border-box; width: 88px; height: 24px; padding: 0 6px; justify-content: center; align-items: center; line-height: 1; white-space: nowrap; flex-shrink: 0; }
+.library-table .badge-chip { box-sizing: border-box; width: 112px; height: 24px; padding: 0 6px; justify-content: center; align-items: center; line-height: 1; white-space: nowrap; flex-shrink: 0; }
 .library-table .badge-chip .badge-dot { display: inline-block; }
 
 /* External CSS keeps badge colors visible under the admin content security policy. */
@@ -36,3 +36,20 @@
 .badge-chip .badge-dot[data-badge="quality"] { background-color: #a58b74; }
 .badge-chip .badge-dot[data-badge="project"] { background-color: #7d9172; }
 .badge-chip .badge-dot[data-badge="ai"] { background-color: #8d85a9; }
+
+.badge-chip .badge-dot[data-badge="it-service"] { background-color: #738da1; }
+.badge-chip .badge-dot[data-badge="talent-acquisition"] { background-color: #948aa8; }
+.badge-chip .badge-dot[data-badge="talent-development"] { background-color: #809a87; }
+.badge-chip .badge-dot[data-badge="customer-growth"] { background-color: #ba9469; }
+.badge-chip .badge-dot[data-badge="hr-compensation"] { background-color: #a78a93; }
+.badge-chip .badge-dot[data-badge="finance-compliance"] { background-color: #7e919d; }
+.badge-chip .badge-dot[data-badge="organization-development"] { background-color: #8d9277; }
+.badge-chip .badge-dot[data-badge="intelligent-solutions"] { background-color: #818fae; }
+.badge-chip .badge-dot[data-badge="workplace"] { background-color: #a4927d; }
+.badge-chip .badge-dot[data-badge="business-operations"] { background-color: #799791; }
+
+/* Eighteen point types retain a separate empty-selection hint. */
+.badge-selector { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.reward-selection-notice { margin-top: 16px; }
+@media (max-width: 680px) { .badge-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .badge-selector { grid-template-columns: 1fr; } }

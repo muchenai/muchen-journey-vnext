@@ -29,8 +29,8 @@ from journey_api.schemas import FinalizeReviewCommand, RevisionCommand, PublishT
 
 router = APIRouter(prefix="/api/v1/review-admin")
 DOMAINS = ["产品开发", "数据交付", "技术开发", "PMO", "AI评测", "质量检测", "项目管理", "AI 能力"]
-BADGES = dict(zip(["product", "data", "tech", "pmo", "ai-eval", "quality", "project", "ai"], DOMAINS))
-from journey_api.novice_economy import PRESETS
+from journey_api.novice_economy import POINT_NAMES, PRESETS
+BADGES = POINT_NAMES
 
 
 def envelope(request, data):

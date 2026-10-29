@@ -1,4 +1,4 @@
-import {escapeHtml as e} from './core.js?v=20261028-publication-local';
+import {escapeHtml as e} from './core.js?v=20261029-reward-types';
 import {openBulkAccess} from './member-bulk.js';
 const domains = ['产品开发','数据交付','技术开发','PMO','AI评测','质量检测','项目管理','AI 能力'];
 const levels = ['初级','中级','高级'];
