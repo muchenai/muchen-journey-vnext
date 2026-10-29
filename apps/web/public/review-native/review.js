@@ -1,5 +1,5 @@
-import { BADGES, FAILURE_REASONS, getSubmissionStatus, getSubmissionFailureReasons, getReviewCamp, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261021-review-decision';
-import { reviewFeedbackError } from './native-model.js';
+import { BADGES, FAILURE_REASONS, getSubmissionStatus, getSubmissionFailureReasons, getReviewCamp, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261028-publication-local';
+import { reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
 
 const campStates = { exploration: { tab: 'pending', query: '' }, novice: { tab: 'pending', query: '' } };
 let currentCamp = 'novice';

@@ -26,3 +26,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: make ci-fast
+      - name: Rehearse administrator migration range in disposable database
+        run: |
+          set -euo pipefail
+          docker compose exec -T db-test createdb -U journey_next journey_community_drill_test
+          trap 'docker compose exec -T db-test dropdb -U journey_next --if-exists --force journey_community_drill_test' EXIT
+          docker compose run --rm --no-deps --user root -v "$PWD:/app:ro" -e APP_ENV=test -e ALLOW_FIXTURE_IDENTITY=true -e ATTACHMENTS_ENABLED=true -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_community_drill_test api python deploy/admin-community/migration_drill.py

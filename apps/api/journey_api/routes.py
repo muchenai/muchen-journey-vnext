@@ -430,12 +430,14 @@ def publish_task_version(
         .where(
             TaskDefinition.id == task_definition_id,
             TaskDefinition.organization_id == actor.organization_id,
-            TaskDefinition.created_by == actor.id,
+            (TaskDefinition.created_by == actor.id) | (TaskDefinition.id == getattr(request.state, 'approved_publication_task_id', None)),
         )
         .with_for_update()
     )
     if definition is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可发布的任务定义。")
+    from journey_api.publication_routes import ensure_editable
+    ensure_editable(session, task_definition_id)
     ensure_revision(definition.revision, command.expected_revision)
     if definition.status == TaskDefinitionStatus.WITHDRAWN:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已撤销的任务定义不能发布新版本。")
@@ -507,6 +509,12 @@ def publish_task_version(
     )
     session.add(version)
     session.flush()
+    # Capture admin presentation with the immutable version in the same transaction.
+    from journey_api.review_admin_models import ReviewAdminTask, PublishedTaskContent
+    profile = session.get(ReviewAdminTask, definition.id)
+    if profile is not None and profile.organization_id == actor.organization_id:
+        session.add(PublishedTaskContent(task_version_id=version.id,
+            organization_id=actor.organization_id, content=profile.content))
     definition.status = TaskDefinitionStatus.PUBLISHED
     definition.revision += 1
     result = {"id": str(version.id), "task_definition_id": str(definition.id)}
@@ -883,6 +891,7 @@ def current_action(
     enrollment_query = select(Enrollment).where(
         Enrollment.organization_id == actor.organization_id,
         Enrollment.learner_id == actor.id,
+        Enrollment.novice_task_id.is_(None),
     )
     if enrollment_id is not None:
         enrollment_query = enrollment_query.where(Enrollment.id == enrollment_id)
@@ -1089,6 +1098,7 @@ def learner_enrollments(
         .where(
             Enrollment.organization_id == actor.organization_id,
             Enrollment.learner_id == actor.id,
+            Enrollment.novice_task_id.is_(None),
         )
         .order_by(
             case(

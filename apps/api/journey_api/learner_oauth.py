@@ -55,7 +55,8 @@ def provision_learner(session: Session, identity: ExternalIdentity | None, *,
     # Any existing journey, including a completed/cancelled one, is preserved.
     # Login is never an instruction to reset or replace learning history.
     enrollment = session.scalar(select(Enrollment).where(
-        Enrollment.organization_id == organization_id, Enrollment.learner_id == user.id))
+        Enrollment.organization_id == organization_id, Enrollment.learner_id == user.id,
+        Enrollment.novice_task_id.is_(None)))
     if enrollment is None:
         settings = get_settings()
         reviewer_id = settings.feishu_learner_reviewer_id

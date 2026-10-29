@@ -129,7 +129,7 @@ def test_migration_check_rehearses_ai_and_review_release_range(
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -181,12 +181,12 @@ def test_migration_check_rehearses_ai_and_review_release_range(
     assert report["upgrade_to_head"] == "PASS"
     assert report["downgrade_to_base"] == "PASS"
     assert report["base_revision"] == "0035_phone_password_login"
-    assert report["head_revision"] == "0047_learner_notification_reads"
+    assert report["head_revision"] == "0051_community_modules"
     assert report["business_facts_preserved"] is True
 
 
 def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0047_learner_notification_reads"
+    assert ops.EXPECTED_MIGRATION_HEAD == "0051_community_modules"
     assert set(ops.REVIEW_TABLES) == {
         "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
         "review_admin_access", "review_claims", "directory_sync", "directory_members",
@@ -214,7 +214,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "completion_codes",
         "phone_password_credentials",
         "ai_self_checks",
-        *ops.REVIEW_TABLES,
+        *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
         "learner_notification_reads",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
@@ -225,14 +225,14 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "completion_codes",
         "phone_password_credentials",
         "ai_self_checks",
-        *ops.REVIEW_TABLES,
+        *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
         "learner_notification_reads",
     }
 
 
 def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0047_learner_notification_reads",
+        "migration_revision": "0051_community_modules",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -242,14 +242,14 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0047_learner_notification_reads",
+            "migration_revision": "0051_community_modules",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -258,7 +258,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
                 protected_fact: 1,
             },
         }
@@ -276,7 +276,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0047_learner_notification_reads",
+        "migration_revision": "0051_community_modules",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []

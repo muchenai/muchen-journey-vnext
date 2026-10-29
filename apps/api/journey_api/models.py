@@ -992,6 +992,7 @@ class JourneyStageVersion(Base):
 class Enrollment(Base):
     __tablename__ = "enrollments"
     __table_args__ = (
+        UniqueConstraint("organization_id", "learner_id", "novice_task_id", name="uq_novice_claim_owner_task"),
         CheckConstraint("review_assignment_mode IN ('ASSIGNED', 'SHARED')", name="ck_enrollments_review_assignment_mode"),
         UniqueConstraint(
             "id",
@@ -1022,6 +1023,7 @@ class Enrollment(Base):
     learner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     review_assignment_mode: Mapped[str] = mapped_column(String(16), default="ASSIGNED", server_default="ASSIGNED")
+    novice_task_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("task_definitions.id"), nullable=True)
     journey_version_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, nullable=True, index=True
     )

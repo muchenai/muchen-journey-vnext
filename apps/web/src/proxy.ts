@@ -23,6 +23,7 @@ export function proxy(request: NextRequest) {
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",
+    `frame-src 'self'${reviewAvatars ? " blob:" : ""}`,
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",

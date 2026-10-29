@@ -3,7 +3,7 @@
  * Switching to 'api' requires a real server implementing the REST routes below;
  * it never falls back to mock data after a failed API request.
  */
-import { BADGES, DIFFICULTY_PRESETS, FAILURE_REASONS, gradeAnswer, getSubmissionStatus, getReviewCamp, normalizeCertificationRole, getCertificationLevel } from './core.js?v=20261021-review-decision';
+import { BADGES, DIFFICULTY_PRESETS, FAILURE_REASONS, gradeAnswer, getSubmissionStatus, getReviewCamp, normalizeCertificationRole, getCertificationLevel } from './core.js?v=20261028-publication-local';
 
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 const text = value => String(value ?? '').trim();

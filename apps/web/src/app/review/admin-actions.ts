@@ -9,13 +9,14 @@ async function safely<T>(work: () => Promise<T>): Promise<Result<T>> {
 export async function loadAdmin(): Promise<Result<AdminState>> {
  return safely(async () => {
   const rights = await apiRequest<AdminCapabilities>("/api/v1/review-admin/capabilities", "REVIEWER");
-  const [reviews, tasks, members, reviewers] = await Promise.all([
+  const [reviews, tasks, members, reviewers, publications] = await Promise.all([
    apiRequest<{ items: AdminReview[]; actor: AdminState["actor"] }>("/api/v1/review-admin/reviews", "REVIEWER"),
    apiRequest<{ items: AdminTask[] }>("/api/v1/review-admin/tasks", "REVIEWER"),
    rights.isSuperAdmin ? apiRequest<{ items: Member[]; actor_id: string }>("/api/v1/review-admin/members", "REVIEWER") : null,
    rights.canPublish ? apiRequest<{ items: Member[] }>("/api/v1/review-admin/reviewers", "REVIEWER") : null,
+   rights.canPublish ? apiRequest<{ items: unknown[] }>("/api/v1/review-admin/publications", "REVIEWER") : null,
   ]);
-  return { reviews: reviews.items, tasks: tasks.items, actor: reviews.actor, members: reviewers?.items ?? [], administrators: members?.items ?? [], capabilities: rights, operatorId: rights.canPublish ? reviews.actor.id : null };
+  return { reviews: reviews.items, tasks: tasks.items, publicationRequests: publications?.items ?? [], actor: reviews.actor, members: reviewers?.items ?? [], administrators: members?.items ?? [], capabilities: rights, operatorId: rights.canPublish ? reviews.actor.id : null };
  });
 }
 export async function loadReview(id: string): Promise<Result<ReviewDetail>> {

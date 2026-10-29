@@ -1038,7 +1038,12 @@ def finalize_review(
         context.assignment.status = target_status
         if context.enrollment.status != EnrollmentStatus.ACTIVE:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少有效 Enrollment。")
-        if context.enrollment.journey_version_id is None:
+        if context.enrollment.novice_task_id is not None:
+            # A standalone practice result is not exploration graduation.
+            context.enrollment.status = EnrollmentStatus.COMPLETED
+            context.enrollment.revision += 1
+            assignment_event = "assignment.completed.v1"
+        elif context.enrollment.journey_version_id is None:
             context.enrollment.status = EnrollmentStatus.COMPLETED
             context.enrollment.revision += 1
             # The database formal-result Gate reads the immutable submission,
@@ -1092,6 +1097,9 @@ def finalize_review(
     else:
         context.assignment.status = target_status
         assignment_event = "assignment.revision_requested.v1"
+    if decision == Decision.PASS:
+        from journey_api.community_routes import credit_guild_completion
+        credit_guild_completion(session, context, evaluation)
     context.assignment.revision += 1
     result = ReviewMutationOut(
         review_id=context.review.id,

@@ -31,6 +31,15 @@ def system_task_reviewer():
 
 
 def pytest_configure(config):
+    # Never allow fixture writers to pollute the local interactive database again.
+    import os
+    from sqlalchemy.engine import make_url
+    from journey_api.config import DatabaseSettings
+    target = make_url(os.environ.get('DATABASE_URL') or DatabaseSettings().database_url)
+    if target.get_backend_name() != 'sqlite' and not (
+        'test' in (target.host or '').lower() or 'test' in (target.database or '').lower()
+    ):
+        raise pytest.UsageError('Tests require an isolated test database; refusing to write to the application database.')
     config.addinivalue_line("markers", "write_rate_limits: exercise real or explicitly controlled write rate windows")
 
 

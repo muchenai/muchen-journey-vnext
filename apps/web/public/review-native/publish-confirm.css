@@ -1,2 +1,14 @@
 /* The retained publication confirmation is the only additional dialog style. */
-.native-publish-confirm .admin-check-link{display:flex;align-items:flex-start;gap:12px;padding:12px;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.native-publish-confirm > .modal-heading > p{margin-top:12px;font-family:inherit;font-size:18px;font-weight:400;line-height:1.5;color:var(--ink);white-space:normal;overflow-wrap:anywhere}
+.native-publish-confirm > .form-field .field-label,
+.native-publish-confirm > section[aria-label="发布材料清单"] > h3{font-family:inherit;font-size:14px;font-weight:700;line-height:1.5;letter-spacing:normal;color:var(--ink)}
+.native-publish-confirm > section[aria-label="发布材料清单"]{margin-top:24px}
+.native-publish-confirm .admin-check-link{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.native-publish-confirm .admin-check-link > input[type="checkbox"]{margin:0;width:16px;height:16px;flex:0 0 16px}
+.native-publish-confirm .admin-check-link > span{min-width:0;line-height:1.5}
+.native-publish-confirm .material-list{margin:12px 0 18px}
+.native-publish-confirm .material-info strong,.native-publish-confirm .material-info span{white-space:normal;overflow-wrap:anywhere}
+.native-publish-confirm .material-info a{display:inline-block;margin-top:8px;overflow-wrap:anywhere}
+.native-publish-confirm details{margin-top:8px}
+.native-publish-confirm summary{cursor:pointer;color:var(--primary)}
+.native-publish-confirm .material-image{display:block;max-width:100%;max-height:280px;object-fit:contain;margin-top:8px}
