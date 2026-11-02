@@ -1,12 +1,13 @@
 import { randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { worldMapTaskBridge } from "@/app/project29/world-map-navigation"
 
 export const dynamic = "force-dynamic"
 
 // This endpoint serves only the bundled static illustration, never account data.
 // A separate document keeps the map's policy independent of the app's CSP.
-export async function GET() {
+export async function GET(request: Request) {
   const nonce = randomBytes(24).toString("base64")
   const source = await readFile(path.join(process.cwd(), "public/world-map/index.html"), "utf8")
   const ready = `<script nonce="${nonce}">(()=>{const ready=()=>{if(!document.querySelector('.universe .planet-node'))return false;parent.postMessage({type:'journey-world-map-ready'},'*');return true};if(!ready()){const observer=new MutationObserver(()=>{if(ready())observer.disconnect()});observer.observe(document.body,{childList:true,subtree:true})}})();</script>`
@@ -42,7 +43,9 @@ export async function GET() {
     },true);
     addEventListener('message',event=>{if(event.source===parent&&event.data?.type==='journey-world-map-reset')document.querySelector('button[aria-label="重置视图"]')?.click()});
   })();</script>`
-  const html = source.replace(/<(script|style)\b/g, `<$1 nonce="${nonce}"`).replace("</head>", `${embedded}</head>`).replace("</body>", `${fullscreenIntro}${ready}${controls}</body>`)
+  const taskNavigation = new URL(request.url).searchParams.get("tasks") === "village"
+    ? `<script nonce="${nonce}">${worldMapTaskBridge}</script>` : ""
+  const html = source.replace(/<(script|style)\b/g, `<$1 nonce="${nonce}"`).replace("</head>", `${embedded}</head>`).replace("</body>", `${fullscreenIntro}${ready}${controls}${taskNavigation}</body>`)
   return new Response(html, { headers: {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",

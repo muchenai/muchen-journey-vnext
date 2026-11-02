@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import "./worldMap.css"
+import { worldMapTaskDepartment } from "./world-map-navigation"
+import type { TaskDepartmentFilter } from "./taskDepartments"
 
 /** Load the standalone map only when its menu is opened; isolate its CSS and scripts. */
-export function WorldMap() {
+export function WorldMap({ onViewTasks }: { onViewTasks?: (department: TaskDepartmentFilter) => void }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState(false)
@@ -10,18 +12,24 @@ export function WorldMap() {
   useEffect(() => {
     const timer = window.setTimeout(() => setError(true), 20000)
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== frame.current?.contentWindow || event.data?.type !== "journey-world-map-ready") return
+      if (event.source !== frame.current?.contentWindow) return
+      if (event.data?.type === "journey-world-map-tasks") {
+        const department = worldMapTaskDepartment(event.data.department)
+        if (department && onViewTasks) onViewTasks(department)
+        return
+      }
+      if (event.data?.type !== "journey-world-map-ready") return
       window.clearTimeout(timer)
       setReady(true)
       setError(false)
     }
     window.addEventListener("message", onMessage)
     return () => { window.clearTimeout(timer); window.removeEventListener("message", onMessage) }
-  }, [attempt])
+  }, [attempt, onViewTasks])
   return (
     <section className="world-map-page" aria-label="世界地图">
       <div className="village-world-map">
-        <iframe key={attempt} ref={frame} title="沐晨世界地图" src="/api/learner/world-map" sandbox="allow-scripts" allow="fullscreen *" allowFullScreen data-ready={ready} onError={() => setError(true)} />
+        <iframe key={attempt} ref={frame} title="沐晨世界地图" src={onViewTasks ? "/api/learner/world-map?tasks=village" : "/api/learner/world-map"} sandbox="allow-scripts" allow="fullscreen *" allowFullScreen data-ready={ready} onError={() => setError(true)} />
         {!ready && (error ? (
           <div className="module-empty" role="alert">
             <p>世界地图加载失败，请重试。</p>
