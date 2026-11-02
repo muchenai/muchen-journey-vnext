@@ -89,7 +89,7 @@ export function ModuleHeader({
   query,
   onQuery,
   onHome,
-  onLogout,
+  onProfile,
 }: {
   module: ModuleDestination
   menu: string
@@ -97,7 +97,7 @@ export function ModuleHeader({
   query: string
   onQuery: (value: string) => void
   onHome: () => void
-  onLogout: () => void
+  onProfile: () => void
 }) {
   const hall = {
     dashboard: "探索营大厅",
@@ -106,7 +106,7 @@ export function ModuleHeader({
     guild: "公会大厅",
   }
   const page =
-    ({ mine: "我的任务", saved: "我的收藏" } as Record<string, string>)[menu] ||
+    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图" } as Record<string, string>)[menu] ||
     hall[module]
   return (
     <header className="module-header">
@@ -133,8 +133,8 @@ export function ModuleHeader({
         </ReviewNotificationBell>
         <button
           className="module-account"
-          aria-label="切换身份"
-          onClick={onLogout}
+          aria-label="进入个人主页"
+          onClick={onProfile}
         >
           <ModuleIcon file="a2a2a" size={16} />
           <span>{identity}</span>
@@ -215,7 +215,7 @@ export function ModuleSidebar({
               )}
             </button>
           ))}
-          <button onClick={() => onMenu("map")}>
+          <button className={activeMenu === "map" ? "is-active" : ""} aria-current={activeMenu === "map" ? "page" : undefined} onClick={() => onMenu("map")}>
             <ModuleIcon file="93f75" size={24} />
             世界地图
           </button>

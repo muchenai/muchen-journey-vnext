@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/api/learner/world-map",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
 };

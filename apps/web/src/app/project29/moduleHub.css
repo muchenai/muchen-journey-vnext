@@ -79,6 +79,8 @@
 }
 .module-shared-sidebar-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 26px; height: 100%; }
 .module-shared-sidebar .dashboard-nav-frame { --figma-stroke-width: 1.101px; --figma-stroke-radius: 11.011px; }
+.module-navigation-background { position: absolute; inset: 0 0 0 44.39px; border-radius: inherit; overflow: hidden; opacity: .66; pointer-events: none; }
+.module-navigation-background img { position: absolute; height: 329.8%; width: 265.91%; max-width: none; left: -7.87%; top: -46.98%; }
 .module-secondary-navigation {
   flex: 1; min-height: 0; width: 207px;
   display: flex; flex-direction: column;
@@ -321,6 +323,7 @@
 .module-dialog h3 { margin-top: 22px; }
 .module-dialog p, .module-dialog li { color: var(--m-muted); font-size: 13px; line-height: 1.9; }
 .module-dialog ol { padding-left: 22px; }
+.module-dialog .module-claim-action { margin-top: 20px; }
 .module-dialog li { padding: 6px 0; }
 .module-dialog .module-course-artwork { height: 164.657px; margin-bottom: 20px; }
 .module-info-body { white-space: pre-line; }
@@ -336,3 +339,27 @@
 @media (prefers-reduced-motion: reduce) {
   .module-hub *, .module-hub *::before, .module-hub *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* All eight task directions remain accessible on narrow layouts. */
+.module-filterbar { flex-wrap: wrap; gap: 12px; }
+.module-tabs { flex-wrap: wrap; }
+.module-tabs > button { white-space: nowrap; flex-shrink: 0; }
+.module-task-card .module-card-title { overflow-wrap: anywhere; }
+.module-dialog a { overflow-wrap: anywhere; }
+
+/* Project-30 task card and detail styles; rewards remain server-authoritative. */
+.module-task-card .module-rewards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.module-task-reward-preview { margin: 20px 0; border: 1px solid var(--m-border); border-radius: 7px; background: var(--m-deep); padding: 15px; text-align: left; }
+.module-task-reward-preview > p { margin-bottom: 12px; font-size: 12px; }
+.module-task-reward-preview > p > strong { color: var(--m-cyan); font-weight: 500; }
+.module-task-reward-preview > small { display: block; color: var(--m-dim); font-size: 10px; line-height: 1.8; margin-top: 10px; }
+.village-task-dialog ul, .village-task-dialog .module-field, .village-task-dialog .module-demo-note { text-align: left; }
+.village-task-dialog form > .module-secondary { margin-right: 12px; }
+.village-task-dialog .village-task-instructions { margin-top: 22px; }
+.village-task-dialog .village-task-instructions > h3 { margin: 0; text-align: center; }
+.village-task-dialog .village-task-instructions-body { margin: 0; padding: 0 22px; text-align: left; }
+.village-task-dialog .village-task-instructions-body > :is(li, p) { margin: 0; padding: 6px 0; }
+.village-world-map { position: relative; width: 100%; min-width: 0; background: #010204; overflow: hidden; }
+.village-world-map iframe { display: block; width: 100%; height: 820px; border: 0; }
+.village-world-map iframe[data-ready="false"] { visibility: hidden; }
+.village-world-map > .module-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; }

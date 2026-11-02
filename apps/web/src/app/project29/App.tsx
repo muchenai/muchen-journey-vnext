@@ -310,11 +310,10 @@ function ExperienceScreen() {
  const revealLogin = useCallback(() => setEntryResourcesReady(true), []);
  if (screen === "login" && !entryResourcesReady) return <ProjectResourceLoader onReady={revealLogin} />;
  if (screen === "login") return <Login key={`${joinPhase}:${joinError}`} />;
- if (["dashboard", "village", "academy", "guild"].includes(screen)) return <ModuleHub
+ if (["dashboard", "village", "academy", "guild"].includes(screen)) return <ModuleHub key={screen}
    module={screen as "dashboard" | "village" | "academy" | "guild"} identity={learnerName}
    nicknameRequired={joinPhase === "nickname"}
    onNavigate={navigate}
-   onLogout={() => { if (window.confirm("确认退出当前账号？")) void logoutSession({}).then(result => { if (result.error) setNotice(result.error); else window.location.assign("/join"); }); }}
    decoration={<GradientStroke variant="task" strokeWidth={1} />}
    activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />}
    idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />}

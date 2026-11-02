@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { BadgeShop } from "./BadgeShop"
+import { TaskClassifications } from "./TaskClassifications"
+import { filterDepartmentTasks, taskDepartmentName, type TaskDepartmentFilter } from "./taskDepartments"
+import { useVillageTasks, type VillageTask } from "./useVillageTasks"
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { sharedAsset } from "./sharedAsset"
 import type { PreviewIdentity } from "./previewStorage"
 import { useCanvasScale } from "./useCanvasScale"
@@ -8,9 +12,10 @@ import {
 
   moduleTitles,
 
+
   type AcademyCourse,
   type ModuleName,
-  type PracticeTask,
+
 } from "./moduleDemoData"
 import {
   ModuleBorderProvider,
@@ -23,14 +28,21 @@ import {
   type ModuleDestination,
   type ModuleStatusName,
 } from "./ModuleShell"
+import { VillageTaskCard, VillageTaskRewards } from "./VillageTaskCard"
+import { JourneyDialogSurface } from "./JourneyDialogSurface"
+import { AccountSwitchDialog } from "./AccountSwitchDialog"
+import { PersonalProfile } from "./PersonalProfile"
+import { WorldMap } from "./WorldMap"
+import { FavoriteKnowledge, KnowledgeSaveButton } from "./FavoriteKnowledge"
+import "./favoriteKnowledge.css"
 import { ModuleCourseArtwork } from "./ModuleCourseArtwork"
 import "./moduleHub.css"
 
 const academyCourses: AcademyCourse[] = [];
-const practiceTasks: PracticeTask[] = [];
+
 
 type PracticeState = { status: ModuleStatusName; answer: string }
-type DialogState = { type: "task"; task: PracticeTask } | {
+type DialogState = { type: "task"; task: VillageTask } | {
   type: "course"
   course: AcademyCourse
 } | { type: "info"; title: string; body: string } | { type: "share" } | null
@@ -39,7 +51,6 @@ export function ModuleHub({
   module,
   identity,
   onNavigate,
-  onLogout,
   decoration,
   activeNavigationDecoration,
   idleNavigationDecoration,
@@ -51,7 +62,6 @@ export function ModuleHub({
   module: ModuleDestination
   identity: PreviewIdentity
   onNavigate: (destination: ModuleDestination) => void
-  onLogout: () => void
   decoration: ReactNode
   activeNavigationDecoration: ReactNode
   idleNavigationDecoration: ReactNode
@@ -60,35 +70,33 @@ export function ModuleHub({
   explorationTaskCount?: number
   nicknameRequired?: boolean
 }) {
+  const villageEnabled = module === "village"
+  const modulePagesEnabled = ["academy", "guild"].includes(module)
+  const village = useVillageTasks(villageEnabled)
+  const practiceTasks = village.tasks
   const canvasScale = useCanvasScale()
   const [menu, setMenu] = useState("hall")
-  const [previousModule, setPreviousModule] = useState(module)
+  const [profileReturn, setProfileReturn] = useState("hall")
+  const [accountSwitchOpen, setAccountSwitchOpen] = useState(false)
   const displayName = identity
+  const [taskDepartment, setTaskDepartment] = useState<TaskDepartmentFilter>("all")
+  const [taskLevel, setTaskLevel] = useState("全部")
+  const [taskReview, setTaskReview] = useState("全部")
+  const [taskBadgeType, setTaskBadgeType] = useState("全部")
+  const resetTaskFilters = () => {setTaskDepartment("all"); setTaskLevel("全部"); setTaskReview("全部"); setTaskBadgeType("全部"); setQuery("")}
   const [filter, setFilter] = useState("全部")
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("recommended")
   const [practice, setPractice] = useState<Record<string, PracticeState>>({})
-  const [favorites, setFavorites] = useState<string[]>([])
-  const [learned, setLearned] = useState<string[]>([])
+  const [favorites] = useState<string[]>([])
+  const [learned] = useState<string[]>([])
   const [dialog, setDialog] = useState<DialogState>(null)
   const [notice, setNotice] = useState("")
   const [guild, setGuild] = useState("PM")
-  const [shared, setShared] = useState<{ title: string; url: string }[]>([])
+  const [shared] = useState<{ title: string; url: string }[]>([])
   const modal = useRef<HTMLDialogElement>(null)
   const listing = useRef<HTMLDivElement>(null)
   const pageContent = useRef<HTMLDivElement>(null)
-  if (previousModule !== module) {
-    setPreviousModule(module)
-    setMenu("hall")
-    setFilter("全部")
-    setQuery("")
-    setSort("recommended")
-    setDialog(null)
-    setNotice("")
-  }
-  useEffect(() => {
-    pageContent.current?.scrollTo({ top: 0 })
-  }, [module])
   useEffect(() => {
     if (dialog) modal.current?.showModal()
     else modal.current?.close()
@@ -99,11 +107,14 @@ export function ModuleHub({
     return () => window.clearTimeout(timeout)
   }, [notice])
   const taskStatus = (id: string): ModuleStatusName =>
-    practice[id]?.status || "available"
+    practiceTasks.find(task => task.id === id)?.status || "available"
   const accepted = practiceTasks.filter((t) => taskStatus(t.id) !== "available")
   const pending = accepted.filter((t) => taskStatus(t.id) === "pending")
   const completed = accepted.filter((t) => taskStatus(t.id) === "completed")
-  const info = (_title: string, _body: string) => setNotice("暂未开放")
+  const info = (title: string, body: string) => {
+    if (villageEnabled || modulePagesEnabled) setDialog({ type: "info", title, body })
+    else setNotice("暂未开放")
+  }
   const scrollToListing = () => {
     if (!listing.current || !pageContent.current) return
     pageContent.current.scrollTo({
@@ -112,7 +123,17 @@ export function ModuleHub({
     })
   }
   function navigateMenu(next: string) {
+    if (next === "map") {
+      setMenu("map")
+      setQuery("")
+      pageContent.current?.scrollTo({ top: 0 })
+      return
+    }
     if (module === "dashboard") {
+      if (next === "hall") {
+        setMenu("hall")
+        setQuery("")
+      }
       onExplorationMenu(next)
       return
     }
@@ -124,10 +145,7 @@ export function ModuleHub({
       return
     }
     if (next === "badges") {
-      info(
-        "我的徽章",
-        `新手村覆盖产品开发、技术开发、数据交付、PMO、AI 评测和质量检测等能力方向。示例任务提交后为待审核，审核通过才获得经验和徽章点。当前已接取 ${accepted.length} 项，待审核 ${pending.length} 项。`,
-      )
+      setMenu("badges"); setQuery(""); pageContent.current?.scrollTo({top:0})
     } else if (next === "certification") {
       info(
         "能力认证 · 成长路线",
@@ -138,11 +156,6 @@ export function ModuleHub({
         "交付倒计时 · 风险升级演练",
         "你负责的项目距离交付仅剩 3 天，关键依赖延期且验收范围发生变化。\n练习目标：识别交付红线、制定备选方案，并说明何时升级风险。\n交付成果：风险清单、升级沟通稿和应急方案。\n这是合成工作样本，正式提交与导师验收接口尚未接入。",
       )
-    } else if (next === "map") {
-      info(
-        "成长地图",
-        "探索营：建立基础认知。\n新手村：用任务完成第一次实践。\nAI 学院：学习方法与工具，提升工作效率。\n交付线工会：积累工作样本，迈向专业认证。\n可通过左侧板块入口继续探索。",
-      )
     } else if (next === "knowledge") {
       info(
         "知识库",
@@ -150,18 +163,13 @@ export function ModuleHub({
       )
     } else {
       info(
-        "预览设置",
-        `当前身份：${identity}\n界面统一使用本地思源黑体、19 个语义基础色。\n本页新示例的收藏、学习和任务操作仅保留在本次页面会话，不覆盖探索营或既有任务记录。`,
+        "设置",
+        `当前身份：${identity}\n新手村的领取、保存草稿和提交记录已保存到当前账号。`,
       )
     }
   }
-  const visibleTasks = practiceTasks
-    .filter(
-      (t) =>
-        (menu !== "mine" || taskStatus(t.id) !== "available") &&
-        (filter === "全部" || t.category === filter) &&
-        `${t.title}${t.category}${t.description}`.includes(query.trim()),
-    )
+  const taskPool = practiceTasks.filter(t => menu !== "mine" || taskStatus(t.id) !== "available")
+  const visibleTasks = filterDepartmentTasks(taskPool, taskDepartment, taskLevel, taskReview, query, taskBadgeType)
     .sort((a, b) =>
       sort === "duration"
         ? a.minutes - b.minutes
@@ -183,8 +191,41 @@ export function ModuleHub({
           ? b.learners - a.learners
           : 0,
     )
+  const openedTask = dialog?.type === "task" ? practiceTasks.find(t => t.id === dialog.task.id) ?? dialog.task : null
+  const DialogSurface = openedTask ? JourneyDialogSurface : Fragment
+  useEffect(() => {
+    if (!villageEnabled || !practiceTasks.length) return
+    const id = new URLSearchParams(window.location.search).get("task")
+    if (id) {
+      const selected = practiceTasks.find(t => t.id === id)
+      if (selected) {
+        const timer = window.setTimeout(() => {
+          setDialog({type:"task", task:selected});
+          const url = new URL(window.location.href);
+          url.searchParams.delete("task");
+          window.history.replaceState(null,"",url);
+        }, 0);
+        return () => window.clearTimeout(timer);
+      }
+    }
+  }, [villageEnabled, practiceTasks])
+  async function act(task:VillageTask, command:"claim"|"draft"|"submit") {
+    const answer = practice[task.id]?.answer ?? task.answer
+    if (command === "submit" && answer.trim().length < 40) { setNotice("请填写至少 40 个字的成果说明，可附作品链接。"); return }
+    const result = await village.mutate(task, command, answer)
+    if (result) {
+      setPractice(previous => { const next = {...previous}; delete next[task.id]; return next })
+      setNotice(command === "claim" ? "已领取任务" : command === "draft" ? "草稿已保存" : "已提交，等待审核")
+    }
+  }
   const title = module === "dashboard" ? "探索营" : moduleTitles[module]
-  const updateTask = (_id: string, _patch: Partial<PracticeState>) => setNotice("暂未开放")
+  const updateTask = (id: string, patch: Partial<PracticeState>) => {
+    if (!villageEnabled) { setNotice("暂未开放"); return }
+    setPractice(previous => ({
+      ...previous,
+      [id]: { ...(previous[id] ?? { status: "available", answer: "" }), ...patch },
+    }))
+  }
   return (
     <ModuleBorderProvider decoration={decoration}>
       <div className="module-viewport design-viewport" data-screen={module}>
@@ -192,13 +233,15 @@ export function ModuleHub({
           className="module-hub"
           onClickCapture={event=>{
             const target=event.target as HTMLElement;
-            if(module!=="dashboard" && target.closest(".module-page-content") && target.closest("button")) {
+            if(menu!=="profile" && menu!=="map" && module!=="dashboard" && !villageEnabled && !modulePagesEnabled && target.closest(".module-page-content") && target.closest("button")) {
               const button=target.closest("button");
+              if(button?.hasAttribute("data-page-navigation"))return;
               if(button?.closest(".module-filterbar") || button?.closest(".module-filter-tabs"))return;
               event.preventDefault();event.stopPropagation();setNotice("暂未开放");
             }
           }}
           data-module={module}
+          data-world-map={menu === "map" || undefined}
           style={{ zoom: canvasScale }}
         >
           <div className="module-space-background" aria-hidden="true">
@@ -207,7 +250,7 @@ export function ModuleHub({
           <ModuleSidebar
             module={module}
             onNavigate={onNavigate}
-            onLogout={onLogout}
+            onLogout={() => setAccountSwitchOpen(true)}
             onMenu={navigateMenu}
             activeMenu={menu}
             activeDecoration={activeNavigationDecoration}
@@ -222,22 +265,39 @@ export function ModuleHub({
               query={query}
               onQuery={(value) => {
                 setQuery(value)
-                if (menu !== "hall") setMenu("hall")
+                if (menu !== "profile" && menu !== "map" && menu !== "badges" && menu !== "hall" && !(module === "academy" && menu === "saved")) setMenu("hall")
               }}
-              onHome={() => onNavigate("dashboard")}
-              onLogout={onLogout}
+              onHome={() => { setMenu("hall"); setQuery(""); onNavigate("dashboard") }}
+              onProfile={() => {
+                if(menu!=="profile")setProfileReturn(menu)
+                setMenu("profile");setQuery("");pageContent.current?.scrollTo({top:0})
+              }}
             />
-            {module === "dashboard" ? (
+            {module === "dashboard" && menu !== "profile" && menu !== "map" ? (
               <div className="module-dashboard-content">{dashboardContent}</div>
             ) : (
               <div
                 className="module-page-content"
+                data-world-map={menu === "map" || undefined}
                 ref={pageContent}
                 tabIndex={0}
                 role="region"
-                aria-label={`${title}内容，可滚动查看`}
+                aria-label={menu === "map" ? "世界地图内容" : `${title}内容，可滚动查看`}
               >
-                {module !== "guild" ? (
+                {menu === "profile" ? (
+                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>{setMenu("saved");onNavigate("academy")}} />
+                ) : menu === "map" ? (
+                  <WorldMap />
+                ) : module === "academy" && menu === "saved" ? (
+                  <div className="favorite-knowledge-page">
+                    <FavoriteKnowledge headingLevel="h1" courses={academyCourses} favoriteIds={favorites} query={query}
+                      onToggle={() => setNotice("暂未开放")}
+                      onOpen={course => setDialog({type:"course", course})}
+                      onBrowse={() => navigateMenu("hall")} onClearSearch={() => setQuery("")} />
+                  </div>
+                ) : module === "village" && menu === "badges" ? (
+                  <BadgeShop query={query} onTasks={() => {resetTaskFilters(); navigateMenu("hall")}} />
+                ) : module !== "guild" && module !== "dashboard" ? (
                   <>
                     <div className="module-page-heading">
                       <div>
@@ -249,21 +309,16 @@ export function ModuleHub({
                         </p>
                       </div>
                       <div className="module-actions">
+                        {module === "academy" && <button data-page-navigation className="module-secondary favorite-entry" onClick={() => navigateMenu("saved")}><ModuleIcon file="b5cc7" size={18} />我的收藏 <span className="favorite-entry-count">{favorites.length}</span></button>}
                         <button
                           className="module-secondary"
-                          aria-disabled={module === "village" || undefined}
+                          aria-disabled={(module === "village" && !villageEnabled) || undefined}
                           onClick={() =>
                             module === "village"
-                              ? undefined
+                              ? navigateMenu("hall")
                               : info(
                                   "学习记录",
-                                  learned.length
-                                    ? academyCourses
-                                        .filter((c) => learned.includes(c.id))
-                                        .map((c) => `已完成 · ${c.title}`)
-                                        .join("\n") +
-                                        `\n本次演示经验：${learned.length * 50} XP，未写入正式账户。`
-                                    : "本次会话还没有完成的课程。查看课程介绍后，可以标记当前学习完成。",
+                                  "学习记录暂未开放。",
                                 )
                           }
                         >
@@ -287,20 +342,15 @@ export function ModuleHub({
                       <ModuleHero
                         module={module}
                         onContinue={() => {
-                          if (module === "village")
-                            setDialog({
-                              type: "task",
-                              task: accepted[0] || practiceTasks[0],
-                            })
-                          else
-                            setDialog({
-                              type: "course",
-                              course:
-                                academyCourses.find(
-                                  (c) =>
-                                    !c.unavailable && !learned.includes(c.id),
-                                ) || academyCourses[0],
-                            })
+                          if (module === "village") {
+                            const first = accepted.find(task => ["active", "returned"].includes(task.status)) || practiceTasks[0]
+                            if (first) setDialog({type:"task",task:first})
+                            else { setNotice(village.loading ? "任务正在读取，请稍候。" : "暂时没有已发布的任务。"); scrollToListing() }
+                          } else {
+                            const course = academyCourses.find(c => !c.unavailable) || academyCourses[0]
+                            if (course) setDialog({type:"course", course})
+                            else info("AI 探索", "课程内容暂未开放。")
+                          }
                         }}
                         title={
                           module === "village"
@@ -322,7 +372,7 @@ export function ModuleHub({
                         <div className="module-row">
                           <h3>
                             {module === "village"
-                              ? "本周实践目标"
+                              ? "我的实践进度"
                               : "本周探索任务"}
                           </h3>
                           <ModuleIcon
@@ -332,23 +382,24 @@ export function ModuleHub({
                         </div>
                         <p className="module-weekly-count">
                           <strong>
-                            —
+                            {villageEnabled ? completed.length : "—"}
                           </strong>
                           <span>
-                            / — {module === "village" ? "个任务" : "门课程"}
+                            / {villageEnabled ? accepted.length : "—"} {module === "village" ? "个任务" : "门课程"}
                           </span>
                         </p>
                         <div
                           className="module-progress-track"
                           role="progressbar"
-                          aria-label="本周进度"
+                          aria-label={module === "village" ? "我的任务完成进度" : "本周进度"}
                           aria-valuemin={0}
-                          aria-valuemax={3}
-                          aria-valuetext="暂未开放"
+                          aria-valuemax={Math.max(accepted.length, 1)}
+                          aria-valuenow={villageEnabled ? completed.length : undefined}
+                          aria-valuetext={villageEnabled ? undefined : "暂未开放"}
                         >
                           <i
                             style={{
-                              width: `${(Math.min(module === "village" ? completed.length : learned.length, 3) / 3) * 100}%`,
+                              width: `${((module === "village" ? completed.length : learned.length) / Math.max(accepted.length, 1)) * 100}%`,
                             }}
                           />
                         </div>
@@ -359,62 +410,19 @@ export function ModuleHub({
                               : "每完成一门"}
                           </span>
                           <span className="module-cyan">
-                            暂未开放
+                            {villageEnabled ? "点亮能力" : "暂未开放"}
                           </span>
                         </div>
                         <blockquote>
-                          暂未开放
+                          {villageEnabled ? `已接取 ${accepted.length} 项 · 待审核 ${pending.length} 项。提交不等于完成，审核通过后才算完成。` : "暂未开放"}
                         </blockquote>
                       </ModulePanel>
                     </div>
                     <div ref={listing} className="module-listing">
-                      <div className="module-filterbar">
-                        <div
-                          className="module-tabs"
-                          role="group"
-                          aria-label={
-                            module === "village" ? "任务分类" : "课程分类"
-                          }
-                        >
-                          {(module === "village"
-                            ? [
-                                "全部",
-                                "产品开发",
-                                "技术开发",
-                                "数据交付",
-                                "PMO",
-                                "AI 评测",
-                                "质量检测",
-                              ]
-                            : ["全部", "管理员外链", "平台视频", "员工共建"]
-                          ).map((category) => (
-                            <button
-                              key={category}
-                              className={filter === category ? "is-active" : ""}
-                              aria-pressed={filter === category}
-                              onClick={() => setFilter(category)}
-                            >
-                              {category === "全部"
-                                ? module === "village"
-                                  ? "全部任务"
-                                  : "全部课程"
-                                : category}
-                              <span>
-                                {module === "village"
-                                  ? practiceTasks.filter(
-                                      (t) =>
-                                        category === "全部" ||
-                                        t.category === category,
-                                    ).length
-                                  : academyCourses.filter(
-                                      (c) =>
-                                        category === "全部" ||
-                                        c.category === category,
-                                    ).length}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                      <div className={`module-filterbar ${module === "village" ? "is-task-filter" : ""}`}>
+                        {module === "village" ? <TaskClassifications tasks={taskPool} department={taskDepartment} level={taskLevel} review={taskReview} badgeType={taskBadgeType}
+                          onDepartment={setTaskDepartment} onLevel={setTaskLevel} onReview={setTaskReview} onBadgeType={setTaskBadgeType} onReset={resetTaskFilters} /> :
+                          <div className="module-tabs" role="group" aria-label="课程分类">{["全部", "管理员外链", "平台视频", "员工共建"].map(category => <button key={category} className={filter === category ? "is-active" : ""} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category === "全部" ? "全部课程" : category}<span>{academyCourses.filter(c => category === "全部" || c.category === category).length}</span></button>)}</div>}
                         <label className="module-sort">
                           排序
                           <select
@@ -438,7 +446,7 @@ export function ModuleHub({
                             ? `${visibleTasks.length} 个任务 · ${
                                 menu === "mine"
                                   ? "我的任务"
-                                  : "选择一个方向，完成你的第一次实践"
+                                  : taskDepartmentName(taskDepartment)
                               }`
                             : `${visibleCourses.length} 门课程 · ${
                                 menu === "saved"
@@ -447,88 +455,15 @@ export function ModuleHub({
                               }`}
                         </span>
                         <span className="module-demo-label">
-                          暂未开放
+                          {villageEnabled ? "所有学员均可领取" : "暂未开放"}
                         </span>
                       </div>
+                      {villageEnabled && village.loading && <p role="status">正在读取任务…</p>}
+                      {villageEnabled && village.error && <p role="alert">{village.error} <button onClick={() => void village.refresh()}>重试</button></p>}
                       {module === "village" ? (
                         <div className="module-cards-grid">
-                          {visibleTasks.map((task, index) => (
-                            <ModulePanel
-                              className="module-task-card"
-                              key={task.id}
-                            >
-                              <div className="module-row">
-                                <span className="module-tag">
-                                  {task.category}
-                                </span>
-                                <ModuleStatus status={taskStatus(task.id)} />
-                              </div>
-                              <button
-                                className="module-card-title"
-                                onClick={() =>
-                                  setDialog({ type: "task", task })
-                                }
-                              >
-                                {task.title}
-                              </button>
-                              <time className="module-small module-muted">
-                                示例发布 · 2026/10/
-                                {18 - practiceTasks.indexOf(task)} 10:30
-                              </time>
-                              <p className="module-card-description">
-                                {task.description}
-                              </p>
-                              <div className="module-meta">
-                                <span>{task.level}</span>
-                                <span>{task.minutes} 分钟</span>
-                                <span>{task.review}</span>
-                              </div>
-                              <div className="module-reward-box">
-                                <div className="module-rewards">
-                                  {[
-                                    ["经验值", task.experience],
-                                    ["任务点", task.points],
-                                    ["徽章点", task.points],
-                                  ].map(([label, value]) => (
-                                    <div key={label}>
-                                      <small>{label}</small>
-                                      <strong>+{value}</strong>
-                                    </div>
-                                  ))}
-                                </div>
-                                {task.badges.map(([badge, percent]) => (
-                                  <div
-                                    className="module-badge-allocation"
-                                    key={badge}
-                                  >
-                                    <span>
-                                      {badge}徽章 <small>{percent}%</small>
-                                    </span>
-                                    <span>
-                                      +{(task.points * percent) / 100} 点
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="module-card-footer">
-                                <div className="module-author">
-                                  <span className="module-avatar">
-                                    {task.mentor[0]}
-                                  </span>
-                                  <span>
-                                    {task.mentor}
-                                    <small>任务发布人</small>
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    setDialog({ type: "task", task })
-                                  }
-                                >
-                                  查看任务 →
-                                </button>
-                              </div>
-                            </ModulePanel>
+                          {visibleTasks.map(task => (
+                            <VillageTaskCard key={task.id} task={task} onOpen={() => setDialog({ type: "task", task })} />
                           ))}
                         </div>
                       ) : (
@@ -557,37 +492,7 @@ export function ModuleHub({
                                     />
                                     {course.category}
                                   </span>
-                                  <button
-                                    className={`module-favorite${
-                                      favorites.includes(course.id)
-                                        ? " is-saved"
-                                        : ""
-                                    }`}
-                                    aria-label={`${
-                                      favorites.includes(course.id)
-                                        ? "取消收藏"
-                                        : "收藏"
-                                    } ${course.title}`}
-                                    aria-pressed={favorites.includes(course.id)}
-                                    onClick={() =>
-                                      setFavorites((previous) =>
-                                        previous.includes(course.id)
-                                          ? previous.filter(
-                                              (id) => id !== course.id,
-                                            )
-                                          : [...previous, course.id],
-                                      )
-                                    }
-                                  >
-                                    <ModuleIcon
-                                      file={
-                                        favorites.includes(course.id)
-                                          ? "b5cc7"
-                                          : "cdc4e"
-                                      }
-                                      size={21}
-                                    />
-                                  </button>
+                                  <KnowledgeSaveButton course={course} saved={favorites.includes(course.id)} onToggle={() => setNotice("暂未开放")} />
                                 </div>
                                 <button
                                   className="module-course-cover"
@@ -673,19 +578,19 @@ export function ModuleHub({
                         </div>
                       )}
                       {(module === "village"
-                        ? !visibleTasks.length
+                        ? !visibleTasks.length && !village.loading && !village.error
                         : !visibleCourses.length) && (
                         <ModulePanel className="module-empty">
                           <h3>
-                            暂未开放
+                            {villageEnabled ? (menu === "mine" ? "还没有接取任务" : !practiceTasks.length ? "暂无已发布任务" : "未找到匹配内容") : "暂未开放"}
                           </h3>
-                          <p>该板块暂未开放。</p>
+                          <p>{villageEnabled ? (!practiceTasks.length ? "管理员发布新手村任务后，会在这里显示。" : "试试其他分类或清空搜索词。") : "该板块暂未开放。"}</p>
                           <button
                             className="module-secondary"
                             onClick={() => {
                               setMenu("hall")
                               setFilter("全部")
-                              setQuery("")
+                              resetTaskFilters()
                             }}
                           >
                             查看全部
@@ -725,7 +630,7 @@ export function ModuleHub({
                     onClick={() =>
                       info(
                         "配色与演示说明",
-                        "三个新板块统一使用 19 个语义基础色，标签沿用探索营的状态规范：进行中为青色，待审核为金色，已完成为绿色，待解锁为灰蓝。插画与照片保留设计原貌，不计入界面配色。新示例操作仅在本次会话中体验；原有探索营和发布任务记录不受影响。",
+                        "新手村展示管理员发布的任务，所有学员均可领取。领取后可保存草稿、提交成果并查看审核反馈；退回的任务修改后可再次提交。",
                       )
                     }
                   >
@@ -742,12 +647,13 @@ export function ModuleHub({
           )}
           <dialog
             ref={modal}
-            className="module-dialog"
+            className={`module-dialog${openedTask ? " journey-dialog village-task-dialog" : ""}`}
             onCancel={() => setDialog(null)}
             onClick={(event) => {
               if (event.target === event.currentTarget) setDialog(null)
             }}
           >
+            <DialogSurface>
             <div className="module-dialog-heading">
               <span className="module-eyebrow">
                 {title} /{" "}
@@ -761,80 +667,42 @@ export function ModuleHub({
                 关闭 ×
               </button>
             </div>
-            {dialog?.type === "task" && (
+            {openedTask && (
               <>
-                <div className="module-row">
-                  <span className="module-tag">{dialog.task.category}</span>
-                  <ModuleStatus status={taskStatus(dialog.task.id)} />
-                </div>
-                <h2>{dialog.task.title}</h2>
-                <p>{dialog.task.description}</p>
-                <div className="module-meta">
-                  <span>{dialog.task.level}</span>
-                  <span>{dialog.task.minutes} 分钟</span>
-                  <span>{dialog.task.review}</span>
-                </div>
-                <h3>任务要求</h3>
-                <ol>
-                  {dialog.task.requirements.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ol>
-                <h3>通关标准</h3>
-                <p>
-                  问题理解 30% · 方案完整性 40% · 证据与表达 30%。示例及格线 60
-                  分，审核通过后才算完成。
-                </p>
-                <div className="module-demo-note">
-                  这是设计稿中的练习示例。本次接取和提交不写入正式账户，也不会调用
-                  AI
-                  或自动通过审核。
-                </div>
-                {taskStatus(dialog.task.id) === "available" ? (
-                  <button
-                    className="module-primary"
-                    onClick={() =>
-                      updateTask(dialog.task.id, { status: "active" })
-                    }
-                  >
-                    接取任务 →
-                  </button>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      const answer = practice[dialog.task.id]?.answer || ""
-                      if (answer.trim().length < 20) {
-                        setNotice("请填写至少 20 个字的成果说明或作品链接。")
-                        return
-                      }
-                      updateTask(dialog.task.id, { status: "pending" })
-                      setNotice(
-                        "本次演示提交已进入待审核，不会自动完成或发放奖励。",
-                      )
-                    }}
-                  >
-                    <label className="module-field">
-                      成果说明或作品链接
-                      <textarea
-                        required
-                        minLength={20}
-                        rows={5}
-                        disabled={taskStatus(dialog.task.id) === "pending"}
-                        value={practice[dialog.task.id]?.answer || ""}
-                        onChange={(e) =>
-                          updateTask(dialog.task.id, { answer: e.target.value })
-                        }
-                        placeholder="写下你的分析过程、结果与作品链接…"
-                      />
+                <div className="module-row"><div className="task-department-labels"><span className="module-tag">{openedTask.publishingDepartment || "部门待补充"}</span></div><ModuleStatus status={openedTask.status}/></div>
+                <h2>{openedTask.title}</h2><p>{openedTask.description}</p>
+                <div className="module-meta"><span>{openedTask.level}</span><span>{openedTask.minutes} 分钟</span><span>{openedTask.review}</span></div>
+                <VillageTaskRewards task={openedTask} />
+                <h3>学习材料</h3>
+                <ul>{openedTask.materials.map((material,index) => <li key={index}>
+                  {material.url ? <a className="module-cyan" href={material.url} target="_blank" rel="noopener noreferrer">{material.name} ↗</a> : <strong>{material.name}</strong>}
+                  {material.text && <p style={{whiteSpace:"pre-wrap"}}>{material.text}</p>}
+                </li>)}</ul>
+                <section className="village-task-instructions">
+                  <h3>任务要求</h3>
+                  <ol className="village-task-instructions-body">{openedTask.requirements.map(r=><li key={r}>{r}</li>)}</ol>
+                </section>
+                <section className="village-task-instructions">
+                  <h3>通关标准</h3>
+                  <div className="village-task-instructions-body">{openedTask.criteria.map(c=><p key={c}>{c}</p>)}</div>
+                </section>
+                {openedTask.status === "available" && openedTask.unlockTaskPoints > 0 && <div className="module-demo-note">解锁需 {openedTask.unlockTaskPoints} 任务点，每人仅扣除一次。{village.wallet && `当前可用 ${village.wallet.taskPoints} 任务点。`}</div>}
+                {openedTask.rubric.length > 0 && <><p>评分参考 · 及格线 {openedTask.passScore} 分，最终以人工审核为准。</p><ul>{openedTask.rubric.map(r=><li key={r.id}>{r.name} · {r.points} 分：{r.description}</li>)}</ul></>}
+                {openedTask.feedback && <div className="module-demo-note"><strong>{openedTask.feedback.decision === "PASS" ? "审核通过" : "返回修改"}</strong><p style={{whiteSpace:"pre-wrap"}}>{openedTask.feedback.text}</p><time>{new Date(openedTask.feedback.at).toLocaleString("zh-CN")}</time></div>}
+                {notice && <p role="status">{notice}</p>}
+                {village.error && <p role="alert">{village.error}</p>}
+                {openedTask.status === "available" ? <button className="module-primary module-claim-action" disabled={village.busy} onClick={()=>void act(openedTask,"claim")}>{village.busy ? "正在领取…" : "接取任务 →"}</button> : (
+                  <form onSubmit={e=>{e.preventDefault();void act(openedTask,"submit")}}>
+                    <label className="module-field">成果说明或作品链接
+                      <textarea required minLength={40} maxLength={8000} rows={5}
+                        disabled={village.busy || !["active","returned"].includes(openedTask.status)}
+                        value={practice[openedTask.id]?.answer ?? openedTask.answer}
+                        onChange={e=>updateTask(openedTask.id,{answer:e.target.value})}
+                        placeholder="写下你的分析过程、结果与作品链接（至少 40 字）…"/>
                     </label>
-                    <button
-                      className="module-primary"
-                      disabled={taskStatus(dialog.task.id) === "pending"}
-                    >
-                      {taskStatus(dialog.task.id) === "pending"
-                        ? "已提交，等待审核"
-                        : "提交当前"}
+                    {["active","returned"].includes(openedTask.status) && <button type="button" className="module-secondary" disabled={village.busy} onClick={()=>void act(openedTask,"draft")}>保存草稿</button>}
+                    <button className="module-primary" disabled={village.busy || !["active","returned"].includes(openedTask.status)}>
+                      {village.busy ? "正在保存…" : openedTask.status === "pending" ? "已提交，等待审核" : openedTask.status === "completed" ? "已完成" : openedTask.status === "returned" ? "重新提交审核" : "提交审核"}
                     </button>
                   </form>
                 )}
@@ -872,24 +740,14 @@ export function ModuleHub({
                       {dialog.course.category === "平台视频"
                         ? "设计稿未提供视频文件，本页展示课程介绍，不模拟视频播放。"
                         : "设计稿未提供真实课程地址，本页展示课程介绍，不跳转到虚构资料。"}{" "}
-                      学习完成仅用于本次会话演示。
+                      学习进度功能暂未开放。
                     </div>
                     <button
                       className="module-primary"
                       disabled={learned.includes(dialog.course.id)}
-                      onClick={() => {
-                        const id = dialog.course.id
-                        setLearned((prev) =>
-                          prev.includes(id) ? prev : [...prev, id],
-                        )
-                        setNotice(
-                          "当前学习已完成，+50 XP（仅演示，不写入正式经验）。",
-                        )
-                      }}
+                      onClick={() => setNotice("暂未开放")}
                     >
-                      {learned.includes(dialog.course.id)
-                        ? "当前已完成"
-                        : "标记当前学习完成"}
+                      暂未开放
                     </button>
                   </>
                 )}
@@ -901,6 +759,7 @@ export function ModuleHub({
                 <p className="module-info-body">{dialog.body}</p>
               </>
             )}
+            {dialog && !openedTask && notice && <p role="status">{notice}</p>}
             {dialog?.type === "share" && (
               <>
                 <h2>分享我的发现</h2>
@@ -908,18 +767,7 @@ export function ModuleHub({
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
-                    const form = new FormData(e.currentTarget)
-                    const url = String(form.get("url"))
-                    if (!/^https?:\/\//i.test(url)) {
-                      setNotice("请填写 http:// 或 https:// 开头的资源链接。")
-                      return
-                    }
-                    setShared((previous) => [
-                      ...previous,
-                      { title: String(form.get("title")), url },
-                    ])
-                    setDialog(null)
-                    setNotice("共建提案已加入本次演示列表，尚未发送至后台。")
+                    setNotice("暂未开放")
                   }}
                 >
                   <label className="module-field">
@@ -951,13 +799,15 @@ export function ModuleHub({
                     />
                   </label>
                   <div className="module-demo-note">
-                    仅创建本次会话的演示提案，不会发布到公开课程列表。
+                    分享功能暂未开放，当前可查看表单。
                   </div>
-                  <button className="module-primary">提交演示提案</button>
+                  <button type="button" className="module-primary" onClick={() => setNotice("暂未开放")}>暂未开放</button>
                 </form>
               </>
             )}
+            </DialogSurface>
           </dialog>
+          <AccountSwitchDialog open={accountSwitchOpen} onClose={()=>setAccountSwitchOpen(false)} />
           <WelcomeNameDialog open={nicknameRequired} decoration={decoration} onSave={saveLearnerNickname} />
 
         </main>
@@ -1024,8 +874,8 @@ function GuildPage({
         onContinue={onCertification}
         onIdentity={() =>
           info(
-            "我的公会身份 · 示例",
-            `学员 ${identity} · ${guild} 岗位公会\n等级 L2 · 交付实践者\n已验收作品 1 件 · 公会贡献 20\n这些是设计展示数据，不代表你的正式认证结果。`,
+            "我的公会身份",
+            "暂未开放",
           )
         }
         title={`${guild} 岗位公会`}
@@ -1172,7 +1022,7 @@ function GuildPage({
                 onClick={() =>
                   info(
                     "公会导师",
-                    "陈远 · 交付与协同\n周予安 · 数据质量\n许嘉宁 · 风险管理\n以上为示例导师，未提供真实联系方式。",
+                    "导师名单暂未开放。",
                   )
                 }
               >
@@ -1204,6 +1054,7 @@ function GuildPage({
               <h3>同行正在发生</h3>
               <ModuleIcon pack="guild" file="0c0f8" />
             </div>
+            <p className="module-muted" role="status">暂未开放</p>
             {([] as string[][]).map(([letter, heading, text]) => (
               <div className="module-peer" key={letter}>
                 <span className="module-avatar">{letter}</span>

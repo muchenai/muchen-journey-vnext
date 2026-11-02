@@ -33,6 +33,57 @@ const {JourneyProvider}=load(path.join(root,'app/project29/journey-context.tsx')
 const {TaskCards,ExecutionView,executionTasks}=load(path.join(root,'app/project29/ExecutionPages.tsx'));
 const {SelfCheckHistory}=load(path.join(root,'app/project29/SelfCheckHistory.tsx'));
 const {ReviewNotificationPanel}=load(path.join(root,'app/project29/ReviewNotificationBell.tsx'));
+const {VillageTaskCard,VillageTaskRewards}=load(path.join(root,'app/project29/VillageTaskCard.tsx'));
+const {FavoriteKnowledge}=load(path.join(root,'app/project29/FavoriteKnowledge.tsx'));
+const {PersonalProfileView}=load(path.join(root,'app/project29/PersonalProfile.tsx'));
+const {AccountSwitchDialog}=load(path.join(root,'app/project29/AccountSwitchDialog.tsx'));
+
+test('personal profile shows actual rewards and unavailable features without demo identity or level',()=>{
+  const props={name:'真实学员',wallet:{xp:200,badgeBalances:{product:20,data:5}},error:'',onRetry(){},onBack(){},onAcademy(){}};
+  const html=renderToStaticMarkup(React.createElement(PersonalProfileView,props));
+  assert.match(html,/真实学员/);assert.match(html,/200/);assert.match(html,/20 点/);assert.match(html,/5 点/);
+  assert.match(html,/成长等级暂未开放/);assert.match(html,/沐晨商城积分/);assert.match(html,/我的徽章墙/);
+  assert.doesNotMatch(html,/1,250|Lv\.3|洞察新星|演示成长|预览身份/);
+  const failed=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,error:'读取失败'}));
+  assert.match(failed,/读取失败/);assert.match(failed,/重新加载/);assert.doesNotMatch(failed,/200|20 点/);
+});
+
+test('identity selection exposes independent staff login and a learner logout form',()=>{
+  const html=renderToStaticMarkup(React.createElement(AccountSwitchDialog,{open:true,onClose(){}}));
+  assert.match(html,/以哪种身份继续探索/);assert.match(html,/切换账号/);
+  assert.match(html,/href="\/review" target="_blank" rel="noopener noreferrer"/);
+  assert.match(html,/<form/);assert.match(html,/type="submit"/);
+  assert.doesNotMatch(html,/登录地址尚未配置|111|333/);
+});
+
+test('project30 task cards use canonical badge allocations, not task points or fractional weights',()=>{
+  const task={id:'card',title:'真实发布任务',category:'产品开发',description:'真实简介',level:'挑战',
+    minutes:90,experience:150,points:0,review:'人工审核',mentor:'发布人',publishedAt:'2026-10-29T08:00:00Z',
+    badges:[['产品开发',50],['财法合规',50]],rewardAllocations:[{id:'product',points:8},{id:'finance-compliance',points:7}]};
+  for(const [status,label] of [['available','可接取'],['active','正在进行中'],['returned','需修改'],['pending','待审核'],['completed','已完成']]){
+    const html=renderToStaticMarkup(React.createElement(VillageTaskCard,{task:{...task,status},onOpen(){}}));
+    assert.match(html,/真实发布任务/);assert.match(html,/150<!-- --> XP|150 XP/);
+    assert.ok(html.includes(label),label);
+    assert.match(html,/产品开发徽章点/);assert.match(html,/财法合规徽章点/);
+    assert.match(html,/\+8 点/);assert.match(html,/\+7 点/);
+    assert.doesNotMatch(html,/7\.5|任务点|示例发布|50%/);
+  }
+});
+
+test('village detail rewards preserve published values and handle unconfigured badges',()=>{
+  const html=renderToStaticMarkup(React.createElement(VillageTaskRewards,{task:{experience:200,points:999,rewardAllocations:[{id:'product',points:20}]}}));
+  assert.match(html,/审核通过后的奖励/);assert.match(html,/200 XP/);
+  assert.match(html,/产品开发徽章点/);assert.match(html,/\+20 点/);
+  assert.doesNotMatch(html,/999|3\.5|1\.5/);
+  const empty=renderToStaticMarkup(React.createElement(VillageTaskRewards,{task:{experience:0,rewardAllocations:[]}}));
+  assert.match(empty,/暂未配置徽章点/);assert.match(empty,/0 XP/);
+});
+
+test('project30 favorites empty state never imports demo collections',()=>{
+  const html=renderToStaticMarkup(React.createElement(FavoriteKnowledge,{courses:[],favoriteIds:['prompt','design'],query:'',onToggle(){},onOpen(){},onBrowse(){}}));
+  assert.match(html,/暂未开放/);assert.match(html,/共 0 条收藏/);assert.match(html,/data-page-navigation/);
+  assert.doesNotMatch(html,/module-tag">L2|示例学习|\+50 XP/);
+});
 
 test('review notification panel contains only reminders and independent read actions',()=>{
   const props={panelId:'notifications',unread:1,busy:false,loading:false,loaded:true,error:'',cursor:'next',
@@ -124,4 +175,15 @@ test('phone nickname setup renders the supplied welcome dialog over the explorat
   assert.match(html,/确认姓名，进入探索营/);
   assert.match(html,/updated-dashboard/);
   assert.doesNotMatch(html,/当前为前端演示|仅保存在本机浏览器|code-field|autocomplete="current-password"/i);
+});
+
+test('released village uses real departments and does not render demo tasks',()=>{
+  const {practiceTasks}=load(path.join(root,'app/project29/moduleDemoData.ts'));
+  const {taskDepartments}=load(path.join(root,'app/project29/taskDepartments.ts'));
+  const html=render({initialScreen:'village'});
+  for(const department of taskDepartments) assert.ok(html.includes(department.name),department.name);
+  for(const task of practiceTasks) assert.ok(!html.includes(task.title));
+  assert.match(html,/正在读取任务/);
+  assert.doesNotMatch(html,/示例内容 · 本次会话体验/);
+  for(const initialScreen of ['academy','guild']) assert.match(render({initialScreen}),/暂未开放/);
 });
