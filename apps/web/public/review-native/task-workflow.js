@@ -1,5 +1,5 @@
 // Compare editable content only, excluding versions, statistics and browser timestamps.
-const fields = ['title','summary','camp','domain','difficulty','unlockTaskPoints','badges','materials','reviewMode','passScore','rubric','rubricAttachments'];
+const fields = ['title','summary','camp','domain','publishingDepartment','difficulty','unlockTaskPoints','badges','materials','reviewMode','passScore','rubric','rubricAttachments'];
 export function editableContent(task) {
   return Object.fromEntries(fields.map(key => [key, task[key] ?? (key==='unlockTaskPoints' ? 0 : ['badges','materials','rubric','rubricAttachments'].includes(key) ? [] : '')]));
 }

@@ -1,4 +1,4 @@
-import { escapeHtml as e, icon } from './core.js?v=20261029-reward-types';
+import { escapeHtml as e, icon } from './core.js?v=20261030-member-action-spacing';
 
 const MAX_ANSWER_LENGTH = 20000;
 const clone = value => JSON.parse(JSON.stringify(value));

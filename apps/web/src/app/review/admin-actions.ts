@@ -48,9 +48,14 @@ export async function decideAdminReview(id: string, command: { expected_revision
   method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(command),
  }));
 }
-export async function certifyMember(member: Member, domain: string, level: string): Promise<Result<unknown>> {
+export async function certifyMember(member: Member, domain: string, level: string, department?: string): Promise<Result<unknown>> {
  return safely(() => apiRequest(`/api/v1/review-admin/members/${encodeURIComponent(member.id)}/certification`, "OPERATOR", {
-  method: "PUT", body: JSON.stringify({ expected_revision: member.revision, domain, level }),
+  method: "PUT", body: JSON.stringify({ expected_revision: member.revision, domain, level, department }),
+ }));
+}
+export async function updateMemberDepartment(member: Member, department: string): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/members/${encodeURIComponent(member.id)}/department`, "REVIEWER", {
+  method: "PUT", body: JSON.stringify({ expected_revision: member.departmentRevision ?? 0, department }),
  }));
 }
 export async function testAdminTask(task: AdminTask, answer: string): Promise<Result<{ result: string; model: string }>> {
@@ -67,9 +72,14 @@ export async function bulkAdministratorAction(action: "departments" | "preview" 
   method: "POST", body: JSON.stringify(payload),
  }));
 }
-export async function grantAdministrator(payload: { open_id: string; expected_revision: number; domain: string; level: string; access_role?: "admin" | "super_admin" }): Promise<Result<unknown>> {
+export async function grantAdministrator(payload: { open_id: string; expected_revision: number; domain: string; department?: string; level: string; access_role?: "admin" | "super_admin" }): Promise<Result<unknown>> {
  return safely(() => apiRequest("/api/v1/review-admin/members/grant", "REVIEWER", { method: "POST", body: JSON.stringify(payload) }));
 }
 export async function revokeAdministrator(id: string, revision: number): Promise<Result<unknown>> {
  return safely(() => apiRequest(`/api/v1/review-admin/members/${encodeURIComponent(id)}/revoke`, "REVIEWER", { method: "POST", body: JSON.stringify({expected_revision: revision, confirmed: true}) }));
+}
+export async function demoteAdministrator(id: string, revision: number, level: string): Promise<Result<unknown>> {
+ return safely(() => apiRequest(`/api/v1/review-admin/members/${encodeURIComponent(id)}/demote`, "REVIEWER", {
+  method: "POST", body: JSON.stringify({ expected_revision: revision, level, confirmed: true }),
+ }));
 }

@@ -27,6 +27,8 @@ from journey_api.review_ai_self_checks import review_document_ai_checks
 from journey_api.learner_phone import read_verified_phone
 from journey_api.schemas import FinalizeReviewCommand, RevisionCommand, PublishTaskVersionCommand
 
+from journey_api.publishing_departments import PublishingDepartment
+
 router = APIRouter(prefix="/api/v1/review-admin")
 DOMAINS = ["产品开发", "数据交付", "技术开发", "PMO", "AI评测", "质量检测", "项目管理", "AI 能力"]
 from journey_api.novice_economy import POINT_NAMES, PRESETS
@@ -239,6 +241,7 @@ class TaskContent(BaseModel):
     summary: str = Field(default="", max_length=2000)
     camp: Literal["exploration", "novice"] = "novice"
     domain: str = "产品开发"
+    publishingDepartment: PublishingDepartment | Literal[""] = ""
     difficulty: Literal["入门", "进阶", "挑战"] = "入门"
     unlockTaskPoints: int = Field(default=0, strict=True, ge=0, le=1000000)
     rewardRulesVersion: Literal[1, 2, 3] = 3
@@ -312,6 +315,8 @@ class PublishTask(BaseModel):
 
 def task_content_for_publish(content):
     d = TaskContent.model_validate(content)
+    if not d.publishingDepartment:
+        raise ApiError(422, "VALIDATION_FAILED", "请选择发布部门。")
     if len(d.title.strip()) < 3:
         raise ApiError(422, "VALIDATION_FAILED", "任务标题至少需要 3 个字。")
     if len(d.summary.strip()) < 10:
@@ -554,6 +559,9 @@ def members(request: Request, actor: Actor=Depends(get_actor), session: Session=
         User.organization_id==actor.organization_id,User.status==UserStatus.ACTIVE,
         or_(RoleAssignment.role.in_(STAFF_ROLES), ReviewAdminAccess.user_id.is_not(None))).distinct()).all()
     profiles = cached_directory_profiles(session, actor, [u.id for u in users])
+    certifications = {c.user_id: c for c in session.scalars(select(ReviewAdminCertification).where(
+        ReviewAdminCertification.organization_id == actor.organization_id,
+        ReviewAdminCertification.user_id.in_([u.id for u in users])))}
     result=[]
     for u in users:
         roles=[r.value for r in session.scalars(select(RoleAssignment.role).where(RoleAssignment.user_id==u.id,
@@ -565,8 +573,10 @@ def members(request: Request, actor: Actor=Depends(get_actor), session: Session=
                        "departments":profile.get('departments') or [],
                        "department_paths":profile.get('department_paths') or [],
                        "roles":roles,"revision":a.revision if a else 0,
+                       "protectedAdmin":bool(a and a.can_grant_super_admin),
                        "accessRole":a.access_role if a else "admin", "status":"revoked" if a and a.revoked_at else "active",
-                       "certification":{"domain":a.domain if a else "产品开发","level":a.level if a else "初级"}})
+                       "departmentRevision":certifications[u.id].revision if u.id in certifications else 0,
+                       "certification":{"domain":a.domain if a else "产品开发","department":certifications[u.id].content.get("department", "") if u.id in certifications else "","level":a.level if a else "初级"}})
     return envelope(request,{"items":result,"actor_id":str(actor.id)})
 
 
@@ -631,8 +641,23 @@ def search_directory(request:Request, q:str=Query(min_length=1,max_length=60), a
         identity=session.scalar(select(ExternalIdentity).where(ExternalIdentity.provider=="FEISHU",ExternalIdentity.subject==directory_subject(profile["open_id"])))
         row=access_for(session,identity.user_id,actor.organization_id) if identity and identity.organization_id==actor.organization_id else None
         items.append({**profile,"revision":row.revision if row else 0,
+                      "member_id":str(identity.user_id) if identity and identity.organization_id==actor.organization_id and not identity.revoked_at else None,
                       "access_status":"revoked" if row and row.revoked_at else "active" if row else "ungranted"})
     return envelope(request,{**result,"items":items})
+
+
+def save_member_department(session, organization_id, user_id, department):
+    # Older callers and bulk grants keep their existing metadata. Do not infer a department from a domain.
+    if department is None:
+        return
+    record = session.get(ReviewAdminCertification, user_id)
+    if record and record.organization_id != organization_id:
+        raise ApiError(403, "FORBIDDEN", "不能修改其他组织的认证信息。")
+    if record is None:
+        record = ReviewAdminCertification(user_id=user_id, organization_id=organization_id, revision=0, content={})
+        session.add(record)
+    record.content = {**record.content, "department": department}
+    record.revision += 1
 
 
 class GrantAdministrator(BaseModel):
@@ -640,8 +665,37 @@ class GrantAdministrator(BaseModel):
     open_id:str=Field(pattern=r"^ou_[A-Za-z0-9_-]{1,170}$")
     expected_revision:int=Field(default=0,ge=0)
     domain:str="产品开发"
+    department:PublishingDepartment | None = None
     level:Literal["初级","中级","高级"]="初级"
     access_role:Literal["admin","super_admin"]="admin"
+
+
+class MemberDepartment(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    expected_revision:int=Field(ge=0)
+    department:PublishingDepartment
+
+
+@router.put("/members/{user_id}/department")
+def update_member_department(user_id:uuid.UUID, command:MemberDepartment, request:Request,
+                             actor:Actor=Depends(get_actor),session:Session=Depends(get_db)):
+    require_super(session,actor)
+    user=session.scalar(select(User).where(User.id==user_id,User.organization_id==actor.organization_id,
+                                         User.status==UserStatus.ACTIVE).with_for_update())
+    if not user or str(user_id) not in {m["id"] for m in members(request,actor,session)["data"]["items"]}:
+        raise ApiError(404,"NOT_FOUND","管理成员不存在。")
+    access=access_for(session,user_id,actor.organization_id,lock=True)
+    record=session.get(ReviewAdminCertification,user_id)
+    if (record.revision if record else 0)!=command.expected_revision:
+        raise ApiError(409,"VERSION_CONFLICT","部门信息已更新，请刷新后重试。")
+    previous=record.content.get("department", "") if record else ""
+    save_member_department(session,actor.organization_id,user_id,command.department)
+    if access:
+        access.revision+=1
+    audit(session,request,actor,"review_admin.member_department_updated",user_id,
+          {"previous_department":previous,"department":command.department})
+    session.commit()
+    return members(request,actor,session)
 
 
 @router.post("/members/grant")
@@ -667,15 +721,19 @@ def grant_administrator(command:GrantAdministrator,request:Request,actor:Actor=D
         session.flush()
         session.add(ExternalIdentity(id=uuid.uuid4(),organization_id=actor.organization_id,user_id=user.id,
             provider="FEISHU",subject=subject,revision=1))
+    session.scalar(select(User.id).where(User.id==user.id).with_for_update())
     row=access_for(session,user.id,actor.organization_id,lock=True)
-    if user.id==actor.id or row and row.access_role=="super_admin":
+    if user.id==actor.id or row and (row.can_grant_super_admin or row.access_role=="super_admin" and
+            (not row.revoked_at or not permissions(session,actor)["canGrantSuperAdmins"])):
         raise ApiError(403,"FORBIDDEN","不能通过添加成员修改自己或已有超级管理员的身份。")
     if (row.revision if row else 0)!=command.expected_revision:
         raise ApiError(409,"VERSION_CONFLICT","该成员权限已变化，请重新搜索后操作。")
     if row is None:
         row=ReviewAdminAccess(user_id=user.id,organization_id=actor.organization_id,access_role="admin",revision=0,granted_by=actor.id)
         session.add(row)
-    row.domain=command.domain
+    if "domain" in command.model_fields_set or not row.domain:
+        row.domain=command.domain
+    save_member_department(session, actor.organization_id, user.id, command.department)
     row.access_role=command.access_role
     row.can_grant_super_admin=False
     row.level="高级" if command.access_role == "super_admin" else command.level
@@ -684,7 +742,7 @@ def grant_administrator(command:GrantAdministrator,request:Request,actor:Actor=D
     row.revision+=1
     if not session.scalar(select(RoleAssignment.id).where(RoleAssignment.user_id==user.id,RoleAssignment.role==Role.REVIEWER)):
         session.add(RoleAssignment(id=uuid.uuid4(),organization_id=actor.organization_id,user_id=user.id,role=Role.REVIEWER))
-    audit(session,request,actor,"review_admin.access_granted",user.id,{"level":row.level,"domain":command.domain,"revision":row.revision,"access_role":row.access_role,"can_grant_super_admin":False})
+    audit(session,request,actor,"review_admin.access_granted",user.id,{"level":row.level,"domain":row.domain,"department":command.department,"revision":row.revision,"access_role":row.access_role,"can_grant_super_admin":False})
     session.commit()
     return members(request,actor,session)
 
@@ -695,6 +753,51 @@ class RevokeAdministrator(BaseModel):
     confirmed:Literal[True]
 
 
+class DemoteAdministrator(RevokeAdministrator):
+    level:Literal["初级","中级","高级"]
+
+
+def require_manage_super_target(session, actor, user_id, row):
+    if user_id==actor.id or row and row.can_grant_super_admin:
+        raise ApiError(403,"PROTECTED_ADMIN","不能降级或撤销自己及最高权限管理员。")
+    if not permissions(session,actor)["canGrantSuperAdmins"]:
+        raise ApiError(403,"SUPER_ADMIN_MANAGE_FORBIDDEN","仅最高权限管理员可以降级或撤销超级管理员。")
+
+
+@router.post("/members/{user_id}/demote")
+def demote_administrator(user_id:uuid.UUID, command:DemoteAdministrator, request:Request,
+                         actor:Actor=Depends(get_actor),session:Session=Depends(get_db)):
+    require_super(session,actor)
+    user=session.scalar(select(User).where(User.id==user_id,User.organization_id==actor.organization_id).with_for_update())
+    if not user:
+        raise ApiError(404,"NOT_FOUND","成员不存在。")
+    row=access_for(session,user_id,actor.organization_id,lock=True)
+    require_manage_super_target(session,actor,user_id,row)
+    if not row or row.revoked_at or row.access_role!="super_admin" or user.status!=UserStatus.ACTIVE:
+        raise ApiError(409,"MEMBER_STATE_CHANGED","仅能将有效超级管理员降为普通管理员，请刷新后重试。")
+    if row.revision!=command.expected_revision:
+        raise ApiError(409,"VERSION_CONFLICT","成员权限已变化，请刷新后重试。")
+    previous_level=row.level
+    row.access_role="admin"
+    row.can_grant_super_admin=False
+    row.level=command.level
+    row.revision+=1
+    # Remove elevated roles and expire staff sessions; learner sessions and history remain intact.
+    session.execute(delete(RoleAssignment).where(RoleAssignment.user_id==user_id,
+        RoleAssignment.organization_id==actor.organization_id,RoleAssignment.role.in_({Role.OPERATOR,Role.CONTENT_EDITOR})))
+    if not session.scalar(select(RoleAssignment.id).where(RoleAssignment.user_id==user_id,
+            RoleAssignment.organization_id==actor.organization_id,RoleAssignment.role==Role.REVIEWER)):
+        session.add(RoleAssignment(id=uuid.uuid4(),organization_id=actor.organization_id,user_id=user_id,role=Role.REVIEWER))
+    session.execute(update(IdentitySession).where(IdentitySession.user_id==user_id,
+        IdentitySession.organization_id==actor.organization_id,IdentitySession.role.in_(STAFF_ROLES),
+        IdentitySession.revoked_at.is_(None)).values(revoked_at=datetime.now(UTC)))
+    audit(session,request,actor,"review_admin.super_demoted",user_id,
+          {"previous_role":"super_admin","access_role":"admin","previous_level":previous_level,
+           "level":row.level,"revision":row.revision})
+    session.commit()
+    return members(request,actor,session)
+
+
 @router.post("/members/{user_id}/revoke")
 def revoke_administrator(user_id:uuid.UUID,command:RevokeAdministrator,request:Request,
                          actor:Actor=Depends(get_actor),session:Session=Depends(get_db)):
@@ -702,9 +805,11 @@ def revoke_administrator(user_id:uuid.UUID,command:RevokeAdministrator,request:R
     user=session.scalar(select(User).where(User.id==user_id,User.organization_id==actor.organization_id).with_for_update())
     if not user:
         raise ApiError(404,"NOT_FOUND","成员不存在。")
-    row=access_for(session,user_id,actor.organization_id)
-    if user_id==actor.id or row and row.access_role=="super_admin":
-        raise ApiError(403,"FORBIDDEN","不能撤销自己或其他超级管理员。")
+    row=access_for(session,user_id,actor.organization_id,lock=True)
+    if user_id==actor.id or row and row.can_grant_super_admin:
+        raise ApiError(403,"PROTECTED_ADMIN","不能撤销自己或最高权限管理员。")
+    if row and row.access_role=="super_admin":
+        require_manage_super_target(session,actor,user_id,row)
     if (row.revision if row else 0)!=command.expected_revision:
         raise ApiError(409,"VERSION_CONFLICT","成员权限已变化，请刷新后重试。")
     if row is None:
@@ -715,7 +820,7 @@ def revoke_administrator(user_id:uuid.UUID,command:RevokeAdministrator,request:R
     row.revoked_at=datetime.now(UTC)
     row.revision+=1
     session.execute(delete(RoleAssignment).where(RoleAssignment.user_id==user_id,RoleAssignment.organization_id==actor.organization_id,RoleAssignment.role.in_(STAFF_ROLES)))
-    session.execute(update(IdentitySession).where(IdentitySession.user_id==user_id,IdentitySession.role.in_(STAFF_ROLES),IdentitySession.revoked_at.is_(None)).values(revoked_at=row.revoked_at))
+    session.execute(update(IdentitySession).where(IdentitySession.user_id==user_id,IdentitySession.organization_id==actor.organization_id,IdentitySession.role.in_(STAFF_ROLES),IdentitySession.revoked_at.is_(None)).values(revoked_at=row.revoked_at))
     audit(session,request,actor,"review_admin.access_revoked",user_id,{"revision":row.revision})
     session.commit()
     return members(request,actor,session)
@@ -723,7 +828,8 @@ def revoke_administrator(user_id:uuid.UUID,command:RevokeAdministrator,request:R
 
 class Certification(BaseModel):
     expected_revision:int=Field(ge=0)
-    domain:str
+    domain:str="产品开发"
+    department:PublishingDepartment | None = None
     level:Literal["初级","中级","高级"]
 
 
@@ -743,10 +849,12 @@ def certify(user_id:uuid.UUID, command:Certification, request:Request,
     if not row:
         row=ReviewAdminAccess(user_id=user_id,organization_id=actor.organization_id,revision=0,access_role="admin",granted_by=actor.id)
         session.add(row)
-    row.domain=command.domain
+    if "domain" in command.model_fields_set or not row.domain:
+        row.domain=command.domain
+    save_member_department(session, actor.organization_id, user_id, command.department)
     row.level=command.level
     row.revision+=1
-    audit(session,request,actor,"review_admin.member_certified",user_id)
+    audit(session,request,actor,"review_admin.member_certified",user_id,{"department":command.department,"level":row.level})
     session.commit()
     return members(request,actor,session)
 

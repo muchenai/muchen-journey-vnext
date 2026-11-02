@@ -1,4 +1,4 @@
-import { BADGES, escapeHtml as e } from './core.js?v=20261029-reward-types';
+import { BADGES, escapeHtml as e } from './core.js?v=20261030-member-action-spacing';
 import { normalizeBadgeImage, readBadgeImage, svgToBadgeImage } from './badge-image.js?v=20261028-badges-local';
 
 const labels = { draft: '草稿', published: '已上架', unpublished: '已下架' };

@@ -1,4 +1,4 @@
-import {request} from './native-api.js?v=20261028-publication-local';
+import {request} from './native-api.js?v=20261030-member-action-spacing';
 const toNative = {tech:'dev','ai-eval':'evaluation'};
 const toServer = {dev:'tech',evaluation:'ai-eval'};
 const native = row => ({...row,costs:(row.costs||[]).map(c=>({...c,badgeId:toNative[c.badgeId]||c.badgeId}))});

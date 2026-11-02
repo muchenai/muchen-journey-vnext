@@ -1,5 +1,5 @@
 import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
-import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261029-reward-types';
+import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261030-member-action-spacing';
 let activeStore;
 export async function request(body, reviewId) {
   const response = await fetch('/api/review-native' + (reviewId ? `?review=${encodeURIComponent(reviewId)}` : ''), {
@@ -23,7 +23,7 @@ export const renderInviteLogin = () => '';
 export const bindInviteLogin = () => {};
 export async function clearInviteSession() { await request({ command: 'logout' }); location.assign('/review/login'); }
 export function newDraft() {
-  return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp: 'novice', domain: '产品开发', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
+  return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp: 'novice', domain: '产品开发', publishingDepartment: '', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
 }
 export class ApiStore {
   reviewLeases = new Map();
@@ -159,12 +159,20 @@ export function createJourneyService({ store }) {
         const result = await request({ command: 'grantAdmin', payload: input });
         await store.refresh(); return result;
       },
-      update: async (member, domain, level) => {
-        const result = await request({command:'certify',payload:{member,domain,level}});
+      update: async (member, department, level) => {
+        const result = await request({command:'certify',payload:{member,domain:member.certification?.domain || '产品开发',department,level}});
+        await store.refresh(); return result;
+      },
+      updateDepartment: async (member, department) => {
+        const result = await request({command:'updateMemberDepartment',payload:{member,department}});
         await store.refresh(); return result;
       },
       revoke: async member => {
         const result = await request({command:'revokeAdmin',id:member.id,payload:{revision:member.revision,confirmed:true}});
+        await store.refresh(); return result;
+      },
+      demote: async (member, level) => {
+        const result = await request({command:'demoteAdmin',id:member.id,payload:{revision:member.revision,level,confirmed:true}});
         await store.refresh(); return result;
       },
     },

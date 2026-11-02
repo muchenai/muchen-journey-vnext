@@ -4,7 +4,9 @@
 .member-choice img{border-radius:50%;object-fit:cover}
 .member-choice small{display:block;color:var(--muted,#7d8490);margin-top:4px}
 .member-selected{padding:10px 12px;border:1px solid #b6cfff;border-radius:8px;background:var(--primary-soft,#edf3ff);margin-bottom:16px}
-.member-revoke{color:#cb4354;margin-left:12px}
+.member-revoke{color:#cb4354}
+.member-list-scroll .member-row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;min-width:160px;white-space:normal}
+.member-list-scroll .member-row-actions>.text-btn{flex:0 0 auto;margin:0;padding:4px 0;white-space:nowrap}
 .member-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-left:auto}
 .cert-form-footer .member-form-actions .btn{margin:0;white-space:nowrap}
 .bulk-rule-scroll{max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px 12px}

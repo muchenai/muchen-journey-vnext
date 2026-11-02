@@ -1,5 +1,6 @@
-import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261029-reward-types';
+import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261030-member-action-spacing';
 
+import {PUBLISHING_DEPARTMENTS, departmentLabel} from './publishing-departments.js';
 const state = { tab: 'tasks', search: '', domain: 'all', status: 'all' };
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);
 const badgeName = id => badgeList().find(b => b.id === id)?.name || id;
@@ -19,7 +20,7 @@ const chip = (badge, showWeight = true) => `<span class="badge-chip"><span class
 function filteredTasks(store) {
   return (store.data.tasks || []).filter(task => {
     const haystack = `${task.title || ''} ${task.id || ''} ${taskAuthor(task)} ${task.summary || ''}`.toLowerCase();
-    return (!state.search || haystack.includes(state.search.toLowerCase())) && (state.domain === 'all' || task.domain === state.domain) && (state.status === 'all' || task.status === state.status);
+    return (!state.search || haystack.includes(state.search.toLowerCase())) && (state.domain === 'all' || task.publishingDepartment === state.domain) && (state.status === 'all' || task.status === state.status);
   });
 }
 
@@ -40,7 +41,7 @@ function tasksTable(store) {
   const tasks = filteredTasks(store);
   if (!tasks.length) return `<div class="empty-state"><strong>没有找到相关任务</strong><p>试试调整筛选条件，或创建一个新任务。</p><button class="btn btn-secondary" data-library-action="reset">重置筛选</button></div>`;
   return `<div class="table-wrap"><table class="data-table library-table"><thead><tr><th>任务名称</th><th>发布者</th><th>关联徽章</th><th>审核方式</th><th>完成 / 参与</th><th>状态</th><th class="text-right">操作</th></tr></thead><tbody>${tasks.map(task => `<tr>
-    <td><button class="table-title" data-task-view="${e(task.id)}">${e(task.title || '未命名任务')}</button><div class="table-subtitle">${e(task.id)} · ${e(task.domain || '未设置方向')}</div></td>
+    <td><button class="table-title" data-task-view="${e(task.id)}">${e(task.title || '未命名任务')}</button><div class="table-subtitle">${e(task.id)} · ${e(departmentLabel(task.publishingDepartment))}</div></td>
     <td>${e(taskAuthor(task))}</td>
     <td><div class="badge-cell">${(task.badges || []).map(b => chip(b, false)).join('') || '<span class="muted">尚未设置</span>'}</div></td>
     <td><span class="tag ${task.reviewMode === 'ai' ? 'tag-purple' : 'tag-neutral'}">${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</span></td>
@@ -51,9 +52,9 @@ function tasksTable(store) {
 }
 
 function taskTab(store) {
-  const availableDomains = [...new Set([...domains, ...(store.data.tasks || []).map(t => t.domain).filter(Boolean)])];
+  const availableDomains = PUBLISHING_DEPARTMENTS;
   return `${stats(store)}<section class="card library-main-card"><div class="card-heading"><div><h2>全部任务</h2></div><button class="btn btn-secondary" data-library-action="export">${icon('download')} 导出数据</button></div>
-    <div class="filter-bar"><label class="search-field">${icon('search')}<input id="library-search" type="search" placeholder="搜索任务名称、编号或发布者" value="${e(state.search)}" aria-label="搜索任务"></label><select id="library-domain" aria-label="按任务方向筛选"><option value="all">全部方向</option>${availableDomains.map(domain => `<option value="${e(domain)}" ${state.domain === domain ? 'selected' : ''}>${e(domain)}</option>`).join('')}</select><select id="library-status" aria-label="按任务状态筛选"><option value="all">全部状态</option>${['published', 'draft', 'archived'].map(status => `<option value="${status}" ${state.status === status ? 'selected' : ''}>${statusText(status)}</option>`).join('')}</select></div>
+    <div class="filter-bar"><label class="search-field">${icon('search')}<input id="library-search" type="search" placeholder="搜索任务名称、编号或发布者" value="${e(state.search)}" aria-label="搜索任务"></label><select id="library-domain" aria-label="按发布部门筛选"><option value="all">全部部门</option>${availableDomains.map(domain => `<option value="${e(domain)}" ${state.domain === domain ? 'selected' : ''}>${e(domain)}</option>`).join('')}</select><select id="library-status" aria-label="按任务状态筛选"><option value="all">全部状态</option>${['published', 'draft', 'archived'].map(status => `<option value="${status}" ${state.status === status ? 'selected' : ''}>${statusText(status)}</option>`).join('')}</select></div>
     <div id="library-task-results">${tasksTable(store)}</div>
   </section>`;
 }
@@ -124,7 +125,7 @@ export function openTask(task, store, ui) {
     return `<div class="detail-material"><span>${icon(material.type === 'image' ? 'image' : 'file')} ${e(material.name || '未命名材料')}</span>${url ? `<a class="text-btn" href="${e(url)}" target="_blank" rel="noopener noreferrer">打开材料 ↗</a>` : uploaded ? `<button class="text-btn" data-material-download="${index}">下载材料</button>` : '<span class="muted">示例附件</span>'}</div>`;
   }).join('');
   const taskSubmissions = (store.data.submissions || []).filter(submission => submission.taskId === task.id);
-  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(publicationLabel(task))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body">${task.publication?.status==='rejected'?`<div class="notice">发布退回原因：${e(task.publication.comment)}</div>`:""}<p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span><span>任务方向 <strong>${e(task.domain || '未设置')}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span><span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>${task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(publicationLabel(task))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body">${task.publication?.status==='rejected'?`<div class="notice">发布退回原因：${e(task.publication.comment)}</div>`:""}<p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span><span>发布部门 <strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span><span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>${task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
     <section class="detail-section"><h3>奖励与徽章</h3><div class="reward-summary"><span><strong>${fmt(task.xp)}</strong> 经验值</span><span>直接领取</span><span><strong>${fmt(Number(task.xp || 0) / 10)}</strong> 总徽章点</span></div><div class="badge-cell">${badgeRewards.map(badge => `${chip(badge)}<span class="muted">+${fmt(badge.points)} 点</span>`).join('')}</div></section>
     <section class="detail-section"><h3>学习材料 <span class="count-pill">${(task.materials || []).length}</span></h3>${materialHtml || '<p class="muted">尚未添加学习材料</p>'}</section>
     <section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>

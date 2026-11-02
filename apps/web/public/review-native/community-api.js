@@ -1,4 +1,4 @@
-import {request} from './native-api.js?v=20261028-publication-local';
+import {request} from './native-api.js?v=20261030-member-action-spacing';
 
 export function createCommunityApi(module,getCurrentUser,empty) {
  let cache={...structuredClone(empty),revision:0};

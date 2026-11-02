@@ -1,3 +1,4 @@
+import {isPublishingDepartment} from './publishing-departments.js';
 /** JOURNEY prototype domain model. All persistence stays in this browser. */
 export const BADGES = Object.freeze([
   { id: 'data', name: '数据交付徽章', category: '数据交付', color: '#648b83' },
@@ -158,7 +159,7 @@ export function validateTask(task = {}) {
   const errors = fieldLimits(task);
   if (text(task.title).length < 3) errors.push('任务标题至少需要 3 个字');
   if (text(task.summary).length < 10) errors.push(`任务简述至少需要 10 个字，当前 ${text(task.summary).length} 个字`);
-  if (!text(task.domain)) errors.push('请选择任务方向');
+  if (!isPublishingDepartment(task.publishingDepartment)) errors.push('请选择发布部门');
   if (!DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
 
   const badges = Array.isArray(task.badges) ? task.badges : [];

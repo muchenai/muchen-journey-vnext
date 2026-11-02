@@ -1,6 +1,6 @@
-import {escapeHtml as e} from './core.js?v=20261029-reward-types';
+import {escapeHtml as e} from './core.js?v=20261030-member-action-spacing';
 import {openBulkAccess} from './member-bulk.js';
-const domains = ['产品开发','数据交付','技术开发','PMO','AI评测','质量检测','项目管理','AI 能力'];
+import {departmentOptions, departmentLabel} from './publishing-departments.js';
 const levels = ['初级','中级','高级'];
 const options = (values, selected) => values.map(v=>`<option ${v===selected?'selected':''}>${e(v)}</option>`).join('');
 const allowed = level => ({'初级':'入门','中级':'入门、进阶','高级':'入门、进阶、挑战'})[level] || '入门';
@@ -13,9 +13,25 @@ export function filterAdministrators(members, query) {
   return members.filter(m=>!key || [m.name,m.employee_no].some(value=>String(value||'').toLocaleLowerCase().includes(key)));
 }
 
-export function memberRows(members) {
+export function canManageSuperMember(member,ui){
+  return ui.isSuperAdmin===true && ui.canGrantSuperAdmins===true && !!ui.currentUser?.id &&
+    member.id!==ui.currentUser.id && member.accessRole==='super_admin' && member.protectedAdmin===false;
+}
+
+export function memberActions(member,ui={}){
+  const department=`<button class="text-btn" data-member-department="${e(member.id)}">修改部门</button>`;
+  if(member.protectedAdmin || member.id===ui.currentUser?.id)return department;
+  const superMember=member.accessRole==='super_admin';
+  if(superMember && !canManageSuperMember(member,ui))return department;
+  if(member.status==='revoked')return department+`<button class="text-btn" data-member-restore="${e(member.id)}">重新授权</button>`;
+  return department+(superMember?`<button class="text-btn" data-member-demote="${e(member.id)}">降为普通管理员</button>`:
+    `<button class="text-btn" data-member-edit="${e(member.id)}">修改等级</button>`)+
+    `<button class="text-btn member-revoke" data-member-revoke="${e(member.id)}">撤销管理权限</button>`;
+}
+
+export function memberRows(members,ui={}) {
   if (!members.length) return '<div class="empty-state"><strong>暂无管理员</strong></div>';
-  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>方向</th><th>认证等级</th><th>状态</th><th>操作</th></tr></thead><tbody>${members.map(m=>`<tr><td class="admin-member-details"><strong>${e(m.name)}</strong><div class="table-subtitle">工号：${e(m.employee_no||'未填写')}</div><div class="table-subtitle">部门：${e((m.department_paths?.length?m.department_paths:m.departments)?.join('；')||'未填写')}</div><div class="table-subtitle">${m.accessRole==='super_admin'?'超级管理员':'普通管理员'}</div></td><td>${e(m.certification?.domain||'产品开发')}</td><td>${m.accessRole==='super_admin'?'全部难度':`${e(m.certification?.level||'初级')}<div class="table-subtitle">可发布${allowed(m.certification?.level)}</div>`}</td><td><span class="tag ${m.status==='revoked'?'tag-neutral':'tag-success'}">${m.status==='revoked'?'已撤销':'已开通'}</span></td><td>${m.accessRole==='super_admin'?'—':m.status==='revoked'?`<button class="text-btn" data-member-restore="${e(m.id)}">重新授权</button>`:`<button class="text-btn" data-member-edit="${e(m.id)}">修改等级</button><button class="text-btn member-revoke" data-member-revoke="${e(m.id)}">撤销管理权限</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>身份</th><th>部门</th><th>等级</th><th>状态</th><th>操作</th></tr></thead><tbody>${members.map(m=>`<tr><td class="admin-member-details"><strong>${e(m.name)}</strong><div class="table-subtitle">工号：${e(m.employee_no||'未填写')}</div><div class="table-subtitle">部门：${e((m.department_paths?.length?m.department_paths:m.departments)?.join('；')||'未填写')}</div></td><td>${m.accessRole==='super_admin'?'超级管理员':'普通管理员'}</td><td>${e(departmentLabel(m.certification?.department))}</td><td>${m.accessRole==='super_admin'?'全部难度':`${e(m.certification?.level||'初级')}<div class="table-subtitle">可发布${allowed(m.certification?.level)}</div>`}</td><td><span class="tag ${m.status==='revoked'?'tag-neutral':'tag-success'}">${m.status==='revoked'?'已撤销':'已开通'}</span></td><td><div class="member-row-actions">${memberActions(m,ui)}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 export function directoryStatusText(info) {
@@ -39,7 +55,7 @@ export function searchRows(items) {
 
 export function openCertification(store, ui, initialName='') {
   if (!check(ui)) return;
-  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">MEMBER CERTIFICATION</div><h2>认证</h2></div></div><div class="modal-body"><div class="inline-note certification-note">${ui.canGrantSuperAdmins ? '搜索公司飞书成员，可授予普通管理员或超级管理员身份。新添加的超级管理员只能授权普通管理员。' : '搜索公司飞书成员，选择账号后开通普通管理员权限。认证等级决定可发布的任务难度。'}</div><section class="certification-section"><h3>添加成员</h3><form id="member-access-form" class="certification-form"><div class="form-grid"><label class="form-field"><span class="field-label">成员姓名或工号 <span class="required">*</span></span><input name="name" maxlength="60" autocomplete="off" required placeholder="输入姓名或工号搜索公司飞书成员" value="${e(initialName)}"></label><label class="form-field"><span class="field-label">身份类型</span><select name="access_role">${grantRoleOptions(ui.canGrantSuperAdmins === true)}</select></label></div><div class="directory-toolbar"><span class="muted" data-directory-status role="status">正在读取通讯录状态…</span><button type="button" class="text-btn" data-directory-refresh>刷新通讯录</button></div><div class="member-search-results" data-member-results aria-live="polite"></div><div class="member-selected" data-member-selected hidden></div><div class="form-grid"><label class="form-field"><span class="field-label">专业方向</span><select name="domain">${options(domains,'产品开发')}</select></label><label class="form-field"><span class="field-label">认证等级</span><select name="level">${options(levels,'初级')}</select><span class="field-hint" data-level-hint>初级：入门；中级：入门、进阶；高级：全部难度</span></label></div><div class="cert-form-footer"><span class="muted">确认后即可使用该飞书账号登录</span><button class="btn btn-primary" type="submit" disabled>添加成员</button></div><div class="field-error" data-member-error role="alert"></div></form></section><section class="certification-section member-list-section"><h3>管理员 <span class="count-pill">${(store.administrators||[]).length}</span></h3><div class="member-list-toolbar"><label class="member-list-search"><span class="field-label">搜索管理员</span><input type="search" data-admin-search placeholder="输入管理员姓名或工号" autocomplete="off" value="${e(ui.memberSearchQuery||'')}"></label><span class="muted" data-admin-count role="status" aria-live="polite"></span></div><div class="member-list-scroll" data-admin-list role="region" aria-label="管理员列表" tabindex="0"></div></section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button></div>`, modal=>{
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">MEMBER CERTIFICATION</div><h2>认证</h2></div></div><div class="modal-body"><div class="inline-note certification-note">${ui.canGrantSuperAdmins ? '搜索公司飞书成员，可授予普通管理员或超级管理员身份。新添加的超级管理员只能授权普通管理员。' : '搜索公司飞书成员，选择账号后开通普通管理员权限。认证等级决定可发布的任务难度。'}</div><section class="certification-section"><h3>添加成员</h3><form id="member-access-form" class="certification-form"><div class="form-grid"><label class="form-field"><span class="field-label">成员姓名或工号 <span class="required">*</span></span><input name="name" maxlength="60" autocomplete="off" required placeholder="输入姓名或工号搜索公司飞书成员" value="${e(initialName)}"></label><label class="form-field"><span class="field-label">身份类型</span><select name="access_role">${grantRoleOptions(ui.canGrantSuperAdmins === true)}</select></label></div><div class="directory-toolbar"><span class="muted" data-directory-status role="status">正在读取通讯录状态…</span><button type="button" class="text-btn" data-directory-refresh>刷新通讯录</button></div><div class="member-search-results" data-member-results aria-live="polite"></div><div class="member-selected" data-member-selected hidden></div><div class="form-grid"><label class="form-field"><span class="field-label">部门</span><select name="department" required>${departmentOptions('','请选择部门')}</select></label><label class="form-field"><span class="field-label">认证等级</span><select name="level">${options(levels,'初级')}</select><span class="field-hint" data-level-hint>初级：入门；中级：入门、进阶；高级：全部难度</span></label></div><div class="cert-form-footer"><span class="muted">确认后即可使用该飞书账号登录</span><button class="btn btn-primary" type="submit" disabled>添加成员</button></div><div class="field-error" data-member-error role="alert"></div></form></section><section class="certification-section member-list-section"><h3>管理成员 <span class="count-pill">${(store.administrators||[]).length}</span></h3><div class="member-list-toolbar"><label class="member-list-search"><span class="field-label">搜索管理员</span><input type="search" data-admin-search placeholder="输入管理员姓名或工号" autocomplete="off" value="${e(ui.memberSearchQuery||'')}"></label><span class="muted" data-admin-count role="status" aria-live="polite"></span></div><div class="member-list-scroll" data-admin-list role="region" aria-label="管理员列表" tabindex="0"></div></section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button></div>`, modal=>{
     const root=rootOf(modal), form=root.querySelector('#member-access-form'), input=form.elements.name;
     const results=root.querySelector('[data-member-results]'), selectedBox=root.querySelector('[data-member-selected]'), error=root.querySelector('[data-member-error]'), submit=form.querySelector('[type=submit]');
     let selected=null, sequence=0, timer, composing=false, lastUpdated=null, pollTimer, pollSequence=0;
@@ -100,6 +116,8 @@ export function openCertification(store, ui, initialName='') {
         results.innerHTML=searchRows(value.items)+(value.has_more?'<p class="muted">结果较多，请输入更完整的姓名或工号。</p>':'');
         results.querySelectorAll('[data-member-choice]').forEach(button=>button.onclick=()=>{
           selected=value.items[Number(button.dataset.memberChoice)]; input.value=selected.name;
+          const existing=(store.administrators||[]).find(m=>m.id===selected.member_id);
+          if(existing?.accessRole==='super_admin' && (existing.status!=='revoked' || !canManageSuperMember(existing,ui))) {editMemberDepartment(store,ui,existing.id);return;}
           selectedBox.innerHTML=`<span class="muted">已选择成员</span><div class="member-identity">${memberDetails(selected)}</div>`;
           selectedBox.hidden=false; results.innerHTML=''; submit.disabled=false;
         });
@@ -113,7 +131,7 @@ export function openCertification(store, ui, initialName='') {
     form.addEventListener('submit',async event=>{
       event.preventDefault(); if(!check(ui))return;
       if(!selected){error.textContent='请从搜索结果中选择具体的公司飞书账号。';return;}
-      const payload={open_id:selected.open_id,expected_revision:selected.revision,domain:form.elements.domain.value,level:form.elements.level.value,access_role:form.elements.access_role.value};
+      const payload={open_id:selected.open_id,expected_revision:selected.revision,department:form.elements.department.value,level:form.elements.level.value,access_role:form.elements.access_role.value};
       modal.dataset.operationPending='true'; submit.disabled=true;
       try {await ui.service.certifications.grant(payload);modal.dataset.operationPending='false';ui.toast(payload.access_role==='super_admin'?'超级管理员权限已开通':'普通管理员权限已开通');openCertification(store,ui);}
       catch(err){error.textContent=err.message;}
@@ -134,14 +152,16 @@ export function openCertification(store, ui, initialName='') {
       ui.memberSearchQuery=adminSearch.value;
       const matches=filterAdministrators(all,query);
       adminCount.textContent=query?`找到 ${matches.length} 人 / 共 ${all.length} 人`:`共 ${all.length} 人`;
-      adminList.innerHTML=matches.length?memberRows(matches):`<div class="empty-state"><strong>${query?'没有找到匹配的管理员':'暂无管理员'}</strong>${query?'<p>请更换姓名或工号关键词，或清空搜索查看全部管理员。</p>':''}</div>`;
+      adminList.innerHTML=matches.length?memberRows(matches,ui):`<div class="empty-state"><strong>${query?'没有找到匹配的管理员':'暂无管理员'}</strong>${query?'<p>请更换姓名或工号关键词，或清空搜索查看全部管理员。</p>':''}</div>`;
       adminList.scrollTop=0;
     }
     adminSearch.addEventListener('input',renderAdministrators);
     adminList.addEventListener('click',event=>{
       const button=event.target.closest('button');
       if(!button || !adminList.contains(button))return;
-      if(button.dataset.memberEdit)editMember(store,ui,button.dataset.memberEdit);
+      if(button.dataset.memberDepartment)editMemberDepartment(store,ui,button.dataset.memberDepartment);
+      else if(button.dataset.memberDemote)demoteMember(store,ui,button.dataset.memberDemote);
+      else if(button.dataset.memberEdit)editMember(store,ui,button.dataset.memberEdit);
       else if(button.dataset.memberRevoke)revokeMember(store,ui,button.dataset.memberRevoke);
       else if(button.dataset.memberRestore)openCertification(store,ui,store.administrators.find(m=>m.id===button.dataset.memberRestore)?.name||'');
     });
@@ -149,18 +169,41 @@ export function openCertification(store, ui, initialName='') {
   });
 }
 
-function editMember(store,ui,id){
-  if(!check(ui))return; const m=store.administrators.find(x=>x.id===id);if(!m||m.accessRole==='super_admin')return;
-  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(m.name)} · 普通管理员</div><h2>修改认证等级</h2></div></div><form data-member-edit-form><div class="modal-body"><label class="form-field"><span class="field-label">专业方向</span><select name="domain">${options(domains,m.certification?.domain)}</select></label><label class="form-field"><span class="field-label">认证等级</span><select name="level">${options(levels,m.certification?.level)}</select></label><p class="muted">保存后立即按新等级限制发布，已发布的任务保留。</p><p class="field-error" role="alert"></p></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-back>返回</button><button class="btn btn-primary" type="submit">保存修改</button></div></form>`,modal=>{
+export function editMemberDepartment(store,ui,id){
+  if(!check(ui))return;
+  const member=(store.administrators||[]).find(m=>m.id===id);if(!member)return;
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(member.name)} · ${member.accessRole==='super_admin'?'超级管理员':'普通管理员'}</div><h2>修改部门</h2></div></div><form data-member-department-form><div class="modal-body"><label class="form-field"><span class="field-label">部门</span><select name="department" required>${departmentOptions(member.certification?.department,'请选择部门')}</select></label><p class="muted">仅更新部门，保留当前身份、认证等级和管理权限。</p><p class="field-error" role="alert"></p></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-back>返回</button><button class="btn btn-primary" type="submit">保存部门</button></div></form>`,modal=>{
     const form=modal.querySelector('form');modal.querySelector('[data-back]').onclick=()=>openCertification(store,ui);
     form.onsubmit=async event=>{event.preventDefault();modal.dataset.operationPending='true';const button=form.querySelector('[type=submit]');button.disabled=true;
-      try{await ui.service.certifications.update(m,form.elements.domain.value,form.elements.level.value);modal.dataset.operationPending='false';ui.toast('认证等级已更新');openCertification(store,ui);}
+      try{await ui.service.certifications.updateDepartment(member,form.elements.department.value);modal.dataset.operationPending='false';ui.toast('部门已更新');openCertification(store,ui);}
+      catch(err){form.querySelector('[role=alert]').textContent=err.message;}finally{modal.dataset.operationPending='false';button.disabled=false;}};
+  });
+}
+
+function editMember(store,ui,id){
+  if(!check(ui))return; const m=store.administrators.find(x=>x.id===id);if(!m||m.accessRole==='super_admin')return;
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(m.name)} · 普通管理员</div><h2>修改认证等级</h2></div></div><form data-member-edit-form><div class="modal-body"><label class="form-field"><span class="field-label">部门</span><select name="department" required>${departmentOptions(m.certification?.department,'请选择部门')}</select></label><label class="form-field"><span class="field-label">认证等级</span><select name="level">${options(levels,m.certification?.level)}</select></label><p class="muted">保存后立即按新等级限制发布，已发布的任务保留。</p><p class="field-error" role="alert"></p></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-back>返回</button><button class="btn btn-primary" type="submit">保存修改</button></div></form>`,modal=>{
+    const form=modal.querySelector('form');modal.querySelector('[data-back]').onclick=()=>openCertification(store,ui);
+    form.onsubmit=async event=>{event.preventDefault();modal.dataset.operationPending='true';const button=form.querySelector('[type=submit]');button.disabled=true;
+      try{await ui.service.certifications.update(m,form.elements.department.value,form.elements.level.value);modal.dataset.operationPending='false';ui.toast('认证等级已更新');openCertification(store,ui);}
+      catch(err){form.querySelector('[role=alert]').textContent=err.message;}finally{modal.dataset.operationPending='false';button.disabled=false;}};
+  });
+}
+
+export function demoteMember(store,ui,id){
+  const member=(store.administrators||[]).find(m=>m.id===id);
+  if(!member || !canManageSuperMember(member,ui) || member.status==='revoked')return;
+  ui.openModal(`<div class="modal-header"><h2>降为普通管理员</h2></div><form data-member-demote-form><div class="modal-body"><p>确认将 <strong>${e(member.name)}</strong> 从超级管理员降为普通管理员？</p><label class="form-field"><span class="field-label">降级后的认证等级</span><select name="level" required>${options(levels,'初级')}</select><span class="field-hint">初级：入门；中级：入门、进阶；高级：全部难度</span></label><p class="muted">部门、已发布任务和历史审核记录保留。原管理端登录会失效，重新登录后按普通管理员权限使用。</p><p class="field-error" role="alert"></p></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-back>取消</button><button class="btn btn-primary" type="submit">确认降级</button></div></form>`,modal=>{
+    const form=modal.querySelector('form');modal.querySelector('[data-back]').onclick=()=>openCertification(store,ui);
+    form.onsubmit=async event=>{event.preventDefault();modal.dataset.operationPending='true';const button=form.querySelector('[type=submit]');button.disabled=true;
+      try{await ui.service.certifications.demote(member,form.elements.level.value);modal.dataset.operationPending='false';ui.toast('已降为普通管理员');openCertification(store,ui);}
       catch(err){form.querySelector('[role=alert]').textContent=err.message;}finally{modal.dataset.operationPending='false';button.disabled=false;}};
   });
 }
 
 function revokeMember(store,ui,id){
-  if(!check(ui))return;const m=store.administrators.find(x=>x.id===id);if(!m||m.accessRole==='super_admin')return;
+  if(!check(ui))return;const m=store.administrators.find(x=>x.id===id);
+  if(!m || m.protectedAdmin || m.id===ui.currentUser?.id || (m.accessRole==='super_admin' && !canManageSuperMember(m,ui)))return;
   ui.openModal(`<div class="modal-header"><h2>撤销管理权限</h2></div><div class="modal-body"><p>确认撤销 <strong>${e(m.name)}</strong>（${e(m.id.slice(-8))}）的管理权限？</p><p class="muted">确认后不能再进入管理系统，已有管理端会话立即失效。已发布任务、审核记录和学员端学习记录均保留。</p><p class="field-error" role="alert"></p></div><div class="modal-footer"><button class="btn btn-secondary" data-back>取消</button><button class="btn btn-primary" data-confirm-revoke>确认撤销</button></div>`,modal=>{
     modal.querySelector('[data-back]').onclick=()=>openCertification(store,ui);
     const button=modal.querySelector('[data-confirm-revoke]');button.onclick=async()=>{button.disabled=true;modal.dataset.operationPending='true';
