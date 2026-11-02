@@ -17,3 +17,7 @@ The `Administrator Departments and Access Release` workflow requires the exact s
 The schema remains `0051_community_modules`. No seed, account cleanup, permission backfill or department backfill runs on production.
 
 Local checks: 220 frontend tests and 60 focused backend/release tests passed. Complete PR and mainline checks must pass before dispatch. After deployment, verify public readiness, changed administrator assets and isolation between staff and learner sessions.
+
+## Build dependency remediation
+
+The new npm advisory GHSA-g3hv-75wg-m249 blocked the existing CI dependency gate. All minimatch copies are pinned to patched 11.0.3 (development only). A lint-only preload exposes the legacy callable CommonJS API to ESLint 9/plugins using the patched implementation; named exports remain available. Regression checks exercise both import styles and prove ESLint still reports rule violations. No advisory waiver or runtime dependency change is introduced.

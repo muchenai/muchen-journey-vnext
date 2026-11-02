@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "node --require ./scripts/eslint-minimatch-compat.cjs ./node_modules/eslint/bin/eslint.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test scripts/*.test.mjs"
   },
@@ -27,6 +27,7 @@
     "typescript": "^5"
   },
   "overrides": {
+    "minimatch": "11.0.3",
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
     "postcss": "8.5.23",
