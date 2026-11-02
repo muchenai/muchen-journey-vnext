@@ -80,11 +80,12 @@ def task_view(session, actor, task_id):
             else f"/api/learner/village?task={task_id}&material={index}" if material["type"] in {"file", "image"} else ""})
     result = dict(id=str(task_id), title=version.title, description=version.purpose,
         category=content.get("domain", "产品开发"), level=content.get("difficulty", "入门"),
+        publishingDepartment=content.get("publishingDepartment", ""),
         minutes=minutes, experience=xp, points=points, mentor=author.display_name if author else "任务发布者",
         badges=[[BADGES[b["id"]], b["weight"]] for b in content.get("badges", []) if b.get("id") in BADGES],
         requirements=version.instructions, criteria=version.completion_criteria, materials=materials,
         rubric=content.get("rubric", []) if content.get("reviewMode") == "ai" else [],
-        passScore=content.get("passScore", 60), review="人工审核", reviewMode=content.get("reviewMode", "manual"),
+        passScore=content.get("passScore", 60), review="AI 自测" if content.get("reviewMode") == "ai" else "人工审核", reviewMode=content.get("reviewMode", "manual"),
         publishedAt=version.published_at.isoformat(), versionId=str(version.id),
         status="available", assignmentId=None, revision=None, answer="", feedback=None,
         unlockTaskPoints=unlock_cost(content), rewardAllocations=reward["allocations"])

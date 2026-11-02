@@ -8369,6 +8369,50 @@
         }
       }
     },
+    "/api/v1/me/novice/medals": {
+      "get": {
+        "summary": "Learner Catalog",
+        "operationId": "learner_catalog_api_v1_me_novice_medals_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/novice/medals/{medal_id}/redeem": {
       "post": {
         "summary": "Redeem",

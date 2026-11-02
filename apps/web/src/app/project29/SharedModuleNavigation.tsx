@@ -12,6 +12,12 @@ const imgRectangle61 = `${assetPathPrefix}/603f5.svg`
 const imgFrame = `${assetPathPrefix}/8c48a.svg`
 const imgVector = `${assetPathPrefix}/7fe67.svg`
 
+function NavigationBackground() {
+  return <div className="module-navigation-background" aria-hidden="true">
+    <img src={imgImage67} alt="" />
+  </div>
+}
+
 export function SharedModuleNavigation({
   module,
   onNavigate,
@@ -275,6 +281,7 @@ export function SharedModuleNavigation({
                     data-node-id="shared-nav-frame-491"
                   >
                     {activeDecoration}
+                    <NavigationBackground />
                     <div
                       aria-hidden
                       className="absolute inset-0 rounded-[11.011px]"
@@ -380,6 +387,7 @@ export function SharedModuleNavigation({
                 data-node-id="shared-nav-frame-501"
               >
                 {activeDecoration}
+                <NavigationBackground />
                 <div
                   aria-hidden
                   className="absolute inset-0 rounded-[11.011px]"
@@ -478,6 +486,7 @@ export function SharedModuleNavigation({
                 data-node-id="shared-nav-frame-510"
               >
                 {activeDecoration}
+                <NavigationBackground />
                 <div
                   aria-hidden
                   className="absolute inset-0 rounded-[11.011px]"

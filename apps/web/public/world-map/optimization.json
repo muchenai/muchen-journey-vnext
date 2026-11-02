@@ -1,0 +1,157 @@
+{
+  "source_sha256": "d07b9e3ae807d21525a1bd9a3b5e1df2520244afd38030882c258d0a52a0a058",
+  "before": 59148022,
+  "after": 7452066,
+  "reduction_percent": 87.4,
+  "assets": [
+    {
+      "file": "embedded-subset.woff2",
+      "before": 14270432,
+      "after": 160488
+    },
+    {
+      "file": "e5d0e68de52cb316.webp",
+      "before": 1646373,
+      "after": 407682,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "adce0725f28f2598.webp",
+      "before": 1286988,
+      "after": 332666,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "d0f648d348cbf101.webp",
+      "before": 1818337,
+      "after": 501892,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "c570378e7d90fcae.webp",
+      "before": 1366481,
+      "after": 328976,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "810909c424e44eaa.webp",
+      "before": 1799469,
+      "after": 431864,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "eec7dec5ddd0d4f5.webp",
+      "before": 1536071,
+      "after": 421862,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "864d9dab02bd997a.webp",
+      "before": 1702763,
+      "after": 393970,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "d9a9c044e94a2222.webp",
+      "before": 1372992,
+      "after": 348310,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "d9d8a56acfedfc4f.webp",
+      "before": 2303559,
+      "after": 607972,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "7e45748cd72be124.webp",
+      "before": 1945364,
+      "after": 448364,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "dd7cf466e1b8387b.webp",
+      "before": 1905477,
+      "after": 458688,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "fe52fb986b67fe86.webp",
+      "before": 2031045,
+      "after": 441538,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "0faa725c64677ce3.webp",
+      "before": 1467408,
+      "after": 355294,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "2ea5698fb7fee0ea.webp",
+      "before": 2478317,
+      "after": 561128,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "4abda209856204a4.webp",
+      "before": 2595410,
+      "after": 513766,
+      "size": [
+        1254,
+        1254
+      ]
+    },
+    {
+      "file": "e0535a271ec78944.webp",
+      "before": 2570110,
+      "after": 331404,
+      "size": [
+        1586,
+        992
+      ]
+    }
+  ]
+}

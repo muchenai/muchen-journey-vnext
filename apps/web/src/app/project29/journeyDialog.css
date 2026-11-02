@@ -1,0 +1,58 @@
+/* The existing 19-color module palette also covers dialogs outside ModuleHub. */
+.journey-dialog {
+  --m-bg: #02091c; --m-surface: #0e192b; --m-raised: #162747; --m-deep: #0c1a2c;
+  --m-border: #1e3961; --m-stroke: #71c5ff; --m-text: #eff6ff; --m-muted: #9ab0c6;
+  --m-dim: #5a7c9a; --m-cyan: #86deec; --m-primary: #42dced; --m-primary-mid: #31c9f5;
+  --m-primary-end: #5ceeff; --m-ink: #03245f; --m-teal: #51d0c5; --m-gold: #ffd65d;
+  --m-green: #77ffcf; --m-red: #f03751; --m-violet: #8ea1e2;
+  --m-fill: linear-gradient(267deg, color-mix(in srgb, var(--m-surface) 90%, transparent), color-mix(in srgb, var(--m-raised) 82%, transparent) 28%, color-mix(in srgb, var(--m-deep) 94%, transparent));
+}
+.journey-dialog.journey-dialog {
+  --figma-stroke-width: 1px; --figma-stroke-radius: 10px;
+  box-sizing: border-box; margin: auto; padding: 38px 44px 28px;
+  border: 1px solid transparent; border-radius: 10px; background: var(--m-fill);
+  color: var(--m-text); box-shadow: none; overflow: visible; max-height: none;
+  font: 13px/1.65 "Source Han Sans SC", sans-serif; text-align: center;
+}
+.journey-dialog.journey-dialog::backdrop { background: color-mix(in srgb, var(--m-bg) 82%, transparent); backdrop-filter: blur(5px); }
+.journey-dialog .journey-dialog-body { max-height: 850px; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.journey-dialog-body::-webkit-scrollbar { display: none; }
+.journey-dialog-stroke { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); overflow: visible; pointer-events: none; z-index: 1; }
+.journey-dialog-stroke > rect { width: calc(100% - 1px); height: calc(100% - 1px); }
+.journey-dialog-tracer { opacity: 0; animation: journey-dialog-orbit 8s linear infinite; animation-play-state: paused; transition: opacity .35s; }
+.journey-dialog:hover > .journey-dialog-stroke .journey-dialog-tracer,
+.journey-dialog:focus-within > .journey-dialog-stroke .journey-dialog-tracer { opacity: .85; animation-play-state: running; }
+@keyframes journey-dialog-orbit { to { stroke-dashoffset: -1000; } }
+.journey-dialog :is(button, input, textarea, select) { font-family: inherit; }
+.journey-dialog button { cursor: pointer; }
+.journey-dialog .module-icon { display: inline-block; flex: none; vertical-align: middle; background: currentColor; mask-repeat: no-repeat; mask-position: center; mask-size: contain; }
+.journey-dialog.journey-dialog h2 { text-align: center; font-size: 25px; font-weight: 700; line-height: 1.5; }
+.journey-dialog.journey-dialog .module-primary,
+.journey-dialog.journey-dialog button.primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 42px; padding: 10px 18px; border: 1px solid var(--m-cyan); border-radius: 6.722px;
+  background: linear-gradient(90deg, var(--m-primary), var(--m-primary-mid) 45%, var(--m-primary-end));
+  color: var(--m-ink); font-size: 13px; box-shadow: 0 0 12px color-mix(in srgb, var(--m-primary) 55%, transparent);
+  white-space: nowrap; text-align: center;
+}
+.journey-dialog.journey-dialog .module-secondary {
+  display: inline-flex; justify-content: center; align-items: center; gap: 9px; padding: 10px 16px;
+  border: 1px solid var(--m-border); border-radius: 7.788px; color: var(--m-muted);
+  background: color-mix(in srgb, var(--m-raised) 74%, transparent); font-size: 13px; white-space: nowrap;
+}
+.journey-dialog.journey-dialog button:disabled { opacity: .6; cursor: not-allowed; }
+.journey-dialog :is(button, input, textarea, select, summary):focus-visible { outline: 1px solid var(--m-cyan); outline-offset: 3px; }
+.journey-dialog .module-field { text-align: left; }
+.journey-dialog.journey-dialog .module-field input { text-align: center; }
+.journey-dialog.journey-dialog .module-dialog-heading button,
+.journey-dialog.journey-dialog.motion-export-dialog header > button,
+.journey-dialog.journey-dialog .self-check-header > button {
+  font-size: 12px; color: var(--m-muted); background: none; border: 0; padding: 0; white-space: nowrap;
+}
+.journey-dialog .self-check-header > div { flex: 1; }
+.journey-dialog :is(ol, .self-check-list, .self-check-disclaimer) { text-align: left; }
+.journey-dialog.motion-export-dialog { --me-bg: var(--m-bg); --me-text: var(--m-text); --me-muted: var(--m-muted); --me-line: var(--m-border); --me-cyan: var(--m-cyan); }
+.journey-dialog.journey-dialog.motion-export-dialog button:not(.primary) { background: var(--m-raised); color: var(--m-muted); border-color: var(--m-border); border-radius: 7.788px; }
+.journey-dialog.journey-dialog.motion-export-dialog header > button { background: none; border: 0; }
+.journey-dialog.motion-export-dialog textarea { background: var(--m-bg); color: var(--m-text); }
+@media (prefers-reduced-motion: reduce) { .journey-dialog .journey-dialog-tracer { animation: none; transition: none; } }

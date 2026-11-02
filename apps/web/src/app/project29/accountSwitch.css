@@ -1,0 +1,16 @@
+.shared-preview-label { font-size: 11px; color: var(--m-muted); padding: 6px 11px; border: 1px solid var(--m-border); border-radius: 5px; white-space: nowrap; }
+.account-switch-dialog { width: 580px; }
+.account-switch-dialog h2 { font-size: 26px; }
+.account-switch-options { display: flex; flex-direction: column; gap: 15px; margin: 28px 0 20px; }
+.journey-dialog .account-switch-options > :is(button, a) { display: flex; align-items: center; gap: 17px; width: 100%; border: 1px solid var(--m-border); border-radius: 10px; padding: 21px; background: color-mix(in srgb, var(--m-raised) 55%, transparent); transition: border-color .2s, background .2s; text-align: left; }
+.journey-dialog .account-switch-options > :is(button, a):hover { border-color: var(--m-stroke); background: var(--m-raised); }
+.account-switch-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; color: var(--m-cyan); background: var(--m-deep); border-radius: 10px; }
+.account-switch-options > :is(button, a):nth-child(2) .account-switch-icon { color: var(--m-violet); }
+.account-switch-options strong { display: block; font-size: 17px; font-weight: 500; white-space: nowrap; }
+.account-switch-options small { display: block; color: var(--m-muted); font-size: 11px; margin-top: 6px; }
+.account-switch-options > :is(button, a) > span:last-child { margin-left: auto; color: var(--m-cyan); font-size: 20px; }
+.account-switch-dialog .account-switch-footnote { font-size: 10px; color: var(--m-dim); }
+.account-switch-dialog .account-switch-notice { padding: 13px; border-left: 2px solid var(--m-gold); background: var(--m-raised); font-size: 11px; margin-bottom: 15px; }
+
+.badge-eyebrow { color: var(--m-violet); font-size: 10px; letter-spacing: .18em; }
+.account-switch-options > a { text-decoration: none; color: var(--m-text); }

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LearnerHome({ searchParams }: { searchParams: Promise<{ view?: string; notice?: string }> }) {
   const query = await searchParams;
-  const initialScreen = query.view === "tasks" ? "tasks" : query.view === "dashboard" ? "dashboard" : "welcome";
+  const initialScreen = query.view === "village" ? "village" : query.view === "tasks" ? "tasks" : query.view === "dashboard" ? "dashboard" : "welcome";
   // The introduction precedes nickname setup; the dashboard shows the required
   // modal after the learner clicks 开启旅程. Task deep links remain gated.
   const { learnerName, experience, needsNickname } = await loadProjectExperience(undefined, initialScreen !== "tasks");

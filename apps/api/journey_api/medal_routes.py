@@ -126,6 +126,24 @@ def read_wallet(request: Request, actor: Actor=Depends(get_learner_actor), sessi
     require_role(actor, Role.LEARNER)
     return envelope(request, wallet(session, actor))
 
+
+@router.get("/me/novice/medals")
+def learner_catalog(request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    medals = session.scalars(select(MedalDefinition).where(
+        MedalDefinition.organization_id == actor.organization_id,
+        MedalDefinition.content["status"].as_string() == "published")
+        .order_by(MedalDefinition.created_at, MedalDefinition.id)).all()
+    records = session.scalars(select(MedalRedemption).where(
+        MedalRedemption.organization_id == actor.organization_id,
+        MedalRedemption.user_id == actor.id)
+        .order_by(MedalRedemption.created_at.desc(), MedalRedemption.id)).all()
+    # Keep owned medals visible even after delisting, using the redemption snapshot.
+    owned = [dict(**r.content, id=str(r.id), medalId=str(r.medal_id),
+                  redeemedAt=r.created_at.isoformat()) for r in records]
+    return envelope(request, dict(medals=[medal_view(m) for m in medals],
+                                  redemptions=owned, wallet=wallet(session, actor)))
+
 class RedeemMedal(BaseModel):
     expected_revision: int = Field(ge=1)
 
