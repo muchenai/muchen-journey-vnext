@@ -1,4 +1,4 @@
-import { escapeHtml as e, icon } from './core.js?v=20261029-reward-types';
+import { escapeHtml as e, icon } from './core.js?v=20261030-member-action-spacing';
 
 // Keep file previews inside the confirmation so opening one never loses its selections.
 export function renderPublishMaterials(materials = []) {

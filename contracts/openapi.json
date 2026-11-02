@@ -3782,6 +3782,70 @@
         }
       }
     },
+    "/api/v1/review-admin/members/{user_id}/department": {
+      "put": {
+        "summary": "Update Member Department",
+        "operationId": "update_member_department_api_v1_review_admin_members__user_id__department_put",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberDepartment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/review-admin/members/grant": {
       "post": {
         "summary": "Grant Administrator",
@@ -3810,6 +3874,70 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GrantAdministrator"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/members/{user_id}/demote": {
+      "post": {
+        "summary": "Demote Administrator",
+        "operationId": "demote_administrator_api_v1_review_admin_members__user_id__demote_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoteAdministrator"
               }
             }
           }
@@ -9405,7 +9533,40 @@
           },
           "domain": {
             "type": "string",
-            "title": "Domain"
+            "title": "Domain",
+            "default": "产品开发"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "IT部",
+                  "人才开发部",
+                  "人才发展部",
+                  "客户增长与战略解决方案部",
+                  "人事运营与薪酬部",
+                  "财务法务合规部",
+                  "HRBP与组织发展部",
+                  "智能产品方案部",
+                  "PMO经营治理办公室",
+                  "行政与职场运营部",
+                  "总经办",
+                  "开发部",
+                  "多语种数据交付线",
+                  "Agent交付与行为轨迹交付线",
+                  "代码推理交付线",
+                  "高质量数据构建交付线",
+                  "多模态数据交付线",
+                  "通用模型测评交付线",
+                  "方言语音交付线"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "level": {
             "type": "string",
@@ -9420,7 +9581,6 @@
         "type": "object",
         "required": [
           "expected_revision",
-          "domain",
           "level"
         ],
         "title": "Certification"
@@ -11456,6 +11616,37 @@
         ],
         "title": "DecidePublication"
       },
+      "DemoteAdministrator": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmed"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "初级",
+              "中级",
+              "高级"
+            ],
+            "title": "Level"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "confirmed",
+          "level"
+        ],
+        "title": "DemoteAdministrator"
+      },
       "EnrollmentMutationOut": {
         "properties": {
           "resource_id": {
@@ -11984,6 +12175,38 @@
             "type": "string",
             "title": "Domain",
             "default": "产品开发"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "IT部",
+                  "人才开发部",
+                  "人才发展部",
+                  "客户增长与战略解决方案部",
+                  "人事运营与薪酬部",
+                  "财务法务合规部",
+                  "HRBP与组织发展部",
+                  "智能产品方案部",
+                  "PMO经营治理办公室",
+                  "行政与职场运营部",
+                  "总经办",
+                  "开发部",
+                  "多语种数据交付线",
+                  "Agent交付与行为轨迹交付线",
+                  "代码推理交付线",
+                  "高质量数据构建交付线",
+                  "多模态数据交付线",
+                  "通用模型测评交付线",
+                  "方言语音交付线"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "level": {
             "type": "string",
@@ -14114,6 +14337,47 @@
           "name"
         ],
         "title": "MedalContent"
+      },
+      "MemberDepartment": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "IT部",
+              "人才开发部",
+              "人才发展部",
+              "客户增长与战略解决方案部",
+              "人事运营与薪酬部",
+              "财务法务合规部",
+              "HRBP与组织发展部",
+              "智能产品方案部",
+              "PMO经营治理办公室",
+              "行政与职场运营部",
+              "总经办",
+              "开发部",
+              "多语种数据交付线",
+              "Agent交付与行为轨迹交付线",
+              "代码推理交付线",
+              "高质量数据构建交付线",
+              "多模态数据交付线",
+              "通用模型测评交付线",
+              "方言语音交付线"
+            ],
+            "title": "Department"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "department"
+        ],
+        "title": "MemberDepartment"
       },
       "MigrateCompletionCode": {
         "properties": {
@@ -18944,6 +19208,40 @@
             "type": "string",
             "title": "Domain",
             "default": "产品开发"
+          },
+          "publishingDepartment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "IT部",
+                  "人才开发部",
+                  "人才发展部",
+                  "客户增长与战略解决方案部",
+                  "人事运营与薪酬部",
+                  "财务法务合规部",
+                  "HRBP与组织发展部",
+                  "智能产品方案部",
+                  "PMO经营治理办公室",
+                  "行政与职场运营部",
+                  "总经办",
+                  "开发部",
+                  "多语种数据交付线",
+                  "Agent交付与行为轨迹交付线",
+                  "代码推理交付线",
+                  "高质量数据构建交付线",
+                  "多模态数据交付线",
+                  "通用模型测评交付线",
+                  "方言语音交付线"
+                ]
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ],
+            "title": "Publishingdepartment",
+            "default": ""
           },
           "difficulty": {
             "type": "string",

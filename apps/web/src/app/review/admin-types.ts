@@ -9,7 +9,7 @@ export const BADGES = [
 export const PRESETS: Record<string, [number, number, number]> = { "入门": [30, 50, 5], "进阶": [60, 100, 10], "挑战": [90, 200, 20] };
 export type Material = { id: string; name: string; type: "link" | "file" | "image" | "text"; url: string; text?: string; mime?: string; size?: number };
 export type AdminTask = {
- id: string; title: string; summary: string; camp: "exploration" | "novice"; domain: string; difficulty: string;
+ id: string; title: string; summary: string; camp: "exploration" | "novice"; domain: string; publishingDepartment?: string; difficulty: string;
  badges: { id: string; weight: number }[]; materials: Material[]; reviewMode: "manual" | "ai"; passScore: number;
  rubric: { id: string; name: string; points: number; description: string }[]; rubricAttachments: Material[];
  revision: number; status: string; author?: string; authorId?: string; stableKey?: string;
@@ -17,7 +17,7 @@ export type AdminTask = {
 };
 export type AdminReview = ReviewItem & { learner_id: string; learner_is_feishu?: boolean; learner_employee_no?: string; learner_phone?: string; task_id: string; camp: string; domain: string; review_mode: string;
  decision: string | null; feedback: string; score: number | null; reasons: string[]; ai_statuses: string[] };
-export type Member = { id: string; name: string; employee_no?: string; departments?: string[]; department_paths?: string[]; roles: string[]; revision: number; accessRole?: string; status?: string; certification: { domain: string; level: string } | null };
+export type Member = { id: string; name: string; employee_no?: string; departments?: string[]; department_paths?: string[]; roles: string[]; revision: number; departmentRevision?: number; protectedAdmin?: boolean; accessRole?: string; status?: string; certification: { domain: string; department?: string; level: string } | null };
 export type AdminCapabilities = { isSuperAdmin: boolean; canGrantSuperAdmins: boolean; canPublish: boolean; level: string; allowedDifficulties: string[] };
 export type AdminState = { tasks: AdminTask[]; reviews: AdminReview[]; members: Member[]; administrators?: Member[]; capabilities?: AdminCapabilities; actor: { id: string; name: string }; operatorId: string | null };
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number; code?: string };

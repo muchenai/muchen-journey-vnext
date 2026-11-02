@@ -9,7 +9,7 @@ from test_reviewer_workbench import create_submission, client_for, assert_ok, RE
 
 
 def content():
-    return {'title':'本地新版审核联调任务','summary':'阅读任务材料后，提出有依据的具体改进建议。','camp':'novice','domain':'产品开发','difficulty':'入门',
+    return {'title':'本地新版审核联调任务','summary':'阅读任务材料后，提出有依据的具体改进建议。','camp':'novice','domain':'产品开发','publishingDepartment':'开发部','difficulty':'入门',
         'badges':[{'id':'product','weight':100}], 'materials':[{'id':'source','name':'测试学习材料','type':'link','url':'https://example.com/material'}],
         'reviewMode':'manual','passScore':60,'rubric':[],'rubricAttachments':[]}
 

@@ -1,4 +1,5 @@
-import { escapeHtml as e, rewardBreakdown, BADGES, getReviewCamp } from './core.js?v=20261029-reward-types';
+import {departmentLabel} from './publishing-departments.js';
+import { escapeHtml as e, rewardBreakdown, BADGES, getReviewCamp } from './core.js?v=20261030-member-action-spacing';
 
 const labels = { pending: '待审核', approved: '已通过', rejected: '已退回' };
 const text = value => String(value ?? '');
@@ -41,7 +42,7 @@ export function createPublicationReviewController({ store, service, ui }) {
   }
   function filtered() {
     const query = state.query.trim().toLocaleLowerCase();
-    return requests().filter(request => request.status === state.status && (!query || `${request.task?.title || ''} ${request.submittedBy?.name || ''} ${request.task?.domain || ''}`.toLocaleLowerCase().includes(query)))
+    return requests().filter(request => request.status === state.status && (!query || `${request.task?.title || ''} ${request.submittedBy?.name || ''} ${request.task?.publishingDepartment || ''}`.toLocaleLowerCase().includes(query)))
       .slice().sort((left, right) => text(right.submittedAt).localeCompare(text(left.submittedAt)));
   }
   function table() {
@@ -49,7 +50,7 @@ export function createPublicationReviewController({ store, service, ui }) {
     if (!rows.length) return `<div class="pub-empty">${state.query ? '没有找到匹配的任务' : { pending: '暂无待审核的任务', approved: '暂无已通过的任务', rejected: '暂无已退回的任务' }[state.status]}</div>`;
     return `<div class="pub-table-scroll"><table class="pub-table"><thead><tr><th>任务</th><th>提交人</th><th>提交时间</th><th>状态</th>${state.status === 'rejected' ? '<th>退回原因</th>' : ''}<th>操作</th></tr></thead><tbody>${rows.map(request => {
       const task = request.task || {};
-      return `<tr><td><button type="button" class="pub-task-title" data-pub-open="${e(request.id)}">${e(task.title || '未命名任务')}</button>${request.isDemo ? '<span class="pub-demo">演示</span>' : ''}<small>${e(campName(task))} · ${e(task.domain || '未设置方向')} · ${e(task.difficulty || '未设置难度')}</small></td><td><strong>${e(request.submittedBy?.name || '未记录')}</strong><small>普通管理员</small></td><td class="pub-date">${e(date(request.submittedAt))}</td><td>${statusTag(request.status)}</td>${state.status === 'rejected' ? `<td class="pub-reason-cell">${e(request.comment || '未填写退回原因')}</td>` : ''}<td><div class="pub-row-actions"><button type="button" class="text-btn" data-pub-open="${e(request.id)}">${request.status === 'pending' && ui.isSuperAdmin ? '审核任务' : '查看详情'} ${ui.icon('arrowRight', 14)}</button>${canRevise(request) ? `<button type="button" class="text-btn" data-pub-revise="${e(request.id)}">修改并重新提交</button>` : ''}</div></td></tr>`;
+      return `<tr><td><button type="button" class="pub-task-title" data-pub-open="${e(request.id)}">${e(task.title || '未命名任务')}</button>${request.isDemo ? '<span class="pub-demo">演示</span>' : ''}<small>${e(campName(task))} · ${e(departmentLabel(task.publishingDepartment))} · ${e(task.difficulty || '未设置难度')}</small></td><td><strong>${e(request.submittedBy?.name || '未记录')}</strong><small>普通管理员</small></td><td class="pub-date">${e(date(request.submittedAt))}</td><td>${statusTag(request.status)}</td>${state.status === 'rejected' ? `<td class="pub-reason-cell">${e(request.comment || '未填写退回原因')}</td>` : ''}<td><div class="pub-row-actions"><button type="button" class="text-btn" data-pub-open="${e(request.id)}">${request.status === 'pending' && ui.isSuperAdmin ? '审核任务' : '查看详情'} ${ui.icon('arrowRight', 14)}</button>${canRevise(request) ? `<button type="button" class="text-btn" data-pub-revise="${e(request.id)}">修改并重新提交</button>` : ''}</div></td></tr>`;
     }).join('')}</tbody></table></div><div class="pub-table-footer">共 ${rows.length} 条记录</div>`;
   }
   function materialRows(files, offset = 0) {
@@ -64,7 +65,7 @@ export function createPublicationReviewController({ store, service, ui }) {
     const materials = Array.isArray(task.materials) ? task.materials : [];
     const rubricFiles = Array.isArray(task.rubricAttachments) ? task.rubricAttachments : [];
     const dimensions = Array.isArray(task.rubric) ? task.rubric : [];
-    return `<div class="pub-task-meta"><span>所属营地<strong>${e(campName(task))}</strong></span><span>任务方向<strong>${e(task.domain || '—')}</strong></span><span>任务难度<strong>${e(task.difficulty || '—')}</strong></span><span>预计耗时<strong>${count(task.minutes)} 分钟</strong></span></div>
+    return `<div class="pub-task-meta"><span>所属营地<strong>${e(campName(task))}</strong></span><span>发布部门<strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>任务难度<strong>${e(task.difficulty || '—')}</strong></span><span>预计耗时<strong>${count(task.minutes)} 分钟</strong></span></div>
       <section class="pub-detail-section"><h3>任务简述</h3><p class="pub-summary">${e(task.summary || '未填写任务简述')}</p></section>
       <section class="pub-detail-section"><h3>学习材料 <small>${materials.length}</small></h3>${materialRows(materials)}</section>
       <section class="pub-detail-section"><h3>任务奖励</h3><div class="pub-reward-summary"><span><strong>${count(rewards.xp)}</strong> 经验值</span><span><strong>${count(rewards.totalPoints)}</strong> 徽章点</span><span>发布后可直接领取</span></div><div class="pub-reward-list">${(rewards.allocations || []).map(item => `<div><span>${e(BADGES.find(badge => badge.id === item.id)?.category || item.name || item.id)}徽章点 <small>${count(item.weight)}%</small></span><strong>${count(item.points)} 点</strong></div>`).join('')}</div></section>

@@ -2,20 +2,22 @@ import {createKnowledgeStore} from './knowledge-store.js?v=20261028-server';
 import {createKnowledgeController} from './knowledge.js?v=20261028-server';
 import {createGuildStore} from './guild-store.js?v=20261028-server';
 import {createGuildController} from './guild.js?v=20261028-server';
-import {createPublicationReviewController} from './publication-review.js?v=20261028-my-publications-label';
-import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261028-publication-local';
+import {createPublicationReviewController} from './publication-review.js?v=20261030-member-action-spacing';
+import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261030-member-action-spacing';
 import {createMedalsApi} from './medals-api.js?v=20261028-publication-local';
 import {createMedalsController} from './medals.js?v=20261028-badges-local';
 import { renderPublishMaterials } from './publish-materials.js';
-import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261029-reward-types';
-import { ApiStore, newDraft, createJourneyService } from './native-api.js?v=20261028-publication-local';
+import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261030-member-action-spacing';
+import { ApiStore, newDraft, createJourneyService } from './native-api.js?v=20261030-member-action-spacing';
 import { createSandboxController } from './sandbox.js?v=20261021-brand-npc';
 import { renderReview, bindReview, openSubmission } from './review.js?v=20261026-passed-tab';
-import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261028-badge-colors';
-import { openCertification } from './member-access.js';
-import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261028-publication-local';
-import { createAcademyStore } from './native-api.js?v=20261028-publication-local';
+import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261030-member-action-spacing';
+import { openCertification } from './member-access.js?v=20261030-member-action-spacing';
+import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261030-member-action-spacing';
+import { createAcademyStore } from './native-api.js?v=20261030-member-action-spacing';
 import { createAcademyController } from './academy.js?v=20261021-academy-management';
+
+import {departmentOptions, departmentLabel, isPublishingDepartment} from './publishing-departments.js';
 
 const store = await ApiStore.create().catch(error => { document.querySelector('#app').innerHTML = `<div class="card empty-state"><strong>${e(error.message)}</strong><a href="/review/login">重新登录</a></div>`; throw error; });
 const service = createJourneyService({ store, getCurrentUser: getCurrentInviteUser });
@@ -191,7 +193,7 @@ function renderBasics() {
     <label class="form-field full"><span class="field-label">任务标题 <i>*</i></span><div class="input-counter"><input data-field="title" value="${e(d.title)}" maxlength="60" placeholder="给任务起一个清晰、具体的名字"><span id="title-counter">${d.title.length}/60</span></div></label>
     <label class="form-field full"><span class="field-label">任务简述 <i>*</i></span><textarea data-field="summary" rows="3" maxlength="400" placeholder="简要介绍任务背景与学习目标">${e(d.summary)}</textarea><span class="field-hint">让学员快速了解：要做什么，以及为什么做。</span></label>
     <fieldset class="form-field full camp-field"><legend class="field-label">所属营地</legend><div class="camp-options">${REVIEW_CAMPS.map(camp=>camp.id==='exploration'?`<button type="button" class="camp-option camp-option-unavailable" data-camp-unavailable aria-disabled="true"><span class="camp-unavailable-radio" aria-hidden="true"></span><span>${camp.label}</span></button>`:`<label class="camp-option"><input type="radio" name="task-camp" data-field="camp" value="${camp.id}" ${getReviewCamp({},d)===camp.id?'checked':''}><span>${camp.label}</span></label>`).join('')}</div></fieldset>
-    <label class="form-field"><span class="field-label">任务方向</span><select data-field="domain">${['产品开发','数据交付','技术开发','PMO','AI评测','质量检测','项目管理','AI 能力'].map(x=>`<option ${x===d.domain?'selected':''}>${x}</option>`).join('')}</select></label>
+    <label class="form-field"><span class="field-label">发布部门 <span class="required">*</span></span><select data-field="publishingDepartment" required>${departmentOptions(d.publishingDepartment)}</select></label>
     <label class="form-field"><span class="field-label">难度 <i>*</i></span><select data-field="difficulty">${DIFFICULTY_PRESETS.map(({name})=>`<option ${name===d.difficulty?'selected':''} ${store.capabilities?.allowedDifficulties.includes(name)?'':'disabled'}>${name}</option>`).join('')}</select>${store.capabilities?.isSuperAdmin?'':`<span class="field-hint">当前认证：${e(store.capabilities?.level||'初级')}，可发布${e((store.capabilities?.allowedDifficulties||[]).join('、'))}任务</span>`}</label>
 
   </div></section>
@@ -223,7 +225,7 @@ function getReadiness() {
     try{return ['http:','https:'].includes(new URL(m.url).protocol);}catch{return false;}
   };
   return [
-    {id:'task-basics',title:'基础信息',ready:filled(d.title)&&d.title.trim().length>=3&&d.title.trim().length<=60&&filled(d.summary)&&d.summary.trim().length>=10&&d.summary.trim().length<=400&&filled(d.domain)&&DIFFICULTY_PRESETS.some(p=>p.name===d.difficulty)},
+    {id:'task-basics',title:'基础信息',ready:filled(d.title)&&d.title.trim().length>=3&&d.title.trim().length<=60&&filled(d.summary)&&d.summary.trim().length>=10&&d.summary.trim().length<=400&&isPublishingDepartment(d.publishingDepartment)&&DIFFICULTY_PRESETS.some(p=>p.name===d.difficulty)},
     {id:'task-badges',title:'奖励点数',ready:badges.length>=1&&badges.length<=2&&new Set(badges.map(b=>b.id)).size===badges.length&&badges.every(b=>badgeList().some(x=>x.id===b.id)&&Number.isFinite(Number(b.weight))&&Number.isInteger(b.weight)&&b.weight%20===0&&b.weight>=10&&b.weight<=100)&&Math.abs(badges.reduce((sum,b)=>sum+Number(b.weight),0)-100)<0.000001},
     {id:'task-materials',title:'学习材料',ready:materials.length>0&&materials.every(validMaterial)},
     {id:'task-review',title:'审核方式',ready:['manual','ai'].includes(d.reviewMode)&&(d.reviewMode!=='ai'||(d.passScore!==null&&d.passScore!==undefined&&String(d.passScore).trim()!==''&&Number.isFinite(Number(d.passScore))&&Number(d.passScore)>=0&&Number(d.passScore)<=100))},
@@ -243,7 +245,7 @@ function renderAside() {
   const reward=rewardBreakdown(d);
   const checks=getReadiness();
   return `<section class="card overview-card compact-task-preview">
-    <div class="overview-body"><div class="preview-meta-line"><span class="category-label">${e(d.domain)} <span>·</span> ${e(d.difficulty)}</span><span class="tag tag-neutral">实时预览</span></div><h3>${e(d.title||'等待你的第一个任务')}</h3>
+    <div class="overview-body"><div class="preview-meta-line"><span class="category-label">${e(d.publishingDepartment ? departmentLabel(d.publishingDepartment) : '待选择部门')} <span>·</span> ${e(d.difficulty)}</span><span class="tag tag-neutral">实时预览</span></div><h3>${e(d.title||'等待你的第一个任务')}</h3>
       <div class="overview-time">${icon('clock',14)} 预计 ${d.minutes||0} 分钟 <span>${d.reviewMode==='manual'?'人工审核':'AI 自测'}</span></div>
       <div class="overview-rewards"><div><span class="metric-symbol">XP</span><strong>${format(reward.xp)}</strong><small>经验值</small></div><div>${icon('award',18)}<strong>${format(reward.totalPoints)}</strong><small>徽章点</small></div></div>
       <div class="preview-task-access"><span>领取方式</span><strong>直接领取</strong></div>

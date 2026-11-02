@@ -5,6 +5,8 @@ import { STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE } from "@/lib/auth/cookies";
 import { loadAdmin, loadReview, saveAdminTask, archiveAdminTask, publishAdminTask, decideAdminReview, certifyMember, testAdminTask, searchCompanyMembers, grantAdministrator, revokeAdministrator } from "@/app/review/admin-actions";
 import type { AdminTask, Member } from "@/app/review/admin-types";
 import { updateReviewClaim } from "@/app/review/admin-actions";
+import { updateMemberDepartment } from "@/app/review/admin-actions";
+import { demoteAdministrator } from "@/app/review/admin-actions";
 import { bulkAdministratorAction } from "@/app/review/admin-actions";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +99,9 @@ export async function POST(request: NextRequest) {
       case "revokeAdmin":
         if (!uuid(id) || !Number.isInteger(payload?.revision) || payload.confirmed !== true) break;
         return reply(await revokeAdministrator(id, payload.revision));
+      case "demoteAdmin":
+        if (!uuid(id) || !Number.isInteger(payload?.revision) || payload.confirmed !== true || !["初级","中级","高级"].includes(payload.level)) break;
+        return reply(await demoteAdministrator(id, payload.revision, payload.level));
       case "saveTask":
       case "archiveTask":
       case "publishTask":
@@ -110,7 +115,10 @@ export async function POST(request: NextRequest) {
         return reply(await decideAdminReview(id, payload, key));
       case "certify":
         if (!uuid(payload?.member?.id) || !Number.isInteger(payload.member.revision)) break;
-        return reply(await certifyMember(payload.member as Member, payload.domain, payload.level));
+        return reply(await certifyMember(payload.member as Member, payload.domain, payload.level, payload.department));
+      case "updateMemberDepartment":
+        if (!uuid(payload?.member?.id) || !Number.isInteger(payload.member.departmentRevision) || typeof payload.department !== "string") break;
+        return reply(await updateMemberDepartment(payload.member as Member, payload.department));
       case "sandbox":
         if (!task || typeof payload?.answer !== "string" || payload.answer.length > 30000) break;
         return reply(await testAdminTask(task as AdminTask, payload.answer));
