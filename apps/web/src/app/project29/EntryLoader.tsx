@@ -15,7 +15,7 @@ const publish = () => listeners.forEach(listener => listener());
 
 function withTimeout<T>(operation: Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("资源加载超时")), 45000);
+    const timer = window.setTimeout(() => reject(new Error("资源加载超时")), 60000);
     operation.then(value => {
       window.clearTimeout(timer);
       resolve(value);

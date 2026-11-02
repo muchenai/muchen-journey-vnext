@@ -2,7 +2,7 @@ import { BadgeShop } from "./BadgeShop"
 import { TaskClassifications } from "./TaskClassifications"
 import { filterDepartmentTasks, taskDepartmentName, type TaskDepartmentFilter } from "./taskDepartments"
 import { useVillageTasks, type VillageTask } from "./useVillageTasks"
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { sharedAsset } from "./sharedAsset"
 import type { PreviewIdentity } from "./previewStorage"
 import { useCanvasScale } from "./useCanvasScale"
@@ -97,6 +97,29 @@ export function ModuleHub({
   const modal = useRef<HTMLDialogElement>(null)
   const listing = useRef<HTMLDivElement>(null)
   const pageContent = useRef<HTMLDivElement>(null)
+  const pendingMapTaskScroll = useRef(false)
+  const openMapDepartmentTasks = useCallback((department: TaskDepartmentFilter) => {
+    if (module !== "village") return
+    setMenu("hall")
+    setTaskDepartment(department)
+    setTaskLevel("全部")
+    setTaskReview("全部")
+    setTaskBadgeType("全部")
+    setQuery("")
+    setFilter("全部")
+    setSort("recommended")
+    setDialog(null)
+    setNotice("")
+    pendingMapTaskScroll.current = true
+  }, [module, setQuery, setFilter])
+  useLayoutEffect(() => {
+    if (menu !== "hall" || !pendingMapTaskScroll.current) return
+    pendingMapTaskScroll.current = false
+    if (listing.current && pageContent.current) pageContent.current.scrollTo({
+      top: listing.current.offsetTop - pageContent.current.offsetTop - 24,
+      behavior: "auto",
+    })
+  }, [menu])
   useEffect(() => {
     if (dialog) modal.current?.showModal()
     else modal.current?.close()
@@ -287,7 +310,7 @@ export function ModuleHub({
                 {menu === "profile" ? (
                   <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>{setMenu("saved");onNavigate("academy")}} />
                 ) : menu === "map" ? (
-                  <WorldMap />
+                  <WorldMap onViewTasks={module === "village" ? openMapDepartmentTasks : undefined} />
                 ) : module === "academy" && menu === "saved" ? (
                   <div className="favorite-knowledge-page">
                     <FavoriteKnowledge headingLevel="h1" courses={academyCourses} favoriteIds={favorites} query={query}
@@ -582,7 +605,7 @@ export function ModuleHub({
                         : !visibleCourses.length) && (
                         <ModulePanel className="module-empty">
                           <h3>
-                            {villageEnabled ? (menu === "mine" ? "还没有接取任务" : !practiceTasks.length ? "暂无已发布任务" : "未找到匹配内容") : "暂未开放"}
+                            {villageEnabled ? (menu === "mine" ? "还没有接取任务" : taskDepartment !== "all" && taskLevel === "全部" && taskReview === "全部" && taskBadgeType === "全部" && !query.trim() ? "该部门暂无已发布任务" : !practiceTasks.length ? "暂无已发布任务" : "未找到匹配内容") : "暂未开放"}
                           </h3>
                           <p>{villageEnabled ? (!practiceTasks.length ? "管理员发布新手村任务后，会在这里显示。" : "试试其他分类或清空搜索词。") : "该板块暂未开放。"}</p>
                           <button

@@ -1,0 +1,14 @@
+{
+  "schema_version": 3,
+  "base_candidate": "69c98991a0dcc9e4929f1eb6d618920909ed72f3",
+  "base_release": "/srv/journey-next-production/canary/releases/69c98991a0dcc9e4929f1eb6d618920909ed72f3-learner-project31",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0051_community_modules",
+    "to": "0051_community_modules"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {}
+}
