@@ -73,3 +73,11 @@ condition = "AND"
 regexTarget = "line"
 regexes = ['''(STORAGE_KEY|storageKey)\s*=\s*"muchen[-.][a-z0-9.-]+"''']
 paths = ['''(^|/)prototypes/(boss-dungeon/app\.js|delivery-guild/index\.html)$''']
+
+[[allowlists]]
+description = "Reviewed cleanup scope contains immutable public GHCR image references, not API credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\s*"ghcr\.io/(muchenai|muchenai2024-creator)/muchen-journey-vnext-(api|web|worker)(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})",?\s*$''']
+paths = ['''(^|/)deploy/production/disk-cleanup-scope-20261103\.json$''']
