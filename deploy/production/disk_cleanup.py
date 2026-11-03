@@ -43,16 +43,23 @@ def checked(args, timeout=120):
 
 def image_info(reference, *, optional=False):
     assert IMAGE_ID.fullmatch(reference) or re.fullmatch(r'ghcr\.io/[A-Za-z0-9_./:@-]+',reference), 'IMAGE_REFERENCE'
-    template = '{"id":{{json .Id}},"tags":{{json .RepoTags}},"digests":{{json .RepoDigests}},"labels":{{json .Config.Labels}},"created":{{json .Created}},"parent":{{json .Parent}}}'
-    result = run(['docker','image','inspect','--format',template,reference])
+    # New Docker API versions omit empty legacy fields such as Parent. Parse
+    # the document locally and retain only the deployment metadata we need.
+    # Never log or return Config.Env or other image configuration values.
+    result = run(['docker','image','inspect',reference])
     if optional and result.returncode and any(token in result.stderr.lower() for token in (b'no such image',b'not found')):
         return None
     assert result.returncode==0, 'IMAGE_INSPECTION_FAILED'
-    value = json.loads(result.stdout)
+    rows = json.loads(result.stdout)
+    assert len(rows)==1, 'IMAGE_INSPECTION_COUNT'
+    row = rows[0]
+    labels = (row.get('Config') or {}).get('Labels') or {}
+    value = {'id':row['Id'],'tags':row.get('RepoTags') or [],'digests':row.get('RepoDigests') or [],
+        'created':row['Created'],'parent':row.get('Parent') or '',
+        'revision':labels.get('org.opencontainers.image.revision',''),
+        'source':labels.get('org.opencontainers.image.source','').rstrip('/')}
     assert IMAGE_ID.fullmatch(value['id']), 'IMAGE_ID'
     value['refs'] = sorted(set((value['tags'] or [])+(value['digests'] or [])))
-    value['revision'] = (value['labels'] or {}).get('org.opencontainers.image.revision','')
-    value['source'] = (value['labels'] or {}).get('org.opencontainers.image.source','').rstrip('/')
     return value
 
 
