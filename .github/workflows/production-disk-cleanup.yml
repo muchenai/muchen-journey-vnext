@@ -1,0 +1,99 @@
+name: Scoped Production Disk Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed cleanup operations commit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Identify temporary runner ingress
+        id: runner
+        run: |
+          set -euo pipefail
+          cidr="$(curl -fsS --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress,sys
+          network=ipaddress.ip_network(sys.argv[1],strict=True)
+          assert network.version==4 and network.prefixlen==32 and network.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only the temporary runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Recheck scope, clean verified objects and collect fresh disk accounting
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          JOURNEY_HOST: ${{ secrets.TALENT_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/journey-cleanup-key"
+          known="$RUNNER_TEMP/journey-cleanup-known"
+          remote="/srv/journey-next-production/canary/exploration-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-cleanup"
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          opts=(-i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known")
+          collect() {
+            for name in cleanup-plan.json cleanup-receipt.json; do
+              ssh "${opts[@]}" "root@$JOURNEY_HOST" "test -f '$remote/$name' && cat '$remote/$name'" > "$RUNNER_TEMP/journey-disk-$name" || true
+            done
+            rm -f "$key" "$known"
+          }
+          trap collect EXIT
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$remote' && install -d -m 0700 '$remote'"
+          (
+            cd deploy/production
+            sha256sum disk_cleanup.py disk_audit.py disk-cleanup-scope-20261103.json > "$RUNNER_TEMP/cleanup-SHA256SUMS"
+          )
+          scp "${opts[@]}" deploy/production/disk_cleanup.py deploy/production/disk_audit.py deploy/production/disk-cleanup-scope-20261103.json "root@$JOURNEY_HOST:$remote/"
+          scp "${opts[@]}" "$RUNNER_TEMP/cleanup-SHA256SUMS" "root@$JOURNEY_HOST:$remote/SHA256SUMS"
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "cd '$remote' && sha256sum -c SHA256SUMS && python3 disk_cleanup.py" | tee "$RUNNER_TEMP/journey-disk-cleanup-progress.txt"
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "python3 '$remote/disk_audit.py'" | tee "$RUNNER_TEMP/journey-disk-cleanup-after.json"
+          python3 - <<'PY'
+          import json,os,pathlib
+          result=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'journey-disk-cleanup-after.json').read_text())
+          assert result['status']=='PASS' and result['production_before']==result['production_after']
+          PY
+      - name: Close and verify the exact runner SSH rule
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Preserve cleanup plan, receipt, progress and post-cleanup accounting
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-disk-cleanup-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/journey-disk-cleanup-progress.txt
+            ${{ runner.temp }}/journey-disk-cleanup-plan.json
+            ${{ runner.temp }}/journey-disk-cleanup-receipt.json
+            ${{ runner.temp }}/journey-disk-cleanup-after.json
+          retention-days: 14
