@@ -56,7 +56,7 @@ def verify_image(image, expected):
         process.wait()
 
 
-def transport_files(package, manifest):
+def transport_files(package, manifest, *, preserve_changed=False):
     """Only exact manifest-bound image chunks and their assembled gzip copies."""
     assert package.is_dir() and not package.is_symlink() and package.resolve() == package
     result = []
@@ -76,7 +76,11 @@ def transport_files(package, manifest):
             if path.exists():
                 assert path.is_file() and path.resolve().parent == package, 'UNSAFE_TRANSPORT_FILE'
                 assert 0 < path.stat().st_size <= limit, 'TRANSPORT_SIZE'
-                assert sha(path) == expected, 'TRANSPORT_CHANGED'
+                if sha(path) != expected:
+                    if preserve_changed:
+                        report(preserved_transport=filename, package=package.name, reason='HASH_MISMATCH')
+                        continue
+                    raise AssertionError('TRANSPORT_CHANGED')
                 result.append((path, expected, path.stat().st_size))
     return result
 
@@ -111,7 +115,13 @@ def cleanup_transports(module):
             continue
         if 'archives' not in manifest:
             continue
-        plan = transport_files(package, manifest)
+        try:
+            plan = transport_files(package, manifest, preserve_changed=package != SOURCE)
+        except (AssertionError, KeyError, TypeError):
+            if package == SOURCE:
+                raise
+            report(preserved_package=package.name, reason='HISTORICAL_MANIFEST_NOT_ELIGIBLE')
+            continue
         assert removed + sum(row[2] for row in plan) <= MAXIMUM_RECLAIM, 'RECLAIM_BOUND'
         for path, expected, size in plan:
             assert sha(path) == expected, 'TRANSPORT_CHANGED'

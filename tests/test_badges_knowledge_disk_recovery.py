@@ -78,6 +78,18 @@ def test_already_reclaimed_transport_copies_are_not_required_or_recreated(tmp_pa
     assert recovery.transport_files(tmp_path,data) == []
 
 
+def test_changed_historical_copies_are_preserved_while_matching_copies_remain_eligible(tmp_path):
+    data = manifest(tmp_path)
+    changed = tmp_path/'api.tar.gz'
+    changed.write_bytes(b'changed historical transport')
+    plan = recovery.transport_files(tmp_path,data,preserve_changed=True)
+    assert {row[0].name for row in plan} == {'api.part0000','web.part0000','web.tar.gz'}
+    assert changed.read_bytes() == b'changed historical transport'
+    data['archives']['api']['chunks'][0]['file'] = '../before.json'
+    with pytest.raises(AssertionError,match='UNSAFE_CHUNK'):
+        recovery.transport_files(tmp_path,data,preserve_changed=True)
+
+
 def test_recovery_keeps_original_application_and_production_approval_boundary():
     assert recovery.CANDIDATE == '2bab0cefe55447c9d64af81dd5c52f5db67db09c'
     source = (ROOT/'deploy/badges-knowledge/recover_disk.py').read_text()
