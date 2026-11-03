@@ -29,7 +29,7 @@ export function createKnowledgeStore({getCurrentUser}) {
  const api=createCommunityApi('knowledge',getCurrentUser,{categories:[],items:[]});
  return {...api,
   saveLink:values=>api.change('saveLink',values),updateItem:(id,values)=>api.change('updateItem',{...values,id}),
-  removeItem:id=>api.change('removeItem',{id}),saveCategory:values=>api.change('saveCategory',values),removeCategory:id=>api.change('removeCategory',{id}),
+  removeItem:id=>api.change('removeItem',{id}),setItemStatus:(id,status)=>api.change('setItemStatus',{id,status}),saveCategory:values=>api.change('saveCategory',values),removeCategory:id=>api.change('removeCategory',{id}),
   async uploadFiles(files,values={}) {
    files=Array.from(files||[]);if(!files.length||files.length>20)throw new Error('请选择 1～20 个文件。');
    if(files.some(f=>f.size>100*1024*1024))throw new Error('单个文件不能超过 100 MB。');

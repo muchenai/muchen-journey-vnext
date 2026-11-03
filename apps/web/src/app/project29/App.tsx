@@ -31,6 +31,8 @@ function ExperienceScreen() {
  const taskStatus = useTaskStatus();
  const identity = learnerName;
  const [screen, setScreen] = useState<Screen>(initialScreen);
+ const [lastModule, setLastModule] = useState<"dashboard" | "village" | "academy" | "guild">("dashboard");
+ const isModuleScreen = ["dashboard", "village", "academy", "guild"].includes(screen);
  const [entryResourcesReady, setEntryResourcesReady] = useState(initialScreen !== "login");
  const scale = useCanvasScale();
  const viewportRef = useRef<HTMLElement>(null);
@@ -90,6 +92,7 @@ function ExperienceScreen() {
    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
  }, [screen, router]);
  const navigate = (target: Screen) => {
+   if (["dashboard", "village", "academy", "guild"].includes(target)) setLastModule(target as typeof lastModule);
    if (["village","academy","guild"].includes(target)) {setScreen(target);setNotice("");return;}
    const url = new URL(window.location.href);
    if (target === "dashboard" || target === "tasks" || target === "welcome") {
@@ -310,8 +313,10 @@ function ExperienceScreen() {
  const revealLogin = useCallback(() => setEntryResourcesReady(true), []);
  if (screen === "login" && !entryResourcesReady) return <ProjectResourceLoader onReady={revealLogin} />;
  if (screen === "login") return <Login key={`${joinPhase}:${joinError}`} />;
- if (["dashboard", "village", "academy", "guild"].includes(screen)) return <ModuleHub key={screen}
-   module={screen as "dashboard" | "village" | "academy" | "guild"} identity={learnerName}
+ const moduleContent = <div hidden={!isModuleScreen}>
+ <ModuleHub
+   active={isModuleScreen}
+   module={isModuleScreen ? screen as "dashboard" | "village" | "academy" | "guild" : lastModule} identity={learnerName}
    nicknameRequired={joinPhase === "nickname"}
    onNavigate={navigate}
    decoration={<GradientStroke variant="task" strokeWidth={1} />}
@@ -323,8 +328,8 @@ function ExperienceScreen() {
      <UpdatedDashboard identity={identity} decoration={<GradientStroke variant="task" strokeWidth={1} />} activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />} idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />} />
    </div>{selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position-1]?.title ?? selectedFeedback.title} onClose={()=>setFeedbackAssignmentId(null)} />}
    {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={()=>setBurst(null)} />}{notice && <div className="module-toast" role="status">{notice}</div>}</>}
- />;
- return <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
+ /></div>;
+ return <>{moduleContent}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
    energizePanels(event.currentTarget, event.clientX, event.clientY);
    if (screen === "dashboard" && event.pointerType === "mouse") magnetizeControl(event.currentTarget, event.target, event.clientX, event.clientY);
  }} onPointerLeave={event => {
@@ -341,7 +346,7 @@ function ExperienceScreen() {
  {selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position - 1]?.title ?? selectedFeedback.title} onClose={() => setFeedbackAssignmentId(null)} />}
  {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={() => setBurst(null)} />}
  {(notice || ((screen === "view" || screen === "detail") && workspaceMessage)) && <div role="status" className="fixed bottom-6 left-1/2 z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-cyan-300 bg-[#041a35]/95 px-6 py-3 text-center text-sm text-cyan-100 shadow-lg">{notice || workspaceMessage}</div>}
- </main>;
+ </main>}</>;
 }
 
 const assetPathPrefix = '/assets/project29'

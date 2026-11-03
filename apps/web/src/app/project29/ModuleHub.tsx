@@ -33,6 +33,7 @@ import { JourneyDialogSurface } from "./JourneyDialogSurface"
 import { AccountSwitchDialog } from "./AccountSwitchDialog"
 import { PersonalProfile } from "./PersonalProfile"
 import { WorldMap } from "./WorldMap"
+import { KnowledgeLibrary } from "./KnowledgeLibrary"
 import { FavoriteKnowledge, KnowledgeSaveButton } from "./FavoriteKnowledge"
 import "./favoriteKnowledge.css"
 import { ModuleCourseArtwork } from "./ModuleCourseArtwork"
@@ -48,6 +49,7 @@ type DialogState = { type: "task"; task: VillageTask } | {
 } | { type: "info"; title: string; body: string } | { type: "share" } | null
 
 export function ModuleHub({
+  active = true,
   module,
   identity,
   onNavigate,
@@ -59,6 +61,7 @@ export function ModuleHub({
   explorationTaskCount = 0,
   nicknameRequired = false,
 }: {
+  active?: boolean
   module: ModuleDestination
   identity: PreviewIdentity
   onNavigate: (destination: ModuleDestination) => void
@@ -121,6 +124,19 @@ export function ModuleHub({
     })
   }, [menu])
   useEffect(() => {
+    const initial = window.setTimeout(() => {
+      setMenu("hall")
+      resetTaskFilters()
+      setFilter("全部")
+      setQuery("")
+      setSort("recommended")
+      setDialog(null)
+      setNotice("")
+      pageContent.current?.scrollTo({ top: 0 })
+    }, 0)
+    return () => window.clearTimeout(initial)
+  }, [module])
+  useEffect(() => {
     if (dialog) modal.current?.showModal()
     else modal.current?.close()
   }, [dialog])
@@ -146,8 +162,8 @@ export function ModuleHub({
     })
   }
   function navigateMenu(next: string) {
-    if (next === "map") {
-      setMenu("map")
+    if (next === "map" || next === "knowledge") {
+      setMenu(next)
       setQuery("")
       pageContent.current?.scrollTo({ top: 0 })
       return
@@ -178,11 +194,6 @@ export function ModuleHub({
       info(
         "交付倒计时 · 风险升级演练",
         "你负责的项目距离交付仅剩 3 天，关键依赖延期且验收范围发生变化。\n练习目标：识别交付红线、制定备选方案，并说明何时升级风险。\n交付成果：风险清单、升级沟通稿和应急方案。\n这是合成工作样本，正式提交与导师验收接口尚未接入。",
-      )
-    } else if (next === "knowledge") {
-      info(
-        "知识库",
-        "任务模板：访谈洞察卡、风险清单、数据质量报告、测试用例。\n学习方法：角色—任务—背景—输出格式，先明确目标，再核对证据。\n示例资料未配置外部链接，可先在 AI 学院查看课程介绍。",
       )
     } else {
       info(
@@ -222,13 +233,8 @@ export function ModuleHub({
     if (id) {
       const selected = practiceTasks.find(t => t.id === id)
       if (selected) {
-        const timer = window.setTimeout(() => {
-          setDialog({type:"task", task:selected});
-          const url = new URL(window.location.href);
-          url.searchParams.delete("task");
-          window.history.replaceState(null,"",url);
-        }, 0);
-        return () => window.clearTimeout(timer);
+        const initial = window.setTimeout(() => { setDialog({type:"task", task:selected}); const url = new URL(window.location.href); url.searchParams.delete("task"); window.history.replaceState(null,"",url) }, 0)
+        return () => window.clearTimeout(initial)
       }
     }
   }, [villageEnabled, practiceTasks])
@@ -256,7 +262,7 @@ export function ModuleHub({
           className="module-hub"
           onClickCapture={event=>{
             const target=event.target as HTMLElement;
-            if(menu!=="profile" && menu!=="map" && module!=="dashboard" && !villageEnabled && !modulePagesEnabled && target.closest(".module-page-content") && target.closest("button")) {
+            if(menu!=="profile" && menu!=="map" && menu!=="knowledge" && module!=="dashboard" && !villageEnabled && !modulePagesEnabled && target.closest(".module-page-content") && target.closest("button")) {
               const button=target.closest("button");
               if(button?.hasAttribute("data-page-navigation"))return;
               if(button?.closest(".module-filterbar") || button?.closest(".module-filter-tabs"))return;
@@ -288,7 +294,7 @@ export function ModuleHub({
               query={query}
               onQuery={(value) => {
                 setQuery(value)
-                if (menu !== "profile" && menu !== "map" && menu !== "badges" && menu !== "hall" && !(module === "academy" && menu === "saved")) setMenu("hall")
+                if (menu !== "profile" && menu !== "map" && menu !== "knowledge" && menu !== "badges" && menu !== "hall" && !(module === "academy" && menu === "saved")) setMenu("hall")
               }}
               onHome={() => { setMenu("hall"); setQuery(""); onNavigate("dashboard") }}
               onProfile={() => {
@@ -296,11 +302,15 @@ export function ModuleHub({
                 setMenu("profile");setQuery("");pageContent.current?.scrollTo({top:0})
               }}
             />
-            {module === "dashboard" && menu !== "profile" && menu !== "map" ? (
+            <div className="module-map-host" data-active={menu === "map"} aria-hidden={menu !== "map"} inert={menu !== "map"}>
+              <WorldMap active={active && menu === "map"} onViewTasks={module === "village" ? openMapDepartmentTasks : undefined} />
+            </div>
+            {module === "dashboard" && menu !== "profile" && menu !== "map" && menu !== "knowledge" ? (
               <div className="module-dashboard-content">{dashboardContent}</div>
             ) : (
               <div
                 className="module-page-content"
+                style={menu === "map" ? {display:"none"} : undefined}
                 data-world-map={menu === "map" || undefined}
                 ref={pageContent}
                 tabIndex={0}
@@ -310,7 +320,9 @@ export function ModuleHub({
                 {menu === "profile" ? (
                   <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>{setMenu("saved");onNavigate("academy")}} />
                 ) : menu === "map" ? (
-                  <WorldMap onViewTasks={module === "village" ? openMapDepartmentTasks : undefined} />
+                  null
+                ) : menu === "knowledge" ? (
+                  <KnowledgeLibrary key={module} module={module} query={query} onClearSearch={() => setQuery("")} />
                 ) : module === "academy" && menu === "saved" ? (
                   <div className="favorite-knowledge-page">
                     <FavoriteKnowledge headingLevel="h1" courses={academyCourses} favoriteIds={favorites} query={query}

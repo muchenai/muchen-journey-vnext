@@ -1,4 +1,4 @@
-import { validateKnowledgeUrl, knowledgeFileType } from './knowledge-store.js?v=20261028-server';
+import { validateKnowledgeUrl, knowledgeFileType } from './knowledge-store.js?v=20261103-module-publication';
 
 const e = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const types = [['all','全部格式'],['link','在线文档'],['ppt','PPT'],['word','Word'],['pdf','PDF'],['sheet','表格'],['image','图片'],['other','其他文件']];
@@ -7,9 +7,12 @@ const date = value => { const d = new Date(value); return Number.isNaN(d.getTime
 const fileKind = item => item.kind === 'link' ? 'link' : knowledgeFileType(item.fileName || '');
 const fileLabel = item => item.kind === 'link' ? '在线文档' : (String(item.fileName || '').match(/\.([a-z0-9]{1,10})$/i)?.[1]?.toUpperCase() || '文件');
 const errorText = error => error?.message || '操作失败，请重试';
+const modules = [['dashboard','探索营'],['village','新手村'],['academy','AI学院'],['guild','交付线公会']];
+const moduleNames = item => modules.filter(([id]) => item.modules?.includes(id)).map(([,name]) => name).join('、') || '待设置发布范围';
+const statusName = item => !item.modules?.length ? '待设置范围' : ({published:'已发布',draft:'草稿',unpublished:'已下架'}[item.status] || '草稿');
 
 export function createKnowledgeController({ knowledge, ui }) {
-  const state = { loaded: false, loading: false, loadError: '', query: '', category: 'all', type: 'all' };
+  const state = { loaded: false, loading: false, loadError: '', query: '', category: 'all', type: 'all', module: 'all' };
   let active = false, generation = 0;
   const previewCleanups = new Set();
   const ic = (name, size = 16) => ui.icon(name, size);
@@ -24,6 +27,7 @@ export function createKnowledgeController({ knowledge, ui }) {
     const query = state.query.trim().toLocaleLowerCase();
     return snapshot().items.filter(item => (state.category === 'all' || item.categoryId === state.category)
       && (state.type === 'all' || fileKind(item) === state.type)
+      && (state.module === 'all' || item.modules?.includes(state.module))
       && (!query || [item.title,item.description,item.fileName,item.url,item.createdBy?.name,categoryName(item.categoryId)].some(value => String(value || '').toLocaleLowerCase().includes(query))))
       .sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   }
@@ -32,12 +36,12 @@ export function createKnowledgeController({ knowledge, ui }) {
     if (!state.loaded) return '<div class="kb-empty" role="status">正在加载知识库…</div>';
     const list = results();
     if (!list.length) return `<div class="kb-empty">${ic('library',36)}<strong>${snapshot().items.length ? '没有找到相关资料' : '还没有公司资料'}</strong><p>${snapshot().items.length ? '换个关键词或分类试试。' : '通过右上角上传文件或添加在线文档，并选择所属分类。'}</p></div>`;
-    return `<div class="kb-table-wrap"><table class="kb-table"><thead><tr><th scope="col">资料名称</th><th scope="col">分类</th><th scope="col">格式</th><th scope="col">添加人</th><th scope="col">更新时间</th><th scope="col">操作</th></tr></thead><tbody>${list.map(item => `<tr><td><div class="kb-file-cell"><span class="kb-file-icon kb-file-${fileKind(item)}">${ic(item.kind === 'link' ? 'link' : fileKind(item) === 'image' ? 'image' : 'file',21)}</span><div><button type="button" class="kb-title" data-kb-view="${e(item.id)}" title="${e(item.title)}">${e(item.title)}</button><span class="kb-row-note" title="${e(item.description || item.fileName || item.url)}">${e(item.description || (item.kind === 'link' ? item.url : item.fileName))}</span></div></div></td><td><span class="kb-category-label">${e(categoryName(item.categoryId))}</span></td><td>${e(fileLabel(item))}<small>${item.kind === 'file' ? bytes(item.size) : '外部链接'}</small></td><td>${e(item.createdBy?.name || '管理员')}</td><td>${date(item.updatedAt)}</td><td><div class="kb-row-actions"><button type="button" data-kb-view="${e(item.id)}">查看</button><button type="button" data-kb-edit="${e(item.id)}">编辑</button><button type="button" data-kb-delete="${e(item.id)}">删除</button></div></td></tr>`).join('')}</tbody></table><div class="kb-table-total">共 ${list.length} 份资料</div></div>`;
+    return `<div class="kb-table-wrap"><table class="kb-table"><thead><tr><th scope="col">资料名称</th><th scope="col">分类</th><th scope="col">发布范围</th><th scope="col">状态</th><th scope="col">格式</th><th scope="col">添加人</th><th scope="col">更新时间</th><th scope="col">操作</th></tr></thead><tbody>${list.map(item => `<tr><td><div class="kb-file-cell"><span class="kb-file-icon kb-file-${fileKind(item)}">${ic(item.kind === 'link' ? 'link' : fileKind(item) === 'image' ? 'image' : 'file',21)}</span><div><button type="button" class="kb-title" data-kb-view="${e(item.id)}" title="${e(item.title)}">${e(item.title)}</button><span class="kb-row-note" title="${e(item.description || item.fileName || item.url)}">${e(item.description || (item.kind === 'link' ? item.url : item.fileName))}</span></div></div></td><td><span class="kb-category-label">${e(categoryName(item.categoryId))}</span></td><td><span class="kb-scope-summary">${e(moduleNames(item))}</span></td><td><span class="kb-publication-status" data-status="${e(item.status || 'draft')}">${e(statusName(item))}</span></td><td>${e(fileLabel(item))}<small>${item.kind === 'file' ? bytes(item.size) : '外部链接'}</small></td><td>${e(item.createdBy?.name || '管理员')}</td><td>${date(item.updatedAt)}</td><td><div class="kb-row-actions"><button type="button" data-kb-view="${e(item.id)}">查看</button><button type="button" data-kb-edit="${e(item.id)}">编辑</button><button type="button" data-kb-status="${e(item.id)}">${item.status === 'published' ? '下架' : '发布'}</button><button type="button" data-kb-delete="${e(item.id)}">删除</button></div></td></tr>`).join('')}</tbody></table><div class="kb-table-total">共 ${list.length} 份资料</div></div>`;
   }
   function render() {
     if (!knowledge.isAdmin()) return '<section class="knowledge-page"><div class="kb-empty">仅管理员可管理知识库。</div></section>';
     const data = snapshot();
-    return `<section class="knowledge-page"><header class="kb-heading"><h1>知识库管理</h1><div class="kb-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-add-link ${!state.loaded?'disabled':''}>${ic('link')} 添加在线文档</button><button type="button" class="kb-btn kb-btn-primary" data-kb-upload ${!state.loaded?'disabled':''}>${ic('upload')} 上传文件</button></div></header><div class="kb-category-bar"><div class="kb-categories" aria-label="资料分类">${[{id:'all',name:'全部资料'},...data.categories].map(category => `<button type="button" class="${state.category === category.id ? 'active' : ''}" data-kb-category="${e(category.id)}" aria-pressed="${state.category === category.id}">${e(category.name)}<span>${category.id === 'all' ? data.items.length : data.items.filter(item => item.categoryId === category.id).length}</span></button>`).join('')}</div><button class="kb-manage-categories" type="button" data-kb-manage ${!state.loaded?'disabled':''}>${ic('edit',15)} 分类管理</button></div><div class="kb-toolbar"><label class="kb-search">${ic('search')}<input type="search" data-kb-search value="${e(state.query)}" placeholder="搜索资料名称、说明或添加人" aria-label="搜索知识库"></label><select data-kb-type aria-label="按资料格式筛选">${types.map(([id,label])=>`<option value="${id}" ${state.type===id?'selected':''}>${label}</option>`).join('')}</select></div><div data-kb-results>${table()}</div><p class="kb-storage-note">资料已接入公司知识库，由管理员共同维护。</p></section>`;
+    return `<section class="knowledge-page"><header class="kb-heading"><h1>知识库管理</h1><div class="kb-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-add-link ${!state.loaded?'disabled':''}>${ic('link')} 添加在线文档</button><button type="button" class="kb-btn kb-btn-primary" data-kb-upload ${!state.loaded?'disabled':''}>${ic('upload')} 上传文件</button></div></header><div class="kb-category-bar"><div class="kb-categories" aria-label="资料分类">${[{id:'all',name:'全部资料'},...data.categories].map(category => `<button type="button" class="${state.category === category.id ? 'active' : ''}" data-kb-category="${e(category.id)}" aria-pressed="${state.category === category.id}">${e(category.name)}<span>${category.id === 'all' ? data.items.length : data.items.filter(item => item.categoryId === category.id).length}</span></button>`).join('')}</div><button class="kb-manage-categories" type="button" data-kb-manage ${!state.loaded?'disabled':''}>${ic('edit',15)} 分类管理</button></div><div class="kb-toolbar"><label class="kb-search">${ic('search')}<input type="search" data-kb-search value="${e(state.query)}" placeholder="搜索资料名称、说明或添加人" aria-label="搜索知识库"></label><select data-kb-module aria-label="按发布范围筛选"><option value="all">全部模块</option>${modules.map(([id,name])=>`<option value="${id}" ${state.module===id?'selected':''}>${name}</option>`).join('')}</select><select data-kb-type aria-label="按资料格式筛选">${types.map(([id,label])=>`<option value="${id}" ${state.type===id?'selected':''}>${label}</option>`).join('')}</select></div><div data-kb-results>${table()}</div><p class="kb-storage-note">选择发布范围并发布后，资料会展示在对应模块的学员端知识库中。</p></section>`;
   }
   function load() {
     if (state.loading || state.loaded || !knowledge.isAdmin()) return;
@@ -55,6 +59,7 @@ export function createKnowledgeController({ knowledge, ui }) {
     if (!state.loaded && !state.loadError) load();
     const paintResults = () => { const target = root.querySelector('[data-kb-results]'); if (target) target.innerHTML = table(); };
     root.querySelector('[data-kb-search]')?.addEventListener('input', event => { state.query = event.target.value; paintResults(); });
+    root.querySelector('[data-kb-module]')?.addEventListener('change', event => { state.module = event.target.value; paintResults(); });
     root.querySelector('[data-kb-type]')?.addEventListener('change', event => { state.type = event.target.value; paintResults(); });
     root.addEventListener('click', event => {
       const button = event.target.closest('button'); if (!button || !root.contains(button) || button.disabled) return;
@@ -65,6 +70,7 @@ export function createKnowledgeController({ knowledge, ui }) {
       else if (button.hasAttribute('data-kb-retry')) { state.loadError = ''; load(); paintResults(); }
       else if (button.dataset.kbView) showItem(itemById(button.dataset.kbView));
       else if (button.dataset.kbEdit) itemForm(itemById(button.dataset.kbEdit));
+      else if (button.dataset.kbStatus) setItemStatus(itemById(button.dataset.kbStatus));
       else if (button.dataset.kbDelete) removeItem(itemById(button.dataset.kbDelete));
     });
   }
@@ -89,9 +95,28 @@ export function createKnowledgeController({ knowledge, ui }) {
     } catch (error) { if (node.isConnected) formError(node,errorText(error)); else ui.toast(errorText(error),'error'); }
     finally { node.dataset.kbBusy = 'false';delete node.dataset.operationPending; controls.forEach(([control,disabled]) => { control.disabled = disabled; }); }
   }
+  function publicationFields(item = null) {
+    const selected = item?.modules || [];
+    const status = item ? item.status || 'draft' : 'published';
+    return `<fieldset class="kb-publication-field"><legend>发布范围 <i>*</i></legend><label class="kb-module-option"><input type="checkbox" data-kb-all-modules ${selected.length===modules.length?'checked':''}>全部模块</label><div class="kb-module-options">${modules.map(([id,name])=>`<label class="kb-module-option"><input type="checkbox" name="modules" value="${id}" ${selected.includes(id)?'checked':''}>${name}</label>`).join('')}</div><small>可多选；资料只会出现在所选模块的知识库中。</small></fieldset><label class="kb-field"><span>发布状态</span><select name="status">${[['published','发布到学员端'],['draft','保存草稿'],['unpublished','已下架']].map(([id,name])=>`<option value="${id}" ${status===id?'selected':''}>${name}</option>`).join('')}</select></label>`;
+  }
+  function bindPublication(node) {
+    const all = node.querySelector('[data-kb-all-modules]');
+    const choices = [...node.querySelectorAll('[name="modules"]')];
+    const update = () => { all.checked = choices.every(c=>c.checked); all.indeterminate = choices.some(c=>c.checked) && !all.checked; };
+    all.onchange = () => { choices.forEach(c=>{c.checked=all.checked;}); update(); };
+    choices.forEach(c=>c.onchange=update); update();
+  }
+  async function setItemStatus(item) {
+    if (!item || !guard()) return;
+    if (!item.modules?.length) { itemForm(item); ui.toast('请先选择资料的发布范围。'); return; }
+    try { await knowledge.setItemStatus(item.id,item.status==='published'?'unpublished':'published'); changed(); ui.toast(item.status==='published'?'资料已下架':'资料已发布'); }
+    catch(error) { ui.toast(errorText(error),'error'); }
+  }
   function uploadForm() {
     let files = [];
-    modal('上传文件', `<form class="kb-form" data-kb-upload-form><div class="kb-dropzone" data-kb-drop>${ic('upload',30)}<strong>拖动文件到这里</strong><span>PPT、Word、PDF、表格、图片等文件</span><button type="button" class="kb-btn kb-btn-secondary" data-kb-choose>选择文件</button><input type="file" multiple data-kb-file hidden><small>单文件最多 100 MB，每次最多 20 个</small></div><div class="kb-upload-list" data-kb-file-list aria-live="polite"></div><label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(defaultCategory())}</select></label><label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" rows="3" maxlength="1000" placeholder="介绍这批资料的内容或使用场景"></textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">保存资料</button></footer></form>`, node => {
+    modal('上传文件', `<form class="kb-form" data-kb-upload-form><div class="kb-dropzone" data-kb-drop>${ic('upload',30)}<strong>拖动文件到这里</strong><span>PPT、Word、PDF、表格、图片等文件</span><button type="button" class="kb-btn kb-btn-secondary" data-kb-choose>选择文件</button><input type="file" multiple data-kb-file hidden><small>单文件最多 100 MB，每次最多 20 个</small></div><div class="kb-upload-list" data-kb-file-list aria-live="polite"></div><label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(defaultCategory())}</select></label>${publicationFields()}<label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" rows="3" maxlength="1000" placeholder="介绍这批资料的内容或使用场景"></textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">保存资料</button></footer></form>`, node => {
+      bindPublication(node);
       const fileInput = node.querySelector('[data-kb-file]'), list = node.querySelector('[data-kb-file-list]'), drop = node.querySelector('[data-kb-drop]');
       const paint = () => { list.innerHTML = files.map((file,index)=>`<div><span>${ic('file')}<strong>${e(file.name)}</strong><small>${bytes(file.size)}</small></span><button type="button" class="kb-icon-button" data-kb-remove-file="${index}" aria-label="移除 ${e(file.name)}">${ic('close')}</button></div>`).join(''); };
       const addFiles = incoming => {
@@ -111,15 +136,18 @@ export function createKnowledgeController({ knowledge, ui }) {
       node.querySelector('form').onsubmit = event => {
         event.preventDefault(); if (!files.length) { formError(node,'请先选择至少一个文件'); return; }
         const values = new FormData(event.currentTarget);
-        perform(node, () => knowledge.uploadFiles(files,{categoryId:values.get('categoryId'),description:values.get('description')}),`已添加 ${files.length} 份资料`);
+        if (!values.getAll('modules').length) { formError(node,'请至少选择一个发布模块'); return; }
+        perform(node, () => knowledge.uploadFiles(files,{categoryId:values.get('categoryId'),description:values.get('description'),modules:values.getAll('modules'),status:values.get('status')}),`已保存 ${files.length} 份资料`);
       };
     });
   }
   function itemForm(item = null) {
     const isLink = !item || item.kind === 'link';
-    modal(item ? '编辑资料' : '添加在线文档', `<form class="kb-form"><label class="kb-field"><span>资料名称 <i>*</i></span><input name="title" required maxlength="120" value="${e(item?.title || '')}" placeholder="填写资料名称"></label>${isLink ? `<label class="kb-field"><span>文档链接 <i>*</i></span><input name="url" type="url" required value="${e(item?.url || '')}" placeholder="https://"><small>支持飞书、在线文档和其他网页链接。</small></label>` : `<div class="kb-file-summary">${ic('file',22)}<span>${e(item.fileName)}<small>${bytes(item.size)}</small></span></div>`}<label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(item?.categoryId || defaultCategory())}</select></label><label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" maxlength="1000" rows="3" placeholder="介绍资料内容或适用场景">${e(item?.description || '')}</textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">${item ? '保存修改' : '添加文档'}</button></footer></form>`, node => {
+    modal(item ? '编辑资料' : '添加在线文档', `<form class="kb-form"><label class="kb-field"><span>资料名称 <i>*</i></span><input name="title" required maxlength="120" value="${e(item?.title || '')}" placeholder="填写资料名称"></label>${isLink ? `<label class="kb-field"><span>文档链接 <i>*</i></span><input name="url" type="url" required value="${e(item?.url || '')}" placeholder="https://"><small>支持飞书、在线文档和其他网页链接。</small></label>` : `<div class="kb-file-summary">${ic('file',22)}<span>${e(item.fileName)}<small>${bytes(item.size)}</small></span></div>`}<label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(item?.categoryId || defaultCategory())}</select></label>${publicationFields(item)}<label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" maxlength="1000" rows="3" placeholder="介绍资料内容或适用场景">${e(item?.description || '')}</textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">${item ? '保存修改' : '添加文档'}</button></footer></form>`, node => {
+      bindPublication(node);
       node.querySelector('form').onsubmit = event => {
-        event.preventDefault(); const fields=Object.fromEntries(new FormData(event.currentTarget));
+        event.preventDefault(); const values=new FormData(event.currentTarget); const fields=Object.fromEntries(values); fields.modules=values.getAll('modules');
+        if (!fields.modules.length) { formError(node,'请至少选择一个发布模块'); return; }
         if (!fields.title.trim()) { formError(node,'请填写资料名称'); return; }
         if (isLink) { const result=validateKnowledgeUrl(fields.url.trim()); if (!result.valid) { formError(node,result.message); return; } fields.url=result.url; }
         perform(node,()=>item ? knowledge.updateItem(item.id,fields) : knowledge.saveLink(fields),item?'资料已更新':'在线文档已添加');
@@ -191,6 +219,6 @@ export function createKnowledgeController({ knowledge, ui }) {
     },true);
   }
   function deactivate() { active=false; for(const cleanup of [...previewCleanups])cleanup(); }
-  function reset() { deactivate(); generation++; Object.assign(state,{loaded:false,loading:false,loadError:'',query:'',category:'all',type:'all'}); }
+  function reset() { deactivate(); generation++; Object.assign(state,{loaded:false,loading:false,loadError:'',query:'',category:'all',type:'all',module:'all'}); }
   return { render, bind, reset, deactivate };
 }

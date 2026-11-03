@@ -101,3 +101,46 @@
 @media (max-width: 1100px) { .md-editor { grid-template-columns: minmax(0,1fr) 245px; gap: 18px; } .md-editor-aside { padding: 20px; } .md-form-section { padding: 20px; } }
 @media (max-width: 850px) { .md-editor { grid-template-columns: 1fr; } .md-editor-aside { position: static; } .md-live-preview { max-width: 340px; margin: auto; } .md-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 550px) { .md-heading { align-items: flex-start; gap: 12px; } .md-heading h1 { font-size: 21px; } .md-heading .btn { padding: 8px 12px; } .md-cost-fields, .md-form-grid { grid-template-columns: 1fr; } .md-form-section { padding: 17px; } .md-search { width: 100%; } .md-form-actions { flex-wrap: wrap; } .md-form-actions > div { margin-left: auto; } .md-stats > div { padding: 16px; } }
+
+/* Position the supplied symbol relative to the circular frame, excluding the ribbon. */
+.md-art-purple { background: var(--purple-soft, var(--primary-soft)); color: var(--purple, var(--primary)); }
+.md-art.md-art-builtin { width: 54px; height: 58.5px; border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.md-art.md-art-builtin.md-art-large { width: 144px; height: 156px; }
+.md-badge-composite { position: relative; display: block; width: 100%; aspect-ratio: 240 / 260; flex-shrink: 0; }
+.md-badge-composite > .md-badge-frame { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; }
+.md-badge-composite > .md-badge-symbol { position: absolute; display: block; object-fit: contain; left: 22%; top: 16%; width: 56%; height: 52%; }
+.md-badge-composite.is-locked > .md-badge-symbol { filter: grayscale(1) brightness(.7); opacity: .68; }
+.md-artwork-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+.md-artwork-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.md-artwork-categories button { border: 1px solid var(--border); border-radius: 18px; padding: 7px 12px; background: var(--surface); color: var(--muted); font-size: 12px; }
+.md-artwork-categories button.active { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary); }
+.md-artwork-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.md-artwork-card { min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.md-artwork-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 18px; }
+.md-artwork-card h3 { font-size: 14px; margin: 0 0 5px; color: var(--ink); font-weight: 600; }
+.md-artwork-card header span { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.md-artwork-card header .btn { flex-shrink: 0; }
+.md-artwork-states { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 20px 14px 18px; background: #0e2036; border-radius: 10px; }
+.md-artwork-card > .md-artwork-states { border-radius: 0; }
+.md-artwork-states figure { min-width: 0; margin: 0; text-align: center; }
+.md-artwork-states figcaption { color: #cfdeec; font-size: 11px; line-height: 1.6; margin-top: 9px; white-space: nowrap; }
+.md-artwork-states .is-selected figcaption { color: #fff; font-weight: 600; }
+.md-artwork-selection { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.md-artwork-selection strong { color: var(--ink); font-size: 13px; font-weight: 500; }
+.md-artwork-selection small { display: block; margin-top: 5px; }
+.md-level-option { border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 9px 13px; font-size: 12px; }
+.md-level-option.active { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary); }
+.md-detail > .md-artwork-states { margin: 20px 0; }
+@media (max-width: 1200px) {
+  .md-artwork-gallery { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .md-artwork-toolbar .md-filters { flex-wrap: wrap; }
+  .md-artwork-toolbar .md-search { width: 100%; }
+  .md-artwork-card > header { padding: 15px 12px; gap: 8px; }
+  .md-artwork-card header .btn { font-size: 11px; padding: 7px 10px; }
+  .md-artwork-states { padding: 14px 8px; gap: 3px; }
+  .md-artwork-states figcaption { font-size: 9px; }
+  .md-artwork-selection { align-items: flex-start; }
+  .md-level-option { padding: 8px 9px; font-size: 11px; }
+}

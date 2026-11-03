@@ -8715,6 +8715,222 @@
           }
         }
       }
+    },
+    "/api/v1/me/knowledge/{module}": {
+      "get": {
+        "summary": "Listing",
+        "operationId": "listing_api_v1_me_knowledge__module__get",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "dashboard",
+                "village",
+                "academy",
+                "guild"
+              ],
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/knowledge/{module}/favorites/{item_id}": {
+      "post": {
+        "summary": "Favorite",
+        "operationId": "favorite_api_v1_me_knowledge__module__favorites__item_id__post",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "dashboard",
+                "village",
+                "academy",
+                "guild"
+              ],
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FavoriteCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/knowledge/{module}/files/{item_id}/chunks/{position}": {
+      "get": {
+        "summary": "Chunk",
+        "operationId": "chunk_api_v1_me_knowledge__module__files__item_id__chunks__position__get",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "dashboard",
+                "village",
+                "academy",
+                "guild"
+              ],
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Position"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11982,6 +12198,19 @@
         ],
         "title": "EvaluationOut"
       },
+      "FavoriteCommand": {
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved"
+        ],
+        "title": "FavoriteCommand"
+      },
       "FinalizeReviewCommand": {
         "properties": {
           "expected_revision": {
@@ -14332,11 +14561,43 @@
             "type": "string",
             "enum": [
               "blue",
+              "purple",
               "gold",
               "green"
             ],
             "title": "Style",
             "default": "blue"
+          },
+          "artworkId": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Artworkid",
+            "default": ""
+          },
+          "artworkLevel": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artworklevel"
+          },
+          "themeId": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Themeid",
+            "default": ""
+          },
+          "themeName": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Themename",
+            "default": ""
           },
           "costs": {
             "items": {

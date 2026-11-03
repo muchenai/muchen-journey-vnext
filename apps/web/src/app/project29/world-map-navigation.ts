@@ -11,13 +11,20 @@ export function worldMapTaskDepartment(name: unknown): TaskDepartmentFilter | nu
 export const worldMapTaskBridge = `(()=>{
   const selector='.planet-detail .detail-return';
   const label='查看相关任务 →';
+  let village=true;
   const sync=()=>{
     const button=document.querySelector(selector);
-    if(button && button.textContent!==label)button.textContent=label;
+    const text=village?label:'返回地图';
+    if(button && button.textContent!==text)button.textContent=text;
   };
+  addEventListener('message',event=>{
+    if(event.source!==parent||event.data?.type!=='journey-world-map-context')return;
+    village=event.data.village===true;sync();
+  });
   new MutationObserver(sync).observe(document.body,{childList:true,subtree:true});
   sync();
   document.addEventListener('click',event=>{
+    if(!village)return;
     if(!(event.target instanceof Element)||!event.target.closest(selector))return;
     const department=document.querySelector('#planet-detail-title')?.textContent?.trim();
     if(!department)return;
@@ -27,3 +34,5 @@ export const worldMapTaskBridge = `(()=>{
     else navigate();
   },true);
 })();`;
+
+export const worldMapSharedTaskBridge = worldMapTaskBridge.replace('let village=true', 'let village=false');
