@@ -3,11 +3,17 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { ModuleIcon, ModulePanel } from "./ModuleShell";
 import { badgeCostStatus, badgePointLabel, badgePointTypes, adaptMedals, type Badge, type MedalResponse } from "./badgeEconomy";
 import "./badgeShop.css";
+import { BadgeArtworkImage } from "./BadgeArtworkImage";
+import { badgeArtworkFor, badgeGrades } from "./badgeArtwork";
+import { BadgeCatalogGallery } from "./BadgeCatalogGallery";
+import { badgeCatalogEntries } from "./badgeCatalog";
 import { BadgePointBalances } from "./BadgePointBalances";
 
-export function Medal({ badge, large = false }: { badge: Badge; large?: boolean }) {
-  if (badge.image) return <div className={`badge-medal ${large ? "badge-medal-large" : ""}`}><img className="badge-published-image" src={badge.image} alt="" /></div>;
-  return <div className={`badge-medal ${large ? "badge-medal-large" : ""}`} data-tone={badge.tone} aria-hidden="true">
+export function Medal({ badge, large = false, locked = false }: { badge: Badge; large?: boolean; locked?: boolean }) {
+  const artwork = badgeArtworkFor(badge, locked);
+  if (artwork) return <BadgeArtworkImage path={artwork.path} level={artwork.level} large={large} />;
+  if (badge.image) return <div className={`badge-medal ${large ? "badge-medal-large" : ""}`} data-locked={locked || undefined}><img className="badge-published-image" src={badge.image} alt="" /></div>;
+  return <div className={`badge-medal ${large ? "badge-medal-large" : ""}`} data-locked={locked || undefined} data-tone={badge.tone} aria-hidden="true">
     <div className="badge-medal-ribbons"><i /><i /></div>
     <div className="badge-medal-edge"><div className="badge-medal-face">
       <span className="badge-medal-stars">· · ·</span>
@@ -40,7 +46,7 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
     return () => { window.clearTimeout(initial); ++sequence.current; window.clearInterval(timer); window.removeEventListener("focus", check); };
   }, [refresh]);
   const {badges, wallet} = adaptMedals(data || {medals:[], redemptions:[], wallet:{badgeBalances:{}}});
-  const [tab, setTab] = useState("shop");
+  const [tab, setTab] = useState("catalog");
   const [category, setCategory] = useState("全部");
   const [sort, setSort] = useState("default");
   const [selected, setSelected] = useState<Badge | null>(null);
@@ -101,7 +107,7 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
         </div>
         <div className="badge-intro-art">
           <div className="badge-orbit badge-orbit-one" /><div className="badge-orbit badge-orbit-two" />
-          <Medal badge={badges[0] || {id:"decoration", name:"", category:"", level:"", description:"", icon:"a03b5", tone:"gold", requirements:[], revision:0, stock:null, published:false}} large />
+          <BadgeArtworkImage path="points/ai-evaluation/ai-evaluation-2" level={0} large />
           <span className="badge-art-caption">YOUR NEXT ACHIEVEMENT</span>
         </div>
       </ModulePanel>
@@ -117,10 +123,12 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
     <div className="badge-content-grid">
       <section className="badge-catalog" aria-label="徽章兑换">
         <div className="badge-tabs" role="group" aria-label="查看徽章">
+          <button className={tab === "catalog" ? "is-active" : ""} aria-pressed={tab === "catalog"} onClick={() => setTab("catalog")}>全部徽章 <span>{badgeCatalogEntries.length}</span></button>
           <button className={tab === "shop" ? "is-active" : ""} aria-pressed={tab === "shop"} onClick={() => setTab("shop")}>徽章商城 <span>{badges.filter(b => b.published).length}</span></button>
           <button className={tab === "owned" ? "is-active" : ""} aria-pressed={tab === "owned"} onClick={() => setTab("owned")}>已拥有徽章 <span>{wallet.owned.length}</span></button>
           <span className="badge-tabs-note">你的成长，由你点亮</span>
         </div>
+        {tab === "catalog" ? <BadgeCatalogGallery wallet={wallet} badges={badges} query={query} onPublication={setSelected} /> : <>
         <div className="badge-filter-row">
           <div className="badge-categories" role="group" aria-label="按所需徽章点类型筛选">
             {["全部", ...badgePointTypes].map(item =>
@@ -135,9 +143,9 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
             const affordable = status.affordable && badge.stock !== 0 && badge.published;
             return <ModulePanel key={badge.id} className={`badge-card ${owned ? "badge-card-owned" : ""}`}>
               <div className="badge-card-art" data-tone={badge.tone}>
-                <span className="badge-rarity">{badge.level}</span>
+                <span className="badge-rarity">{badgeArtworkFor(badge) ? badgeGrades[badge.tone].label : badge.level}</span>
                 {owned && <span className="badge-owned-label">已拥有</span>}
-                <Medal badge={badge} />
+                <Medal badge={badge} locked={!wallet.owned.includes(badge.id)} />
                 <span className="badge-card-index">MJ · {String(badges.indexOf(badge) + 1).padStart(2, "0")}</span>
               </div>
               <div className="badge-card-copy">
@@ -153,7 +161,8 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
             </ModulePanel>;
           })}
         </div>
-        {!visible.length && <ModulePanel className="badge-empty"><h3>{tab === "owned" ? "这里还没有对应的徽章" : "没有找到对应的徽章"}</h3><p>试试其他分类，或通过顶部搜索框调整搜索词。</p><button className="module-secondary" onClick={() => { setCategory("全部"); setTab("shop"); }}>浏览商城</button></ModulePanel>}
+        {!visible.length && <ModulePanel className="badge-empty"><h3>{tab === "owned" ? "这里还没有对应的徽章" : !badges.some(b => b.published) ? "暂无已上架徽章" : "没有找到对应的徽章"}</h3><p>{tab === "shop" && !badges.some(b => b.published) ? "管理员上架后，可在这里查看兑换条件并使用对应徽章点兑换。" : "试试其他分类，或通过顶部搜索框调整搜索词。"}</p><button className="module-secondary" onClick={() => { setCategory("全部"); setTab(tab === "shop" && !badges.some(b => b.published) ? "catalog" : "shop"); }}>{tab === "shop" && !badges.some(b => b.published) ? "查看全部徽章" : "浏览商城"}</button></ModulePanel>}
+        </>}
       </section>
 
       <aside className="badge-aside">
@@ -162,9 +171,10 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
           <p>每一枚徽章，都是你的成长印记。</p>
           <div className="badge-mini-grid">{badges.map(badge =>
             <button key={badge.id} className={wallet.owned.includes(badge.id) ? "" : "is-locked"} aria-label={`${badge.name}，${wallet.owned.includes(badge.id) ? "已拥有" : "未拥有"}`} onClick={() => setSelected(badge)}>
-              <Medal badge={badge} /><span>{badge.name}</span>
+              <Medal badge={badge} locked={!wallet.owned.includes(badge.id)} /><span>{badge.name}</span>
             </button>)}</div>
           <small>已收藏 {wallet.owned.length} 枚徽章，继续积累成长印记。</small>
+          <button className="badge-collection-more" onClick={() => setTab("catalog")}>查看全部 {badgeCatalogEntries.length} 款徽章图鉴 <span>→</span></button>
         </ModulePanel>
         <ModulePanel className="badge-guide">
           <h3>如何获得徽章点？</h3>
@@ -180,7 +190,7 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
       {showHistory ? <div className="badge-history">
         {!wallet.history.length ? <p>暂无兑换记录。去发现你的下一枚徽章吧。</p> : wallet.history.map(item => <div key={item.id} className="module-row"><span>{item.name}<small>{new Date(item.at).toLocaleString("zh-CN")} · 兑换成功</small></span><strong>{item.costs.map(cost => <span key={cost.type}>−{cost.amount} {badgePointLabel(cost.type)}</span>)}</strong></div>)}
       </div> : selected && <>
-        <div className="badge-dialog-medal"><Medal badge={selected} large /></div>
+        <div className="badge-dialog-medal"><Medal badge={currentSelection || selected} large locked={!wallet.owned.includes(selected.id)} /></div>
         <h3>{selected.name}</h3><p>{selected.description}</p>
         {wallet.owned.includes(selected.id) ? <p className="badge-dialog-owned">这枚徽章已在你的徽章墙中，无需重复兑换。</p> : <>
           <div className="badge-type-confirm"><div className="badge-type-confirm-heading"><span>指定徽章点</span><span>所需</span><span>余额</span><span>兑换后 / 缺口</span></div>{selectedStatus?.details.map(cost => <div key={cost.type} data-insufficient={cost.missing > 0}><span>{badgePointLabel(cost.type)}</span><b>{cost.amount}</b><span>{cost.available}</span><strong>{cost.missing ? `还差 ${cost.missing}` : cost.available - cost.amount}</strong></div>)}</div>

@@ -37,6 +37,7 @@ test('only the village map response adds task navigation; original close/geometr
   const route = load('api/learner/world-map/route.ts', {
     'node:fs/promises':{readFile:async()=>original},
     '@/app/project29/world-map-navigation':navigation,
+    '@/app/project29/world-map-loading':load('project29/world-map-loading.ts'),
   }, {process:{cwd:()=>'/app'}});
   for (const query of ['', '?tasks=academy', '?tasks=guild', '?tasks=dashboard', '?tasks=village']) {
     const response = await route.GET(new Request('http://localhost/api/learner/world-map' + query));
@@ -59,7 +60,7 @@ test('map task button exits fullscreen then notifies parent; close button is not
     addEventListener:(type, callback)=>{listeners[type]=callback;},
     exitFullscreen:async()=>{order.push('exit');},
   };
-  vm.runInNewContext(navigation.worldMapTaskBridge, {document, Element,
+  vm.runInNewContext(navigation.worldMapTaskBridge, {document, Element, addEventListener(){},
     MutationObserver:class {constructor(callback){observer=callback;} observe(){}},
     parent:{postMessage:message=>{order.push('navigate');sent.push(message);}},
   });
@@ -79,11 +80,11 @@ test('map task button exits fullscreen then notifies parent; close button is not
 });
 
 test('map parent rejects messages from other windows, unknown departments and non-village maps', () => {
-  const source = {}, received = [];
+  const source = {postMessage(){}}, received = [];
   let onMessage;
   const component = load('project29/WorldMap.tsx', {
     './worldMap.css':{}, './world-map-navigation':navigation,
-    react:{useRef:()=>({current:{contentWindow:source}}),useState:value=>[value,()=>{}],useEffect:callback=>callback()},
+    react:{useRef:value=>({current:value === null ? {contentWindow:source} : value}),useState:value=>[value,()=>{}],useEffect:callback=>callback()},
   }, {window:{setTimeout:()=>1,clearTimeout(){},addEventListener:(_, callback)=>{onMessage=callback;}}});
   component.WorldMap({onViewTasks:value=>received.push(value)});
   const data = {type:'journey-world-map-tasks',department:'财务法务合规部'};
@@ -108,7 +109,7 @@ test('new module reads current viewport scale immediately; resize still updates 
       return value;
     }},
   }, {window,document:{addEventListener(){},removeEventListener(){}},cancelAnimationFrame(){},requestAnimationFrame:callback=>{frame=callback;return 1;}});
-  for (let mount = 0; mount < 4; mount++) {
+  for (let moduleIndex = 0; moduleIndex < 4; moduleIndex++) {
     scale.useCanvasScale();
     assert.equal(value, .75);
     assert.equal(frame, undefined);

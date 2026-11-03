@@ -32,6 +32,13 @@ class KnowledgeChunk(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
+class KnowledgeFavorite(Base):
+    __tablename__ = 'knowledge_favorites'
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('organizations.id'), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    item_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+
+
 class GuildContribution(Base):
     __tablename__ = 'guild_contributions'
     __table_args__ = (UniqueConstraint('organization_id', 'user_id', 'task_id', name='uq_guild_first_completion'),)

@@ -1,11 +1,11 @@
-import {createKnowledgeStore} from './knowledge-store.js?v=20261028-server';
-import {createKnowledgeController} from './knowledge.js?v=20261028-server';
+import {createKnowledgeStore} from './knowledge-store.js?v=20261103-module-publication';
+import {createKnowledgeController} from './knowledge.js?v=20261103-module-publication';
 import {createGuildStore} from './guild-store.js?v=20261028-server';
 import {createGuildController} from './guild.js?v=20261028-server';
 import {createPublicationReviewController} from './publication-review.js?v=20261030-member-action-spacing';
 import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261030-member-action-spacing';
 import {createMedalsApi} from './medals-api.js?v=20261028-publication-local';
-import {createMedalsController} from './medals.js?v=20261028-badges-local';
+import {createMedalsController} from './medals.js?v=20261103-badge-layout-fix';
 import { renderPublishMaterials } from './publish-materials.js';
 import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261030-member-action-spacing';
 import { ApiStore, newDraft, createJourneyService } from './native-api.js?v=20261030-member-action-spacing';
@@ -21,7 +21,7 @@ import {departmentOptions, departmentLabel, isPublishingDepartment} from './publ
 
 const store = await ApiStore.create().catch(error => { document.querySelector('#app').innerHTML = `<div class="card empty-state"><strong>${e(error.message)}</strong><a href="/review/login">重新登录</a></div>`; throw error; });
 const service = createJourneyService({ store, getCurrentUser: getCurrentInviteUser });
-let page = ['knowledge','guild','academy'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'publish';
+let page = location.hash.startsWith('#medals') ? 'medals' : ['knowledge','guild','academy'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'publish';
 let reviewCamp = 'novice';
 try { const savedCamp = localStorage.getItem('journey_admin_review_camp'); if (REVIEW_CAMPS.some(camp => camp.id === savedCamp)) reviewCamp = savedCamp; } catch {}
 const $ = (s, root = document) => root.querySelector(s);
@@ -37,6 +37,11 @@ const academyStore = createAcademyStore({ getCurrentUser: getCurrentInviteUser }
 const academy = createAcademyController({ academy: academyStore, ui });
 const economy = createMedalsApi(store);
 const medals = createMedalsController({economy,ui});
+ui.medalTabChanged = tab => history.replaceState(null, '', tab === 'artworks' ? '#medals/artworks' : tab === 'records' ? '#medals/records' : '#medals');
+if (page === 'medals') {
+  medals.selectTab(location.hash.split('/')[1]);
+  await economy.refresh().catch(error => toast(error.message, 'error'));
+}
 const publicationReview = createPublicationReviewController({store,service,ui});
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);
 const badgeName = id => `${badgeList().find(b => b.id === id)?.category || id}徽章点`;
@@ -102,7 +107,7 @@ document.addEventListener('keydown', event => {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
 });
-function navigate(next) { if(page==='knowledge')knowledge.reset();if(page==='guild')guild.deactivate();if(next==='guild')void loadGuild(); if (page === 'academy' && next !== 'academy') academy.deactivate(); page = next; if(next==='medals'){medals.reset();void economy.refresh().catch(error=>toast(error.message,'error')).finally(()=>{if(page==='medals')render();});} render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function navigate(next) { if(page==='knowledge')knowledge.reset();if(page==='guild')guild.deactivate();if(next==='guild')void loadGuild(); if (page === 'academy' && next !== 'academy') academy.deactivate(); page = next; history.replaceState(null, '', '#'+next); if(next==='medals'){medals.reset();void economy.refresh().catch(error=>toast(error.message,'error')).finally(()=>{if(page==='medals')render();});} render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function editTask(task) {
   if (!store.operatorId) { toast('当前账号没有任务配置权限。','error'); return; }
   if (task.authorId && task.authorId !== store.operatorId) { taskWorkflow.start(task); return; }

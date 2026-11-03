@@ -106,7 +106,7 @@ export function ModuleHeader({
     guild: "公会大厅",
   }
   const page =
-    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图" } as Record<string, string>)[menu] ||
+    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库" } as Record<string, string>)[menu] ||
     hall[module]
   return (
     <header className="module-header">
@@ -219,7 +219,7 @@ export function ModuleSidebar({
             <ModuleIcon file="93f75" size={24} />
             世界地图
           </button>
-          <button onClick={() => onMenu("knowledge")}>
+          <button className={activeMenu === "knowledge" ? "is-active" : ""} aria-current={activeMenu === "knowledge" ? "page" : undefined} onClick={() => onMenu("knowledge")}>
             <ModuleIcon file="643cc" size={24} />
             知识库
           </button>

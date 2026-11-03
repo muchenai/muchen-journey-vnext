@@ -159,3 +159,5 @@ app.include_router(publication_router)
 
 from journey_api.community_routes import router as community_router
 app.include_router(community_router)
+from journey_api.learner_knowledge import router as learner_knowledge_router
+app.include_router(learner_knowledge_router)

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { worldMapTaskBridge } from "@/app/project29/world-map-navigation"
+import { worldMapTaskBridge, worldMapSharedTaskBridge } from "@/app/project29/world-map-navigation"
+import { worldMapReadyBridge, worldMapVisibilityBridge } from "@/app/project29/world-map-loading"
 
 export const dynamic = "force-dynamic"
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic"
 export async function GET(request: Request) {
   const nonce = randomBytes(24).toString("base64")
   const source = await readFile(path.join(process.cwd(), "public/world-map/index.html"), "utf8")
-  const ready = `<script nonce="${nonce}">(()=>{const ready=()=>{if(!document.querySelector('.universe .planet-node'))return false;parent.postMessage({type:'journey-world-map-ready'},'*');return true};if(!ready()){const observer=new MutationObserver(()=>{if(ready())observer.disconnect()});observer.observe(document.body,{childList:true,subtree:true})}})();</script>`
+  const ready = `<script nonce="${nonce}">${worldMapReadyBridge}</script>`
   // Keep the original black starfield and all bundled map geometry unchanged.
   const embedded = `<style nonce="${nonce}">
     .universe{height:100svh;min-height:0}
@@ -43,8 +44,9 @@ export async function GET(request: Request) {
     },true);
     addEventListener('message',event=>{if(event.source===parent&&event.data?.type==='journey-world-map-reset')document.querySelector('button[aria-label="重置视图"]')?.click()});
   })();</script>`
-  const taskNavigation = new URL(request.url).searchParams.get("tasks") === "village"
-    ? `<script nonce="${nonce}">${worldMapTaskBridge}</script>` : ""
+  const mode = new URL(request.url).searchParams.get("tasks")
+  const taskNavigation = mode === "village" ? `<script nonce="${nonce}">${worldMapTaskBridge}</script>`
+    : mode === "shared" ? `<script nonce="${nonce}">${worldMapSharedTaskBridge}${worldMapVisibilityBridge}</script>` : ""
   const html = source.replace(/<(script|style)\b/g, `<$1 nonce="${nonce}"`).replace("</head>", `${embedded}</head>`).replace("</body>", `${fullscreenIntro}${ready}${controls}${taskNavigation}</body>`)
   return new Response(html, { headers: {
     "Content-Type": "text/html; charset=utf-8",

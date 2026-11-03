@@ -16,6 +16,7 @@ from journey_api.review_admin_models import MedalDefinition, MedalRedemption
 from journey_api.review_admin_access import require_publisher
 from journey_api.review_admin_routes import envelope, audit
 from journey_api.novice_economy import POINT_TYPES, wallet
+from journey_api.medal_catalog import BADGE_ARTWORKS
 
 router = APIRouter(prefix="/api/v1")
 
@@ -61,7 +62,11 @@ class MedalContent(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=1000)
     image: str = Field(default="", max_length=2800000)
-    style: Literal["blue", "gold", "green"] = "blue"
+    style: Literal["blue", "purple", "gold", "green"] = "blue"
+    artworkId: str = Field(default="", max_length=80)
+    artworkLevel: int | None = Field(default=None, strict=True, ge=1, le=3)
+    themeId: str = Field(default="", max_length=80)
+    themeName: str = Field(default="", max_length=80)
     costs: list[Cost] = Field(default_factory=list, max_length=8)
     stock: int | None = Field(default=None, strict=True, ge=0, le=1000000)
     status: Literal["draft", "published", "unpublished"] = "draft"
@@ -71,6 +76,18 @@ class MedalContent(BaseModel):
     def valid(self):
         self.name = self.name.strip()
         if not self.name: raise ValueError("请填写徽章名称")
+        if self.artworkId and self.artworkId not in BADGE_ARTWORKS:
+            raise ValueError("请选择有效的内置徽章图案")
+        if self.image and self.artworkId:
+            raise ValueError("自定义图片与内置徽章图案不能同时使用")
+        if self.artworkId:
+            artwork = BADGE_ARTWORKS[self.artworkId]
+            self.artworkLevel = self.artworkLevel or {"blue": 1, "purple": 2, "gold": 3}.get(self.style, 1)
+            self.style = {1: "blue", 2: "purple", 3: "gold"}[self.artworkLevel]
+            self.themeId, self.themeName = artwork['categoryId'], artwork['categoryName']
+        else:
+            self.artworkLevel = None
+            self.themeId = self.themeName = ""
         if any(c.badgeId not in POINT_TYPES for c in self.costs) or len({c.badgeId for c in self.costs}) != len(self.costs):
             raise ValueError("兑换点数类型无效或重复")
         if self.status == "published" and not self.costs: raise ValueError("上架前请配置兑换点数")
@@ -164,7 +181,11 @@ def redeem(medal_id: uuid.UUID, command: RedeemMedal, request: Request,
     balance = wallet(session, actor)["badgeBalances"]
     if any(balance[c["badgeId"]] < c["points"] for c in content["costs"]): raise ApiError(409, "INSUFFICIENT_POINTS", "徽章点不足，暂不能兑换。")
     result = MedalRedemption(id=uuid.uuid4(), organization_id=actor.organization_id, user_id=actor.id, medal_id=medal_id,
-        content=dict(medalName=content["name"], image=content["image"], style=content["style"], costs=content["costs"]))
+        content=dict(medalName=content["name"], image=content["image"], style=content["style"],
+                     artworkId=content.get("artworkId", ""),
+                     artworkLevel=content.get("artworkLevel"),
+                     themeId=content.get("themeId", ""), themeName=content.get("themeName", ""),
+                     costs=content["costs"]))
     session.add(result)
     if content["stock"] is not None:
         content["stock"] -= 1

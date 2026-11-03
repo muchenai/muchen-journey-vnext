@@ -18,12 +18,27 @@ from journey_api.errors import ApiError
 from journey_api.models import User, UserStatus, Role, RoleAssignment, TaskVersion, Assignment, Enrollment, Evaluation, Decision
 from journey_api.review_admin_models import ReviewAdminTask
 from journey_api.review_admin_access import require_publisher
-from journey_api.community_models import CommunityState, KnowledgeFile, KnowledgeChunk, GuildContribution
+from journey_api.community_models import CommunityState, KnowledgeFile, KnowledgeChunk, KnowledgeFavorite, GuildContribution
 
 router = APIRouter(prefix='/api/v1/review-admin/community')
 CHUNK_SIZE = 512 * 1024
 MAX_FILE_SIZE = 100 * 1024 * 1024
 ABILITIES = {'data','implementation','quality','communication','collaboration'}
+KNOWLEDGE_MODULES = ('dashboard', 'village', 'academy', 'guild')
+
+
+def knowledge_publication(payload, previous=None):
+    previous = previous or {}
+    modules = payload.get('modules', previous.get('modules', []))
+    status = payload.get('status', previous.get('status', 'draft'))
+    if not isinstance(modules, list) or len(modules) > 4 or any(not isinstance(m, str) or m not in KNOWLEDGE_MODULES for m in modules):
+        fail('请选择有效的发布范围。')
+    modules = [m for m in KNOWLEDGE_MODULES if m in modules]
+    if status not in ('draft', 'published', 'unpublished'):
+        fail('资料发布状态无效。')
+    if status == 'published' and not modules:
+        fail('发布前请至少选择一个模块。')
+    return dict(modules=modules, status=status)
 
 
 def fail(message, status=422):
@@ -170,6 +185,7 @@ def knowledge_change(session,actor,data,action,p):
         return None
     if action=='removeItem':
         row=find(data['items'],p.get('id'));data['items'].remove(row)
+        session.execute(delete(KnowledgeFavorite).where(KnowledgeFavorite.organization_id==actor.organization_id, KnowledgeFavorite.item_id==identifier(row['id'])))
         if row['kind']=='file':session.delete(get_file(session,actor,row['id']))
         return None
     if action=='completeUpload':
@@ -177,11 +193,17 @@ def knowledge_change(session,actor,data,action,p):
         chunks=session.execute(select(KnowledgeChunk.position,func.length(KnowledgeChunk.data)).where(KnowledgeChunk.file_id==file.id).order_by(KnowledgeChunk.position)).all()
         if len(chunks)!=math.ceil(file.size/CHUNK_SIZE) or sum(c[1] for c in chunks)!=file.size:fail('文件未完整上传，请重试。')
         row=dict(id=str(file.id),kind='file',title=file.metadata_json['fileName'][:120],**file.metadata_json,categoryId=category(data,p.get('categoryId')),description=text(p.get('description',''),'资料说明'),createdAt=timestamp(),updatedAt=timestamp(),createdBy=editor)
+        row.update(knowledge_publication(p))
         file.complete=True;data['items'].insert(0,row);return row
+    if action=='setItemStatus':
+        row=find(data['items'],p.get('id'))
+        row.update(knowledge_publication(p, row));row['updatedAt']=timestamp()
+        return row
     if action not in ('saveLink','updateItem'):fail('不支持的知识库操作。')
     row=find(data['items'],p['id']) if p.get('id') else None
     if action=='updateItem' and not row:fail('请选择资料。')
     fields=dict(title=text(p.get('title'),'资料名称',120,True),description=text(p.get('description',''),'资料说明'),categoryId=category(data,p.get('categoryId')),updatedAt=timestamp())
+    fields.update(knowledge_publication(p, row))
     if not row or row['kind']=='link':fields['url']=url(p.get('url',row.get('url') if row else ''))
     if row:row.update(fields)
     else:
