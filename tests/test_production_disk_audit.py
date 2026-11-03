@@ -53,6 +53,18 @@ def test_database_backups_are_reported_separately_from_temporary_plain_dumps(tmp
         'encrypted_database_dumps','temporary_plain_dumps','backup_metadata'}
 
 
+def test_root_file_categories_count_swap_without_following_links_or_reading_contents(tmp_path):
+    (tmp_path/'swapfile').write_bytes(b'allocated swap fixture')
+    (tmp_path/'other-file').write_bytes(b'private fixture')
+    (tmp_path/'subdirectory').mkdir()
+    (tmp_path/'link').symlink_to(tmp_path/'swapfile')
+    with patch('builtins.open',side_effect=AssertionError('FILE_CONTENT_READ')):
+        result = audit.root_file_accounting(tmp_path)
+    assert result['swap_files']['files'] == 1
+    assert result['other_root_files']['files'] == 1
+    assert 'private fixture' not in str(result)
+
+
 def test_docker_logical_sizes_do_not_replace_unique_layer_total_or_include_labels():
     result = audit.docker_summary({'LayersSize':120,
         'Images':[{'Id':'a','Size':100,'SharedSize':80,'Containers':1,'Labels':{'private':'hidden'}},

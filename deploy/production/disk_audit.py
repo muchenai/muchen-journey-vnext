@@ -121,6 +121,22 @@ def file_accounting(root, kind):
     return {'groups':groups,'metadata_errors':errors}
 
 
+def root_file_accounting(root):
+    groups = {}
+    device = root.stat().st_dev
+    with os.scandir(root) as entries:
+        for entry in entries:
+            info = entry.stat(follow_symlinks=False)
+            if info.st_dev != device or not stat.S_ISREG(info.st_mode):
+                continue
+            label = 'swap_files' if entry.name in {'swapfile','swap.img'} else 'other_root_files'
+            row = groups.setdefault(label,{'files':0,'allocated_bytes':0,'apparent_bytes':0})
+            row['files'] += 1
+            row['allocated_bytes'] += info.st_blocks*512
+            row['apparent_bytes'] += info.st_size
+    return groups
+
+
 class DockerConnection(http.client.HTTPConnection):
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
@@ -282,6 +298,7 @@ def main():
         'measurement':'Allocated disk bytes; changing live filesystem, not a frozen snapshot.',
         'read_only':True,'production_before':before,'production_after':after,
         'filesystems':roots,'selected_directory_bytes':directory_sizes,
+        'root_regular_files':root_file_accounting(Path('/')),
         'journey_allocated_bytes':journey_tree.get(str(JOURNEY)), 'journey_collections':collections,
         'docker':docker,'deleted_open_files':deleted,'warnings':WARNINGS,
         'notes':['Filesystem reserved-free bytes are unavailable to normal users, but are not used data.',
