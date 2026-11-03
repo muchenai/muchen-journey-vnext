@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import subprocess
 from unittest.mock import patch
 import pytest
 
@@ -31,6 +32,30 @@ def eligible(value,protected=(),revisions=(),referenced=()):
 
 def test_retired_project_image_is_eligible():
     assert eligible(image())
+
+
+@pytest.mark.parametrize('legacy_parent',[None,'sha256:'+'e'*64])
+def test_image_inspection_handles_omitted_legacy_fields_and_does_not_expose_configuration(legacy_parent):
+    row={'Id':'sha256:'+'a'*64,'RepoDigests':['ghcr.io/muchenai/muchen-journey-vnext-api@sha256:'+'c'*64],
+        'Created':'2026-01-01T00:00:00Z','Config':{'Env':['PRIVATE_FIXTURE=do-not-return'],
+        'Labels':{'org.opencontainers.image.revision':'b'*40,
+            'org.opencontainers.image.source':'https://github.com/muchenai/muchen-journey-vnext'}}}
+    if legacy_parent is not None: row['Parent']=legacy_parent
+    result=subprocess.CompletedProcess([],0,json.dumps([row]).encode(),b'')
+    with patch.object(cleanup,'run',return_value=result) as command:
+        value=cleanup.image_info(row['Id'])
+    assert value['parent']==(legacy_parent or '') and value['tags']==[]
+    assert value['revision']=='b'*40 and len(value['refs'])==1
+    assert 'PRIVATE_FIXTURE' not in str(value) and 'Config' not in value
+    assert command.call_args.args[0]==['docker','image','inspect',row['Id']]
+
+
+def test_missing_optional_image_is_distinct_from_docker_inspection_failure():
+    with patch.object(cleanup,'run',return_value=subprocess.CompletedProcess([],1,b'',b'No such image')):
+        assert cleanup.image_info('sha256:'+'a'*64,optional=True) is None
+    with patch.object(cleanup,'run',return_value=subprocess.CompletedProcess([],1,b'',b'permission denied private fixture')):
+        with pytest.raises(AssertionError,match='IMAGE_INSPECTION_FAILED'):
+            cleanup.image_info('sha256:'+'a'*64,optional=True)
 
 
 @pytest.mark.parametrize('change',['runtime','protected','revision','source','unknown_alias','mutable_tag','tool','new','no_revision'])
