@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { ModuleIcon, ModulePanel } from "./ModuleShell";
-import { FavoriteKnowledge } from "./FavoriteKnowledge";
+import { AcademyFavoritesPreview } from "./AcademyLearning";
 import { pointNames } from "./VillageTaskCard";
 import "./personalProfile.css";
 
 export type ProfileWallet={xp:number;badgeBalances:Record<string,number>};
-export function PersonalProfile({name,onBack,onAcademy}:{name:string;onBack:()=>void;onAcademy:()=>void}){
+export function PersonalProfile({name,onBack,onAcademy,onAcademyFavorites}:{name:string;onBack:()=>void;onAcademy:()=>void;onAcademyFavorites:()=>void}){
   const [wallet,setWallet]=useState<ProfileWallet|null>(null);
   const [error,setError]=useState("");
   const [attempt,setAttempt]=useState(0);
@@ -17,10 +17,10 @@ export function PersonalProfile({name,onBack,onAcademy}:{name:string;onBack:()=>
     }).catch(failure=>{if(!controller.signal.aborted)setError(failure instanceof Error?failure.message:"成长数据读取失败，请重试。")});
     return()=>controller.abort();
   },[attempt]);
-  return <PersonalProfileView name={name} wallet={wallet} error={error} onRetry={()=>{setError("");setWallet(null);setAttempt(n=>n+1)}} onBack={onBack} onAcademy={onAcademy}/>;
+  return <PersonalProfileView name={name} wallet={wallet} error={error} onRetry={()=>{setError("");setWallet(null);setAttempt(n=>n+1)}} onBack={onBack} onAcademy={onAcademy} onAcademyFavorites={onAcademyFavorites}/>;
 }
 
-export function PersonalProfileView({name,wallet,error,onRetry,onBack,onAcademy}:{name:string;wallet:ProfileWallet|null;error:string;onRetry:()=>void;onBack:()=>void;onAcademy:()=>void}){
+export function PersonalProfileView({name,wallet,error,onRetry,onBack,onAcademy,onAcademyFavorites}:{name:string;wallet:ProfileWallet|null;error:string;onRetry:()=>void;onBack:()=>void;onAcademy:()=>void;onAcademyFavorites:()=>void}){
   const [notice,setNotice]=useState("");
   const unavailable=()=>setNotice("暂未开放");
   const xp=wallet?wallet.xp.toLocaleString():"—";
@@ -32,7 +32,7 @@ export function PersonalProfileView({name,wallet,error,onRetry,onBack,onAcademy}
       <div className="profile-summary"><div><strong>—</strong><span>已拥有徽章 · 暂未开放</span></div><div><strong>{xp}</strong><span>累计新手村经验</span></div><div><strong>—</strong><span>商城积分 · 暂未开放</span></div></div>
       <div className="profile-featured"><ModuleIcon file="a03b5" pack="guild" size={48}/><div><span className="badge-eyebrow">展示徽章</span><h3>暂未开放</h3></div></div>
     </ModulePanel>
-    <FavoriteKnowledge compact courses={[]} favoriteIds={[]} onToggle={unavailable} onOpen={unavailable} onBrowse={onAcademy} onShowAll={onAcademy}/>
+    <AcademyFavoritesPreview onBrowse={onAcademy} onViewAll={onAcademyFavorites}/>
     <div className="profile-experience-grid">
       <ModulePanel className="profile-experience"><div className="module-row"><div><span className="badge-eyebrow">EXPERIENCE & GROWTH</span><h2>我的经验与等级</h2></div><span className="module-tag">成长账户</span></div>
         <div className="profile-level-heading"><div className="profile-level-mark"><span>LEVEL</span><strong>—</strong></div><div><h3>成长等级暂未开放</h3><p>经验来自已审核通过的新手村任务。</p></div><div className="profile-lifetime"><strong>{xp}</strong><span>累计新手村经验</span></div></div>

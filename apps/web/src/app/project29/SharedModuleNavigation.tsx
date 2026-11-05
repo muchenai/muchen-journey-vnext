@@ -61,35 +61,19 @@ export function SharedModuleNavigation({
               data-name="Heading 1"
             >
               <div
-                className="[word-break:break-word] bg-clip-text font-['Source_Han_Sans_SC'] font-bold leading-[0] not-italic relative shrink-0 text-[23.053px] text-[transparent] tracking-[0.8233px] whitespace-nowrap"
+                className="dashboard-brand-gradient [word-break:break-word] font-['Source_Han_Sans_SC'] font-bold leading-[0] not-italic relative shrink-0 text-[23.053px] tracking-[0.8233px] whitespace-nowrap"
                 data-node-id="4062:469"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(109.83453136673711deg, rgb(146, 244, 255) 6.5249%, rgb(49, 201, 245) 43.5%, rgb(200, 249, 255) 88.692%)",
-                }}
               >
                 <p className="font-['Source_Han_Sans_SC'] font-black mb-0 whitespace-pre">
                   <span
-                    className="bg-clip-text leading-[23.053px] tracking-[1.7438px]"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(109.83453136673711deg, rgb(146, 244, 255) 6.5249%, rgb(49, 201, 245) 43.5%, rgb(200, 249, 255) 88.692%)",
-                    }}
+                    className="dashboard-brand-gradient leading-[23.053px] tracking-[1.7438px]"
                   >{` MUCHEN`}</span>
                   <span
-                    className="bg-clip-text leading-[23.053px]"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(109.83453136673711deg, rgb(146, 244, 255) 6.5249%, rgb(49, 201, 245) 43.5%, rgb(200, 249, 255) 88.692%)",
-                    }}
+                    className="dashboard-brand-gradient leading-[23.053px]"
                   >{` `}</span>
                 </p>
                 <p
-                  className="bg-clip-text font-['Source_Han_Sans_SC'] font-black leading-[23.053px] whitespace-pre"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(109.83453136673711deg, rgb(146, 244, 255) 6.5249%, rgb(49, 201, 245) 43.5%, rgb(200, 249, 255) 88.692%)",
-                  }}
+                  className="dashboard-brand-gradient font-['Source_Han_Sans_SC'] font-black leading-[23.053px] whitespace-pre"
                 >
                   JOURNEY
                 </p>

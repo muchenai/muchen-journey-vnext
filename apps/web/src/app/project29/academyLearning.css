@@ -1,0 +1,52 @@
+.academy-learning .academy-progress { display:block; width:100%; height:7px; margin:20px 0; border:0; border-radius:8px; overflow:hidden; appearance:none; background:var(--m-border); }
+.academy-progress::-webkit-progress-bar { background:var(--m-border); }
+.academy-progress::-webkit-progress-value { background:linear-gradient(90deg,var(--m-cyan),var(--m-violet)); }
+.academy-progress::-moz-progress-bar { background:var(--m-cyan); }
+.academy-view-tabs { display:flex; gap:24px; margin-bottom:22px; border-bottom:1px solid var(--m-border); }
+.academy-view-tabs button { display:flex; align-items:center; gap:8px; padding:12px 0; color:var(--m-muted); border-bottom:2px solid transparent; }
+.academy-view-tabs button.is-active { color:var(--m-cyan); border-bottom-color:var(--m-cyan); }
+.academy-view-tabs span { background:var(--m-raised); border-radius:4px; padding:1px 5px; font-size:10px; }
+.academy-filter-panel { padding:18px 22px; }
+.academy-filter-panel .module-filterbar { margin:0; }
+.academy-tag-filter { display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--m-border); padding-top:16px; margin-top:15px; }
+.academy-tag-filter button { border:1px solid var(--m-border); border-radius:5px; padding:7px 11px; color:var(--m-muted); font-size:11px; }
+.academy-tag-filter button.is-active { background:var(--m-raised); border-color:var(--m-cyan); color:var(--m-cyan); }
+.academy-course-tags { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+.academy-course-tags .module-tag { font-size:10px; }
+.academy-cover-image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; }
+.academy-cover-image.is-loaded { opacity:1; }
+.academy-learning .module-course-card { padding-bottom:24px; }
+.academy-learning .module-course-card > .module-card-action { margin-top:16px; }
+.academy-empty { padding:40px 24px; display:flex; align-items:center; flex-direction:column; gap:15px; text-align:center; }
+.academy-empty h3 { font-size:18px; }
+.academy-empty p { color:var(--m-muted); font-size:12px; }
+.academy-refresh { color:var(--m-cyan); }
+.academy-error { display:flex; gap:16px; align-items:center; color:#ffb5b5!important; font-size:12px; line-height:1.8; padding:14px 0; }
+.academy-share-list { padding:24px; }
+.academy-share-list h2 { font-size:20px; }
+.academy-share-list article { padding:22px 0; border-bottom:1px solid var(--m-border); }
+.academy-share-list article:last-child { border-bottom:0; }
+.academy-share-list article h3 { font-size:16px; }
+.academy-share-list article p { color:var(--m-muted); font-size:12px; margin:10px 0; line-height:1.8; }
+.academy-share-list article small { color:var(--m-dim); }
+.academy-review-reason { border-left:2px solid #ffd080; padding:8px 12px; color:#ffd080!important; }
+.academy-share-approved { color:var(--m-cyan); }
+.academy-share-rejected { color:#ffd080; }
+.academy-player { width:100%; max-height:440px; display:block; background:#030a15; margin-top:22px; border:1px solid var(--m-border); border-radius:8px; }
+/* Native video controls use viewport coordinates in fullscreen. Remove the
+   surrounding design-canvas zoom only while this player is fullscreen, so
+   the timeline fill and its drag handle share the same coordinate space. */
+.journey-scaled-canvas:has(.academy-player:fullscreen) { zoom:1; }
+.academy-player:fullscreen { width:100%; height:100%; max-height:none; margin:0; border:0; border-radius:0; object-fit:contain; background:#000; }
+.academy-player-note { margin-top:10px; }
+.academy-detail-summary { white-space:pre-wrap; }
+.academy-link-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:24px; }
+.academy-link-actions p { flex-basis:100%; }
+.academy-detail-actions { display:flex; gap:12px; align-items:center; margin-top:22px; flex-wrap:wrap; }
+.academy-detail-actions .academy-error { flex-basis:100%; }
+.academy-share-dialog fieldset { border:0; padding:0; min-width:0; }
+.academy-share-dialog .academy-share-tags { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+.academy-share-tags legend { font-size:13px; margin-bottom:12px; }
+.academy-share-tags label { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--m-muted); padding:6px 8px; border:1px solid var(--m-border); border-radius:4px; }
+.academy-share-tags input { accent-color:var(--m-cyan); }
+.academy-share-dialog button:disabled, .academy-learning button:disabled { opacity:.55; cursor:wait; }

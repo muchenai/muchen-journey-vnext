@@ -150,7 +150,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 @container login-canvas (max-width: 600px) { .cosmos-shell { padding: 18px 16px; }.topbar { align-items: center; }.brand-mark img { width: 44px; height: 44px; }.brand-mark strong { font-size: 10px; }.brand-mark small { display: none; }.navigation { padding: 6px 8px; gap: 8px; }.nav-control { font-size: 11px; }.experience-grid { margin: 1rem auto; }.mission-zone { min-height: 310px; }.mission-zone h1 { top: 0; left: 0; font-size: 28px; }.mission-art { margin-top: 42px; width: 94vw; }.explore-button { transform: scale(.8); transform-origin: right center; top: 72%; }.login-panel { min-height: 560px; padding: 34px 23px; gap: 27px; border-radius: 26px; }.panel-logo { width: 125px; height: 125px; }.panel-title { font-size: 23px; }.code-field { height: 75px; }.launch-button span { font-size: 17px; }.status-line { margin-top: -14px; } footer { flex-direction: column; text-align: center; font-size: 11px; white-space: normal; gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
-.design-stage { width: 1920px; min-height: 1080px; animation: screen-arrive .5s ease-out; }
+.design-stage { width: 1920px; min-height: 1080px; }
 .design-viewport > .design-stage { flex: none; height: 1080px; }
 .design-stage button { cursor: pointer; text-align: inherit; transition: translate .25s; }
 .design-stage button:hover { translate: 0 -3px; }

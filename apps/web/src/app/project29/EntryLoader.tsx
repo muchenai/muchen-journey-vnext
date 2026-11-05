@@ -1,5 +1,4 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { useCanvasScale } from "./useCanvasScale";
 // Refresh with node scripts/check-resources.mjs --write after changing assets.
 import imageUrls from "./preloadAssets.json";
 
@@ -85,7 +84,6 @@ function prepare() {
 }
 
 export function ProjectResourceLoader({onReady}: {onReady:()=>void}) {
-  const scale = useCanvasScale();
   const [, refresh] = useState(0);
   useEffect(() => {
     const update = () => refresh(value => value + 1);
@@ -95,7 +93,7 @@ export function ProjectResourceLoader({onReady}: {onReady:()=>void}) {
   }, []);
   useEffect(()=>{ if(resourcesReady)onReady(); });
   const progress = Math.floor(completed / total * 100);
-  return <div className="app-loader-viewport"><main className="app-loader" style={{ zoom: scale }} aria-busy={!failure}>
+  return <div className="app-loader-viewport"><main className="app-loader journey-scaled-canvas" aria-busy={!failure}>
     <section className="app-loader-content" aria-labelledby="app-loader-title">
       <p className="app-loader-brand">MUCHEN JOURNEY</p>
       <div className="app-loader-ring" role="progressbar" aria-label="探索营资源载入进度"

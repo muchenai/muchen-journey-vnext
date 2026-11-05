@@ -1,5 +1,6 @@
 .personal-profile { padding-bottom: 8px; }
 .personal-profile button, .personal-profile .module-tag, .profile-identity-tags { white-space: nowrap; }
+.personal-profile .favorite-knowledge-empty > p { margin-bottom: 16px; }
 .profile-overview { display: grid; grid-template-columns: minmax(0, 1fr) 425px 300px; align-items: center; gap: 28px; min-height: 222px; padding: 34px; margin-bottom: 24px; background: radial-gradient(ellipse at 10% 0, color-mix(in srgb, var(--m-cyan) 9%, transparent), transparent 65%), var(--m-fill); }
 .profile-identity { display: flex; align-items: center; gap: 24px; min-width: 0; }
 .profile-avatar { width: 96px; height: 96px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--m-stroke); color: var(--m-cyan); font-size: 38px; background: radial-gradient(circle at 30% 20%, var(--m-raised), var(--m-deep)); outline: 1px solid var(--m-border); outline-offset: 7px; }

@@ -5,7 +5,6 @@ import { useVillageTasks, type VillageTask } from "./useVillageTasks"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { sharedAsset } from "./sharedAsset"
 import type { PreviewIdentity } from "./previewStorage"
-import { useCanvasScale } from "./useCanvasScale"
 import { WelcomeNameDialog } from "./WelcomeNameDialog"
 import { saveLearnerNickname } from "../actions"
 import {
@@ -34,6 +33,7 @@ import { AccountSwitchDialog } from "./AccountSwitchDialog"
 import { PersonalProfile } from "./PersonalProfile"
 import { WorldMap } from "./WorldMap"
 import { KnowledgeLibrary } from "./KnowledgeLibrary"
+import { AcademyLearning } from "./AcademyLearning"
 import { FavoriteKnowledge, KnowledgeSaveButton } from "./FavoriteKnowledge"
 import "./favoriteKnowledge.css"
 import { ModuleCourseArtwork } from "./ModuleCourseArtwork"
@@ -77,7 +77,6 @@ export function ModuleHub({
   const modulePagesEnabled = ["academy", "guild"].includes(module)
   const village = useVillageTasks(villageEnabled)
   const practiceTasks = village.tasks
-  const canvasScale = useCanvasScale()
   const [menu, setMenu] = useState("hall")
   const [profileReturn, setProfileReturn] = useState("hall")
   const [accountSwitchOpen, setAccountSwitchOpen] = useState(false)
@@ -101,6 +100,7 @@ export function ModuleHub({
   const listing = useRef<HTMLDivElement>(null)
   const pageContent = useRef<HTMLDivElement>(null)
   const pendingMapTaskScroll = useRef(false)
+  const pendingAcademyFavorites = useRef(false)
   const openMapDepartmentTasks = useCallback((department: TaskDepartmentFilter) => {
     if (module !== "village") return
     setMenu("hall")
@@ -125,7 +125,8 @@ export function ModuleHub({
   }, [menu])
   useEffect(() => {
     const initial = window.setTimeout(() => {
-      setMenu("hall")
+      setMenu(module === "academy" && pendingAcademyFavorites.current ? "saved" : "hall")
+      pendingAcademyFavorites.current = false
       resetTaskFilters()
       setFilter("全部")
       setQuery("")
@@ -161,6 +162,14 @@ export function ModuleHub({
       behavior: "smooth",
     })
   }
+  function openAcademy(next: "hall" | "saved") {
+    pendingAcademyFavorites.current = module !== "academy" && next === "saved"
+    setMenu(next)
+    setFilter("全部")
+    setQuery("")
+    pageContent.current?.scrollTo({ top: 0 })
+    onNavigate("academy")
+  }
   function navigateMenu(next: string) {
     if (next === "map" || next === "knowledge") {
       setMenu(next)
@@ -169,7 +178,7 @@ export function ModuleHub({
       return
     }
     if (module === "dashboard") {
-      if (next === "hall") {
+      if (next === "hall" || next === "tasks") {
         setMenu("hall")
         setQuery("")
       }
@@ -259,10 +268,10 @@ export function ModuleHub({
     <ModuleBorderProvider decoration={decoration}>
       <div className="module-viewport design-viewport" data-screen={module}>
         <main
-          className="module-hub"
+          className="module-hub journey-scaled-canvas"
           onClickCapture={event=>{
             const target=event.target as HTMLElement;
-            if(menu!=="profile" && menu!=="map" && menu!=="knowledge" && module!=="dashboard" && !villageEnabled && !modulePagesEnabled && target.closest(".module-page-content") && target.closest("button")) {
+            if(menu!=="profile" && menu!=="map" && menu!=="knowledge" && module!=="dashboard" && module!=="academy" && !villageEnabled && !modulePagesEnabled && target.closest(".module-page-content") && target.closest("button")) {
               const button=target.closest("button");
               if(button?.hasAttribute("data-page-navigation"))return;
               if(button?.closest(".module-filterbar") || button?.closest(".module-filter-tabs"))return;
@@ -271,7 +280,6 @@ export function ModuleHub({
           }}
           data-module={module}
           data-world-map={menu === "map" || undefined}
-          style={{ zoom: canvasScale }}
         >
           <div className="module-space-background" aria-hidden="true">
             <img src="/assets/project29/home-4062/0ba79.webp" alt="" />
@@ -318,11 +326,13 @@ export function ModuleHub({
                 aria-label={menu === "map" ? "世界地图内容" : `${title}内容，可滚动查看`}
               >
                 {menu === "profile" ? (
-                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>{setMenu("saved");onNavigate("academy")}} />
+                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>openAcademy("hall")} onAcademyFavorites={()=>openAcademy("saved")} />
                 ) : menu === "map" ? (
                   null
                 ) : menu === "knowledge" ? (
                   <KnowledgeLibrary key={module} module={module} query={query} onClearSearch={() => setQuery("")} />
+                ) : ["academy"].includes(module) ? (
+                  <AcademyLearning active={active} savedOnly={menu === "saved"} query={query} onSaved={saved => { setMenu(saved ? "saved" : "hall"); setQuery("") }} onClearSearch={() => setQuery("")} />
                 ) : module === "academy" && menu === "saved" ? (
                   <div className="favorite-knowledge-page">
                     <FavoriteKnowledge headingLevel="h1" courses={academyCourses} favoriteIds={favorites} query={query}
@@ -843,7 +853,7 @@ export function ModuleHub({
             </DialogSurface>
           </dialog>
           <AccountSwitchDialog open={accountSwitchOpen} onClose={()=>setAccountSwitchOpen(false)} />
-          <WelcomeNameDialog open={nicknameRequired} decoration={decoration} onSave={saveLearnerNickname} />
+          <WelcomeNameDialog open={active && nicknameRequired} decoration={decoration} onSave={saveLearnerNickname} />
 
         </main>
       </div>

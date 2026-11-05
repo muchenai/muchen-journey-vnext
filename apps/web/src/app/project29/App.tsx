@@ -10,7 +10,6 @@ import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/li
 import { ExecutionDetail, ExecutionView, TaskCards, executionTasks } from "./ExecutionPages";
 import { UpdatedDashboard } from "./UpdatedDashboard";
 import { ModuleHub } from "./ModuleHub";
-import { useCanvasScale } from "./useCanvasScale";
 import { SelfCheckHistory } from "./SelfCheckHistory";
 import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
 import { useWorkspaceRecovery } from "./useWorkspaceRecovery";
@@ -34,7 +33,6 @@ function ExperienceScreen() {
  const [lastModule, setLastModule] = useState<"dashboard" | "village" | "academy" | "guild">("dashboard");
  const isModuleScreen = ["dashboard", "village", "academy", "guild"].includes(screen);
  const [entryResourcesReady, setEntryResourcesReady] = useState(initialScreen !== "login");
- const scale = useCanvasScale();
  const viewportRef = useRef<HTMLElement>(null);
  const [notice, setNotice] = useState(initialNotice ?? "");
  const [burst, setBurst] = useState<{ x: number; y: number; key: number } | null>(null);
@@ -93,6 +91,7 @@ function ExperienceScreen() {
  }, [screen, router]);
  const navigate = (target: Screen) => {
    if (["dashboard", "village", "academy", "guild"].includes(target)) setLastModule(target as typeof lastModule);
+   setBurst(null);
    if (["village","academy","guild"].includes(target)) {setScreen(target);setNotice("");return;}
    const url = new URL(window.location.href);
    if (target === "dashboard" || target === "tasks" || target === "welcome") {
@@ -286,7 +285,7 @@ function ExperienceScreen() {
    return;
  }
  if (text.includes("返回登录")) window.location.assign("/join");
- else if (text.includes("返回主页面")) window.location.assign("/app?view=dashboard");
+ else if (text.includes("返回主页面")) navigate("dashboard");
  else if (text.includes("返回任务列表")) window.location.assign("/app?view=tasks");
  else if (text.includes("开启旅程")) navigate("dashboard");
  else if (text.includes("开始执行") || text.includes("继续当前")) {
@@ -336,7 +335,7 @@ function ExperienceScreen() {
    event.currentTarget.querySelectorAll(".holo-panel").forEach(panel => panel.removeAttribute("data-energized"));
    resetControlMagnet(event.currentTarget);
  }}>
- <div className="design-stage origin-top-left" key={screen} style={{ zoom: scale }} data-selection={choice}>
+ <div className="design-stage journey-scaled-canvas origin-top-left" key={screen} data-selection={choice}>
  {screen === "welcome" && <Welcome />}
  {screen === "tasks" && <Tasks />}
  {screen === "detail" && (executing ? <ExecutionDetail task={task} openedMaterials={[Boolean(openedMaterials[`${task.id}-material-1`]), Boolean(openedMaterials[`${task.id}-material-2`])]} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} /> : <Detail />)}
@@ -357,7 +356,6 @@ const loginArrow = `${assetPathPrefix}/79892.svg`
 
 export function Login() {
   const { joinPhase, joinError } = useJourney();
-  const [scale, setScale] = useState<number | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [loginMode, setLoginMode] = useState<'feishu' | 'password'>('password')
@@ -435,12 +433,6 @@ export function Login() {
     }, 10000);
     return () => { active = false; window.clearTimeout(timer); window.clearInterval(interval); };
   }, [joinPhase, joinError, loginMode]);
-  useLayoutEffect(() => {
-    const resize = () => setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080))
-    window.addEventListener('resize', resize)
-    resize()
-    return () => window.removeEventListener('resize', resize)
-  }, [])
 
   const launch = async (event: FormEvent) => {
     event.preventDefault()
@@ -525,7 +517,7 @@ export function Login() {
 
   return (
     <div className="login-viewport">
-      <div className="login-canvas" style={{ zoom: scale ?? 1 }}>
+      <div className="login-canvas journey-scaled-canvas">
       <main className={`cosmos-shell login-stage ${isLaunched ? 'is-launched' : ''}`}>
       <div className="cosmos-background" aria-hidden="true" />
       <div className="atmosphere atmosphere-one" aria-hidden="true" />
@@ -707,7 +699,7 @@ const imgRectangle60 = `${assetPathPrefix}/59316.svg`;
           </div>
           <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_16px_3px_44.8px_0px_rgba(114,133,255,0.36)]" />
         </div>
-        <button type="button" data-action="true" className="col-1 grid-cols-[max-content] grid-rows-[max-content] inline-grid ml-[114px] mt-[105px] place-items-start relative row-1" data-node-id="2006:454">
+        <button type="button" data-action="dashboard" className="col-1 grid-cols-[max-content] grid-rows-[max-content] inline-grid ml-[114px] mt-[105px] place-items-start relative row-1" data-node-id="2006:454">
           <div className="col-1 grid-cols-[max-content] grid-rows-[max-content] inline-grid ml-0 mt-0 place-items-start relative row-1" data-node-id="2006:455">
             <div className="border-[#e8f6ff] border-[1.6px] border-solid col-1 h-[68px] ml-0 mt-0 pointer-events-none relative rounded-[16px] row-1 w-[261px] figma-stroke figma-stroke-back" data-node-id="2006:456"><GradientStroke variant="back" />
               <div aria-hidden className="absolute inset-0 rounded-[16px] journey-back-tint" />

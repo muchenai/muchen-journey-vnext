@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import preloadAssets from "./src/app/project29/preloadAssets.json";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -9,6 +10,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      ...preloadAssets.filter(source => /^\/world-map\/[a-f0-9]{16}\.webp$/.test(source)).map(source => ({
+        source,
+        headers: [{key:"Cache-Control", value:"public, max-age=31536000, immutable"}],
+      })),
       {
         source: "/:path*",
         headers: [

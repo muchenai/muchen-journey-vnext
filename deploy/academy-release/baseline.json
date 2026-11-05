@@ -1,0 +1,14 @@
+{
+  "schema_version": 3,
+  "base_candidate": "2bab0cefe55447c9d64af81dd5c52f5db67db09c",
+  "base_release": "/srv/journey-next-production/canary/releases/2bab0cefe55447c9d64af81dd5c52f5db67db09c-badges-knowledge",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0052_knowledge_publication",
+    "to": "0054_academy_covers"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {}
+}
