@@ -17,11 +17,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  recover:
+  prepare:
     if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
     runs-on: ubuntu-latest
-    environment: production-canary-uat
-    timeout-minutes: 60
+    timeout-minutes: 25
+    outputs:
+      artifact_id: ${{ steps.controls.outputs.artifact-id }}
+      control_sum: ${{ steps.proof.outputs.control_sum }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -71,9 +73,68 @@ jobs:
           PACKAGE_RUN: '42035425027'
         run: python3 original-candidate/deploy/academy-release/package.py
       - name: Create a small control package with original source and archive hash proof
+        id: proof
         run: |
+          set -euo pipefail
           python3 deploy/academy-release/recover_import.py --prepare-proof \
             "$RUNNER_TEMP/offline-package" "$RUNNER_TEMP/import-recovery-controls" "$GITHUB_SHA"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          folder=pathlib.Path(os.environ['RUNNER_TEMP'])/'import-recovery-controls'
+          proof=json.loads((folder/'original-package-proof.json').read_text())
+          assert proof['operations_commit']==os.environ['GITHUB_SHA']
+          assert len(proof['files'])==155, 'ORIGINAL_PACKAGE_FILE_COUNT'
+          assert sum(item['bytes'] for item in proof['files'].values())==293543657, 'ORIGINAL_PACKAGE_BYTES_CHANGED'
+          checksum=hashlib.sha256((folder/'SHA256SUMS').read_bytes()).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+            output.write('control_sum='+checksum+'\n')
+          print(json.dumps({'proof':'PASS','original_files':155,'original_bytes':293543657,'control_sum':checksum}))
+          PY
+      - name: Preserve exact control package and original provenance before production approval
+        id: controls
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-import-controls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/import-recovery-controls/
+          if-no-files-found: error
+          retention-days: 7
+
+  recover:
+    needs: prepare
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Download only this run's verified small control package
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
+          path: ${{ runner.temp }}/import-recovery-controls
+          merge-multiple: true
+      - name: Verify prepared control provenance before opening production access
+        env:
+          EXPECTED_CONTROL_SUM: ${{ needs.prepare.outputs.control_sum }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CONTROL_SUM" =~ ^[0-9a-f]{64}$ ]]
+          cd "$RUNNER_TEMP/import-recovery-controls"
+          printf '%s  SHA256SUMS\n' "$EXPECTED_CONTROL_SUM" | sha256sum -c -
+          sha256sum -c SHA256SUMS
+          python3 - <<'PY'
+          import json,os,pathlib
+          folder=pathlib.Path.cwd()
+          assert {p.name for p in folder.iterdir()}=={'recover_import.py','image_transport.py','original-package-proof.json','SHA256SUMS'}
+          proof=json.loads((folder/'original-package-proof.json').read_text())
+          assert proof['operations_commit']==os.environ['GITHUB_SHA']
+          assert proof['source_run_id']=='42037456146' and proof['source_attempt']==1
+          assert proof['manifest']['candidate']=='29f00234e5f2de1321792ac57ba810fc23c8bdaa'
+          assert proof['manifest']['package_run_id']=='42035425027'
+          assert len(proof['files'])==155 and sum(item['bytes'] for item in proof['files'].values())==293543657
+          PY
       - name: Identify temporary runner ingress
         id: runner
         run: |

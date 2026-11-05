@@ -275,3 +275,38 @@ def test_recovery_workflow_has_protected_exact_pins_and_no_image_reupload():
     assert 'transfer_package.py' not in workflow and 'resume_transfer.py' not in workflow
     assert 'candidate-package' not in workflow and 'docker build' not in workflow
     assert 'if: always() && steps.runner.outputs.cidr' in workflow
+
+
+def test_package_reconstruction_and_byte_count_finish_before_production_approval():
+    workflow = (ROOT / '.github/workflows/academy-import-recovery.yml').read_text()
+    prepare, recover = workflow.split('\n  recover:\n', 1)
+    assert '\n  prepare:\n' in prepare
+    assert 'environment:' not in prepare
+    assert 'secrets.WP08_DEPLOY_SSH_PRIVATE_KEY' not in prepare
+    assert 'secrets.VOLCENGINE_ACCESS_KEY' not in prepare
+    assert 'secrets.WP08_MIGRATION_DB_PASSWORD' not in prepare
+    assert 'secrets.WP15_BACKUP_KEY' not in prepare
+    assert 'original-candidate/deploy/academy-release/package.py' in prepare
+    assert "len(proof['files'])==155" in prepare
+    assert "sum(item['bytes'] for item in proof['files'].values())==293543657" in prepare
+    assert prepare.index('ORIGINAL_PACKAGE_BYTES_CHANGED') < prepare.index('id: controls')
+    assert 'needs: prepare' in recover and 'environment: production-canary-uat' in recover
+    assert 'application-build' not in recover and 'offline-package' not in recover
+    assert '--prepare-proof' not in recover
+
+
+def test_protected_job_accepts_only_this_runs_exact_prepared_control_artifact():
+    workflow = (ROOT / '.github/workflows/academy-import-recovery.yml').read_text()
+    prepare, recover = workflow.split('\n  recover:\n', 1)
+    assert 'artifact_id: ${{ steps.controls.outputs.artifact-id }}' in prepare
+    assert 'control_sum: ${{ steps.proof.outputs.control_sum }}' in prepare
+    assert 'name: journey-import-controls-${{ github.run_id }}-${{ github.run_attempt }}' in prepare
+    assert 'if-no-files-found: error' in prepare
+    assert 'artifact-ids: ${{ needs.prepare.outputs.artifact_id }}' in recover
+    assert 'EXPECTED_CONTROL_SUM: ${{ needs.prepare.outputs.control_sum }}' in recover
+    assert '"$EXPECTED_CONTROL_SUM" | sha256sum -c -' in recover
+    assert "proof['operations_commit']==os.environ['GITHUB_SHA']" in recover
+    assert "proof['source_run_id']=='42037456146'" in recover
+    assert "proof['manifest']['package_run_id']=='42035425027'" in recover
+    assert recover.index('Verify prepared control provenance') < recover.index('Identify temporary runner ingress')
+    assert recover.index('sha256sum -c SHA256SUMS') < recover.index('secrets.VOLCENGINE_ACCESS_KEY')
