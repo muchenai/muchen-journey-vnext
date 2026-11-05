@@ -19,7 +19,7 @@ from canary_schema_upgrade import (
 )
 from prepare import ExplorationPreparation
 from disk_space import DiskSpaceError, check_space
-from image_transport import verify_loaded_image, cleanup_verified_transports
+from image_transport import source_config_digest, verify_loaded_image, cleanup_verified_transports
 
 BASE = "2bab0cefe55447c9d64af81dd5c52f5db67db09c"
 WEB_BASE = "2bab0cefe55447c9d64af81dd5c52f5db67db09c"
@@ -113,6 +113,11 @@ class Activation(ExplorationPreparation):
             require(file_sha(archive) == entry["gzip_sha256"], "ARCHIVE_SHA")
             with gzip.open(archive, "rb") as handle:
                 require(stream_sha(handle) == entry["source_tar_sha256"], "SOURCE_TAR_SHA")
+            # The historical config_digest field holds Docker's image identity.
+            # Containerd can identify an OCI index/manifest rather than the
+            # config blob. Resolve the config through the verified source graph.
+            with gzip.open(archive, "rb") as handle:
+                config_digest = source_config_digest(handle, entry["config_digest"])
             event("IMPORT_" + name.upper())
             run(["docker", "load", "--input", str(archive)], timeout=600)
             # Docker/containerd may rewrap an imported image in a new manifest.
@@ -120,7 +125,7 @@ class Activation(ExplorationPreparation):
             # the actual locally loaded immutable ID. Never deploy by tag.
             loaded = json.loads(run(["docker", "image", "inspect", entry["source_reference"]]))[0]
             require(re.fullmatch(r"sha256:[0-9a-f]{64}", loaded["Id"]), "LOADED_IMAGE_ID")
-            verify_loaded_image(loaded["Id"], entry["config_digest"])
+            verify_loaded_image(loaded["Id"], config_digest)
             self.manifest["images"][name] = loaded["Id"]
             self.image_check(name, self.images[name], self.manifest["candidate"])
         for name, reference in self.old_images.items():
@@ -357,5 +362,8 @@ if __name__ == "__main__":
     try:
         main()
     except (Exception, KeyboardInterrupt) as error:
-        print(json.dumps({"result": "STOP", "category": str(error) if isinstance(error, (UpgradeError, DiskSpaceError)) else type(error).__name__, "do_not_retry_blindly": True}), flush=True)
+        category = str(error) if isinstance(error, (UpgradeError, DiskSpaceError)) else type(error).__name__
+        if isinstance(error, AssertionError) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,95}", str(error)):
+            category = str(error)
+        print(json.dumps({"result": "STOP", "category": category, "do_not_retry_blindly": True}), flush=True)
         raise SystemExit(1)
