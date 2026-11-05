@@ -1,0 +1,18 @@
+/* The head bootstrap supplies the final scale before the first body paint.
+   Keep scaling in this external stylesheet so strict CSP also permits SSR. */
+.journey-scaled-canvas {
+  zoom: var(--journey-canvas-scale, 1);
+}
+
+/* A deliberately enlarged canvas stays reachable instead of losing its left
+   edge. At the normal fitted size these viewports remain non-scrolling. */
+html .login-viewport,
+html .design-viewport:not(.module-viewport) {
+  overflow: var(--journey-canvas-overflow, hidden);
+  justify-content: safe center;
+}
+
+html .module-viewport {
+  overflow-x: var(--journey-canvas-overflow, hidden);
+  justify-content: safe center;
+}

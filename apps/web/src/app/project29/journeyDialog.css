@@ -25,7 +25,8 @@
 @keyframes journey-dialog-orbit { to { stroke-dashoffset: -1000; } }
 .journey-dialog :is(button, input, textarea, select) { font-family: inherit; }
 .journey-dialog button { cursor: pointer; }
-.journey-dialog .module-icon { display: inline-block; flex: none; vertical-align: middle; background: currentColor; mask-repeat: no-repeat; mask-position: center; mask-size: contain; }
+.journey-dialog .module-icon { display: inline-block; flex: none; vertical-align: middle; }
+.journey-dialog .module-icon-mask { mask-type: alpha; }
 .journey-dialog.journey-dialog h2 { text-align: center; font-size: 25px; font-weight: 700; line-height: 1.5; }
 .journey-dialog.journey-dialog .module-primary,
 .journey-dialog.journey-dialog button.primary {

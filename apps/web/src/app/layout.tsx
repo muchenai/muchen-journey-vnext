@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { headers } from "next/headers";
+import { canvasScaleBootstrap } from "./project29/canvas-scale";
 
 import "./globals.css";
+import "./project29/canvasScale.css";
 
 
 export const metadata: Metadata = {
@@ -19,8 +22,13 @@ export default async function RootLayout({
   // framework scripts. Keep the whole application request-rendered so Next.js
   // can apply the nonce supplied by proxy.ts.
   await connection();
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang="zh-CN">
+    // The bootstrap owns the root scale style before React hydrates the page.
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: canvasScaleBootstrap }} />
+      </head>
       <body>{children}</body>
     </html>
   );

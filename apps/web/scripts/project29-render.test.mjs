@@ -185,5 +185,9 @@ test('released village uses real departments and does not render demo tasks',()=
   for(const task of practiceTasks) assert.ok(!html.includes(task.title));
   assert.match(html,/正在读取任务/);
   assert.doesNotMatch(html,/示例内容 · 本次会话体验/);
-  for(const initialScreen of ['academy','guild']) assert.match(render({initialScreen}),/暂未开放/);
+  assert.match(render({initialScreen:'guild'}),/暂未开放/);
+  const academy = render({initialScreen:'academy'});
+  assert.match(academy,/正在读取学院内容/);
+  assert.match(academy,/我的学习进度|学习记录/);
+  assert.doesNotMatch(academy,/课程详情暂未开放|首次完成获得探索勋章|认识生成式 AI：从概念到工作场景/);
 });

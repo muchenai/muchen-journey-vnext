@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useId, type ReactNode } from "react"
 import { dashboardStatusLabels } from "./DashboardTaskGrid"
 import type { ModuleName } from "./moduleDemoData"
 import { SharedModuleNavigation } from "./SharedModuleNavigation"
@@ -48,17 +48,24 @@ export function ModuleIcon({
   pack?: ModuleName
   size?: number
 }) {
-  // Preserve the original SVG shape while using the shared semantic icon color.
+  const maskId = `module-icon-${useId()}`
+  // SVG attributes also render under CSP before hydration; inline CSS does not.
   return (
-    <span
+    <svg
       className="module-icon"
       aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        maskImage: `url("${sharedAsset(`/assets/project29/modules/${pack}/${file}.svg`)}")`,
-      }}
-    />
+      focusable="false"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+    >
+      <defs>
+        <mask id={maskId} className="module-icon-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <image href={sharedAsset(`/assets/project29/modules/${pack}/${file}.svg`)} width="24" height="24" preserveAspectRatio="xMidYMid meet" />
+        </mask>
+      </defs>
+      <rect width="24" height="24" fill="currentColor" mask={`url(#${maskId})`} />
+    </svg>
   )
 }
 export type ModuleStatusName = keyof typeof dashboardStatusLabels | "available" | "returned" | "unavailable"

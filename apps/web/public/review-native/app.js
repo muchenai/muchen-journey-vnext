@@ -15,7 +15,7 @@ import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261030-me
 import { openCertification } from './member-access.js?v=20261030-member-action-spacing';
 import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261030-member-action-spacing';
 import { createAcademyStore } from './native-api.js?v=20261030-member-action-spacing';
-import { createAcademyController } from './academy.js?v=20261021-academy-management';
+import { createAcademyController } from './academy.js?v=20261105-sources';
 
 import {departmentOptions, departmentLabel, isPublishingDepartment} from './publishing-departments.js';
 
@@ -107,7 +107,7 @@ document.addEventListener('keydown', event => {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
 });
-function navigate(next) { if(page==='knowledge')knowledge.reset();if(page==='guild')guild.deactivate();if(next==='guild')void loadGuild(); if (page === 'academy' && next !== 'academy') academy.deactivate(); page = next; history.replaceState(null, '', '#'+next); if(next==='medals'){medals.reset();void economy.refresh().catch(error=>toast(error.message,'error')).finally(()=>{if(page==='medals')render();});} render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function navigate(next) { if(page==='knowledge')knowledge.reset();if(page==='guild')guild.deactivate();if(next==='guild')void loadGuild(); if (page === 'academy' && next !== 'academy') academy.deactivate(); page = next; if(next==='academy')void academy.activate(); history.replaceState(null, '', '#'+next); if(next==='medals'){medals.reset();void economy.refresh().catch(error=>toast(error.message,'error')).finally(()=>{if(page==='medals')render();});} render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function editTask(task) {
   if (!store.operatorId) { toast('当前账号没有任务配置权限。','error'); return; }
   if (task.authorId && task.authorId !== store.operatorId) { taskWorkflow.start(task); return; }
@@ -387,7 +387,7 @@ let refreshing = false;
 async function refreshRecords() {
   if (refreshing || document.hidden) return;
   refreshing = true;
-  try { await store.refresh(); if (!document.querySelector('.modal') && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) && (page === 'review' || page === 'library' || page === 'publications' || (page==='publish'&&draftPublication()))) render(); }
+  try { await store.refresh(); if(page==='academy'&&academy.canRefresh()&&!document.querySelector('.modal')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))await academy.activate(); if (!document.querySelector('.modal') && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) && (page === 'review' || page === 'library' || page === 'publications' || (page==='publish'&&draftPublication()))) render(); }
   catch (error) { toast(error.message, 'error'); }
   finally { refreshing = false; }
 }

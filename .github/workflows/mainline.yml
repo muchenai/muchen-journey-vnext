@@ -48,6 +48,12 @@ jobs:
           fi
           echo "application_changed=$application_changed" >> "$GITHUB_OUTPUT"
       - run: make ci-main
+      - name: Rehearse AI Academy migration with existing knowledge favorites
+        run: |
+          set -euo pipefail
+          docker compose exec -T db-test createdb -U journey_next journey_academy_drill_test
+          trap 'docker compose exec -T db-test dropdb -U journey_next --if-exists --force journey_academy_drill_test' EXIT
+          docker compose run --rm --no-deps --user root -v "$PWD:/app:ro" -e APP_ENV=test -e ALLOW_FIXTURE_IDENTITY=true -e ATTACHMENTS_ENABLED=true -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_academy_drill_test api python deploy/academy-release/migration_drill.py
       - run: make candidate-package
         if: steps.scope.outputs.application_changed == 'true'
       - name: Log in to GHCR

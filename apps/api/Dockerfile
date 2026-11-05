@@ -7,6 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Generate and normalize persisted AI Academy covers without external media services.
+RUN apk add --no-cache ffmpeg=8.1.3-r0
+
 COPY requirements.lock requirements-build.lock ./
 RUN python -m pip install --require-hashes -r requirements-build.lock \
     && python -m pip install --require-hashes --no-build-isolation -r requirements.lock \

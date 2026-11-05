@@ -1,5 +1,6 @@
 import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
 import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261030-member-action-spacing';
+import { createAcademyApi } from './academy-api.js?v=20261105-sources';
 let activeStore;
 export async function request(body, reviewId) {
   const response = await fetch('/api/review-native' + (reviewId ? `?review=${encodeURIComponent(reviewId)}` : ''), {
@@ -183,9 +184,5 @@ export function createJourneyService({ store }) {
   };
 }
 export function createAcademyStore() {
-  const unavailable = () => { throw new Error('AI学院尚未接入本地后端，当前不能保存或发布课程。'); };
-  return { isAdmin: () => !!activeStore?.operatorId, user: getCurrentInviteUser,
-    listManagedCourses: () => [], getManagedCourse: () => null, listShares: () => [],
-    getAdminStats: () => ({ total: 0, published: 0, unpublished: 0, pending: 0 }),
-    addCourse: unavailable, updateCourse: unavailable, setCourseVisibility: unavailable, reviewShare: unavailable, getVideoUrl: unavailable };
+  return createAcademyApi({ getCurrentUser: getCurrentInviteUser });
 }

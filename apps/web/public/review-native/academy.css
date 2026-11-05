@@ -105,6 +105,22 @@
 .ac-modal-body > .ac-field { margin-top: 18px; }
 .ac-modal-body > .ac-btn { margin-top: 12px; }
 .ac-modal-footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 23px; padding-top: 18px; border-top: 1px solid var(--border); }
+.ac-tag-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.ac-tag-filter { padding: 8px 13px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: var(--surface); font-size: 12px; line-height: 1.6; cursor: pointer; }
+.ac-tag-filter:hover { border-color: var(--primary-border); color: var(--primary); }
+.ac-tag-filter.active { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); }
+.ac-tag-filter:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ac-course-tags { display: flex; flex-wrap: wrap; gap: 5px; min-width: 100px; max-width: 210px; }
+.ac-form-fields { display: flex; flex-direction: column; gap: 22px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ac-form-fields:disabled { opacity: .7; }
+.ac-tag-options { margin: 0; padding: 0; border: 0; }
+.ac-tag-options legend { margin-bottom: 10px; padding: 0; }
+.ac-tag-options > div { display: flex; flex-wrap: wrap; gap: 9px; }
+.ac-tag-options label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.ac-tag-options label:has(input:checked) { border-color: var(--primary-border); background: var(--primary-soft); color: var(--primary); }
+.ac-tag-options input { width: 14px; height: 14px; accent-color: var(--primary); }
+.ac-upload-progress { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }
+.ac-upload-progress progress { width: min(100%, 280px); height: 10px; accent-color: var(--primary); }
 @media (max-width: 959px) {
   .ac-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
   .ac-actions { justify-content: flex-start; }
