@@ -47,7 +47,26 @@ def protected_containers():
         if labels.get('com.docker.compose.project') == PROJECT and labels.get('com.docker.compose.service') == 'web':
             continue
         result[item['Name']] = {key: item[key] for key in ('Id', 'Image', 'Config', 'HostConfig', 'Mounts')}
+        # Docker can return mount entries in a different order on each inspect.
+        # Keep every mount attribute while comparing this unordered collection.
+        result[item['Name']]['Mounts'] = sorted(item['Mounts'], key=lambda mount: json.dumps(mount, sort_keys=True))
     return result
+
+
+def verify_protected_containers(expected, category):
+    actual = protected_containers()
+    changes = []
+    for name in sorted(set(expected) | set(actual)):
+        before, after = expected.get(name), actual.get(name)
+        if before == after:
+            continue
+        fields = ['container_presence'] if before is None or after is None else [
+            field for field in before if before[field] != after[field]]
+        changes.append({'container_id': (after or before)['Id'], 'fields': fields})
+    if changes:
+        # Values can contain credentials, so report field names and IDs only.
+        print(json.dumps({'step': 'PROTECTED_RUNTIME_DIFFERENCE', 'changes': changes}), flush=True)
+    require(not changes, category)
 
 
 def healthy_web(candidate, requested_image, actual_images):
@@ -133,7 +152,7 @@ def cleanup_web_transports(package, entry):
     print(json.dumps({'step': 'CURRENT_WEB_TRANSPORTS_RETIRED', 'files': len(rows), 'reclaimed_bytes': reclaimed}), flush=True)
 
 
-def activate(package):
+def activate(package, recovery_id=None):
     require(socket.gethostname() == 'journey-next-staging' and ROOT.resolve() == ROOT, 'HOST')
     require(package.resolve() == package and package.parent == ROOT / 'exploration-runs' and
             re.fullmatch(r'[0-9]+-[0-9]+-activate', package.name), 'PACKAGE_PATH')
@@ -143,7 +162,11 @@ def activate(package):
     require(re.fullmatch('[0-9]+', pin['package_run_id']), 'PACKAGE_RUN')
     require(pin['base_candidate'] == BASE and pin['base_release'] == BASE + '-academy' and pin['schema'] == SCHEMA, 'BASE_PIN')
     base = ROOT / 'releases' / pin['base_release']
-    new = ROOT / 'releases' / (candidate + '-login-layout')
+    suffix = '-login-layout'
+    if recovery_id is not None:
+        require(re.fullmatch(r'[0-9]+-[0-9]+', recovery_id), 'RECOVERY_ID')
+        suffix += '-recovery-' + recovery_id
+    new = ROOT / 'releases' / (candidate + suffix)
     require((ROOT / 'current').is_symlink() and (ROOT / 'current').resolve(strict=True) == base and
             base.resolve() == base and not os.path.lexists(new), 'BASE_RELEASE')
     receipt = json.loads(read_file(base / 'activation-receipt.json'))
@@ -165,14 +188,16 @@ def activate(package):
     require(entry['reference'] == f'ghcr.io/muchenai/muchen-journey-vnext-web:{candidate}', 'WEB_SOURCE_REFERENCE')
     check_space('IMPORT', pin['disk_budget']['import'])
     archive = package / 'web.tar.gz'
-    with archive.open('xb') as dest:
-        require(0 < len(entry['chunks']) <= 1000, 'CHUNK_COUNT')
-        for index, part in enumerate(entry['chunks']):
-            require(part['file'] == f'web.part{index:04}', 'CHUNK_NAME')
-            path = package / part['file']
-            require(0 < path.stat().st_size <= 2 * 1024**2 and sha(path) == part['sha256'], 'CHUNK_SHA')
-            with path.open('rb') as src:
-                shutil.copyfileobj(src, dest)
+    require(0 < len(entry['chunks']) <= 1000, 'CHUNK_COUNT')
+    for index, part in enumerate(entry['chunks']):
+        require(part['file'] == f'web.part{index:04}', 'CHUNK_NAME')
+        path = package / part['file']
+        require(0 < path.stat().st_size <= 2 * 1024**2 and sha(path) == part['sha256'], 'CHUNK_SHA')
+    if not os.path.lexists(archive):
+        with archive.open('xb') as dest:
+            for part in entry['chunks']:
+                with (package / part['file']).open('rb') as src:
+                    shutil.copyfileobj(src, dest)
     require(archive.stat().st_size == entry['gzip_bytes'] and sha(archive) == entry['gzip_sha256'], 'ARCHIVE_SHA')
     with gzip.open(archive, 'rb') as src:
         require(hashlib.file_digest(src, 'sha256').hexdigest() == entry['tar_sha256'], 'TAR_SHA')
@@ -185,13 +210,14 @@ def activate(package):
     require(image['Config']['Labels']['org.opencontainers.image.revision'] == candidate, 'IMAGE_REVISION')
     verify_loaded_image(image['Id'], config_digest)
     hashes = stage_configuration(base, new, before, candidate, image['Id'])
-    require(protected_containers() == protected and (ROOT / 'current').resolve() == base, 'BASE_RUNTIME_CHANGED')
+    verify_protected_containers(protected, 'BASE_RUNTIME_CHANGED')
+    require((ROOT / 'current').resolve() == base, 'BASE_POINTER_CHANGED')
     cleanup_web_transports(package, entry)
     try:
         print('SWITCH_WEB_ONLY', flush=True)
         compose(new, 'up', '-d', '--no-deps', '--no-build', '--pull', 'never',
                 '--force-recreate', '--wait', '--wait-timeout', '180', 'web', timeout=240)
-        require(protected_containers() == protected, 'PROTECTED_CONTAINER_CHANGED')
+        verify_protected_containers(protected, 'PROTECTED_CONTAINER_CHANGED')
         healthy_web(candidate, image['Id'], {image['Id'], config_digest})
         verify_schema(base)
         receipt = {'result': 'PASS', 'web_candidate': candidate, 'api_candidate': BASE, 'schema': SCHEMA,
@@ -205,7 +231,7 @@ def activate(package):
     except (Exception, KeyboardInterrupt):
         compose(base, 'up', '-d', '--no-deps', '--no-build', '--pull', 'never',
                 '--force-recreate', '--wait', '--wait-timeout', '180', 'web', timeout=240)
-        require(protected_containers() == protected, 'ROLLBACK_PROTECTED_CONTAINER_CHANGED')
+        verify_protected_containers(protected, 'ROLLBACK_PROTECTED_CONTAINER_CHANGED')
         healthy_web(BASE, web_before['Config']['Image'], {web_before['Image']})
         if (ROOT / 'current').resolve() == new:
             rollback_pointer = ROOT / ('current-rollback-' + candidate)

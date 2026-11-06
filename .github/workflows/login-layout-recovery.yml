@@ -1,0 +1,200 @@
+name: Recover Verified Login Layout Web Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed recovery operations commit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wp08-volcengine-staging
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      artifact_id: ${{ steps.controls.outputs.artifact-id }}
+      control_sum: ${{ steps.proof.outputs.control_sum }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Require the exact failed original run and successful original build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          candidate='f01385df0921e3773bb530391ccf5fbf6c96b027'
+          assert os.environ['GITHUB_REPOSITORY']=='muchenai/muchen-journey-vnext'
+          def read_run(run_id):
+            url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+run_id
+            request=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+            with urllib.request.urlopen(request,timeout=30) as response:
+              return json.load(response)
+          build=read_run('42162769489')
+          assert build['status']=='completed' and build['conclusion']=='success'
+          assert build['head_sha']==candidate and build['head_branch']=='main' and build['event']=='push'
+          assert build['name']=='Mainline Candidate Gate' and build['run_attempt']==1
+          source=read_run('42164220807')
+          assert source['status']=='completed' and source['conclusion']=='failure'
+          assert source['head_sha']==candidate and source['head_branch']=='main' and source['event']=='workflow_dispatch'
+          assert source['name']=='Learner Login Layout Web Release' and source['run_attempt']==1
+          PY
+      - name: Check out the immutable original application candidate separately
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: f01385df0921e3773bb530391ccf5fbf6c96b027
+          path: original-candidate
+          persist-credentials: false
+      - name: Verify the application source pin
+        run: test "$(git -C original-candidate rev-parse HEAD)" = f01385df0921e3773bb530391ccf5fbf6c96b027
+      - name: Download the original successful build only to the GitHub runner
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: wp07-candidate-f01385df0921e3773bb530391ccf5fbf6c96b027
+          run-id: '42162769489'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/application-build
+      - name: Reconstruct exact original hashes without rebuilding application images
+        env:
+          BUILD_DIR: ${{ runner.temp }}/application-build
+          PACKAGE_DIR: ${{ runner.temp }}/offline-package
+          CANDIDATE: f01385df0921e3773bb530391ccf5fbf6c96b027
+          PACKAGE_RUN: '42162769489'
+        run: python3 original-candidate/deploy/exploration-web/package.py
+      - name: Create a small control package with original source and archive hash proof
+        id: proof
+        run: |
+          set -euo pipefail
+          python3 deploy/exploration-web/recover.py --prepare-proof \
+            "$RUNNER_TEMP/offline-package" "$RUNNER_TEMP/web-recovery-controls" "$GITHUB_SHA"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          folder=pathlib.Path(os.environ['RUNNER_TEMP'])/'web-recovery-controls'
+          proof=json.loads((folder/'original-package-proof.json').read_text())
+          assert proof['operations_commit']==os.environ['GITHUB_SHA']
+          assert len(proof['files'])==96, 'ORIGINAL_PACKAGE_FILE_COUNT'
+          assert sum(item['bytes'] for item in proof['files'].values())==187423441, 'ORIGINAL_PACKAGE_BYTES_CHANGED'
+          checksum=hashlib.sha256((folder/'SHA256SUMS').read_bytes()).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+            output.write('control_sum='+checksum+'\n')
+          print(json.dumps({'proof':'PASS','original_files':96,'original_bytes':187423441,'control_sum':checksum}))
+          PY
+      - name: Preserve exact control package and original provenance before production approval
+        id: controls
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-web-recovery-controls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/web-recovery-controls/
+          if-no-files-found: error
+          retention-days: 7
+
+  recover:
+    needs: prepare
+    if: github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha
+    runs-on: ubuntu-latest
+    environment: production-canary-uat
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Download only this run's verified small control package
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
+          path: ${{ runner.temp }}/web-recovery-controls
+          merge-multiple: true
+      - name: Verify prepared control provenance before opening production access
+        env:
+          EXPECTED_CONTROL_SUM: ${{ needs.prepare.outputs.control_sum }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CONTROL_SUM" =~ ^[0-9a-f]{64}$ ]]
+          cd "$RUNNER_TEMP/web-recovery-controls"
+          printf '%s  SHA256SUMS\n' "$EXPECTED_CONTROL_SUM" | sha256sum -c -
+          sha256sum -c SHA256SUMS
+          python3 - <<'PY'
+          import json,os,pathlib
+          folder=pathlib.Path.cwd()
+          assert {p.name for p in folder.iterdir()}=={'recover.py','activate.py','canary_schema_upgrade.py','image_transport.py','disk_space.py','original-package-proof.json','SHA256SUMS'}
+          proof=json.loads((folder/'original-package-proof.json').read_text())
+          assert proof['operations_commit']==os.environ['GITHUB_SHA']
+          assert proof['source_run_id']=='42164220807' and proof['source_attempt']==1
+          assert proof['manifest']['candidate']=='f01385df0921e3773bb530391ccf5fbf6c96b027'
+          assert proof['manifest']['package_run_id']=='42162769489'
+          assert len(proof['files'])==96 and sum(item['bytes'] for item in proof['files'].values())==187423441
+          PY
+      - name: Identify temporary runner ingress
+        id: runner
+        run: |
+          set -euo pipefail
+          cidr="$(curl -fsS --max-time 15 https://checkip.amazonaws.com | tr -d '\r\n')/32"
+          python3 - "$cidr" <<'PY'
+          import ipaddress,sys
+          n=ipaddress.ip_network(sys.argv[1],strict=True)
+          assert n.version==4 and n.prefixlen==32 and n.network_address.is_global
+          PY
+          echo "::add-mask::$cidr"
+          echo "cidr=$cidr" >> "$GITHUB_OUTPUT"
+      - name: Open only the approved temporary runner SSH rule
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group open --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Verify original package and recover only the login Web service
+        env:
+          DEPLOY_KEY: ${{ secrets.WP08_DEPLOY_SSH_PRIVATE_KEY }}
+          JOURNEY_HOST: ${{ secrets.TALENT_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export SSH_KEY="$RUNNER_TEMP/journey-web-recovery-key"
+          export SSH_KNOWN="$RUNNER_TEMP/journey-web-recovery-known"
+          export RECOVERY_PAYLOAD="$RUNNER_TEMP/journey-web-recovery-payload.json"
+          export REMOTE_CONTROLS="/srv/journey-next-production/canary/exploration-runs/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-web-recover"
+          trap 'rm -f "$SSH_KEY" "$SSH_KNOWN" "$RECOVERY_PAYLOAD"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$SSH_KEY"
+          python3 - <<'PY'
+          import json,os,pathlib
+          pathlib.Path(os.environ['RECOVERY_PAYLOAD']).write_text(json.dumps({
+            'operations_commit':os.environ['GITHUB_SHA'],
+            'recovery_id':os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']}))
+          PY
+          opts=(-i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_KNOWN")
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "test \"\$(hostname)\" = journey-next-staging && test ! -e '$REMOTE_CONTROLS' && test ! -L '$REMOTE_CONTROLS' && install -d -m 0700 '$REMOTE_CONTROLS'"
+          scp "${opts[@]}" "$RUNNER_TEMP/web-recovery-controls/"* "root@$JOURNEY_HOST:$REMOTE_CONTROLS/"
+          control_sum="$(sha256sum "$RUNNER_TEMP/web-recovery-controls/SHA256SUMS" | cut -d ' ' -f 1)"
+          [[ "$control_sum" =~ ^[0-9a-f]{64}$ ]]
+          ssh "${opts[@]}" "root@$JOURNEY_HOST" "cd '$REMOTE_CONTROLS' && printf '%s  SHA256SUMS\n' '$control_sum' | sha256sum -c - && sha256sum -c SHA256SUMS && PYTHONDONTWRITEBYTECODE=1 python3 recover.py" < "$RECOVERY_PAYLOAD" | tee "$RUNNER_TEMP/journey-web-recovery.txt"
+      - name: Close and verify the exact runner SSH rule
+        if: always() && steps.runner.outputs.cidr != ''
+        env:
+          VOLCENGINE_ACCESS_KEY: ${{ secrets.VOLCENGINE_ACCESS_KEY }}
+          VOLCENGINE_SECRET_KEY: ${{ secrets.VOLCENGINE_SECRET_KEY }}
+          SECURITY_GROUP: ${{ secrets.TALENT_SECURITY_GROUP }}
+          RUNNER_CIDR: ${{ steps.runner.outputs.cidr }}
+        run: python3 -m scripts.wp08_security_group close --security-group-id "$SECURITY_GROUP" --cidr "$RUNNER_CIDR"
+      - name: Preserve safe recovery progress and provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-web-recovery-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/journey-web-recovery.txt
+            ${{ runner.temp }}/web-recovery-controls/original-package-proof.json
+            ${{ runner.temp }}/web-recovery-controls/SHA256SUMS
+          retention-days: 7
