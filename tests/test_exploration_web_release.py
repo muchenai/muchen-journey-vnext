@@ -1,5 +1,5 @@
 import copy
-from contextlib import ExitStack
+from contextlib import ExitStack, redirect_stdout
 import gzip
 import hashlib
 import importlib.util
@@ -30,7 +30,7 @@ class WebReleaseTests(unittest.TestCase):
         after['services']['api']['image'] = 'api-new'
         self.assertNotEqual(release.normalized(after, Path('/new'), Path('/old'), before['services']['web']), before)
 
-    def exercise(self, failure=None):
+    def exercise(self, failure=None, recovery=False):
         candidate = '1' * 40
         image_id = 'sha256:' + '2' * 64
         old_web = 'sha256:' + '3' * 64
@@ -69,6 +69,11 @@ class WebReleaseTests(unittest.TestCase):
             zipped = gzip.compress(tar_bytes)
             (package / 'web.part0000').write_bytes(zipped)
             (package / 'unrelated.keep').write_bytes(b'keep')
+            if recovery:
+                (package / 'web.tar.gz').write_bytes(b'tampered' if failure == 'archive' else zipped)
+                original_stage = root / 'releases' / (candidate + '-login-layout')
+                original_stage.mkdir()
+                (original_stage / 'diagnostic.keep').write_bytes(b'original staged files')
             manifest = {'candidate': candidate, 'package_run_id': '12345678',
                 'base_candidate': release.BASE, 'base_release': release.BASE + '-academy', 'schema': release.SCHEMA,
                 'disk_budget': {'import': 1024}, 'archive': {
@@ -143,7 +148,7 @@ class WebReleaseTests(unittest.TestCase):
                 if failure:
                     expected = KeyboardInterrupt if failure == 'pointer' else OSError if failure == 'receipt' else release.UpgradeError
                     with self.assertRaises(expected):
-                        release.activate(package)
+                        release.activate(package, recovery_id='20-1' if recovery else None)
                     self.assertEqual((root/'current').resolve(), base)
                     if failure in ('up', 'pointer', 'receipt'):
                         self.assertEqual(operations[-1][0], base)
@@ -154,7 +159,7 @@ class WebReleaseTests(unittest.TestCase):
                         self.assertFalse(operations)
                         self.assertFalse(commands)
                 else:
-                    release.activate(package)
+                    release.activate(package, recovery_id='20-1' if recovery else None)
                     new = (root/'current').resolve()
                     self.assertNotEqual(new, base)
                     for source in (base/'secrets').iterdir():
@@ -167,6 +172,10 @@ class WebReleaseTests(unittest.TestCase):
                     self.assertTrue(json.loads((new/'web-release-receipt.json').read_text())['other_containers_unchanged'])
                     self.assertFalse((package/'web.part0000').exists())
                     self.assertFalse((package/'web.tar.gz').exists())
+                if recovery:
+                    self.assertEqual((original_stage / 'diagnostic.keep').read_bytes(), b'original staged files')
+                    if not failure:
+                        self.assertEqual((root/'current').resolve().name, candidate+'-login-layout-recovery-20-1')
                 self.assertEqual((package/'unrelated.keep').read_bytes(), b'keep')
                 for _, args in operations:
                     self.assertEqual(args[-1], 'web')
@@ -193,6 +202,49 @@ class WebReleaseTests(unittest.TestCase):
 
     def test_changed_chunk_stops_before_import(self):
         self.exercise('chunk')
+
+    def test_recovery_reuses_verified_archive_and_preserves_original_stage(self):
+        self.exercise(recovery=True)
+
+    def test_recovery_rejects_changed_existing_archive_before_import(self):
+        self.exercise('archive', recovery=True)
+
+    def test_mount_order_does_not_change_protected_snapshot(self):
+        item = {'Name': '/api', 'Id': 'api-id', 'Image': 'image-id',
+                'Config': {'Labels': {}, 'Env': ['SECRET=value']}, 'HostConfig': {},
+                'Mounts': [{'Destination': '/a', 'Source': '/source-a', 'RW': False},
+                           {'Destination': '/b', 'Source': '/source-b', 'RW': True}]}
+        reordered = copy.deepcopy(item)
+        reordered['Mounts'].reverse()
+        outputs = [b'api-id', json.dumps([item]).encode(), b'api-id', json.dumps([reordered]).encode()]
+        with patch.object(release, 'run', side_effect=outputs):
+            self.assertEqual(release.protected_containers(), release.protected_containers())
+
+    def test_runtime_differences_stop_without_exposing_configuration(self):
+        item = {'Id': 'api-id', 'Image': 'image-id',
+                'Config': {'Env': ['SECRET=old-private']}, 'HostConfig': {},
+                'Mounts': [{'Destination': '/a', 'Source': '/private', 'RW': False}]}
+        for field, value in [('Id', 'replaced-id'), ('Image', 'new-image'),
+                             ('Config', {'Env': ['SECRET=new-private']}),
+                             ('HostConfig', {'Privileged': True}),
+                             ('Mounts', [{'Destination': '/a', 'Source': '/different-private', 'RW': False}])]:
+            after = copy.deepcopy(item)
+            after[field] = value
+            output = io.StringIO()
+            with self.subTest(field=field), patch.object(release, 'protected_containers', return_value={'/api': after}):
+                with redirect_stdout(output), self.assertRaisesRegex(release.UpgradeError, 'BASE_RUNTIME_CHANGED'):
+                    release.verify_protected_containers({'/api': item}, 'BASE_RUNTIME_CHANGED')
+            message = json.loads(output.getvalue())
+            self.assertEqual(message['changes'][0]['fields'], [field])
+            self.assertNotIn('private', output.getvalue())
+            self.assertNotIn('SECRET', output.getvalue())
+
+    def test_added_or_removed_protected_container_is_detected(self):
+        item = {'Id': 'api-id'}
+        for before, after in [({}, {'/api': item}), ({'/api': item}, {})]:
+            with patch.object(release, 'protected_containers', return_value=after):
+                with redirect_stdout(io.StringIO()), self.assertRaisesRegex(release.UpgradeError, 'RUNTIME_CHANGED'):
+                    release.verify_protected_containers(before, 'RUNTIME_CHANGED')
 
     def test_cleanup_checks_all_transports_before_any_removal(self):
         with tempfile.TemporaryDirectory() as directory:
