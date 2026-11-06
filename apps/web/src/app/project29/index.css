@@ -188,14 +188,14 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 }
 .login-gradient-border { border-color: transparent; overflow: clip; overflow-clip-margin: border-box; --figma-stroke-width: 1px; --login-border-radius: 41px; }
 .login-gradient-border > .figma-stroke-svg .figma-stroke-rect { rx: calc(var(--login-border-radius) - .5px); }
-.login-method-panel { justify-content: flex-start; gap: 0; padding: 42px 12% 68px; }
+.login-method-panel { --login-fields-height: 214px; --login-agreement-height: 55px; justify-content: flex-start; gap: 0; padding: 42px 12% 68px; }
 .login-method-panel .panel-logo { width: 130px; height: 130px; flex-shrink: 0; }
 .cosmos-shell .login-method-panel .panel-title { font-size: clamp(22px, 2.1cqw, 36.901px); font-weight: 700; letter-spacing: .18em; margin: 13px 0 35px; }
 .login-method-tabs { position: relative; display: flex; width: 100%; min-height: 56px; padding: 5px; border: 1.375px solid rgba(125,211,252,.24); border-radius: 16.504px; background: rgba(6,15,36,.68); }
 .login-method-tabs button { position: relative; display: flex; align-items: center; justify-content: center; gap: 9.627px; flex: 1; min-width: 0; padding: 8px 4px; border: 1.375px solid transparent; border-radius: 12.378px; color: rgba(176,202,240,.62); font-weight: 700; font-size: clamp(12px, 1.05cqw, 18.567px); letter-spacing: .6877px; cursor: pointer; background: transparent; white-space: nowrap; }
 .login-method-tabs button[aria-selected="true"] { color: white; border-color: rgba(77,240,255,.55); background: linear-gradient(167.905deg, rgba(56,189,248,.32), rgba(64,207,251,.25) 50%, rgba(77,240,255,.18)); box-shadow: 0 0 19.255px rgba(77,240,255,.25); }
 .login-method-tabs img { flex-shrink: 0; }
-.login-method-fields { position: relative; width: 100%; height: 214px; padding-top: 55px; }
+.login-method-fields { position: relative; width: 100%; height: var(--login-fields-height); padding-top: 55px; }
 .login-method-fields.phone { padding-top: 31px; display: flex; flex-direction: column; gap: 22px; }
 .login-method-panel .code-field { position: relative; height: 54px; flex-shrink: 0; padding: 0 19px; border: 1.375px solid rgba(148,184,240,.28); border-radius: 13.753px; background: rgba(168,189,224,.22); backdrop-filter: blur(11.003px); }
 .login-method-panel .graduation-code { height: 157px; border-radius: 16.509px; }
@@ -207,7 +207,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 .verification-row .code-field { flex: 1; min-width: 0; }
 .verification-row .code-field input { letter-spacing: 1.8px; }
 .verification-button { flex-shrink: 0; padding: 0 18px; border: 1.375px solid rgba(77,240,255,.48); border-radius: 13.753px; background: rgba(14,42,86,.75); color: #4df0ff; font-size: 16.4px; font-weight: 700; cursor: pointer; }
-.login-agreement { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; min-height: 55px; margin-top: 1px; width: 100%; color: rgba(176,202,240,.58); font-size: 12px; line-height: 19.5px; }
+.login-agreement { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; min-height: var(--login-agreement-height); margin-top: 1px; width: 100%; color: rgba(176,202,240,.58); font-size: 12px; line-height: 19.5px; }
 .login-agreement button { background: transparent; border: 0; padding: 0; color: rgba(125,211,252,.88); cursor: pointer; }
 .login-method-panel .launch-button { flex-shrink: 0; }
 .login-method-panel .launch-button img { width: auto; height: auto; }
@@ -216,7 +216,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 .login-method-panel input:focus { outline: none; box-shadow: none; }
 .login-method-panel .code-field:focus-within { background: rgba(164,196,244,.64); border-color: #4874a8; box-shadow: none; }
 @container login-canvas (max-width: 1050px) { .cosmos-shell .login-method-panel .panel-title { font-size: clamp(23px, 5vw, 36.901px); } .login-method-tabs button { font-size: 16px; } }
-@container login-canvas (max-width: 600px) { .login-method-panel { padding: 30px 23px 40px; gap: 0; } .login-method-panel .panel-logo { width: 115px; height: 115px; } .cosmos-shell .login-method-panel .panel-title { margin-bottom: 28px; font-size: clamp(19px, 5vw, 29px); } .login-method-tabs button { font-size: 12px; gap: 5px; } .login-method-fields { padding-top: 32px; height: 191px; } .login-method-panel .code-field input { font-size: 14px; } .verification-button { font-size: 13px; padding: 0 12px; } .phone-prefix { font-size: 14px; margin-right: 12px; } .login-agreement { font-size: 10px; } }
+@container login-canvas (max-width: 600px) { .login-method-panel { --login-fields-height: 191px; padding: 30px 23px 40px; gap: 0; } .login-method-panel .panel-logo { width: 115px; height: 115px; } .cosmos-shell .login-method-panel .panel-title { margin-bottom: 28px; font-size: clamp(19px, 5vw, 29px); } .login-method-tabs button { font-size: 12px; gap: 5px; } .login-method-fields { padding-top: 32px; } .login-method-panel .code-field input { font-size: 14px; } .verification-button { font-size: 13px; padding: 0 12px; } .phone-prefix { font-size: 14px; margin-right: 12px; } .login-agreement { font-size: 10px; } }
 @container login-canvas (max-width: 600px) { .login-gradient-border { --login-border-radius: 26px; } }
 @keyframes screen-arrive { from { opacity: 0; } to { opacity: 1; } }
 .orbit-tracer { opacity: 0; stroke-dashoffset: 0; transition: opacity .35s; animation: orbit-trace 8s linear infinite; animation-play-state: paused; }
