@@ -554,7 +554,13 @@ export function Login() {
           </button>
         </div>
 
-        <form className={`login-panel login-gradient-border ${loginMode === 'feishu' ? 'login-method-panel' : ''} ${joinPhase === 'feishu' && loginMode === 'password' ? 'password-login-mode phone-account-panel' : ''}`} onSubmit={launch}>
+        <form className={[
+          'login-panel login-gradient-border',
+          joinPhase === 'feishu' && (loginMode === 'feishu' || phoneMode === 'login') ? 'login-method-panel' : '',
+          joinPhase === 'feishu' && loginMode === 'password'
+            ? `password-login-mode phone-account-panel ${phoneMode === 'login' ? 'phone-account-login' : 'phone-account-setup'}`
+            : '',
+        ].filter(Boolean).join(' ')} onSubmit={launch}>
           <GradientStroke variant="back" strokeWidth={1} animated={false} />
           <div className="panel-glow" aria-hidden="true" />
           <img className="panel-logo" src={logo} alt="" />

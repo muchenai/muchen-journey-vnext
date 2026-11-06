@@ -1,5 +1,5 @@
 {
-  "candidate": "7361d0fe4c988649b3de17de8d70b32c2350caa2",
-  "package_run_id": "38382800926",
-  "base_candidate": "b685ee68f249a66b2b03f9c5c4edac1a388206c6"
+  "base_candidate": "29f00234e5f2de1321792ac57ba810fc23c8bdaa",
+  "base_release": "29f00234e5f2de1321792ac57ba810fc23c8bdaa-academy",
+  "schema": "0054_academy_covers"
 }
