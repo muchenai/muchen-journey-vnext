@@ -4,7 +4,7 @@ No demo balance or browser state is authoritative. Old published snapshots keep
 their original reward schedule; updated publications opt into reward rules v2.
 """
 from decimal import Decimal, ROUND_FLOOR
-from sqlalchemy import select, func
+from sqlalchemy import select, func, literal, union_all
 from journey_api.models import Assignment, AssignmentStatus, Enrollment, Evaluation, Decision
 from journey_api.review_admin_models import PublishedTaskContent, MedalRedemption, NoviceUnlockDebit
 
@@ -41,27 +41,74 @@ def unlock_cost(content):
     # immutable debit records stay available for audit and are never rewritten.
     return 0
 
-def wallet(session, actor):
-    # Evaluation existence prevents completion-like status alone minting rewards.
-    passed = select(Evaluation.id).where(Evaluation.assignment_id == Assignment.id,
-        Evaluation.organization_id == actor.organization_id, Evaluation.decision == Decision.PASS).exists()
-    contents = session.scalars(select(PublishedTaskContent.content).join(Assignment,
+def completed_rewards_query(actor):
+    # One immutable approval time per assignment. A repeated PASS must neither
+    # duplicate a reward nor move its original earned time in the history.
+    approvals = select(Evaluation.assignment_id,
+        func.min(Evaluation.created_at).label("occurred_at")).where(
+        Evaluation.organization_id == actor.organization_id,
+        Evaluation.decision == Decision.PASS).group_by(Evaluation.assignment_id).subquery()
+    return select(Assignment.id.label("source_id"), literal("task_reward").label("kind"),
+        approvals.c.occurred_at, Assignment.task_definition_id.label("subject_id"),
+        PublishedTaskContent.content.label("content")).select_from(Assignment).join(PublishedTaskContent,
         Assignment.task_version_id == PublishedTaskContent.task_version_id).join(Enrollment,
-        Enrollment.id == Assignment.enrollment_id).where(
+        Enrollment.id == Assignment.enrollment_id).join(approvals,
+        approvals.c.assignment_id == Assignment.id).where(
         Assignment.organization_id == actor.organization_id, Enrollment.organization_id == actor.organization_id,
         PublishedTaskContent.organization_id == actor.organization_id, Enrollment.learner_id == actor.id,
-        Enrollment.novice_task_id.is_not(None), Assignment.status == AssignmentStatus.COMPLETED, passed)).all()
+        Enrollment.novice_task_id.is_not(None), Assignment.status == AssignmentStatus.COMPLETED)
+
+
+def medal_redemptions_query(actor):
+    return select(MedalRedemption).where(MedalRedemption.user_id == actor.id,
+        MedalRedemption.organization_id == actor.organization_id)
+
+
+def wallet(session, actor):
+    contents = session.execute(completed_rewards_query(actor)).all()
     balances = dict.fromkeys(POINT_TYPES, 0)
     task_points = xp = 0
-    for content in contents:
-        reward = rewards(content)
+    for row in contents:
+        reward = rewards(row.content)
         task_points += reward["taskPoints"]
         xp += reward["xp"]
         for item in reward["allocations"]:
             if item["id"] in balances: balances[item["id"]] += item["points"]
     task_points -= session.scalar(select(func.coalesce(func.sum(NoviceUnlockDebit.amount), 0)).where(
         NoviceUnlockDebit.user_id == actor.id, NoviceUnlockDebit.organization_id == actor.organization_id))
-    for content in session.scalars(select(MedalRedemption.content).where(
-        MedalRedemption.user_id == actor.id, MedalRedemption.organization_id == actor.organization_id)):
-        for item in content["costs"]: balances[item["badgeId"]] -= item["points"]
-    return dict(taskPoints=task_points, xp=xp, badgeBalances=balances)
+    redemptions = session.scalars(medal_redemptions_query(actor)).all()
+    for redemption in redemptions:
+        for item in redemption.content["costs"]: balances[item["badgeId"]] -= item["points"]
+    # XP exchange remains closed: the only existing debits spend task points or
+    # badge points. Never subtract either currency from a learner's earned XP.
+    return dict(taskPoints=task_points, xp=xp, badgeBalances=balances,
+                availableXp=xp, redeemedXp=0,
+                ownedMedalCount=len({redemption.medal_id for redemption in redemptions}))
+
+
+def growth_history(session, actor, *, offset=0, limit=20):
+    redemptions = medal_redemptions_query(actor).with_only_columns(
+        MedalRedemption.id.label("source_id"), literal("medal_redemption").label("kind"),
+        MedalRedemption.created_at.label("occurred_at"), MedalRedemption.medal_id.label("subject_id"),
+        MedalRedemption.content.label("content"))
+    sources = union_all(completed_rewards_query(actor), redemptions).subquery()
+    total = session.scalar(select(func.count()).select_from(sources))
+    rows = session.execute(select(sources).order_by(sources.c.occurred_at.desc(),
+        sources.c.kind, sources.c.source_id.desc()).offset(offset).limit(limit)).all()
+    items = []
+    for row in rows:
+        item = dict(id=f"{row.kind}:{row.source_id}", kind=row.kind,
+                    occurredAt=row.occurred_at.isoformat(), module="新手村")
+        if row.kind == "task_reward":
+            reward = rewards(row.content)
+            item.update(title=row.content.get("title") or "历史新手村任务", taskId=str(row.subject_id),
+                        xp=reward["xp"], badgePoints=reward["allocations"], method="任务审核通过")
+        else:
+            name = row.content.get("medalName") or "历史徽章"
+            item.update(title=name, xp=0, medal=dict(id=str(row.subject_id), name=name),
+                        badgePoints=[dict(id=cost["badgeId"], points=-cost["points"])
+                                     for cost in row.content["costs"]], method="徽章点兑换")
+        items.append(item)
+    next_offset = offset + len(items)
+    return dict(items=items, total=total, hasMore=next_offset < total,
+                nextOffset=next_offset if next_offset < total else None)

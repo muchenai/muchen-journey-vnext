@@ -23,7 +23,9 @@ export function Medal({ badge, large = false, locked = false }: { badge: Badge; 
   </div>;
 }
 
-export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => void }) {
+export type BadgeTab = "catalog" | "shop" | "owned";
+
+export function BadgeShop({ query, onTasks, initialTab = "catalog" }: { query: string; onTasks: () => void; initialTab?: BadgeTab }) {
   const [data, setData] = useState<MedalResponse | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +48,7 @@ export function BadgeShop({ query, onTasks }: { query: string; onTasks: () => vo
     return () => { window.clearTimeout(initial); ++sequence.current; window.clearInterval(timer); window.removeEventListener("focus", check); };
   }, [refresh]);
   const {badges, wallet} = adaptMedals(data || {medals:[], redemptions:[], wallet:{badgeBalances:{}}});
-  const [tab, setTab] = useState("catalog");
+  const [tab, setTab] = useState<BadgeTab>(initialTab);
   const [category, setCategory] = useState("全部");
   const [sort, setSort] = useState("default");
   const [selected, setSelected] = useState<Badge | null>(null);

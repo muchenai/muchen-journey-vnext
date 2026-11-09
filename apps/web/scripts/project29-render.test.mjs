@@ -36,16 +36,45 @@ const {ReviewNotificationPanel}=load(path.join(root,'app/project29/ReviewNotific
 const {VillageTaskCard,VillageTaskRewards}=load(path.join(root,'app/project29/VillageTaskCard.tsx'));
 const {FavoriteKnowledge}=load(path.join(root,'app/project29/FavoriteKnowledge.tsx'));
 const {PersonalProfileView}=load(path.join(root,'app/project29/PersonalProfile.tsx'));
+const {GrowthHistoryContent}=load(path.join(root,'app/project29/GrowthHistoryDialog.tsx'));
 const {AccountSwitchDialog}=load(path.join(root,'app/project29/AccountSwitchDialog.tsx'));
 
 test('personal profile shows actual rewards and unavailable features without demo identity or level',()=>{
-  const props={name:'真实学员',wallet:{xp:200,badgeBalances:{product:20,data:5}},error:'',onRetry(){},onBack(){},onAcademy(){}};
+  const props={name:'真实学员',wallet:{xp:200,availableXp:200,redeemedXp:0,ownedMedalCount:0,badgeBalances:{product:20,data:5}},error:'',onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){}};
   const html=renderToStaticMarkup(React.createElement(PersonalProfileView,props));
   assert.match(html,/真实学员/);assert.match(html,/200/);assert.match(html,/20 点/);assert.match(html,/5 点/);
   assert.match(html,/成长等级暂未开放/);assert.match(html,/沐晨商城积分/);assert.match(html,/我的徽章墙/);
+  assert.match(html,/已拥有徽章/);assert.doesNotMatch(html,/已拥有徽章 · 暂未开放/);
+  assert.match(html,/可兑换经验<\/span><strong>200/);assert.match(html,/已用于兑换<\/span><strong>0/);
+  assert.match(html,/<strong>0 <small>枚<\/small><\/strong>/);
+  assert.match(html,/查看成长明细/);assert.match(html,/经验兑换暂未开放/);assert.match(html,/商城积分 · 暂未开放/);
   assert.doesNotMatch(html,/1,250|Lv\.3|洞察新星|演示成长|预览身份/);
   const failed=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,error:'读取失败'}));
   assert.match(failed,/读取失败/);assert.match(failed,/重新加载/);assert.doesNotMatch(failed,/200|20 点/);
+  assert.match(failed,/可兑换经验<\/span><strong>—/);assert.match(failed,/已用于兑换<\/span><strong>—/);
+});
+
+test('growth details show task origins and signed badge costs without presenting mall exchange as enabled',()=>{
+  const page={items:[
+    {id:'reward-1',kind:'task_reward',occurredAt:'2026-11-09T08:41:11Z',module:'新手村',title:'学习任务 <script>',taskId:'task-1',xp:100,badgePoints:[{id:'product',points:10}],method:'任务审核通过'},
+    {id:'medal-1',kind:'medal_redemption',occurredAt:'2026-11-08T08:41:11Z',module:'新手村',title:'洞察者',xp:0,badgePoints:[{id:'product',points:-5}],medal:{id:'medal-1',name:'洞察者'},method:'徽章点兑换'},
+  ],total:3,hasMore:true,nextOffset:2};
+  const html=renderToStaticMarkup(React.createElement(GrowthHistoryContent,{page,loading:false,error:'',onRetry(){},onMore(){}}));
+  assert.match(html,/学习任务 &lt;script&gt;/);assert.doesNotMatch(html,/<script>/);
+  assert.match(html,/新手村/);assert.match(html,/任务审核通过/);assert.match(html,/\+100 XP/);assert.match(html,/\+10 点/);
+  assert.match(html,/产品开发徽章点/);assert.match(html,/−5 点/);assert.match(html,/已获得「洞察者」/);assert.match(html,/徽章点兑换/);
+  assert.match(html,/dateTime="2026-11-09T08:41:11Z"|datetime="2026-11-09T08:41:11Z"/);
+  assert.match(html,/16:41/);assert.match(html,/加载更多/);assert.doesNotMatch(html,/\+0 XP|确认兑换|经验兑换商城积分/);
+});
+
+test('growth details distinguish empty, failed and still loading states',()=>{
+  const props={page:null,loading:true,error:'',onRetry(){},onMore(){}};
+  const loading=renderToStaticMarkup(React.createElement(GrowthHistoryContent,props));
+  assert.match(loading,/正在读取成长明细/);assert.doesNotMatch(loading,/还没有成长记录/);
+  const failed=renderToStaticMarkup(React.createElement(GrowthHistoryContent,{...props,loading:false,error:'登录已失效'}));
+  assert.match(failed,/登录已失效/);assert.match(failed,/重新读取/);assert.doesNotMatch(failed,/还没有成长记录|共 0 条/);
+  const empty=renderToStaticMarkup(React.createElement(GrowthHistoryContent,{...props,loading:false,page:{items:[],total:0,hasMore:false,nextOffset:null}}));
+  assert.match(empty,/还没有成长记录/);assert.doesNotMatch(empty,/读取失败|加载更多/);
 });
 
 test('identity selection exposes independent staff login and a learner logout form',()=>{
@@ -185,7 +214,7 @@ test('released village uses real departments and does not render demo tasks',()=
   for(const task of practiceTasks) assert.ok(!html.includes(task.title));
   assert.match(html,/正在读取任务/);
   assert.doesNotMatch(html,/示例内容 · 本次会话体验/);
-  assert.match(render({initialScreen:'guild'}),/暂未开放/);
+  assert.match(render({initialScreen:'guild'}),/正在读取你的公会认证和徽章凭证/);
   const academy = render({initialScreen:'academy'});
   assert.match(academy,/正在读取学院内容/);
   assert.match(academy,/我的学习进度|学习记录/);

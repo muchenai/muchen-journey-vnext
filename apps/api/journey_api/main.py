@@ -164,3 +164,5 @@ app.include_router(learner_knowledge_router)
 from journey_api.academy_routes import admin_router as academy_admin_router, learner_router as academy_learner_router
 app.include_router(academy_admin_router)
 app.include_router(academy_learner_router)
+from journey_api.guild_routes import router as guild_router
+app.include_router(guild_router)

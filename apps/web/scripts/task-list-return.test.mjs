@@ -181,12 +181,14 @@ test('return navigation clears click ripples while ordinary in-page clicks retai
   }
 });
 
-test('opening exploration tasks from a secondary section prepares the retained hall for return', () => {
+function createModuleFlow(moduleName = 'dashboard') {
   const slots = [];
   let cursor = 0;
   const calls = [];
   const ModuleSidebar = () => null;
   const ModuleHeader = () => null;
+  const DeliveryLab = () => null;
+  const GuildGrowthPage = () => null;
   const component = () => null;
   const dependencies = {
     react: {
@@ -199,17 +201,20 @@ test('opening exploration tasks from a secondary section prepares the retained h
       useRef(initial) { return slots[cursor++] ??= { current: initial }; },
       useCallback(callback) { return callback; }, useEffect() {}, useLayoutEffect() {},
     },
-    './useVillageTasks': { useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
+    './useVillageTasks': { isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available', useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
     './useCanvasScale': { useCanvasScale: () => 0.8 },
     './sharedAsset': { sharedAsset: path => path },
     './taskDepartments': { filterDepartmentTasks: tasks => tasks, taskDepartmentName: name => name },
     './moduleDemoData': { moduleTitles: {} },
+    './deliveryLabModel': { createDeliveryLabSession: () => ({ status: 'available', answers: {} }) },
+    './DeliveryLab': { DeliveryLab },
+    './GuildGrowthPage': { GuildGrowthPage },
     '../actions': {}, './favoriteKnowledge.css': {}, './moduleHub.css': {},
   };
   for (const [file, names] of Object.entries({
     BadgeShop: ['BadgeShop'], TaskClassifications: ['TaskClassifications'], WelcomeNameDialog: ['WelcomeNameDialog'],
     ModuleShell: ['ModuleBorderProvider', 'ModuleHero', 'ModuleHeader', 'ModuleIcon', 'ModulePanel', 'ModuleSidebar', 'ModuleStatus'],
-    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], JourneyDialogSurface: ['JourneyDialogSurface'],
+    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'], JourneyDialogSurface: ['JourneyDialogSurface'],
     AccountSwitchDialog: ['AccountSwitchDialog'], PersonalProfile: ['PersonalProfile'], WorldMap: ['WorldMap'],
     KnowledgeLibrary: ['KnowledgeLibrary'], FavoriteKnowledge: ['FavoriteKnowledge', 'KnowledgeSaveButton'],
     ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'],
@@ -222,10 +227,15 @@ test('opening exploration tasks from a secondary section prepares the retained h
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : nativeRequire(name) });
   const render = (active = true) => {
     cursor = 0;
-    return loaded.exports.ModuleHub({ active, module: 'dashboard', identity: '真实学员', onNavigate() {},
+    return loaded.exports.ModuleHub({ active, module: moduleName, identity: '真实学员', onNavigate() {},
       onExplorationMenu: menu => calls.push(menu), decoration: null, activeNavigationDecoration: null,
       idleNavigationDecoration: null, dashboardContent: 'retained-dashboard' });
   };
+  return { render, calls, ModuleSidebar, ModuleHeader, DeliveryLab, GuildGrowthPage };
+}
+
+test('opening exploration tasks from a secondary section prepares the retained hall for return', () => {
+  const { render, calls, ModuleSidebar, ModuleHeader } = createModuleFlow();
   for (const section of ['map', 'knowledge', 'profile']) {
     let tree = render();
     if (section === 'profile') find(tree, node => node.type === ModuleHeader).props.onProfile();
@@ -242,4 +252,48 @@ test('opening exploration tasks from a secondary section prepares the retained h
     assert.equal(find(tree, node => node.props?.className === 'module-dashboard-content').props.children, 'retained-dashboard');
   }
   assert.deepEqual(calls, ['tasks', 'tasks', 'tasks']);
+});
+
+test('guild lab is available to real learners and retains search and work across hall navigation', () => {
+  const { render, ModuleSidebar, ModuleHeader, DeliveryLab } = createModuleFlow('guild');
+  let tree = render();
+  find(tree, node => node.type === ModuleSidebar).props.onMenu('lab');
+  tree = render();
+  let lab = find(tree, node => node.type === DeliveryLab);
+  assert.ok(lab, 'a real learner can enter the simulation lab without local preview flags');
+  assert.equal(find(tree, node => node.type === ModuleSidebar).props.activeMenu, 'lab');
+  assert.equal(find(tree, node => node.props?.className === 'module-page-content').props['data-delivery-lab'], true);
+
+  const session = { ...lab.props.session, status: 'active', answers: { brief: { artifact: '已保存的需求澄清草稿' } } };
+  lab.props.onChange(session);
+  find(tree, node => node.type === ModuleHeader).props.onQuery('数据准备');
+  tree = render();
+  lab = find(tree, node => node.type === DeliveryLab);
+  assert.ok(lab, 'searching lab stages must keep the learner inside the lab');
+  assert.equal(lab.props.query, '数据准备');
+  assert.equal(lab.props.session, session);
+  lab.props.onClearSearch();
+  tree = render();
+  assert.equal(find(tree, node => node.type === ModuleHeader).props.query, '');
+
+  find(tree, node => node.type === ModuleSidebar).props.onMenu('hall');
+  tree = render();
+  assert.equal(find(tree, node => node.type === DeliveryLab), null);
+  assert.equal(find(tree, node => node.type === ModuleSidebar).props.activeMenu, 'hall');
+  find(tree, node => node.type === ModuleSidebar).props.onMenu('lab');
+  tree = render();
+  assert.equal(find(tree, node => node.type === DeliveryLab).props.session, session,
+    'returning to the lab must preserve this session\'s draft and progress');
+});
+
+test('guild certification opens the real ability map without preview mode', () => {
+  const { render, ModuleSidebar, GuildGrowthPage } = createModuleFlow('guild');
+  let tree = render();
+  find(tree, node => node.type === ModuleSidebar).props.onMenu('certification');
+  tree = render();
+  const page = find(tree, node => node.type === GuildGrowthPage);
+  assert.ok(page, 'certification uses real persisted guild growth');
+  assert.equal(page.props.view, 'certification');
+  assert.equal(page.props.identity, '真实学员');
+  assert.equal(find(tree, node => node.type === ModuleSidebar).props.activeMenu, 'certification');
 });

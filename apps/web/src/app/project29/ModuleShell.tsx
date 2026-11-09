@@ -113,7 +113,7 @@ export function ModuleHeader({
     guild: "公会大厅",
   }
   const page =
-    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库" } as Record<string, string>)[menu] ||
+    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库", lab: "模拟实验室", certification: "能力地图", "capability-map": "能力地图", arena: "认证竞技场" } as Record<string, string>)[menu] ||
     hall[module]
   return (
     <header className="module-header">
@@ -189,7 +189,7 @@ export function ModuleSidebar({
             ]
           : [
               ["hall", "工会大厅", "8c48a"],
-              ["certification", "能力认证", "a03b5"],
+              ["certification", "能力地图", "a03b5"],
               ["lab", "模拟实验室", "eec40"],
             ]
   return (

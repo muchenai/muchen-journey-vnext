@@ -1,11 +1,13 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from journey_api.config import get_settings
 from journey_api.db import SessionLocal
 from journey_api.directory_cache_models import DirectoryMember
 from journey_api.fixtures import ORGANIZATION_ID
-from journey_api.models import ExternalIdentity, Organization, User
+from journey_api.models import CompletionCode, ExternalIdentity, Organization, User, UserStatus
 from journey_api.review_admin_routes import directory_subject
 from test_reviewer_workbench import create_submission, client_for, assert_ok, REVIEWER_HEADERS
 
@@ -62,3 +64,103 @@ def test_review_queue_uses_scoped_cached_feishu_identity_not_name(monkeypatch):
         assert flow['learner'].get('/api/v1/review-admin/reviews').status_code == 403
     finally:
         get_settings.cache_clear()
+
+
+@pytest.fixture
+def inherited_review(monkeypatch):
+    monkeypatch.setenv('FEISHU_LEARNER_ORGANIZATION_ID', str(ORGANIZATION_ID))
+    get_settings.cache_clear()
+    try:
+        flow = create_submission('inherited-employee-' + uuid.uuid4().hex[:8])
+        client = client_for('inherited-employee-reviewer-' + uuid.uuid4().hex[:8])
+
+        def row():
+            data = assert_ok(client.get('/api/v1/review-admin/reviews', headers=REVIEWER_HEADERS))
+            return next(item for item in data['items'] if item['id'] == str(flow['review_id']))
+
+        initial = row()
+        assert initial['learner_is_feishu'] is False
+        assert initial['learner_employee_no'] == ''
+        yield initial, row
+    finally:
+        get_settings.cache_clear()
+
+
+def attach_migrated_feishu_account(initial, *, used=True, revoked=False,
+                                  same_organization=True, active=True, linked=True):
+    """Keep the historical learner separate from its receiving corporate user."""
+    now = datetime.now(UTC)
+    learner_id = uuid.UUID(initial['learner_id'])
+    corporate_id, identity_id = uuid.uuid4(), uuid.uuid4()
+    organization_id = ORGANIZATION_ID if same_organization else uuid.uuid4()
+    open_id = 'ou_' + uuid.uuid4().hex
+    with SessionLocal.begin() as session:
+        if not same_organization:
+            session.add(Organization(id=organization_id, name='Unrelated corporate organization'))
+            session.flush()
+        session.add(User(id=corporate_id, organization_id=organization_id,
+            display_name=initial['learner_name'],
+            status=UserStatus.ACTIVE if active else UserStatus.DISABLED))
+        session.flush()
+        session.add(ExternalIdentity(id=identity_id, organization_id=organization_id,
+            user_id=corporate_id, provider='FEISHU', subject=directory_subject(open_id),
+            revision=1, revoked_at=now if revoked else None))
+        session.add(DirectoryMember(organization_id=organization_id,
+            app_id=get_settings().feishu_app_id, open_id=open_id,
+            search_name=initial['learner_name'],
+            profile={'name': initial['learner_name'], 'employee_no': 'MCE-INHERITED-42'}))
+        if linked:
+            session.add(CompletionCode(id=uuid.uuid4(), organization_id=ORGANIZATION_ID,
+                user_id=learner_id, code_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+                code_ciphertext='isolated-test-unused-ciphertext', code_hint='test',
+                created_at=now - timedelta(days=3), expires_at=now - timedelta(days=1),
+                used_at=now - timedelta(days=2) if used else None,
+                migrated_to_user_id=corporate_id))
+            if used:
+                session.get(User, learner_id).status = UserStatus.DISABLED
+    return corporate_id, identity_id, open_id
+
+
+def test_review_queue_resolves_consumed_migration_after_code_expiry(inherited_review, monkeypatch):
+    initial, row = inherited_review
+    corporate_id, _, open_id = attach_migrated_feishu_account(initial)
+    app_id = get_settings().feishu_app_id
+    with SessionLocal.begin() as session:
+        # Neither a same-name record nor the right open_id in another app is authoritative.
+        for app, subject, number in [
+            (app_id, 'ou_' + uuid.uuid4().hex, 'WRONG-SAME-NAME'),
+            (app_id + '-other', open_id, 'WRONG-APP'),
+        ]:
+            session.add(DirectoryMember(organization_id=ORGANIZATION_ID, app_id=app,
+                open_id=subject, search_name=initial['learner_name'],
+                profile={'name': initial['learner_name'], 'employee_no': number}))
+
+    from journey_api import feishu_directory
+    def forbid_remote():
+        raise AssertionError('Review queue must use the cached identity profile')
+    monkeypatch.setattr(feishu_directory, 'get_directory', forbid_remote)
+    actual = row()
+    assert actual['learner_is_feishu'] is True
+    assert actual['learner_employee_no'] == 'MCE-INHERITED-42'
+    assert actual['learner_phone'] == ''
+    assert actual['learner_id'] == initial['learner_id']
+    assert actual['learner_id'] != str(corporate_id)
+    assert actual['learner_name'] == initial['learner_name']
+
+
+@pytest.mark.parametrize('account_options', [
+    pytest.param({'used': False}, id='unused-code'),
+    pytest.param({'revoked': True}, id='revoked-feishu-identity'),
+    pytest.param({'same_organization': False}, id='cross-organization-target'),
+    pytest.param({'active': False}, id='disabled-corporate-account'),
+    pytest.param({'linked': False}, id='same-name-without-migration'),
+])
+def test_review_queue_rejects_untrusted_migration_identity(inherited_review, account_options):
+    initial, row = inherited_review
+    attach_migrated_feishu_account(initial, **account_options)
+    actual = row()
+    assert actual['learner_is_feishu'] is False
+    assert actual['learner_employee_no'] == ''
+    assert actual['learner_phone'] == ''
+    assert actual['learner_id'] == initial['learner_id']
+    assert actual['learner_name'] == initial['learner_name']

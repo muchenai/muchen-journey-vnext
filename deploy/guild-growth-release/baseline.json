@@ -1,0 +1,15 @@
+{
+  "schema_version": 3,
+  "base_candidate": "29f00234e5f2de1321792ac57ba810fc23c8bdaa",
+  "base_release": "/srv/journey-next-production/canary/releases/f01385df0921e3773bb530391ccf5fbf6c96b027-login-layout-recovery-42173791325-1",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0054_academy_covers",
+    "to": "0056_guild_halls"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {},
+  "base_web_candidate": "f01385df0921e3773bb530391ccf5fbf6c96b027"
+}

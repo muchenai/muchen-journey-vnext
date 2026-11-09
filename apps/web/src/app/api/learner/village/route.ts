@@ -32,12 +32,18 @@ export async function POST(request: NextRequest) {
     if (!request.headers.get("content-type")?.startsWith("application/json")) return NextResponse.json({ error:"请求格式不正确。" }, { status:415 });
     const raw = await request.text();
     if (Buffer.byteLength(raw) > 50000) return NextResponse.json({ error:"内容过长。" }, { status:413 });
-    const body = JSON.parse(raw);
-    if (!uuid(body.taskId) || !uuid(body.key) || !["claim","draft","submit"].includes(body.command)) return NextResponse.json({ error:"请求参数无效。" }, { status:400 });
+    let body;
+    try { body = JSON.parse(raw); } catch { return NextResponse.json({ error:"请求格式不正确。" }, { status:400 }); }
+    if (!body || Array.isArray(body) || !uuid(body.taskId) || !uuid(body.key) || !["claim","draft","submit","cancel"].includes(body.command)) return NextResponse.json({ error:"请求参数无效。" }, { status:400 });
     if (body.command === "claim") {
       if (!uuid(body.versionId)) return NextResponse.json({ error:"任务版本无效。" }, { status:400 });
+      if (body.revision != null && (!Number.isSafeInteger(body.revision) || body.revision < 1)) return NextResponse.json({ error:"任务状态已变化，请重新读取。" }, { status:400 });
       await apiRequest(`/api/v1/me/novice/tasks/${body.taskId}/claim`, "LEARNER", { method:"POST",
-        headers:{"Idempotency-Key":body.key}, body:JSON.stringify({ version_id:body.versionId }) });
+        headers:{"Idempotency-Key":body.key}, body:JSON.stringify({ version_id:body.versionId, ...(body.revision != null ? { expected_revision:body.revision } : {}) }) });
+    } else if (body.command === "cancel") {
+      if (!Number.isSafeInteger(body.revision) || body.revision < 1) return NextResponse.json({ error:"任务状态已变化，请重新读取。" }, { status:400 });
+      await apiRequest(`/api/v1/me/novice/tasks/${body.taskId}/cancel`, "LEARNER", {
+        method:"POST", headers:{"Idempotency-Key":body.key}, body:JSON.stringify({expected_revision:body.revision}) });
     } else {
       // Resolve the learner-owned assignment on the server, never trust a client assignment ID.
       const task = await apiRequest<{ assignmentId:string|null }>(`/api/v1/me/novice/tasks/${body.taskId}`, "LEARNER");
@@ -46,6 +52,6 @@ export async function POST(request: NextRequest) {
         method:body.command === "draft" ? "PUT" : "POST", headers:{"Idempotency-Key":body.key},
         body:JSON.stringify({expected_revision:body.revision, body:body.answer, attachment_ids:[]}) });
     }
-    return NextResponse.json(await apiRequest(`/api/v1/me/novice/tasks/${body.taskId}`, "LEARNER"));
+    return NextResponse.json(await apiRequest(`/api/v1/me/novice/tasks/${body.taskId}`, "LEARNER"), {headers:{"Cache-Control":"no-store"}});
   } catch (error) { return fail(error); }
 }

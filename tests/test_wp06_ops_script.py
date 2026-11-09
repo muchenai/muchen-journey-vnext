@@ -129,7 +129,7 @@ def test_migration_check_rehearses_ai_and_review_release_range(
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -181,12 +181,12 @@ def test_migration_check_rehearses_ai_and_review_release_range(
     assert report["upgrade_to_head"] == "PASS"
     assert report["downgrade_to_base"] == "PASS"
     assert report["base_revision"] == "0035_phone_password_login"
-    assert report["head_revision"] == "0054_academy_covers"
+    assert report["head_revision"] == "0056_guild_halls"
     assert report["business_facts_preserved"] is True
 
 
 def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0054_academy_covers"
+    assert ops.EXPECTED_MIGRATION_HEAD == "0056_guild_halls"
     assert set(ops.REVIEW_TABLES) == {
         "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
         "review_admin_access", "review_claims", "directory_sync", "directory_members",
@@ -215,6 +215,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES,
         "learner_notification_reads",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
@@ -226,13 +227,14 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES,
         "learner_notification_reads",
     }
 
 
 def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0054_academy_covers",
+        "migration_revision": "0056_guild_halls",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -242,14 +244,14 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0054_academy_covers",
+            "migration_revision": "0056_guild_halls",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -258,7 +260,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
                 protected_fact: 1,
             },
         }
@@ -270,13 +272,57 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
         ops.require_safe_schema_rollback(facts)
 
 
+ACADEMY_AND_GUILD_FACT_TABLES = (
+    "academy_videos", "academy_video_chunks", "academy_courses",
+    "academy_learning_records", "academy_course_covers",
+    "guild_certification_requests", "guild_memberships", "guild_selections",
+    "guild_task_submissions", "knowledge_favorites",
+)
+
+
+@pytest.mark.parametrize("table", ACADEMY_AND_GUILD_FACT_TABLES)
+def test_current_schema_rollback_requires_empty_academy_and_guild_facts(table):
+    assert table in ops.CURRENT_FACT_TABLES
+    assert table in ops.POST_AI_BASE_TABLES
+    assert table in ops.ROLLBACK_OWNED_FACT_TABLES
+    facts = {
+        "migration_revision": ops.EXPECTED_MIGRATION_HEAD,
+        "counts": dict.fromkeys(ops.ROLLBACK_OWNED_FACT_TABLES, 0),
+    }
+    ops.require_safe_schema_rollback(facts)
+    facts["counts"][table] = 1
+    with pytest.raises(OpsError, match=table):
+        ops.require_safe_schema_rollback(facts)
+    del facts["counts"][table]
+    with pytest.raises(OpsError, match=table):
+        ops.require_safe_schema_rollback(facts)
+
+
+@pytest.mark.parametrize("table", ("academy_learning_records", "guild_task_submissions"))
+def test_migration_drill_refuses_downgrade_before_touching_current_business_facts(
+    monkeypatch, table
+):
+    calls = []
+    facts = {
+        "migration_revision": ops.EXPECTED_MIGRATION_HEAD,
+        "counts": {**dict.fromkeys(ops.ROLLBACK_OWNED_FACT_TABLES, 0), table: 1},
+    }
+    monkeypatch.setattr(ops, "ensure_local_services", lambda: None)
+    monkeypatch.setattr(ops, "psql", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(ops, "compose", lambda *args: calls.append(args))
+    monkeypatch.setattr(ops, "database_facts", lambda *_args, **_kwargs: facts)
+    with pytest.raises(OpsError, match=table):
+        ops.migration_check()
+    assert not any("downgrade" in call for call in calls)
+
+
 def test_application_rollback_requires_immutable_images_and_preserves_facts(
     monkeypatch,
 ):
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0054_academy_covers",
+        "migration_revision": "0056_guild_halls",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []
