@@ -326,8 +326,34 @@
 .module-dialog ol { padding-left: 22px; }
 .module-dialog .module-claim-action { margin-top: 20px; }
 .module-dialog li { padding: 6px 0; }
+.village-task-materials { text-align: left; }
+.module-dialog .village-material-button { display: inline; color: var(--m-cyan); font: inherit; text-align: left; overflow-wrap: anywhere; }
+.module-dialog .village-material-button:disabled { opacity: .65; cursor: wait; }
+.village-material-feedback { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--m-muted); font-size: 12px; }
+.village-material-feedback:not(:empty) { margin-top: 6px; }
+.village-material-feedback.is-error { color: var(--m-red); }
 .module-dialog .module-course-artwork { height: 164.657px; margin-bottom: 20px; }
 .module-info-body { white-space: pre-line; }
+.module-dialog .guild-certification-steps {
+  display: grid;
+  gap: 12px;
+  max-width: 500px;
+  margin: 24px auto 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.module-dialog .guild-certification-steps > li {
+  display: grid;
+  grid-template-columns: 24px 5em minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.guild-certification-number { color: var(--m-cyan); font-variant-numeric: tabular-nums; }
+.guild-certification-steps strong { color: var(--m-text); font-weight: 600; white-space: nowrap; }
 .module-demo-note { padding: 13px 15px; border: 1px solid var(--m-border); border-left: 2px solid var(--m-cyan); background: color-mix(in srgb, var(--m-raised) 60%, transparent); border-radius: 5px; color: var(--m-muted); font-size: 12px; line-height: 1.9; margin: 20px 0; }
 .module-field { display: block; font-size: 13px; margin: 18px 0; color: var(--m-text); }
 .module-field input, .module-field textarea { display: block; width: 100%; padding: 12px 14px; border: 1px solid var(--m-border); border-radius: 7px; background: var(--m-bg); color: var(--m-text); font-size: 13px; margin-top: 8px; resize: vertical; }
@@ -355,7 +381,13 @@
 .module-task-reward-preview > p > strong { color: var(--m-cyan); font-weight: 500; }
 .module-task-reward-preview > small { display: block; color: var(--m-dim); font-size: 10px; line-height: 1.8; margin-top: 10px; }
 .village-task-dialog ul, .village-task-dialog .module-field, .village-task-dialog .module-demo-note { text-align: left; }
-.village-task-dialog form > .module-secondary { margin-right: 12px; }
+.village-task-dialog .village-task-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; }
+.village-task-dialog .village-draft-feedback { min-height: 32px; margin: 2px 0 8px; display: flex; align-items: center; justify-content: center; color: var(--m-cyan); font-size: 13px; font-weight: 600; }
+.village-task-dialog .village-draft-feedback > span { display: inline-flex; align-items: center; gap: 6px; }
+.village-task-dialog .village-cancel-confirm { margin: 18px 0; padding: 16px; border: 1px solid var(--m-border); border-radius: 8px; background: rgba(5, 17, 34, .6); text-align: left; }
+.village-task-dialog .village-cancel-confirm p { margin: 10px 0; }
+.village-task-dialog .village-cancel-confirm .village-cancel-unsaved { color: #f1d094; }
+.village-task-dialog .village-cancel-confirm .village-task-actions { justify-content: flex-end; margin-top: 14px; }
 .village-task-dialog .village-task-instructions { margin-top: 22px; }
 .village-task-dialog .village-task-instructions > h3 { margin: 0; text-align: center; }
 .village-task-dialog .village-task-instructions-body { margin: 0; padding: 0 22px; text-align: left; }

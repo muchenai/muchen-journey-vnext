@@ -4,7 +4,7 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from typing import Literal
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ from journey_api.models import User, Role
 from journey_api.review_admin_models import MedalDefinition, MedalRedemption
 from journey_api.review_admin_access import require_publisher
 from journey_api.review_admin_routes import envelope, audit
-from journey_api.novice_economy import POINT_TYPES, wallet
+from journey_api.novice_economy import POINT_TYPES, wallet, growth_history
 from journey_api.medal_catalog import BADGE_ARTWORKS
 
 router = APIRouter(prefix="/api/v1")
@@ -142,6 +142,14 @@ def save(medal_id: uuid.UUID, command: SaveMedal, request: Request,
 def read_wallet(request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     return envelope(request, wallet(session, actor))
+
+
+@router.get("/me/novice/growth")
+def read_growth_history(request: Request, offset: int=Query(default=0, ge=0, le=2147483647),
+                        limit: int=Query(default=20, ge=1, le=100),
+                        actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    return envelope(request, growth_history(session, actor, offset=offset, limit=limit))
 
 
 @router.get("/me/novice/medals")

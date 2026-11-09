@@ -18,6 +18,7 @@ export function TaskClassifications({ tasks, department, level, review, badgeTyp
   const published = tasks;
   const options: { id: TaskDepartmentFilter; name: string }[] = [
     { id: "all", name: "全部部门" },
+    { id: "functional", name: "综合职能工会" },
     ...taskDepartments.filter(item => !item.delivery),
     { id: "delivery", name: "交付线（全部）" },
     ...taskDepartments.filter(item => item.delivery),

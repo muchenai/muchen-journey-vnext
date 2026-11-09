@@ -8090,6 +8090,79 @@
         }
       }
     },
+    "/api/v1/me/novice/tasks/{task_id}/cancel": {
+      "post": {
+        "summary": "Cancel Claim",
+        "operationId": "cancel_claim_api_v1_me_novice_tasks__task_id__cancel_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelClaimCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/novice/tasks/{task_id}/claim": {
       "post": {
         "summary": "Claim",
@@ -8330,6 +8403,74 @@
         "summary": "Read Wallet",
         "operationId": "read_wallet_api_v1_me_novice_wallet_get",
         "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/novice/growth": {
+      "get": {
+        "summary": "Read Growth History",
+        "operationId": "read_growth_history_api_v1_me_novice_growth_get",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
           {
             "name": "X-Fixture-Role",
             "in": "header",
@@ -10225,6 +10366,320 @@
           }
         }
       }
+    },
+    "/api/v1/me/guild": {
+      "get": {
+        "summary": "Learner Guild",
+        "operationId": "learner_guild_api_v1_me_guild_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/guild/join": {
+      "post": {
+        "summary": "Join",
+        "operationId": "join_api_v1_me_guild_join_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuildJoin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/guild/tasks": {
+      "post": {
+        "summary": "Save Task",
+        "operationId": "save_task_api_v1_me_guild_tasks_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuildTaskSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/guild/requests": {
+      "post": {
+        "summary": "Apply",
+        "operationId": "apply_api_v1_me_guild_requests_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuildApply"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/guild-requests": {
+      "get": {
+        "summary": "Admin Guild",
+        "operationId": "admin_guild_api_v1_review_admin_guild_requests_get",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/guild-requests/{request_id}/review": {
+      "post": {
+        "summary": "Review",
+        "operationId": "review_api_v1_review_admin_guild_requests__request_id__review_post",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuildReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11055,6 +11510,21 @@
           "weight"
         ],
         "title": "Badge"
+      },
+      "CancelClaimCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "CancelClaimCommand"
       },
       "CancelEnrollmentCommand": {
         "properties": {
@@ -14013,6 +14483,135 @@
           "reason"
         ],
         "title": "GrantReviewerRoleCommand"
+      },
+      "GuildApply": {
+        "properties": {
+          "level": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level"
+          },
+          "guildId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guildid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expectedrevision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level",
+          "expectedRevision"
+        ],
+        "title": "GuildApply"
+      },
+      "GuildJoin": {
+        "properties": {
+          "guildId": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Guildid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "guildId"
+        ],
+        "title": "GuildJoin"
+      },
+      "GuildReview": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "returned"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "GuildReview"
+      },
+      "GuildTaskSave": {
+        "properties": {
+          "guildId": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Guildid"
+          },
+          "level": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level"
+          },
+          "artifact": {
+            "type": "string",
+            "maxLength": 6000,
+            "title": "Artifact"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Checks"
+          },
+          "submit": {
+            "type": "boolean",
+            "title": "Submit"
+          },
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedrevision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "guildId",
+          "level",
+          "artifact",
+          "checks",
+          "submit"
+        ],
+        "title": "GuildTaskSave"
       },
       "HTTPValidationError": {
         "properties": {
@@ -22070,6 +22669,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Version Id"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           }
         },
         "type": "object",

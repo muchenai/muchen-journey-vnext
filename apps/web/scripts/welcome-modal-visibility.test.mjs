@@ -65,10 +65,11 @@ function createWelcomeFlow() {
       useEffect() {}, useLayoutEffect() {},
     },
     './WelcomeNameDialog': { WelcomeNameDialog },
-    './useVillageTasks': { useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
+    './useVillageTasks': { isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available', useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
     './useCanvasScale': { useCanvasScale: () => 1 },
     './sharedAsset': { sharedAsset: name => name },
     './taskDepartments': { filterDepartmentTasks: tasks => tasks, taskDepartmentName: name => name },
+    './deliveryLabModel': { createDeliveryLabSession: () => ({ status: 'available', answers: {} }) },
     './moduleDemoData': { moduleTitles: { village: '新手村', academy: 'AI学院', guild: '交付线公会' } },
     '../actions': { saveLearnerNickname: async () => ({}) },
     './favoriteKnowledge.css': {}, './moduleHub.css': {},
@@ -76,10 +77,10 @@ function createWelcomeFlow() {
   for (const [file, names] of Object.entries({
     BadgeShop: ['BadgeShop'], TaskClassifications: ['TaskClassifications'],
     ModuleShell: ['ModuleBorderProvider', 'ModuleHero', 'ModuleHeader', 'ModuleIcon', 'ModulePanel', 'ModuleSidebar', 'ModuleStatus'],
-    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], JourneyDialogSurface: ['JourneyDialogSurface'],
+    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'], JourneyDialogSurface: ['JourneyDialogSurface'],
     AccountSwitchDialog: ['AccountSwitchDialog'], PersonalProfile: ['PersonalProfile'], WorldMap: ['WorldMap'],
     KnowledgeLibrary: ['KnowledgeLibrary'], FavoriteKnowledge: ['FavoriteKnowledge', 'KnowledgeSaveButton'],
-    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'],
+    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'], DeliveryLab: ['DeliveryLab'], GuildGrowthPage: ['GuildGrowthPage'],
   })) dependencies[`./${file}`] = Object.fromEntries(names.map(name => [name, component]));
   const { ModuleHub } = loadComponent('ModuleHub.tsx', dependencies);
 

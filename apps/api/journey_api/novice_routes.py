@@ -1,7 +1,7 @@
 """Learner catalog and claims; drafts, submissions and reviews stay canonical."""
 import uuid
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, Request
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session, aliased
 from journey_api.auth import Actor, get_learner_actor, require_role
@@ -9,7 +9,8 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.models import (Assignment, AssignmentStatus, Enrollment, EnrollmentStatus,
     TaskDefinition, TaskDefinitionStatus, TaskVersion, User, UserStatus, Role, RoleAssignment,
-    Submission, SubmissionVersion, SubmissionDraft, Evaluation)
+    Submission, SubmissionVersion, SubmissionDraft, Evaluation, AuditEntry)
+from journey_api.idempotency import find_replay, store_result
 from journey_api.review_admin_models import ReviewAdminTask, PublishedTaskContent
 from journey_api.review_admin_routes import DOMAINS, BADGES, PRESETS, envelope, audit
 from journey_api.novice_economy import rewards, unlock_cost, wallet
@@ -32,6 +33,19 @@ def assignment_task(assignment_id: uuid.UUID, request: Request,
 def owned_claim(session, actor, task_id):
     return session.scalar(select(Enrollment).where(Enrollment.organization_id == actor.organization_id,
         Enrollment.learner_id == actor.id, Enrollment.novice_task_id == task_id))
+
+
+def learner_cancelled(session, actor, assignment):
+    """Only this learner's explicit cancellation of the current revision can reopen."""
+    if assignment.status != AssignmentStatus.CANCELLED:
+        return False
+    enrollment = session.get(Enrollment, assignment.enrollment_id)
+    return bool(enrollment and enrollment.status == EnrollmentStatus.ACTIVE and
+        enrollment.organization_id == actor.organization_id and enrollment.learner_id == actor.id and
+        session.scalar(select(AuditEntry.id).where(AuditEntry.organization_id == actor.organization_id,
+            AuditEntry.actor_id == actor.id, AuditEntry.resource_id == assignment.id,
+            AuditEntry.action == "novice.cancel", AuditEntry.result == "SUCCESS",
+            AuditEntry.details["revision"].as_integer() == assignment.revision).limit(1)))
 
 
 def published(session, actor, task_id):
@@ -87,7 +101,7 @@ def task_view(session, actor, task_id):
         rubric=content.get("rubric", []) if content.get("reviewMode") == "ai" else [],
         passScore=content.get("passScore", 60), review="AI 自测" if content.get("reviewMode") == "ai" else "人工审核", reviewMode=content.get("reviewMode", "manual"),
         publishedAt=version.published_at.isoformat(), versionId=str(version.id),
-        status="available", assignmentId=None, revision=None, answer="", feedback=None,
+        status="available", claimed=False, assignmentId=None, revision=None, answer="", feedback=None,
         unlockTaskPoints=unlock_cost(content), rewardAllocations=reward["allocations"])
     if assignment:
         draft = session.scalar(select(SubmissionDraft).where(SubmissionDraft.assignment_id == assignment.id,
@@ -97,12 +111,23 @@ def task_view(session, actor, task_id):
         evaluation = session.scalar(select(Evaluation).where(Evaluation.assignment_id == assignment.id)
             .order_by(Evaluation.created_at.desc()).limit(1))
         result.update(assignmentId=str(assignment.id), revision=assignment.revision,
+            claimed=assignment.status != AssignmentStatus.CANCELLED,
             status={"IN_PROGRESS":"active", "SUBMITTED":"pending", "IN_REVIEW":"pending",
                 "NEEDS_REVISION":"returned", "COMPLETED":"completed", "PASSED":"completed",
                 "CANCELLED":"unavailable"}.get(assignment.status.value, "active"),
             answer=draft.body if draft else submission.body if submission else "",
             feedback={"text":evaluation.feedback, "at":evaluation.created_at.isoformat(),
                 "decision":evaluation.decision.value} if evaluation else None)
+        if learner_cancelled(session, actor, assignment):
+            # Keep the saved draft and its fixed task version; an archived task cannot
+            # be reclaimed even though its learner-owned history is still visible.
+            try:
+                published(session, actor, task_id)
+                result["status"] = "available"
+            except ApiError as error:
+                if error.status_code != 404:
+                    raise
+            result["unlockTaskPoints"] = 0
     return result
 
 
@@ -134,6 +159,48 @@ def detail(task_id: uuid.UUID, request: Request, actor: Actor = Depends(get_lear
 
 class ClaimCommand(BaseModel):
     version_id: uuid.UUID
+    expected_revision: int | None = Field(default=None, strict=True, ge=1)
+
+
+class CancelClaimCommand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(strict=True, ge=1)
+
+
+@router.post("/tasks/{task_id}/cancel")
+def cancel_claim(task_id: uuid.UUID, command: CancelClaimCommand, request: Request,
+                 idempotency_key: str = Header(alias="Idempotency-Key"),
+                 actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    # Serializes this learner's claim commands without blocking FK KEY SHARE
+    # locks taken by a concurrent draft/submission that already owns Enrollment.
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update(key_share=True))
+    payload = {**command.model_dump(mode="json"), "task_id": str(task_id)}
+    replay = find_replay(session, actor_id=actor.id, command="novice.cancel", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return envelope(request, replay)
+    enrollment = session.scalar(select(Enrollment).where(Enrollment.organization_id == actor.organization_id,
+        Enrollment.learner_id == actor.id, Enrollment.novice_task_id == task_id,
+        Enrollment.status == EnrollmentStatus.ACTIVE).with_for_update())
+    if enrollment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可取消的已接取任务。")
+    assignment = session.scalar(select(Assignment).where(Assignment.enrollment_id == enrollment.id,
+        Assignment.organization_id == actor.organization_id, Assignment.task_definition_id == task_id).with_for_update())
+    if assignment is None:
+        raise ApiError(404, "NOT_FOUND", "没有找到可取消的已接取任务。")
+    if assignment.revision != command.expected_revision:
+        raise ApiError(409, "VERSION_CONFLICT", "任务状态已更新，请重新查看后操作。")
+    if assignment.status != AssignmentStatus.IN_PROGRESS:
+        raise ApiError(409, "INVALID_STATE_TRANSITION", "只有进行中的任务可以取消接取。")
+    assignment.status = AssignmentStatus.CANCELLED
+    assignment.revision += 1
+    audit(session, request, actor, "novice.cancel", assignment.id,
+        {"task_id": str(task_id), "revision": assignment.revision, "draft_preserved": True})
+    session.flush()
+    result = task_view(session, actor, task_id)
+    store_result(session, actor_id=actor.id, command="novice.cancel", key=idempotency_key, payload=payload, response=result)
+    session.commit()
+    return envelope(request, result)
 
 
 @router.post("/tasks/{task_id}/claim")
@@ -141,9 +208,29 @@ def claim(task_id: uuid.UUID, command: ClaimCommand, request: Request,
           actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     # Serialize claims per learner; the unique owner/task constraint is the final guard.
-    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update(key_share=True))
     existing = owned_claim(session, actor, task_id)
-    if existing is None:
+    if existing is not None:
+        enrollment = session.scalar(select(Enrollment).where(Enrollment.id == existing.id,
+            Enrollment.organization_id == actor.organization_id).with_for_update())
+        assignment = session.scalar(select(Assignment).where(Assignment.enrollment_id == enrollment.id,
+            Assignment.task_definition_id == task_id, Assignment.organization_id == actor.organization_id).with_for_update())
+        if assignment is None:
+            raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能重新接取。")
+        if assignment.status == AssignmentStatus.CANCELLED:
+            if not learner_cancelled(session, actor, assignment):
+                raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能重新接取。")
+            if command.expected_revision != assignment.revision or command.version_id != assignment.task_version_id:
+                raise ApiError(409, "VERSION_CONFLICT", "任务状态或版本已更新，请重新查看后接取。")
+            session.scalar(select(TaskDefinition.id).where(TaskDefinition.id == task_id,
+                TaskDefinition.organization_id == actor.organization_id).with_for_update())
+            published(session, actor, task_id)
+            assignment.status = AssignmentStatus.IN_PROGRESS
+            assignment.revision += 1
+            audit(session, request, actor, "novice.reclaim", assignment.id,
+                {"task_id": str(task_id), "revision": assignment.revision, "draft_preserved": True})
+            session.commit()
+    else:
         definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
             TaskDefinition.organization_id == actor.organization_id).with_for_update())
         if definition is None:

@@ -16,7 +16,7 @@ from journey_api.identity import add_audit
 from journey_api.idempotency import find_replay, store_result
 from journey_api.models import (Assignment, AssignmentStatus, EnrollmentStatus,
     Review, ReviewKind, ReviewStatus, Role, RoleAssignment, Submission, SubmissionVersion, TaskDefinition, Evaluation, CoachingFeedback,
-    TaskDefinitionStatus, TaskVersion, User, UserStatus, ExternalIdentity, IdentitySession, Organization)
+    TaskDefinitionStatus, TaskVersion, User, UserStatus, ExternalIdentity, IdentitySession, Organization, CompletionCode)
 from journey_api.review_admin_models import ReviewAdminTask, ReviewAdminDecision, ReviewAdminCertification, ReviewAdminAccess, ReviewClaim
 from journey_api.review_claims import LEASE_SECONDS, live_claim, busy, check_write, claim_views
 from journey_api.review_admin_access import access_for, permissions, require_super, require_publisher, STAFF_ROLES
@@ -115,6 +115,32 @@ def tasks(request: Request, actor: Actor = Depends(get_actor), session: Session 
     return envelope(request, {"items": [task_data(session, d) for d in definitions]})
 
 
+def review_learner_identity_ids(session, organization_id, learner_ids):
+    """Resolve display identity without changing immutable review ownership.
+
+    A consumed completion code lets a corporate account inherit the retired
+    learner's records. Only that explicit same-organization relationship and an
+    active Feishu account may provide its current directory identity. Code expiry
+    limits redemption, not the lifetime of an already completed migration.
+    """
+    result = {learner_id: learner_id for learner_id in learner_ids}
+    if not learner_ids:
+        return result
+    migrated = session.execute(select(CompletionCode.user_id, User.id)
+        .join(User, User.id == CompletionCode.migrated_to_user_id)
+        .join(ExternalIdentity, ExternalIdentity.user_id == User.id)
+        .where(CompletionCode.organization_id == organization_id,
+               CompletionCode.user_id.in_(learner_ids),
+               CompletionCode.used_at.is_not(None),
+               CompletionCode.user_id != CompletionCode.migrated_to_user_id,
+               User.organization_id == organization_id, User.status == UserStatus.ACTIVE,
+               ExternalIdentity.organization_id == organization_id,
+               ExternalIdentity.provider == "FEISHU", ExternalIdentity.revoked_at.is_(None))
+        .distinct()).all()
+    result.update(migrated)
+    return result
+
+
 @router.get("/reviews")
 def reviews(request: Request, actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.REVIEWER)
@@ -126,17 +152,19 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
     credits = review_credits(session, [(ctx.review, ctx.evaluation or ctx.coaching_feedback) for ctx in contexts])
     claims = claim_views(session, [ctx.review for ctx in contexts], actor)
     learner_ids = {ctx.learner.id for ctx in contexts}
-    profiles = cached_directory_profiles(session, actor, learner_ids)
+    identity_ids = review_learner_identity_ids(session, actor.organization_id, learner_ids)
+    display_ids = set(identity_ids.values())
+    profiles = cached_directory_profiles(session, actor, display_ids)
     feishu_ids = set(session.scalars(select(ExternalIdentity.user_id).where(
         ExternalIdentity.organization_id == actor.organization_id,
-        ExternalIdentity.user_id.in_(learner_ids), ExternalIdentity.provider == 'FEISHU',
-        ExternalIdentity.revoked_at.is_(None)))) if learner_ids else set()
+        ExternalIdentity.user_id.in_(display_ids), ExternalIdentity.provider == 'FEISHU',
+        ExternalIdentity.revoked_at.is_(None)))) if display_ids else set()
     items = []
     phones = {}
-    if learner_ids - feishu_ids:
+    if display_ids - feishu_ids:
         identities = session.scalars(select(ExternalIdentity).where(
             ExternalIdentity.organization_id == actor.organization_id,
-            ExternalIdentity.user_id.in_(learner_ids - feishu_ids),
+            ExternalIdentity.user_id.in_(display_ids - feishu_ids),
             ExternalIdentity.provider.in_(["PHONE", "PHONE_PASSWORD"]),
             ExternalIdentity.revoked_at.is_(None)).order_by(ExternalIdentity.verified_at.desc(), ExternalIdentity.id))
         for identity in identities:
@@ -152,10 +180,11 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
         meta = session.get(ReviewAdminDecision, ctx.review.id)
         decision = ctx.evaluation or ctx.coaching_feedback
         checks = review_document_ai_checks(session, ctx)
+        identity_id = identity_ids[ctx.learner.id]
         item.update(learner_id=str(ctx.learner.id), task_id=str(ctx.definition.id),
-            learner_is_feishu=ctx.learner.id in feishu_ids,
-            learner_employee_no=profiles.get(ctx.learner.id, {}).get("employee_no") or "",
-            learner_phone=phones.get(ctx.learner.id, ""),
+            learner_is_feishu=identity_id in feishu_ids,
+            learner_employee_no=profiles.get(identity_id, {}).get("employee_no") or "",
+            learner_phone=phones.get(identity_id, ""),
             camp=task_camp(ctx.definition, profile),
             domain=profile.content.get("domain", "产品开发") if profile else "探索营",
             review_mode=profile.content.get("reviewMode", "manual") if profile else "manual",

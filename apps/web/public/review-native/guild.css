@@ -42,6 +42,20 @@
 .gd-status.active, .gd-status.published, .gd-status.enabled { background: var(--green-soft); color: var(--green); }
 .gd-status.revoked { background: var(--red-soft); color: var(--red); }
 .gd-status.draft { background: var(--primary-soft); color: var(--primary); }
+.gd-status.pending { background: var(--primary-soft); color: var(--primary); }
+.gd-status.approved { background: var(--green-soft); color: var(--green); }
+.gd-status.returned { background: var(--red-soft); color: var(--red); }
+.gd-pending-count { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; min-height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 5px; background: var(--primary-soft); color: var(--primary); font-size: 10px; }
+.gd-request-evidence-summary { display: flex; flex-direction: column; gap: 7px; max-width: 280px; }
+.gd-request-evidence-summary > span { display: flex; align-items: baseline; gap: 7px; }
+.gd-badge-grade { display: inline-block; flex: none; font-size: 10px; font-weight: 400; color: var(--primary); }
+.gd-badge-grade[data-grade="2"] { color: #7860be; }
+.gd-badge-grade[data-grade="3"] { color: #a47c26; }
+.gd-review-evidence { list-style: none; margin: 0; padding: 0; }
+.gd-review-evidence > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.gd-review-evidence > li:last-child { border-bottom: 0; }
+.gd-review-evidence strong { font-size: 13px; font-weight: 500; }
+.gd-review-evidence small { width: 100%; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .gd-table td .gd-positive { color: var(--primary); }
 .gd-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; min-height: 250px; padding: 35px 20px; border: 1px dashed var(--border); border-radius: 14px; background: var(--surface-alt); text-align: center; color: var(--muted); font-size: 13px; }
 .gd-empty > svg { margin-bottom: 4px; color: var(--primary); stroke-width: 1.5; }
@@ -75,3 +89,18 @@
 .gd-points-input > span { position: absolute; right: 13px; color: var(--muted); font-size: 12px; pointer-events: none; }
 @media (max-width: 900px) { .gd-stats { gap: 10px; } .gd-stats > div { padding: 16px; } .gd-table { min-width: 800px; } }
 @media (max-width: 600px) { .gd-heading { align-items: flex-start; gap: 12px; } .gd-heading h1 { font-size: 21px; } .gd-btn { padding: 8px 13px; font-size: 12px; } .gd-stats { gap: 8px; } .gd-stats > div { padding: 13px 10px; } .gd-stats > div > span { font-size: 11px; } .gd-stats strong { font-size: 23px; } .gd-stats small { font-size: 10px; margin-left: 4px; } .gd-tabs { gap: 23px; } .gd-tabs > button { font-size: 13px; } .gd-search { flex: 1; min-width: 0; } .gd-search input { font-size: 12px !important; } .gd-toolbar { gap: 10px; } .gd-toolbar > select { width: 112px; } .gd-form-grid { grid-template-columns: 1fr; } .gd-details > div { grid-template-columns: 78px minmax(0,1fr); gap: 10px; } }
+
+.gd-requests-table { min-width: 1120px; }
+.gd-request-guild { min-width: 160px; max-width: 230px; overflow-wrap: anywhere; }
+.gd-request-stage { min-width: 150px; max-width: 235px; }
+.gd-request-task-title { line-height: 1.8; }
+.modal.gd-modal.gd-request-modal { width: min(820px, calc(100vw - 36px)); max-width: 820px; }
+.gd-review-task { margin: 24px 0; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }
+.gd-review-task h3 { margin: 0 0 12px; color: var(--ink); font-size: 16px; font-weight: 600; }
+.gd-review-task h4 { margin: 18px 0 12px; color: var(--ink); font-size: 13px; font-weight: 500; }
+.gd-review-task .gd-details { margin-bottom: 0; }
+.gd-review-checks { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gd-review-checks li { display: flex; gap: 8px; line-height: 1.8; }
+.gd-review-checks li > span { flex: none; color: var(--green); }
+.gd-review-artifact { padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .gd-review-task { padding: 14px; } .gd-review-task .gd-details > div { grid-template-columns: 1fr; gap: 6px; } }

@@ -25,15 +25,16 @@ export const taskDepartments = [
   { id: "dialect-speech", name: "方言语音交付线", delivery: true },
 ] as const;
 export type TaskDepartmentId = typeof taskDepartments[number]["id"];
-export type TaskDepartmentFilter = TaskDepartmentId | "all" | "delivery";
-export const taskDepartmentName = (id: string) => id === "all" ? "全部部门" : id === "delivery" ? "交付线（全部）" : taskDepartments.find(item => item.id === id)?.name || id;
+export type TaskDepartmentFilter = TaskDepartmentId | "all" | "delivery" | "functional";
+export const taskDepartmentName = (id: string) => id === "all" ? "全部部门" : id === "delivery" ? "交付线（全部）" : id === "functional" ? "综合职能工会" : taskDepartments.find(item => item.id === id)?.name || id;
 export function isTaskDepartmentFilter(id: string): id is TaskDepartmentFilter {
-  return id === "all" || id === "delivery" || taskDepartments.some(item => item.id === id);
+  return id === "all" || id === "delivery" || id === "functional" || taskDepartments.some(item => item.id === id);
 }
 export function belongsToDepartment(task: VillageTask, department: TaskDepartmentFilter) {
   const departments = taskDepartments.filter(item => item.name === task.publishingDepartment).map(item => item.id);
   if (department === "all") return true;
   if (department === "delivery") return departments.some(id => taskDepartments.some(item => item.id === id && item.delivery));
+  if (department === "functional") return departments.some(id => taskDepartments.some(item => item.id === id && !item.delivery));
   return departments.includes(department);
 }
 export function filterDepartmentTasks(tasks: VillageTask[], department: TaskDepartmentFilter, level = "全部", review = "全部", query = "", badgeType = "全部") {
