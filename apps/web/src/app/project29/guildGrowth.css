@@ -48,6 +48,7 @@
 .guild-entry > .module-icon { color: var(--m-cyan); margin-bottom: 12px; }
 .module-hub .guild-entry h3 { font-size: 19px; font-weight: 500; }
 .guild-entry > p { color: var(--m-muted); font-size: 12px; margin: 10px 0 20px; }
+.module-hub .guild-entry > p { margin-bottom: 20px; }
 .guild-entry > button { width: 100%; }
 .guild-two-column { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; margin-bottom: 18px; }
 .guild-muted { color: var(--m-muted); font-size: 11px; line-height: 1.95; margin-top: 10px !important; }

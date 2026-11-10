@@ -36,22 +36,98 @@ const {ReviewNotificationPanel}=load(path.join(root,'app/project29/ReviewNotific
 const {VillageTaskCard,VillageTaskRewards}=load(path.join(root,'app/project29/VillageTaskCard.tsx'));
 const {FavoriteKnowledge}=load(path.join(root,'app/project29/FavoriteKnowledge.tsx'));
 const {PersonalProfileView}=load(path.join(root,'app/project29/PersonalProfile.tsx'));
+const {profileGrowthLevel}=load(path.join(root,'app/project29/profileGrowth.ts'));
+const {ProfileBadgeWall}=load(path.join(root,'app/project29/ProfileBadgeWall.tsx'));
+const {parseProfileCollection}=load(path.join(root,'app/project29/profileBadges.ts'));
 const {GrowthHistoryContent}=load(path.join(root,'app/project29/GrowthHistoryDialog.tsx'));
 const {AccountSwitchDialog}=load(path.join(root,'app/project29/AccountSwitchDialog.tsx'));
 
-test('personal profile shows actual rewards and unavailable features without demo identity or level',()=>{
-  const props={name:'真实学员',wallet:{xp:200,availableXp:200,redeemedXp:0,ownedMedalCount:0,badgeBalances:{product:20,data:5}},error:'',onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){}};
+test('personal profile shows actual rewards and growth levels with mall exchange still unavailable',()=>{
+  const props={name:'真实学员',wallet:{xp:200,availableXp:200,redeemedXp:0,ownedMedalCount:0,badgeBalances:{product:20,data:5}},badges:[],error:'',onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){},onBadgeCatalog(){},onBadgeOwned(){}};
   const html=renderToStaticMarkup(React.createElement(PersonalProfileView,props));
   assert.match(html,/真实学员/);assert.match(html,/200/);assert.match(html,/20 点/);assert.match(html,/5 点/);
-  assert.match(html,/成长等级暂未开放/);assert.match(html,/沐晨商城积分/);assert.match(html,/我的徽章墙/);
+  assert.match(html,/Lv\.1 · 成长探索者/);assert.match(html,/沐晨商城积分/);assert.match(html,/我的徽章墙/);
   assert.match(html,/已拥有徽章/);assert.doesNotMatch(html,/已拥有徽章 · 暂未开放/);
   assert.match(html,/可兑换经验<\/span><strong>200/);assert.match(html,/已用于兑换<\/span><strong>0/);
   assert.match(html,/<strong>0 <small>枚<\/small><\/strong>/);
   assert.match(html,/查看成长明细/);assert.match(html,/经验兑换暂未开放/);assert.match(html,/商城积分 · 暂未开放/);
   assert.doesNotMatch(html,/1,250|Lv\.3|洞察新星|演示成长|预览身份/);
-  const failed=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,error:'读取失败'}));
+  const failed=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,badges:null,error:'读取失败'}));
   assert.match(failed,/读取失败/);assert.match(failed,/重新加载/);assert.doesNotMatch(failed,/200|20 点/);
   assert.match(failed,/可兑换经验<\/span><strong>—/);assert.match(failed,/已用于兑换<\/span><strong>—/);
+  assert.match(failed,/等级数据读取失败/);assert.doesNotMatch(failed,/<progress|Lv\.1/);
+  const loading=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,badges:null,error:''}));
+  assert.match(loading,/正在读取成长等级/);assert.doesNotMatch(loading,/<progress|Lv\.1/);
+});
+
+test('profile growth levels follow cumulative XP boundaries and ignore spendable balance',()=>{
+  const cases=[
+    [0,1,0,500,'成长探索者'],[499,1,499,1,'成长探索者'],
+    [500,2,0,500,'成长探索者'],[700,2,200,300,'成长探索者'],
+    [1000,3,0,500,'成长实践者'],[1250,3,250,250,'成长实践者'],
+  ];
+  for(const [xp,level,progress,remaining,title] of cases){
+    assert.deepEqual(profileGrowthLevel(xp),{level,nextLevel:level+1,title,progress,step:500,remaining});
+    const html=renderToStaticMarkup(React.createElement(PersonalProfileView,{
+      name:'真实学员',wallet:{xp,availableXp:0,redeemedXp:xp,ownedMedalCount:0,badgeBalances:{}},badges:[],error:'',
+      onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){},onBadgeCatalog(){},onBadgeOwned(){},
+    }));
+    assert.equal(html.split(`Lv.${level} · ${title}`).length-1,2,'Overview and experience card must agree');
+    assert.ok(html.includes(`value="${progress}" max="500"`));
+    assert.ok(html.includes(`aria-valuetext="Lv.${level}，${progress} / 500 XP，距离 Lv.${level+1} 还需 ${remaining} 经验"`));
+    assert.match(html,/可兑换经验<\/span><strong>0/);
+    assert.match(html,/商城积分 · 暂未开放/);assert.match(html,/经验兑换暂未开放/);
+    assert.doesNotMatch(html,/<progress[^>]*style=|演示成长|成长等级暂未开放/);
+  }
+  for(const invalid of [undefined,-1,1.5,NaN,Infinity])assert.equal(profileGrowthLevel(invalid),null);
+});
+
+test('profile badge wall uses real ownership, keeps delisted medals and orders newest first',()=>{
+  const published=(id)=>({id,name:'徽章 '+id,description:'真实发布',image:'',style:'blue',revision:1,stock:null,costs:[{badgeId:'data',points:5}]});
+  const owned=(id,at)=>({id:'r-'+id,medalId:id,medalName:'已获得 '+id,image:'/saved-'+id+'.webp',style:'gold',costs:[{badgeId:'data',points:5}],redeemedAt:at});
+  const data={wallet:{xp:100,availableXp:100,redeemedXp:0,ownedMedalCount:2,badgeBalances:{data:8}},medals:[published('unowned'),published('owned')],redemptions:[owned('owned','2026-11-08T00:00:00Z'),owned('delisted','2026-11-09T00:00:00Z')]};
+  const result=parseProfileCollection(data);
+  assert.deepEqual(result.badges.map(b=>b.id),['delisted','owned']);
+  assert.equal(result.badges[0].image,'/saved-delisted.webp');
+  assert.equal(result.badges[0].published,false);
+  assert.equal(result.badges[0].tone,'gold');
+  assert.equal(result.wallet.ownedMedalCount,2);
+  assert.throws(()=>parseProfileCollection({...data,redemptions:undefined}),/徽章数据不完整/);
+  assert.throws(()=>parseProfileCollection({...data,wallet:{...data.wallet,ownedMedalCount:3}}),/徽章记录正在更新/);
+});
+
+test('profile badge wall distinguishes real empty, loading, error and stale data',()=>{
+  const props={badges:null,error:'',onRetry(){},onShop(){},onOwned(){}};
+  const render=overrides=>renderToStaticMarkup(React.createElement(ProfileBadgeWall,{...props,...overrides}));
+  const loading=render({});
+  assert.match(loading,/正在读取已拥有徽章/);
+  assert.doesNotMatch(loading,/你还没有获得徽章|已获得 0 枚/);
+  const failed=render({error:'网络错误'});
+  assert.match(failed,/徽章读取失败|重新加载/);
+  assert.doesNotMatch(failed,/你还没有获得徽章|已获得 0 枚/);
+  const empty=render({badges:[]});
+  assert.match(empty,/你还没有获得徽章/);
+  assert.match(empty,/完成任务积累徽章点，前往徽章商城兑换你的第一枚徽章。/);
+  assert.match(empty,/已获得 0 枚徽章/);
+  assert.doesNotMatch(empty,/暂未开放|查看全部/);
+  const stale=render({badges:[],error:'网络错误'});
+  assert.match(stale,/当前显示上次读取的徽章/);
+});
+
+test('profile badge wall previews six owned artworks and offers all owned navigation',()=>{
+  const artwork=JSON.parse(readFileSync(path.join(root,'app/project29/badgeCatalogData.json'),'utf8'))[0];
+  const badges=Array.from({length:7},(_,i)=>({id:'owned-'+i,name:'已获得 '+i,description:'',category:'数据交付',level:'成长徽章',tone:['cyan','violet','gold'][i%3],artworkId:artwork.id,image:'',icon:'a03b5',requirements:[],revision:1,stock:null,published:true}));
+  const props={badges,error:'',onRetry(){},onShop(){},onOwned(){}};
+  const html=renderToStaticMarkup(React.createElement(ProfileBadgeWall,props));
+  assert.match(html,/已获得 7 枚徽章/);
+  assert.equal((html.match(/class="profile-badge-item"/g)||[]).length,6);
+  for(const level of [1,2,3])assert.ok(html.includes('/assets/journey-badges/frames/level-'+level+'.svg'));
+  assert.ok(html.includes('/assets/journey-badges/centered-icons/'+artwork.path+'.webp'));
+  assert.match(html,/一级/);assert.match(html,/二级/);assert.match(html,/三级/);
+  assert.doesNotMatch(html,/<h3>已获得 6<\/h3>|暂未开放/);
+  assert.match(html,/展示最近获得的 6 枚徽章/);assert.match(html,/查看全部/);
+  const one=renderToStaticMarkup(React.createElement(ProfileBadgeWall,{...props,badges:badges.slice(0,1)}));
+  assert.doesNotMatch(one,/查看全部/);
 });
 
 test('growth details show task origins and signed badge costs without presenting mall exchange as enabled',()=>{

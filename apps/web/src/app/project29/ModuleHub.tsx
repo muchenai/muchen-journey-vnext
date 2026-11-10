@@ -359,7 +359,7 @@ export function ModuleHub({
                 {module === "guild" && menu === "lab" ? (
                   <DeliveryLab identity={identity} session={deliveryLab} onChange={setDeliveryLab} query={query} onClearSearch={() => setQuery("")} />
                 ) : menu === "profile" ? (
-                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>openAcademy("hall")} onAcademyFavorites={()=>openAcademy("saved")} onBadgeShop={()=>openGuildVillage("badges", "shop")} />
+                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>openAcademy("hall")} onAcademyFavorites={()=>openAcademy("saved")} onBadgeShop={()=>openGuildVillage("badges", "shop")} onBadgeCatalog={()=>openGuildVillage("badges", "catalog")} onBadgeOwned={()=>openGuildVillage("badges", "owned")} />
                 ) : menu === "map" ? (
                   null
                 ) : menu === "knowledge" ? (

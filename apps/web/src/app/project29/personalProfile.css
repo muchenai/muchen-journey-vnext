@@ -41,6 +41,12 @@
 .profile-badge-empty { grid-column: 1 / -1; text-align: center; padding: 32px; color: var(--m-muted); }
 .profile-badge-empty > .module-icon { margin-bottom: 15px; color: var(--m-violet); }
 .profile-badge-empty p { font-size: 12px; margin: 10px 0 20px; }
+.personal-profile .profile-badge-grid { list-style: none; padding: 0; margin: 0; }
+.personal-profile .profile-badge-item h3 { margin: 0 14px 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.personal-profile .profile-badge-empty p { margin: 12px 0 0; line-height: 1.8; }
+.profile-badge-error { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; color: var(--m-muted); font-size: 12px; }
+.profile-badge-error > .module-secondary, .profile-collection-footer > .module-secondary { font-size: 11px; }
+.profile-collection-footer { align-items: center; gap: 18px; }
 .profile-next { margin-top: 22px; display: flex; align-items: center; gap: 17px; padding: 25px; }
 .profile-next-icon { width: 48px; height: 48px; border-radius: 10px; display: grid; place-items: center; background: var(--m-raised); color: var(--m-cyan); flex: none; }
 .profile-next h3 { font-size: 14px; }
@@ -81,8 +87,10 @@
 .profile-lifetime span { font-size: 10px; color: var(--m-muted); }
 .profile-xp-labels { display: flex; justify-content: space-between; color: var(--m-muted); font-size: 10px; margin-bottom: 8px; }
 .profile-xp-labels span:first-child { color: var(--m-cyan); }
-.profile-xp-track { height: 7px; background: var(--m-border); border-radius: 7px; overflow: hidden; }
-.profile-xp-track > span { display: block; height: 100%; background: linear-gradient(90deg, var(--m-primary), var(--m-primary-mid), var(--m-violet)); border-radius: inherit; }
+.profile-xp-track { display: block; width: 100%; height: 7px; border: 0; appearance: none; background: var(--m-border); border-radius: 7px; overflow: hidden; }
+.profile-xp-track::-webkit-progress-bar { background: var(--m-border); border-radius: 7px; }
+.profile-xp-track::-webkit-progress-value { background: linear-gradient(90deg, var(--m-primary), var(--m-primary-mid), var(--m-violet)); border-radius: 7px; }
+.profile-xp-track::-moz-progress-bar { background: linear-gradient(90deg, var(--m-primary), var(--m-primary-mid), var(--m-violet)); border-radius: 7px; }
 .profile-xp-balances { display: grid; grid-template-columns: 1fr 1fr 1.4fr; margin-top: 23px; align-items: center; }
 .profile-xp-balances > div + div { border-left: 1px solid var(--m-border); padding-left: 24px; }
 .profile-xp-balances > div > span { color: var(--m-muted); font-size: 11px; display: block; }
