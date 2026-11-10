@@ -30,6 +30,23 @@ const record = (value: unknown): value is Record<string, unknown> => value !== n
 const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const integer = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
 
+export const XP_PER_GROWTH_LEVEL = 500;
+
+// Levels use lifetime task rewards, independently of any spendable XP balance.
+export function profileGrowthLevel(lifetimeXp: number | undefined) {
+  if (!count(lifetimeXp)) return null;
+  const level = Math.floor(lifetimeXp / XP_PER_GROWTH_LEVEL) + 1;
+  const progress = lifetimeXp % XP_PER_GROWTH_LEVEL;
+  return {
+    level,
+    nextLevel: level + 1,
+    title: level <= 2 ? "成长探索者" : "成长实践者",
+    progress,
+    step: XP_PER_GROWTH_LEVEL,
+    remaining: XP_PER_GROWTH_LEVEL - progress,
+  };
+}
+
 export function parseProfileWallet(value: unknown): ProfileWallet {
   if (!record(value) || !count(value.xp) || !count(value.availableXp) || !count(value.redeemedXp)
     || !count(value.ownedMedalCount) || !record(value.badgeBalances)
