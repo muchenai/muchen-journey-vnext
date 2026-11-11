@@ -355,10 +355,10 @@ const exploreFrame = `${assetPathPrefix}/baa53.webp`
 const loginArrow = `${assetPathPrefix}/79892.svg`
 
 export function Login() {
-  const { joinPhase, joinError } = useJourney();
+  const { joinPhase, joinError, feishuClient = false } = useJourney();
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [loginMode, setLoginMode] = useState<'feishu' | 'password'>('password')
+  const [loginMode, setLoginMode] = useState<'feishu' | 'password'>(feishuClient ? 'feishu' : 'password')
   const [phoneMode, setPhoneMode] = useState<'login' | 'register' | 'reset'>('login')
   const [passwordPhone, setPasswordPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -565,9 +565,9 @@ export function Login() {
           <div className="panel-glow" aria-hidden="true" />
           <img className="panel-logo" src={logo} alt="" />
           <p className="panel-title">MUCHEN JOURNEY</p>
-          {joinPhase === 'feishu' && <div className="login-method-tabs" role="tablist" aria-label="登录方式">
+          {joinPhase === 'feishu' && <div className={`login-method-tabs${feishuClient ? ' feishu-only' : ''}`} role="tablist" aria-label="登录方式">
             <button disabled={isLaunched || sendingCode} type="button" role="tab" aria-selected={loginMode === 'feishu'} className={loginMode === 'feishu' ? 'active' : ''} onClick={() => { setLoginMode('feishu'); setMessage(''); }}><img src={`${assetPathPrefix}/${loginMode === 'feishu' ? '06dc8' : '7c344'}.svg`} alt="" />飞书登录</button>
-            <button disabled={isLaunched || sendingCode} type="button" role="tab" aria-selected={loginMode === 'password'} className={loginMode === 'password' ? 'active' : ''} onClick={() => { setLoginMode('password'); setMessage(''); }}><img src={`${assetPathPrefix}/${loginMode === 'password' ? '3088c' : '973c8'}.svg`} alt="" />手机号登录</button>
+            {!feishuClient && <button disabled={isLaunched || sendingCode} type="button" role="tab" aria-selected={loginMode === 'password'} className={loginMode === 'password' ? 'active' : ''} onClick={() => { setLoginMode('password'); setMessage(''); }}><img src={`${assetPathPrefix}/${loginMode === 'password' ? '3088c' : '973c8'}.svg`} alt="" />手机号登录</button>}
           </div>}
           {joinPhase === 'feishu' && loginMode === 'feishu' ? <div className="login-method-fields feishu"><label className={`code-field graduation-code ${graduationCode ? 'filled' : ''}`}>
               <span className="sr-only">探索营毕业码（选填）</span>
@@ -618,7 +618,7 @@ export function Login() {
             <b aria-hidden="true" />
           </button>
           <div className="status-line" role="status">{message}</div>
-          {joinPhase === 'feishu' && loginMode === 'feishu' && !joinError && !isLaunched && isFeishuClient(typeof navigator === 'undefined' ? '' : navigator.userAgent) && <span className="login-auto-countdown" aria-hidden="true">{countdown}</span>}
+          {joinPhase === 'feishu' && loginMode === 'feishu' && !joinError && !isLaunched && feishuClient && <span className="login-auto-countdown" aria-hidden="true">{countdown}</span>}
         </form>
       </section>
 

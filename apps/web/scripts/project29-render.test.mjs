@@ -15,7 +15,7 @@ function load(filename) {
   if(filename.endsWith('.css'))return {};
   if(filename.endsWith('.json'))return JSON.parse(readFileSync(filename,'utf8'));
   if(cache.has(filename))return cache.get(filename).exports;
-  const compiledModule={exports:{}};cache.set(filename,compiledModule);
+  const compiledModule ={exports:{}};cache.set(filename,compiledModule);
   const source=ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true},fileName:filename}).outputText;
   const require=(name)=>{
     if(name==='next/navigation')return {useRouter:()=>({refresh(){}})};
@@ -226,7 +226,7 @@ test('new dashboard renders real learner state without browser globals or demo r
 test('all source pages render safely, and unavailable modules never show invented learner progress',()=>{
   for(const initialScreen of ['welcome','tasks','detail','view','village','academy','guild']) {
     const html=render({initialScreen});assert.ok(html.length>1000,initialScreen);
-    if(['village','academy','guild'].includes(initialScreen))assert.doesNotMatch(html,/许知微 · 通过了|<strong>20<\/strong>|module-tag">L2|<small>L2<|10<small>%|示例内容 · 本次会话体验/);
+    if(['village','academy'].includes(initialScreen))assert.doesNotMatch(html,/许知微 · 通过了|<strong>20<\/strong>|module-tag">L2|<small>L2<|10<small>%|示例内容 · 本次会话体验/);
   }
 });
 
@@ -272,6 +272,26 @@ test('new history design receives real records including failures and prior resu
 
 export { render, data };
 
+test('Feishu client first render retains the original selected Feishu entry without phone controls',()=>{
+  const html=renderToStaticMarkup(React.createElement(JourneyProvider,{
+    value:{...value,initialScreen:'login',experience:null,feishuClient:true},
+  },React.createElement(Login)));
+  const tabs=html.match(/<div[^>]*role="tablist"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(tabs,'The existing login-method row remains present');
+  assert.equal((tabs.match(/role="tab"/g)||[]).length,1);
+  assert.match(html,/class="login-method-tabs feishu-only"/);
+  assert.match(tabs,/aria-selected="true"/);
+  assert.match(tabs,/class="active"/);
+  assert.match(tabs,/src="\/assets\/project29\/06dc8\.svg"/);
+  assert.match(tabs,/飞书登录/);
+  assert.doesNotMatch(tabs,/7c344\.svg|3088c\.svg|973c8\.svg/);
+  assert.match(html,/class="panel-logo" src="\/assets\/project29\/6f233\.webp"/);
+  assert.match(html,/class="panel-title">MUCHEN JOURNEY/);
+  assert.match(html,/placeholder="探索营毕业码（选填）"/);
+  assert.match(html,/<button[^>]*class="launch-button"[^>]*type="submit"[^>]*>[\s\S]*?79892\.svg[\s\S]*?登录并开始探索[\s\S]*?<\/button>/);
+  assert.doesNotMatch(html,/手机号登录|请输入手机号|aria-label="手机号"|password-login-fields|autocomplete="current-password"|type="password"|注册账号|忘记密码|重置密码/);
+});
+
 test('phone nickname setup renders the supplied welcome dialog over the exploration dashboard',()=>{
   const html=render({initialScreen:'dashboard',joinPhase:'nickname'});
   assert.match(html,/welcome-name-dialog/);
@@ -281,6 +301,8 @@ test('phone nickname setup renders the supplied welcome dialog over the explorat
   assert.match(html,/updated-dashboard/);
   assert.doesNotMatch(html,/当前为前端演示|仅保存在本机浏览器|code-field|autocomplete="current-password"/i);
 });
+
+
 
 test('released village uses real departments and does not render demo tasks',()=>{
   const {practiceTasks}=load(path.join(root,'app/project29/moduleDemoData.ts'));

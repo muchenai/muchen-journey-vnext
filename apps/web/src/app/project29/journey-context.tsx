@@ -9,6 +9,7 @@ export type JourneyContextValue = {
   initialScreen: "login" | "welcome" | "dashboard" | "tasks" | "detail" | "view" | "village" | "academy" | "guild";
   joinPhase: "invite" | "identity" | "feishu" | "nickname";
   joinError: string;
+  feishuClient?: boolean;
   initialNotice?: string;
 };
 

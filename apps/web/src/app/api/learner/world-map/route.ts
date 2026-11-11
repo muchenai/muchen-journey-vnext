@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { worldMapTaskBridge, worldMapSharedTaskBridge } from "@/app/project29/world-map-navigation"
-import { worldMapReadyBridge, worldMapVisibilityBridge } from "@/app/project29/world-map-loading"
+import { worldMapReadyBridge, worldMapVisibilityBridge, worldMapInstantResetBridge } from "@/app/project29/world-map-loading"
 
 export const dynamic = "force-dynamic"
 
@@ -15,7 +15,11 @@ export async function GET(request: Request) {
   // Keep the original black starfield and all bundled map geometry unchanged.
   const embedded = `<style nonce="${nonce}">
     .universe{height:100svh;min-height:0}
+    html[data-map-resetting] .universe,html[data-map-resetting] .universe *,html[data-map-resetting] .universe *::before,html[data-map-resetting] .universe *::after{transition:none!important;animation:none!important}
+    html[data-map-departing] .universe,html[data-map-departing] .universe *{visibility:hidden!important;pointer-events:none!important}
     .universe-coordinate,.universe-fineprint{display:none}
+    .planet-detail .detail-return[data-village-task-link]{justify-content:center;text-align:center;min-height:38px;padding:8px 14px;border:1px solid #6ff2ff;border-radius:6px;background:linear-gradient(90deg,#2ed3e9,#56e7f8);color:#07334c;font-size:12px!important;line-height:20px;letter-spacing:0;box-shadow:0 0 16px #31def56b,inset 0 1px 0 #ffffff2e;transition:background .18s,box-shadow .18s}
+    .planet-detail .detail-return[data-village-task-link]:hover{background:linear-gradient(90deg,#42dff2,#70efff);box-shadow:0 0 20px #31def580,inset 0 1px 0 #ffffff40}
     .map-fullscreen-intro{display:none;position:fixed;top:5%;left:4.6%;z-index:4;pointer-events:none;color:#eff6ff;font-family:Source Han Sans SC,Microsoft YaHei,sans-serif;text-shadow:0 2px 18px #02091c}
     :root:fullscreen .map-fullscreen-intro{display:block}
     .map-fullscreen-intro .eyebrow{font-size:9px;letter-spacing:3px;color:#9ab0c6}
@@ -42,8 +46,7 @@ export async function GET(request: Request) {
       catch{document.querySelector('.map-fullscreen-notice')?.remove();const notice=document.createElement('div');notice.className='map-fullscreen-notice';notice.setAttribute('role','alert');notice.textContent='浏览器暂不支持全屏，请使用桌面浏览器打开。';document.body.append(notice);setTimeout(()=>notice.remove(),4500)}
       finally{pending=false;sync()}
     },true);
-    addEventListener('message',event=>{if(event.source===parent&&event.data?.type==='journey-world-map-reset')document.querySelector('button[aria-label="重置视图"]')?.click()});
-  })();</script>`
+  })();${worldMapInstantResetBridge}</script>`
   const mode = new URL(request.url).searchParams.get("tasks")
   const taskNavigation = mode === "village" ? `<script nonce="${nonce}">${worldMapTaskBridge}</script>`
     : mode === "shared" ? `<script nonce="${nonce}">${worldMapSharedTaskBridge}${worldMapVisibilityBridge}</script>` : ""

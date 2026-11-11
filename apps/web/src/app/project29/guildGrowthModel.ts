@@ -60,7 +60,7 @@ export function guildSubmission(snapshot: GuildSnapshot, guildId: string, level:
 }
 export function guildTaskValidation(task: GuildTask, draft: Pick<GuildTaskDraft, "artifact" | "checks">) {
   if (draft.artifact.trim().length < 60 || draft.artifact.length > 6000) return "请填写 60～6,000 字的任务成果。";
-  if (draft.checks.length !== task.checks.length || !task.checks.every(item => draft.checks.includes(item))) return "请逐项完成任务成果自查。";
+  if (new Set(draft.checks).size !== draft.checks.length || draft.checks.some(item => !task.checks.includes(item))) return "成果记录已更新，请重新载入后再提交。";
   return "";
 }
 export function adaptGuildMedals(data: MedalResponse) {

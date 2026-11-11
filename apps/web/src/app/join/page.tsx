@@ -1,6 +1,7 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import ProjectExperience from "@/app/project29/App";
+import { isFeishuClient } from "@/lib/feishu-client-login";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,12 @@ export default async function JoinPage({
 }: {
   searchParams: Promise<{ code?: string; auth_error?: string; method?: string }>;
 }) {
-  const [query, cookieStore] = await Promise.all([searchParams, cookies()]);
+  const [query, cookieStore, requestHeaders] = await Promise.all([searchParams, cookies(), headers()]);
   const summary = parseSummary(cookieStore.get("journey_next_join_summary")?.value);
   return (
     <ProjectExperience
       initialScreen="login"
+      feishuClient={isFeishuClient(requestHeaders.get("user-agent") ?? "")}
       joinPhase={query.method === "invite" ? (summary ? "identity" : "invite") : "feishu"}
       joinError={query.auth_error ? ERRORS[query.auth_error] ?? "飞书登录失败，请重新尝试。" : query.code ? ERRORS[query.code] ?? "登录处理失败，请重试。" : ""}
     />

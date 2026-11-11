@@ -89,8 +89,8 @@ test('exploration task list returns to the retained dashboard without document o
     const firstModule = firstWrapper.props.children;
     assert.equal(firstModule.type, flow.ModuleHub);
     for (let pass = 0; pass < 2; pass++) {
-      const currentModule = find(tree, node => node.type === flow.ModuleHub);
-      currentModule.props.onExplorationMenu('tasks');
+      const moduleHub = find(tree, node => node.type === flow.ModuleHub);
+      moduleHub.props.onExplorationMenu('tasks');
       tree = flow.render();
       const wrapper = tree.props.children[0];
       assert.equal(wrapper.type, firstWrapper.type);
@@ -181,30 +181,64 @@ test('return navigation clears click ripples while ordinary in-page clicks retai
   }
 });
 
-function createModuleFlow(moduleName = 'dashboard') {
+function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, tasks = [] } = {}) {
   const slots = [];
   let cursor = 0;
+  let changed = false;
+  let layoutEffects = [];
+  let effects = [];
+  const attachedRefs = new Set();
   const calls = [];
+  const navigations = [];
+  const scrolls = [];
   const ModuleSidebar = () => null;
   const ModuleHeader = () => null;
   const DeliveryLab = () => null;
   const GuildGrowthPage = () => null;
+  const WorldMap = () => null;
+  const TaskClassifications = () => null;
   const component = () => null;
+  const loadedModels = new Map();
+  const loadModel = name => {
+    if (loadedModels.has(name)) return loadedModels.get(name);
+    const source = ts.transpileModule(readFileSync(new URL(`../src/app/project29/${name}.ts`, import.meta.url), 'utf8'),
+      { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const loaded = { exports: {} };
+    vm.runInNewContext(source, { module: loaded, exports: loaded.exports,
+      require: dependency => loadModel(dependency.replace(/^\.\//, '')) });
+    loadedModels.set(name, loaded.exports);
+    return loaded.exports;
+  };
+  const registerEffect = (queue, callback, dependencies) => {
+    if (!simulateEffects) return;
+    const index = cursor++;
+    const previous = slots[index];
+    if (!previous || !dependencies || dependencies.some((value, i) => !Object.is(value, previous[i]))) queue.push(callback);
+    slots[index] = dependencies;
+  };
   const dependencies = {
     react: {
       Fragment: Symbol.for('react.fragment'),
       useState(initial) {
         const index = cursor++;
         if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
-        return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
+        return [slots[index], value => {
+          const next = typeof value === 'function' ? value(slots[index]) : value;
+          changed ||= !Object.is(next, slots[index]);
+          slots[index] = next;
+        }];
       },
       useRef(initial) { return slots[cursor++] ??= { current: initial }; },
-      useCallback(callback) { return callback; }, useEffect() {}, useLayoutEffect() {},
+      useCallback(callback) { return callback; },
+      useEffect(callback, dependencies) { registerEffect(effects, callback, dependencies); },
+      useLayoutEffect(callback, dependencies) { registerEffect(layoutEffects, callback, dependencies); },
     },
-    './useVillageTasks': { isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available', useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
+    './useVillageTasks': { useVillageTasks: () => ({ tasks, loading: false, error: null }),
+      isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available' },
     './useCanvasScale': { useCanvasScale: () => 0.8 },
     './sharedAsset': { sharedAsset: path => path },
-    './taskDepartments': { filterDepartmentTasks: tasks => tasks, taskDepartmentName: name => name },
+    './taskDepartments': loadModel('taskDepartments'),
+    './villageTaskList': loadModel('villageTaskList'),
     './moduleDemoData': { moduleTitles: {} },
     './deliveryLabModel': { createDeliveryLabSession: () => ({ status: 'available', answers: {} }) },
     './DeliveryLab': { DeliveryLab },
@@ -214,25 +248,152 @@ function createModuleFlow(moduleName = 'dashboard') {
   for (const [file, names] of Object.entries({
     BadgeShop: ['BadgeShop'], TaskClassifications: ['TaskClassifications'], WelcomeNameDialog: ['WelcomeNameDialog'],
     ModuleShell: ['ModuleBorderProvider', 'ModuleHero', 'ModuleHeader', 'ModuleIcon', 'ModulePanel', 'ModuleSidebar', 'ModuleStatus'],
-    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'], JourneyDialogSurface: ['JourneyDialogSurface'],
+    VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], JourneyDialogSurface: ['JourneyDialogSurface'],
     AccountSwitchDialog: ['AccountSwitchDialog'], PersonalProfile: ['PersonalProfile'], WorldMap: ['WorldMap'],
     KnowledgeLibrary: ['KnowledgeLibrary'], FavoriteKnowledge: ['FavoriteKnowledge', 'KnowledgeSaveButton'],
     ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'],
+    VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'],
   })) dependencies[`./${file}`] = Object.fromEntries(names.map(name => [name, component]));
   Object.assign(dependencies['./ModuleShell'], { ModuleSidebar, ModuleHeader });
+  dependencies['./WorldMap'] = { WorldMap };
+  dependencies['./TaskClassifications'] = { TaskClassifications };
   const source = ts.transpileModule(readFileSync(new URL('../src/app/project29/ModuleHub.tsx', import.meta.url), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   const loaded = { exports: {} };
-  vm.runInNewContext(source, { module: loaded, exports: loaded.exports,
+  const timers = new Map();
+  let timerId = 0;
+  vm.runInNewContext(source, { module: loaded, exports: loaded.exports, URL, URLSearchParams, window: { location: { search: "", href: "https://journey.test/join" }, history: { replaceState() {} }, setTimeout(callback) { timers.set(++timerId, callback); return timerId; }, clearTimeout(id) { timers.delete(id); } },
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : nativeRequire(name) });
   const render = (active = true) => {
-    cursor = 0;
-    return loaded.exports.ModuleHub({ active, module: moduleName, identity: '真实学员', onNavigate() {},
-      onExplorationMenu: menu => calls.push(menu), decoration: null, activeNavigationDecoration: null,
-      idleNavigationDecoration: null, dashboardContent: 'retained-dashboard' });
+    for (let pass = 0; pass < 10; pass++) {
+      cursor = 0;
+      changed = false;
+      layoutEffects = [];
+      effects = [];
+      const tree = loaded.exports.ModuleHub({ active, module: moduleName, identity: '真实学员',
+        onNavigate: destination => navigations.push(destination),
+        onExplorationMenu: menu => calls.push(menu), decoration: null, activeNavigationDecoration: null,
+        idleNavigationDecoration: null, dashboardContent: 'retained-dashboard' });
+      if (!simulateEffects) return tree;
+      for (const ref of attachedRefs) ref.current = null;
+      attachedRefs.clear();
+      find(tree, node => {
+        const ref = node.props?.ref;
+        if (typeof node.type === 'string' && ref && typeof ref === 'object') {
+          ref.current = { offsetTop: node.props.className === 'module-listing' ? 600 : 100,
+            scrollTo: options => scrolls.push({ module: moduleName, ...options }), showModal() {}, close() {} };
+          attachedRefs.add(ref);
+        }
+        return false;
+      });
+      for (const effect of layoutEffects) effect();
+      for (const effect of effects) effect();
+      const pendingTimers = [...timers.values()];
+      timers.clear();
+      for (const callback of pendingTimers) callback();
+      if (!changed) return tree;
+    }
+    assert.fail('ModuleHub effects did not settle');
   };
-  return { render, calls, ModuleSidebar, ModuleHeader, DeliveryLab, GuildGrowthPage };
+  return { render, calls, navigations, scrolls, setModule(value) { moduleName = value; },
+    ModuleSidebar, ModuleHeader, DeliveryLab, GuildGrowthPage, WorldMap, TaskClassifications };
 }
+
+const mapTasks = [
+  { id: 'it', publishingDepartment: 'IT部', status: 'available' },
+  { id: 'multilingual', publishingDepartment: '多语种数据交付线', status: 'available' },
+  { id: 'quality', publishingDepartment: '高质量数据构建交付线', status: 'active' },
+].map(task => ({ title: task.id, description: '任务说明', category: '实践', level: '入门', review: '导师评审',
+  minutes: 20, experience: 50, rewardAllocations: [], ...task }));
+
+test('world map from academy and guild retains the department when returning to the village hall', () => {
+  for (const sourceModule of ['academy', 'guild']) {
+    for (const department of ['it', 'delivery']) {
+      const flow = createModuleFlow(sourceModule, { simulateEffects: true, tasks: mapTasks });
+      let tree = flow.render();
+      find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('map');
+      tree = flow.render();
+      find(tree, node => node.type === flow.ModuleHeader).props.onQuery('旧地图搜索');
+      tree = flow.render();
+      flow.scrolls.length = 0;
+      const map = find(tree, node => node.type === flow.WorldMap);
+      assert.equal(map.props.active, true);
+      map.props.onViewTasks(department);
+      assert.deepEqual(flow.navigations, ['village']);
+      tree = flow.render();
+      assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.menu, 'map',
+        'the source module must retain its map until the destination module renders');
+      assert.deepEqual(flow.scrolls, [], 'the source module must not consume the pending listing scroll');
+      flow.setModule('village');
+      tree = flow.render();
+      const filters = find(tree, node => node.type === flow.TaskClassifications);
+      assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.menu, 'hall');
+      assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.query, '');
+      assert.equal(filters.props.department, department);
+      assert.equal(filters.props.visibleCount, department === 'delivery' ? 2 : 1);
+      assert.deepEqual(flow.scrolls, [{ module: 'village', top: 476, behavior: 'auto' }]);
+      flow.render();
+      assert.equal(flow.scrolls.length, 1, 'the pending scroll is consumed exactly once');
+    }
+  }
+});
+
+test('world map within village clears stale task filters and keeps the selected department', () => {
+  const flow = createModuleFlow('village', { simulateEffects: true, tasks: mapTasks });
+  let tree = flow.render();
+  find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('mine');
+  tree = flow.render();
+  const oldFilters = find(tree, node => node.type === flow.TaskClassifications).props;
+  oldFilters.onDepartment('it');
+  oldFilters.onLevel('进阶');
+  oldFilters.onReview('自动校验');
+  oldFilters.onBadgeType('IT服务');
+  oldFilters.onStatus('returned');
+  find(tree, node => node.type === 'select' && node.props['aria-label'] === '排序方式').props.onChange({ target: { value: 'reward' } });
+  find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('map');
+  tree = flow.render();
+  find(tree, node => node.type === flow.ModuleHeader).props.onQuery('不匹配的旧搜索');
+  tree = flow.render();
+  flow.scrolls.length = 0;
+  find(tree, node => node.type === flow.WorldMap).props.onViewTasks('delivery');
+  tree = flow.render();
+  const filters = find(tree, node => node.type === flow.TaskClassifications).props;
+  assert.equal(filters.department, 'delivery');
+  assert.equal(filters.level, '全部');
+  assert.equal(filters.review, '全部');
+  assert.equal(filters.badgeType, '全部');
+  assert.equal(filters.visibleCount, 2);
+  assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.query, '');
+  assert.equal(find(tree, node => node.type === 'select' && node.props['aria-label'] === '排序方式').props.value, 'recommended');
+  assert.deepEqual(flow.navigations, []);
+  assert.deepEqual(flow.scrolls, [{ module: 'village', top: 476, behavior: 'auto' }]);
+  find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('mine');
+  tree = flow.render();
+  assert.equal(find(tree, node => node.type === flow.TaskClassifications).props.status, 'all');
+});
+
+test('world map task navigation stays unavailable in dashboard and does not leak a superseded department', () => {
+  const flow = createModuleFlow('academy', { simulateEffects: true, tasks: mapTasks });
+  let tree = flow.render();
+  find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('map');
+  tree = flow.render();
+  find(tree, node => node.type === flow.WorldMap).props.onViewTasks('delivery');
+  flow.setModule('dashboard');
+  tree = flow.render();
+  find(tree, node => node.type === flow.ModuleSidebar).props.onMenu('map');
+  tree = flow.render();
+  const dashboardMap = find(tree, node => node.type === flow.WorldMap);
+  assert.equal(dashboardMap.props.active, true);
+  assert.equal(dashboardMap.props.onViewTasks, undefined);
+  flow.scrolls.length = 0;
+  flow.setModule('village');
+  tree = flow.render();
+  const filters = find(tree, node => node.type === flow.TaskClassifications).props;
+  assert.equal(filters.department, 'all');
+  assert.equal(filters.visibleCount, 3);
+  assert.ok(flow.scrolls.every(scroll => scroll.top === 0), 'normal navigation must not reuse the old map listing scroll');
+  assert.deepEqual(flow.navigations, ['village']);
+});
 
 test('opening exploration tasks from a secondary section prepares the retained hall for return', () => {
   const { render, calls, ModuleSidebar, ModuleHeader } = createModuleFlow();

@@ -11,7 +11,7 @@ const { taskDepartments, belongsToDepartment, isTaskDepartmentFilter, taskDepart
 
 test("guild functional aggregate uses actual publishing departments and excludes all seven delivery lines", () => {
   assert.equal(isTaskDepartmentFilter("functional"), true);
-  assert.equal(taskDepartmentName("functional"), "综合职能工会");
+  assert.equal(taskDepartmentName("functional"), "综合职能公会");
   for (const department of taskDepartments) {
     const task = { publishingDepartment: department.name, category: "数据交付", rewardAllocations: [{id: "data", points: 10}] };
     assert.equal(belongsToDepartment(task, "functional"), !department.delivery);

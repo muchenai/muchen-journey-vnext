@@ -1,6 +1,7 @@
 import { BadgeShop, type BadgeTab } from "./BadgeShop"
 import { TaskClassifications } from "./TaskClassifications"
 import { filterDepartmentTasks, taskDepartmentName, type TaskDepartmentFilter } from "./taskDepartments"
+import { filterVillageTaskStatus, sortVillageTasks, type VillageTaskStatusFilter } from "./villageTaskList"
 import { useVillageTasks, isVillageTaskClaimed, type VillageTask, type VillageTaskCommand } from "./useVillageTasks"
 import { VillageTaskForm } from "./VillageTaskForm"
 import { VillageTaskMaterials } from "./VillageTaskMaterials"
@@ -85,14 +86,16 @@ export function ModuleHub({
   const practiceTasks = village.tasks
   const [menu, setMenu] = useState("hall")
   const [profileReturn, setProfileReturn] = useState("hall")
-  const [badgeEntryTab, setBadgeEntryTab] = useState<BadgeTab>("catalog")
+  const [badgeEntryTab, setBadgeEntryTab] = useState<BadgeTab>("shop")
+  const [badgeEntryVersion, setBadgeEntryVersion] = useState(0)
   const [accountSwitchOpen, setAccountSwitchOpen] = useState(false)
   const displayName = identity
   const [taskDepartment, setTaskDepartment] = useState<TaskDepartmentFilter>("all")
   const [taskLevel, setTaskLevel] = useState("全部")
   const [taskReview, setTaskReview] = useState("全部")
   const [taskBadgeType, setTaskBadgeType] = useState("全部")
-  const resetTaskFilters = () => {setTaskDepartment("all"); setTaskLevel("全部"); setTaskReview("全部"); setTaskBadgeType("全部"); setQuery("")}
+  const [taskStatusFilter, setTaskStatusFilter] = useState<VillageTaskStatusFilter>("all")
+  const resetTaskFilters = () => {setTaskDepartment("all"); setTaskLevel("全部"); setTaskReview("全部"); setTaskBadgeType("全部"); setTaskStatusFilter("all"); setQuery("")}
   const [filter, setFilter] = useState("全部")
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("recommended")
@@ -108,43 +111,55 @@ export function ModuleHub({
   const listing = useRef<HTMLDivElement>(null)
   const pageContent = useRef<HTMLDivElement>(null)
   const pendingMapTaskScroll = useRef(false)
+  const pendingMapTaskDepartment = useRef<TaskDepartmentFilter | null>(null)
   const pendingAcademyFavorites = useRef(false)
   const pendingVillageMenu = useRef<"hall" | "badges" | null>(null)
   const openMapDepartmentTasks = useCallback((department: TaskDepartmentFilter) => {
-    if (module !== "village") return
+    if (module !== "village") {
+      if (module !== "academy" && module !== "guild") return
+      pendingMapTaskDepartment.current = department
+      pendingVillageMenu.current = "hall"
+      onNavigate("village")
+      return
+    }
     setMenu("hall")
     setTaskDepartment(department)
     setTaskLevel("全部")
     setTaskReview("全部")
     setTaskBadgeType("全部")
+    setTaskStatusFilter("all")
     setQuery("")
     setFilter("全部")
     setSort("recommended")
     setDialog(null)
     setNotice("")
     pendingMapTaskScroll.current = true
-  }, [module, setQuery, setFilter])
+  }, [module, onNavigate, setQuery, setFilter])
   useLayoutEffect(() => {
-    if (menu !== "hall" || !pendingMapTaskScroll.current) return
+    if (module !== "village" || menu !== "hall" || !pendingMapTaskScroll.current || !listing.current || !pageContent.current) return
     pendingMapTaskScroll.current = false
-    if (listing.current && pageContent.current) pageContent.current.scrollTo({
+    pageContent.current.scrollTo({
       top: listing.current.offsetTop - pageContent.current.offsetTop - 24,
       behavior: "auto",
     })
-  }, [menu])
+  }, [module, menu, taskDepartment])
   useEffect(() => {
     const initial = window.setTimeout(() => {
+      const mapDepartment = module === "village" ? pendingMapTaskDepartment.current : null
+      pendingMapTaskDepartment.current = null
       setMenu(module === "village" && pendingVillageMenu.current ? pendingVillageMenu.current : module === "academy" && pendingAcademyFavorites.current ? "saved" : "hall")
-      if (!(module === "village" && pendingVillageMenu.current === "badges")) setBadgeEntryTab("catalog")
+      if (!(module === "village" && pendingVillageMenu.current === "badges")) setBadgeEntryTab("shop")
       pendingVillageMenu.current = null
       pendingAcademyFavorites.current = false
       resetTaskFilters()
+      if (mapDepartment) setTaskDepartment(mapDepartment)
+      pendingMapTaskScroll.current = mapDepartment !== null
       setFilter("全部")
       setQuery("")
       setSort("recommended")
       setDialog(null)
       setNotice("")
-      pageContent.current?.scrollTo({ top: 0 })
+      if (!mapDepartment) pageContent.current?.scrollTo({ top: 0 })
     }, 0)
     return () => window.clearTimeout(initial)
   }, [module])
@@ -184,6 +199,7 @@ export function ModuleHub({
   function openGuildVillage(next: "hall" | "badges", badgeTab: BadgeTab = "catalog") {
     pendingVillageMenu.current = module === "village" ? null : next
     setBadgeEntryTab(badgeTab)
+    if (next === "badges") setBadgeEntryVersion(version => version + 1)
     resetTaskFilters()
     setDialog(null)
     setNotice("")
@@ -214,13 +230,14 @@ export function ModuleHub({
     }
     if (["hall", "mine", "saved"].includes(next)) {
       setMenu(next)
+      setTaskStatusFilter("all")
       setFilter("全部")
       setQuery("")
       scrollToListing()
       return
     }
     if (next === "badges") {
-      setBadgeEntryTab("catalog"); setMenu("badges"); setQuery(""); pageContent.current?.scrollTo({top:0})
+      setBadgeEntryTab("shop"); setBadgeEntryVersion(version => version + 1); setMenu("badges"); setQuery(""); pageContent.current?.scrollTo({top:0})
 
     } else if (next === "lab") {
       info(
@@ -235,14 +252,10 @@ export function ModuleHub({
     }
   }
   const taskPool = practiceTasks.filter(t => menu !== "mine" || isVillageTaskClaimed(t))
-  const visibleTasks = filterDepartmentTasks(taskPool, taskDepartment, taskLevel, taskReview, query, taskBadgeType)
-    .sort((a, b) =>
-      sort === "duration"
-        ? a.minutes - b.minutes
-        : sort === "reward"
-          ? b.experience - a.experience
-          : 0,
-    )
+  const visibleTasks = sortVillageTasks(filterVillageTaskStatus(
+    filterDepartmentTasks(taskPool, taskDepartment, taskLevel, taskReview, query, taskBadgeType),
+    menu === "mine" ? taskStatusFilter : "all",
+  ), sort)
   const visibleCourses = academyCourses
     .filter(
       (c) =>
@@ -340,7 +353,7 @@ export function ModuleHub({
               }}
             />
             <div className="module-map-host" data-active={menu === "map"} aria-hidden={menu !== "map"} inert={menu !== "map"}>
-              <WorldMap active={active && menu === "map"} onViewTasks={module === "village" ? openMapDepartmentTasks : undefined} />
+              <WorldMap contextKey={module} active={active && menu === "map"} onViewTasks={module === "village" || module === "academy" || module === "guild" ? openMapDepartmentTasks : undefined} />
             </div>
             {module === "dashboard" && menu !== "profile" && menu !== "map" && menu !== "knowledge" ? (
               <div className="module-dashboard-content">{dashboardContent}</div>
@@ -374,7 +387,7 @@ export function ModuleHub({
                       onBrowse={() => navigateMenu("hall")} onClearSearch={() => setQuery("")} />
                   </div>
                 ) : module === "village" && menu === "badges" ? (
-                  <BadgeShop initialTab={badgeEntryTab} query={query} onTasks={() => {resetTaskFilters(); navigateMenu("hall")}} />
+                  <BadgeShop key={badgeEntryVersion} initialTab={badgeEntryTab} query={query} onTasks={() => {resetTaskFilters(); navigateMenu("hall")}} />
                 ) : module !== "guild" && module !== "dashboard" ? (
                   <>
                     <div className="module-page-heading">
@@ -499,6 +512,7 @@ export function ModuleHub({
                     <div ref={listing} className="module-listing">
                       <div className={`module-filterbar ${module === "village" ? "is-task-filter" : ""}`}>
                         {module === "village" ? <TaskClassifications tasks={taskPool} department={taskDepartment} level={taskLevel} review={taskReview} badgeType={taskBadgeType}
+                          status={menu === "mine" ? taskStatusFilter : undefined} onStatus={setTaskStatusFilter} visibleCount={visibleTasks.length}
                           onDepartment={setTaskDepartment} onLevel={setTaskLevel} onReview={setTaskReview} onBadgeType={setTaskBadgeType} onReset={resetTaskFilters} /> :
                           <div className="module-tabs" role="group" aria-label="课程分类">{["全部", "管理员外链", "平台视频", "员工共建"].map(category => <button key={category} className={filter === category ? "is-active" : ""} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category === "全部" ? "全部课程" : category}<span>{academyCourses.filter(c => category === "全部" || c.category === category).length}</span></button>)}</div>}
                         <label className="module-sort">
@@ -660,18 +674,18 @@ export function ModuleHub({
                         : !visibleCourses.length) && (
                         <ModulePanel className="module-empty">
                           <h3>
-                            {villageEnabled ? (menu === "mine" ? "还没有接取任务" : taskDepartment !== "all" && taskLevel === "全部" && taskReview === "全部" && taskBadgeType === "全部" && !query.trim() ? "该部门暂无已发布任务" : !practiceTasks.length ? "暂无已发布任务" : "未找到匹配内容") : "暂未开放"}
+                            {villageEnabled ? (menu === "mine" ? accepted.length ? "未找到符合筛选的任务" : "还没有接取任务" : taskDepartment !== "all" && taskLevel === "全部" && taskReview === "全部" && taskBadgeType === "全部" && !query.trim() ? "该部门暂无已发布任务" : !practiceTasks.length ? "暂无已发布任务" : "未找到匹配内容") : "暂未开放"}
                           </h3>
-                          <p>{villageEnabled ? (!practiceTasks.length ? "管理员发布新手村任务后，会在这里显示。" : "试试其他分类或清空搜索词。") : "该板块暂未开放。"}</p>
+                          <p>{villageEnabled ? (!practiceTasks.length ? "管理员发布新手村任务后，会在这里显示。" : menu === "mine" && accepted.length ? "试试其他状态或清空筛选条件。" : "试试其他分类或清空搜索词。") : "该板块暂未开放。"}</p>
                           <button
                             className="module-secondary"
                             onClick={() => {
-                              setMenu("hall")
+                              if (menu !== "mine" || !accepted.length) setMenu("hall")
                               setFilter("全部")
                               resetTaskFilters()
                             }}
                           >
-                            查看全部
+                            {menu === "mine" && accepted.length ? "清空筛选" : "查看全部"}
                           </button>
                         </ModulePanel>
                       )}

@@ -79,7 +79,7 @@ export function useGuildGrowth(identity: string, active = true) {
   }, [identity]);
   const join = useCallback(async (guildId: string) => {
     if (!currentData.current?.snapshot.halls.some(hall => hall.id === guildId)) return false;
-    return mutate({ command: "join", guildId }, "工会切换失败，请重试。");
+    return mutate({ command: "join", guildId }, "公会切换失败，请重试。");
   }, [mutate]);
   const saveTask = useCallback(async (guildId: string, level: 1 | 2 | 3, draft: GuildTaskDraft, submit: boolean) => {
     const snapshot = currentData.current?.snapshot;

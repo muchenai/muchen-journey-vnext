@@ -25,7 +25,7 @@ export function Medal({ badge, large = false, locked = false }: { badge: Badge; 
 
 export type BadgeTab = "catalog" | "shop" | "owned";
 
-export function BadgeShop({ query, onTasks, initialTab = "catalog" }: { query: string; onTasks: () => void; initialTab?: BadgeTab }) {
+export function BadgeShop({ query, onTasks, initialTab = "shop" }: { query: string; onTasks: () => void; initialTab?: BadgeTab }) {
   const [data, setData] = useState<MedalResponse | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,9 +125,9 @@ export function BadgeShop({ query, onTasks, initialTab = "catalog" }: { query: s
     <div className="badge-content-grid">
       <section className="badge-catalog" aria-label="徽章兑换">
         <div className="badge-tabs" role="group" aria-label="查看徽章">
-          <button className={tab === "catalog" ? "is-active" : ""} aria-pressed={tab === "catalog"} onClick={() => setTab("catalog")}>全部徽章 <span>{badgeCatalogEntries.length}</span></button>
           <button className={tab === "shop" ? "is-active" : ""} aria-pressed={tab === "shop"} onClick={() => setTab("shop")}>徽章商城 <span>{badges.filter(b => b.published).length}</span></button>
           <button className={tab === "owned" ? "is-active" : ""} aria-pressed={tab === "owned"} onClick={() => setTab("owned")}>已拥有徽章 <span>{wallet.owned.length}</span></button>
+          <button className={tab === "catalog" ? "is-active" : ""} aria-pressed={tab === "catalog"} onClick={() => setTab("catalog")}>全部徽章 <span>{badgeCatalogEntries.length}</span></button>
           <span className="badge-tabs-note">你的成长，由你点亮</span>
         </div>
         {tab === "catalog" ? <BadgeCatalogGallery wallet={wallet} badges={badges} query={query} onPublication={setSelected} /> : <>

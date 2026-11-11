@@ -2,6 +2,8 @@
 .module-page-content[data-guild-growth="true"] > .module-footer { display: none; }
 .guild-growth-page { display: flex; flex: 1; flex-direction: column; gap: 17px; min-height: 0; }
 .guild-growth-heading { display: flex; justify-content: space-between; align-items: center; flex: none; }
+.guild-growth-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+.guild-growth-heading-actions > button { flex: none; }
 .guild-growth-heading .module-eyebrow { font-size: 9px; letter-spacing: 2px; }
 .module-hub .guild-growth-heading h1 { font-size: 28px; margin-top: 4px; }
 .guild-session-label { color: var(--m-muted); font-size: 11px; border: 1px solid var(--m-border); padding: 6px 11px; border-radius: 5px; }
@@ -16,6 +18,7 @@
 .guild-growth-intro { flex: 1; min-width: 0; }
 .module-hub .guild-growth-intro h2 { font-size: 24px; font-weight: 500; white-space: nowrap; margin: 9px 0 10px; }
 .guild-growth-intro h2 > span { color: var(--m-cyan); }
+.guild-growth-page[data-view="arena"] .guild-growth-intro h2 { white-space: normal; }
 .guild-growth-intro > p { color: var(--m-muted); font-size: 11px; line-height: 1.95; }
 .guild-growth-numbers { display: flex; align-items: center; gap: 22px; border-left: 1px solid var(--m-border); padding-left: 25px; }
 .guild-growth-numbers > div { display: flex; flex-direction: column; gap: 7px; }
@@ -151,12 +154,21 @@
 .guild-task-deliverable > strong { color: var(--m-cyan); font-size: 10px; }
 .guild-task-mentor { color: var(--m-violet); font-size: 10px; margin-bottom: 12px; }
 .guild-cert-task fieldset { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+.guild-cert-task fieldset:has(textarea) { margin-bottom: 16px; }
 .guild-cert-task legend { color: var(--m-text); font-size: 12px; margin-bottom: 10px; }
 .guild-cert-task textarea { width: 100%; min-height: 170px; resize: vertical; border: 1px solid var(--m-border); border-radius: 6px; padding: 12px; background: var(--m-bg); color: var(--m-text); font: inherit; font-size: 12px; line-height: 1.9; }
 .guild-cert-task textarea::placeholder { color: var(--m-dim); }
 .guild-cert-task fieldset > label { display: flex; align-items: start; gap: 9px; margin-top: 10px; font-size: 11px; line-height: 1.8; color: var(--m-muted); }
 .guild-cert-task input { flex: none; margin-top: 3px; accent-color: var(--m-primary); }
 .guild-cert-task > small { display: block; margin-top: 12px; color: var(--m-dim); font-size: 9px; line-height: 1.9; }
+.guild-task-submission { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 18px; margin: 0; padding: 0; border: 0; border-radius: 0; }
+.guild-task-submission > .guild-task-save-state { grid-area: 1 / 1; min-width: 0; }
+.guild-task-submission > .guild-task-actions { grid-area: 1 / 2; justify-content: flex-end; margin: 0; gap: 12px; }
+.guild-task-submission > .guild-task-error, .guild-task-submission > small { grid-column: 1 / -1; }
+.guild-task-submission > small { display: block; margin: 0; color: var(--m-dim); font-size: 10px; line-height: 1.9; }
+.journey-dialog.guild-cert-dialog .guild-task-actions > .module-secondary { min-width: 104px; min-height: 40px; padding: 9px 16px; border-radius: 7px; font-size: 12px; }
+.journey-dialog.guild-cert-dialog .guild-task-actions > .module-secondary:last-child:not(:disabled) { color: var(--m-cyan); border-color: color-mix(in srgb, var(--m-cyan) 55%, var(--m-border)); background: color-mix(in srgb, var(--m-primary) 10%, var(--m-deep)); }
+.journey-dialog.guild-cert-dialog .guild-task-actions > .module-secondary:last-child:not(:disabled):hover { border-color: var(--m-cyan); background: color-mix(in srgb, var(--m-primary) 16%, var(--m-deep)); }
 .guild-cert-task .guild-task-error { color: var(--m-gold); padding: 9px 0; font-size: 11px; }
 
 .guild-review-status { font-size: 10px; color: var(--m-gold); white-space: nowrap; }
@@ -173,3 +185,7 @@
 .guild-task-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .guild-task-save-state { color: var(--m-muted); font-size: 10px; line-height: 1.8; }
 .guild-legacy-records { margin-top: 20px; }
+@media (max-width: 600px) {
+  .guild-task-submission { grid-template-columns: minmax(0, 1fr); }
+  .guild-task-submission > .guild-task-actions { grid-area: 2 / 1; justify-content: flex-start; }
+}

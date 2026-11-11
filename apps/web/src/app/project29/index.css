@@ -195,6 +195,8 @@ footer { display: flex; justify-content: space-between; gap: 1rem; color: #8fb3d
 .login-method-tabs button { position: relative; display: flex; align-items: center; justify-content: center; gap: 9.627px; flex: 1; min-width: 0; padding: 8px 4px; border: 1.375px solid transparent; border-radius: 12.378px; color: rgba(176,202,240,.62); font-weight: 700; font-size: clamp(12px, 1.05cqw, 18.567px); letter-spacing: .6877px; cursor: pointer; background: transparent; white-space: nowrap; }
 .login-method-tabs button[aria-selected="true"] { color: white; border-color: rgba(77,240,255,.55); background: linear-gradient(167.905deg, rgba(56,189,248,.32), rgba(64,207,251,.25) 50%, rgba(77,240,255,.18)); box-shadow: 0 0 19.255px rgba(77,240,255,.25); }
 .login-method-tabs img { flex-shrink: 0; }
+.login-method-tabs.feishu-only { justify-content: center; }
+.login-method-tabs.feishu-only button { flex: 0 1 50%; }
 .login-method-fields { position: relative; width: 100%; height: var(--login-fields-height); padding-top: 55px; }
 .login-method-fields.phone { padding-top: 31px; display: flex; flex-direction: column; gap: 22px; }
 .login-method-panel .code-field { position: relative; height: 54px; flex-shrink: 0; padding: 0 19px; border: 1.375px solid rgba(148,184,240,.28); border-radius: 13.753px; background: rgba(168,189,224,.22); backdrop-filter: blur(11.003px); }

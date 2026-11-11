@@ -26,7 +26,7 @@ export const taskDepartments = [
 ] as const;
 export type TaskDepartmentId = typeof taskDepartments[number]["id"];
 export type TaskDepartmentFilter = TaskDepartmentId | "all" | "delivery" | "functional";
-export const taskDepartmentName = (id: string) => id === "all" ? "全部部门" : id === "delivery" ? "交付线（全部）" : id === "functional" ? "综合职能工会" : taskDepartments.find(item => item.id === id)?.name || id;
+export const taskDepartmentName = (id: string) => id === "all" ? "全部部门" : id === "delivery" ? "交付线（全部）" : id === "functional" ? "综合职能公会" : taskDepartments.find(item => item.id === id)?.name || id;
 export function isTaskDepartmentFilter(id: string): id is TaskDepartmentFilter {
   return id === "all" || id === "delivery" || id === "functional" || taskDepartments.some(item => item.id === id);
 }

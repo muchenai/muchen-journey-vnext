@@ -98,8 +98,10 @@ def valid_submission(row):
     if row is None or row.status != "submitted" or row.submitted_at is None:
         return False
     definition = TASK_VERSIONS.get((row.task_id, row.task_version))
+    # New submissions do not require manual self-checks. Retain and validate any
+    # historical selections without manufacturing completed checks for learners.
     return bool(definition and definition["level"] == row.level and 60 <= len(row.artifact.strip()) <= 6000 and
-                len(row.checks) == len(definition["checks"]) and set(row.checks) == set(definition["checks"]))
+                len(row.checks) == len(set(row.checks)) and set(row.checks).issubset(definition["checks"]))
 
 
 def serialize_submission(row):
@@ -175,9 +177,9 @@ class GuildTaskSave(GuildJoin):
 
 def require_membership(session, actor, guild_id):
     if guild_id not in HALL_BY_ID:
-        fail("请选择有效的工会。", 422, "GUILD_INVALID")
+        fail("请选择有效的公会。", 422, "GUILD_INVALID")
     if not session.get(GuildMembership, (actor.organization_id, actor.id, guild_id)):
-        fail("请先加入该工会。")
+        fail("请先加入该公会。")
 
 
 def require_entry(session, actor, rows, level):
@@ -194,7 +196,7 @@ def require_entry(session, actor, rows, level):
 def join(command: GuildJoin, request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     if command.guildId not in HALL_BY_ID:
-        fail("请选择有效的工会。", 422, "GUILD_INVALID")
+        fail("请选择有效的公会。", 422, "GUILD_INVALID")
     lock_guild(session, actor.organization_id, actor.id)
     if not session.get(GuildMembership, (actor.organization_id, actor.id, command.guildId)):
         session.add(GuildMembership(organization_id=actor.organization_id, user_id=actor.id, guild_id=command.guildId))
@@ -220,9 +222,9 @@ def save_task(command: GuildTaskSave, request: Request, actor: Actor=Depends(get
     require_entry(session, actor, rows, command.level)
     definition = TASKS[command.level - 1]
     if len(set(command.checks)) != len(command.checks) or not set(command.checks).issubset(definition["checks"]):
-        fail("自查项不正确，请重新勾选。", 422, "GUILD_INVALID")
-    if command.submit and (len(command.artifact.strip()) < 60 or set(command.checks) != set(definition["checks"])):
-        fail("请填写 60 至 6000 字的成果，并完成全部三项自查。", 422, "GUILD_INVALID")
+        fail("历史自查记录格式不正确，请刷新后重试。", 422, "GUILD_INVALID")
+    if command.submit and len(command.artifact.strip()) < 60:
+        fail("请填写 60 至 6000 字的成果。", 422, "GUILD_INVALID")
     row = session.get(GuildTaskSubmission, submission_key(actor, command.guildId, command.level))
     if (row and command.expectedRevision != row.revision) or (not row and command.expectedRevision not in (None, 0)):
         fail("成果已在其他页面更新，请刷新后再保存。", 409, "GUILD_REVISION_CONFLICT")
@@ -251,7 +253,7 @@ def apply(command: GuildApply, request: Request, actor: Actor=Depends(get_learne
         # certifications must never be ambiguously assigned to a guild.
         if any(row.status == "pending" and row.level == command.level for row in rows):
             return envelope(request, learner_snapshot(session, actor))
-        fail("请先选择工会，再提交认证申请。")
+        fail("请先选择公会，再提交认证申请。")
     require_membership(session, actor, command.guildId)
     pending = next((row for row in rows if row.status == "pending"), None)
     if pending:
@@ -263,7 +265,7 @@ def apply(command: GuildApply, request: Request, actor: Actor=Depends(get_learne
     evidence = require_entry(session, actor, rows, command.level)
     submission = session.get(GuildTaskSubmission, submission_key(actor, command.guildId, command.level))
     if not valid_submission(submission):
-        fail("请先提交该阶段的任务成果并完成自查。")
+        fail("请先提交该阶段的任务成果。")
     if submission.revision != command.expectedRevision:
         fail("成果已在其他页面更新，请重新载入并核对成果后再申请认证。", 409, "GUILD_REVISION_CONFLICT")
     definition = TASK_VERSIONS[(submission.task_id, submission.task_version)]

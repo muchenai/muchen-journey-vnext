@@ -6,15 +6,16 @@ export function worldMapTaskDepartment(name: unknown): TaskDepartmentFilter | nu
   return taskDepartments.find(item => !item.delivery && item.name === name)?.id ?? null;
 }
 
-// Added only to the novice village's map document. The original map geometry
-// and its close/back interactions remain untouched for the other modules.
+// Enabled by the host for village, academy and guild maps; all task links target
+// the village. Exploration keeps the original map's close/back interactions.
 export const worldMapTaskBridge = `(()=>{
   const selector='.planet-detail .detail-return';
-  const label='查看相关任务 →';
+  const label='探索相关任务 →';
   let village=true;
   const sync=()=>{
     const button=document.querySelector(selector);
     const text=village?label:'返回地图';
+    if(button)button.toggleAttribute('data-village-task-link',village);
     if(button && button.textContent!==text)button.textContent=text;
   };
   addEventListener('message',event=>{
@@ -29,6 +30,9 @@ export const worldMapTaskBridge = `(()=>{
     const department=document.querySelector('#planet-detail-title')?.textContent?.trim();
     if(!department)return;
     event.preventDefault();event.stopImmediatePropagation();
+    // Preserve the chosen department, then reset this retained map synchronously
+    // at departure. Do not defer cleanup until another module opens the map.
+    document.dispatchEvent(new Event('journey-world-map-depart'));
     const navigate=()=>parent.postMessage({type:'journey-world-map-tasks',department},'*');
     if(document.fullscreenElement)document.exitFullscreen().then(navigate,navigate);
     else navigate();
