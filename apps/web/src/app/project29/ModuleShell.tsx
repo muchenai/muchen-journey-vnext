@@ -87,7 +87,7 @@ const sectionTitles: Record<ModuleDestination, string> = {
   dashboard: "探索营",
   village: "新手村",
   academy: "AI学院",
-  guild: "交付线工会",
+  guild: "交付线公会",
 }
 export function ModuleHeader({
   module,
@@ -188,7 +188,7 @@ export function ModuleSidebar({
               ["badges", "我的徽章", "a03b5"],
             ]
           : [
-              ["hall", "工会大厅", "8c48a"],
+              ["hall", "公会大厅", "8c48a"],
               ["certification", "能力地图", "a03b5"],
               ["lab", "模拟实验室", "eec40"],
             ]

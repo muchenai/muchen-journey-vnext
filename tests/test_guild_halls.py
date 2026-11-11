@@ -22,7 +22,7 @@ def join(user, guild="multilingual"):
 
 def save(user, *, guild="multilingual", level=1, artifact=ARTIFACT, checks=None, submit=True, revision=0):
     return post(user, "me/guild/tasks", dict(guildId=guild, level=level, artifact=artifact,
-        checks=TASKS[level - 1]["checks"] if checks is None else checks, submit=submit, expectedRevision=revision))
+        checks=[] if checks is None else checks, submit=submit, expectedRevision=revision))
 
 
 def apply(user, guild="multilingual", level=1):
@@ -45,9 +45,10 @@ def test_halls_catalog_join_selection_and_cross_account_persistence(users):
     assert other["joinedGuild"] is None and not any(hall["joined"] for hall in other["halls"])
 
 
-def test_draft_submit_require_real_badges_self_checks_and_correct_revision(users):
+def test_draft_submit_require_real_badges_valid_artifact_and_correct_revision(users):
     learner, _ = users
     assert save(learner, artifact="草稿", checks=[], submit=False).status_code == 409
+    assert save(learner).status_code == 409
     add_badge(learner)
     assert save(learner, guild="functional").status_code == 409
     draft = ok(save(learner, artifact="草稿", checks=[], submit=False))["submissions"][0]
@@ -56,13 +57,52 @@ def test_draft_submit_require_real_badges_self_checks_and_correct_revision(users
     assert save(learner, revision=0).status_code == 409
     assert save(learner, artifact="太短", revision=1).status_code == 422
     assert save(learner, artifact="字" * 6001, revision=1).status_code == 422
-    for checks in ([], TASKS[0]["checks"][:2], [TASKS[0]["checks"][0]] * 3, ["伪造"]):
+    for checks in ([TASKS[0]["checks"][0]] * 3, ["伪造"]):
         assert save(learner, checks=checks, revision=1).status_code == 422
     submitted = ok(save(learner, revision=1))
     assert submitted["submissions"][0]["revision"] == 2
+    assert submitted["submissions"][0]["checks"] == []
     assert submitted["requirements"][0]["eligible"] and submitted["requirements"][0]["taskSubmitted"]
     assert save(learner, level=2).status_code == 409
     assert post(learner, "me/guild/requests", {"level": 1, "expectedRevision": 1}).status_code == 409
+
+
+def test_unchecked_results_can_be_submitted_applied_and_reviewed_through_all_stages(users):
+    learner, staff = users
+    for level in (1, 2, 3):
+        # The previous stage alone does not replace the next real badge.
+        assert save(learner, level=level).status_code == 409
+        add_badge(learner, level)
+        before = ok(learner["client"].get("/api/v1/me/novice/wallet"))
+        if level < 3:
+            assert save(learner, level=level + 1).status_code == 409
+        submitted = ok(save(learner, level=level))
+        result = next(row for row in submitted["submissions"] if row["level"] == level)
+        assert result["checks"] == [] and result["status"] == "submitted"
+        assert submitted["level"] == level - 1
+        request = ok(apply(learner, level=level))["requests"][0]
+        assert request["status"] == "pending" and request["task"]["checks"] == []
+        listed = ok(staff["client"].get("/api/v1/review-admin/guild-requests"))["requests"][0]
+        assert listed["id"] == request["id"] and listed["task"]["artifact"] == ARTIFACT
+        assert listed["task"]["checks"] == []
+        assert snapshot(learner)["level"] == level - 1
+        ok(review(staff, request["id"]))
+        assert snapshot(learner)["level"] == level
+        assert ok(learner["client"].get("/api/v1/me/novice/wallet")) == before
+
+
+@pytest.mark.parametrize("previous_checks", [TASKS[0]["checks"], TASKS[0]["checks"][:2]])
+def test_historical_self_checks_remain_unchanged_in_drafts_requests_and_reviews(users, previous_checks):
+    learner, staff = users
+    add_badge(learner)
+    draft = ok(save(learner, checks=previous_checks, submit=False))["submissions"][0]
+    assert draft["checks"] == previous_checks
+    result = ok(save(learner, checks=draft["checks"], revision=draft["revision"]))["submissions"][0]
+    assert result["checks"] == previous_checks
+    request = ok(apply(learner))["requests"][0]
+    assert request["task"]["checks"] == previous_checks
+    ok(review(staff, request["id"]))
+    assert snapshot(learner)["requests"][0]["task"]["checks"] == previous_checks
 
 
 def test_independent_guild_requests_levels_and_immutable_artifact_snapshots(users):
@@ -137,14 +177,18 @@ def test_legacy_global_history_keeps_null_scope_and_remains_reviewable(users):
     assert snapshot(learner)["level"] == 1
 
 
-def test_review_revalidates_submitted_artifact_integrity(users):
+@pytest.mark.parametrize("changed_field", ["artifact", "checks"])
+def test_review_revalidates_submitted_artifact_integrity(users, changed_field):
     learner, staff = users
     add_badge(learner)
     ok(save(learner))
     request_id = ok(apply(learner))["requests"][0]["id"]
     with SessionLocal.begin() as session:
         row = session.get(GuildTaskSubmission, (learner["org"], learner["id"], "multilingual", 1))
-        row.artifact = ARTIFACT + "异常修改"
+        if changed_field == "artifact":
+            row.artifact = ARTIFACT + "异常修改"
+        else:
+            row.checks = TASKS[0]["checks"]
     assert review(staff, request_id).status_code == 409
     ok(review(staff, request_id, "returned", "请重新提交成果"))
 

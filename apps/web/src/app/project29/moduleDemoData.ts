@@ -2,7 +2,7 @@ export type ModuleName = "village" | "academy" | "guild"
 export const moduleTitles: Record<ModuleName, string> = {
   village: "新手村",
   academy: "AI 学院",
-  guild: "交付线工会",
+  guild: "交付线公会",
 }
 export type PracticeTask = {
   id: string

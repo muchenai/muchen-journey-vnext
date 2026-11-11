@@ -69,6 +69,7 @@ function createWelcomeFlow() {
     './useCanvasScale': { useCanvasScale: () => 1 },
     './sharedAsset': { sharedAsset: name => name },
     './taskDepartments': { filterDepartmentTasks: tasks => tasks, taskDepartmentName: name => name },
+    './villageTaskList': loadComponent('villageTaskList.ts', {}),
     './deliveryLabModel': { createDeliveryLabSession: () => ({ status: 'available', answers: {} }) },
     './moduleDemoData': { moduleTitles: { village: '新手村', academy: 'AI学院', guild: '交付线公会' } },
     '../actions': { saveLearnerNickname: async () => ({}) },

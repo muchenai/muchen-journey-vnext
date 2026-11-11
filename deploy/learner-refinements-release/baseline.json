@@ -1,0 +1,15 @@
+{
+  "schema_version": 3,
+  "base_candidate": "b1be86fb9dfb81e67fc58965417a0d86061a61d4",
+  "base_release": "/srv/journey-next-production/canary/releases/045d8b61a6b9c521091a34eb8d78e2eb367066a8-profile-growth",
+  "database": "journey_next_canary_20260901_c72fea5",
+  "migrations": {
+    "from": "0056_guild_halls",
+    "to": "0056_guild_halls"
+  },
+  "images": {
+    "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"
+  },
+  "old_images": {},
+  "base_web_candidate": "045d8b61a6b9c521091a34eb8d78e2eb367066a8"
+}

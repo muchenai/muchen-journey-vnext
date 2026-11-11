@@ -18,6 +18,9 @@
 .module-page-content[data-world-map="true"] > .module-footer { display: none; }
 .world-map-page { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .world-map-page .village-world-map, .world-map-page .village-world-map iframe { height: 100%; }
+.world-map-page .village-world-map iframe[data-prepared="false"] { visibility: hidden; }
+.world-map-page .village-world-map iframe[data-presented="false"] { pointer-events: none; }
+.world-map-presentation-cover { position: absolute; inset: 0; z-index: 1; background: #010204; }
 .world-map-intro {
   position: absolute;
   top: calc(108px + 4.5%);

@@ -1,14 +1,14 @@
 """Versioned project39 practice templates, not actual instructor publications."""
 
 HALLS = [
-    dict(id="multilingual", title="多语种数据交付线", type="交付线工会", description="让术语、语义与格式跨越语言准确对齐。", icon="ce04e"),
-    dict(id="agent-trajectories", title="Agent 交付与行为轨迹交付线", type="交付线工会", description="还原决策路径，交付可复核的行为轨迹。", icon="9aa97"),
-    dict(id="code-reasoning", title="代码推理交付线", type="交付线工会", description="验证推理、代码与测试证据的一致性。", icon="a6862"),
-    dict(id="quality-data", title="高质量数据构建交付线", type="交付线工会", description="从样本标准到质量闭环，夯实数据根基。", icon="a03b5"),
-    dict(id="multimodal", title="多模态数据交付线", type="交付线工会", description="连接图像、文本与标注，让信息彼此对齐。", icon="42cb2"),
-    dict(id="model-evaluation", title="通用模型测评交付线", type="交付线工会", description="以基准与证据，识别模型能力边界。", icon="d7bdc"),
-    dict(id="dialect-speech", title="方言语音交付线", type="交付线工会", description="守护乡音细节，完成可信的语音交付。", icon="eec40"),
-    dict(id="functional", title="综合职能工会", type="职能工会", description="面向运营、人才、财法、组织与项目协同的综合实践。", icon="8c48a"),
+    dict(id="multilingual", title="多语种数据交付线", type="交付线公会", description="让术语、语义与格式跨越语言准确对齐。", icon="ce04e"),
+    dict(id="agent-trajectories", title="Agent 交付与行为轨迹交付线", type="交付线公会", description="还原决策路径，交付可复核的行为轨迹。", icon="9aa97"),
+    dict(id="code-reasoning", title="代码推理交付线", type="交付线公会", description="验证推理、代码与测试证据的一致性。", icon="a6862"),
+    dict(id="quality-data", title="高质量数据构建交付线", type="交付线公会", description="从样本标准到质量闭环，夯实数据根基。", icon="a03b5"),
+    dict(id="multimodal", title="多模态数据交付线", type="交付线公会", description="连接图像、文本与标注，让信息彼此对齐。", icon="42cb2"),
+    dict(id="model-evaluation", title="通用模型测评交付线", type="交付线公会", description="以基准与证据，识别模型能力边界。", icon="d7bdc"),
+    dict(id="dialect-speech", title="方言语音交付线", type="交付线公会", description="守护乡音细节，完成可信的语音交付。", icon="eec40"),
+    dict(id="functional", title="综合职能公会", type="职能公会", description="面向运营、人才、财法、组织与项目协同的综合实践。", icon="8c48a"),
 ]
 HALL_BY_ID = {hall["id"]: hall for hall in HALLS}
 TASKS = [

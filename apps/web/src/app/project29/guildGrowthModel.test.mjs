@@ -27,12 +27,12 @@ const hallDefinitions = [
   ["multilingual", "多语种数据交付线"], ["agent-trajectories", "Agent 交付与行为轨迹交付线"],
   ["code-reasoning", "代码推理交付线"], ["quality-data", "高质量数据构建交付线"],
   ["multimodal", "多模态数据交付线"], ["model-evaluation", "通用模型测评交付线"],
-  ["dialect-speech", "方言语音交付线"], ["functional", "综合职能工会"],
+  ["dialect-speech", "方言语音交付线"], ["functional", "综合职能公会"],
 ];
 const hallIcons = ["ce04e", "9aa97", "a6862", "a03b5", "42cb2", "d7bdc", "eec40", "8c48a"];
 const taskTitles = ["需求澄清与验收边界", "质检返修与进度调整", "复杂交付变更与验收复盘"];
 const snapshot = (level = 0) => ({ joinedGuild: "multilingual", level, levelName: model.guildLevelNames[level],
-  halls: hallDefinitions.map(([id, title], index) => ({ id, title, type: index === 7 ? "职能工会" : "交付线工会", description: "真实工会进度", icon: hallIcons[index], joined: index === 0, level: index === 0 ? level : 0 })),
+  halls: hallDefinitions.map(([id, title], index) => ({ id, title, type: index === 7 ? "职能公会" : "交付线公会", description: "真实公会进度", icon: hallIcons[index], joined: index === 0, level: index === 0 ? level : 0 })),
   tasks: taskTitles.map((title, index) => ({ id: `task-${index + 1}`, level: index + 1, title, minutes: 60, difficulty: "进阶", brief: "服务端任务内容", deliverable: "交付实践方案", publicationStatus: "published", source: "project39-template", version: 1, checks: ["需求", "质量", "验收"] })),
   submissions: [], legacyRequests: [],
   requirements: [1, 2, 3].map(item => ({ level: item, grades: [1, 2, 3].slice(0, item), previousMet: level >= item - 1, eligible: item === level + 1, entryEligible: item === level + 1, taskSubmitted: item === level + 1, fulfilled: item, required: item })), requests: [] });
@@ -98,27 +98,79 @@ test("pending blocks duplicate applications and returned requests permit retry w
 });
 
 const nativeRequire = createRequire(import.meta.url);
-function renderGuild(state, view = "hall") {
+function guildPage(state, react = React) {
   const compiledModule = { exports: {} };
   const source = ts.transpileModule(readFileSync(new URL("./GuildGrowthPage.tsx", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const dependencies = {
+    react,
     "./ModuleShell": { ModulePanel: ({ children, className }) => React.createElement("section", { className }, children), ModuleIcon: ({ pack = "academy", file }) => React.createElement("img", { alt: "", "data-module-icon": file, src: load("./sharedAsset").sharedAsset(`/assets/project29/modules/${pack}/${file}.svg`) }) },
     "./JourneyDialogSurface": { JourneyDialogSurface: ({ children }) => React.createElement("div", null, children) },
     "./BadgeArtworkImage": { BadgeArtworkImage: () => null },
     "./BadgeShop": { Medal: () => null },
-    "./useGuildGrowth": { useGuildGrowth: () => state },
+    "./useGuildGrowth": { useGuildGrowth: () => typeof state === "function" ? state() : state },
     "./guildGrowthModel": model,
     "./badgeCatalog": load("./badgeCatalog"),
     "./badgeArtwork": load("./badgeArtwork"),
     "./guildGrowth.css": {},
   };
   vm.runInNewContext(source, { module: compiledModule, exports: compiledModule.exports, require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : nativeRequire(name) });
-  return renderToStaticMarkup(React.createElement(compiledModule.exports.GuildGrowthPage, { view, identity: "当前学员", query: "", onView() {}, onBadges() {}, onTasks() {}, onAcademy() {}, onLab() {} }));
+  return compiledModule.exports.GuildGrowthPage;
+}
+function renderGuild(state, view = "hall") {
+  return renderToStaticMarkup(React.createElement(guildPage(state), { view, identity: "当前学员", query: "", onView() {}, onBadges() {}, onTasks() {}, onAcademy() {}, onLab() {} }));
+}
+function elements(tree, predicate) {
+  const found = [];
+  const visit = node => {
+    if (Array.isArray(node)) return node.forEach(visit);
+    if (!React.isValidElement(node)) return;
+    if (predicate(node)) found.push(node);
+    visit(node.props.children);
+  };
+  visit(tree);
+  return found;
+}
+const hasClass = name => node => node.props.className?.split(/\s+/).includes(name);
+const textContent = tree => Array.isArray(tree) ? tree.map(textContent).join("") : React.isValidElement(tree) ? textContent(tree.props.children) : typeof tree === "string" || typeof tree === "number" ? String(tree) : "";
+const buttonNamed = (tree, name) => elements(tree, node => node.type === "button" && textContent(node) === name)[0];
+function pageHarness(initialState, view = "arena") {
+  const slots = [];
+  let cursor = 0;
+  const state = { ...initialState };
+  const views = [];
+  const fakeReact = {
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
+      return [slots[index], value => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
+    },
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index];
+    },
+    useEffect() {},
+    useLayoutEffect(effect) { layoutEffects.push(effect); },
+  };
+  const Page = guildPage(() => state, fakeReact);
+  return {
+    views,
+    render(patch = {}) {
+      Object.assign(state, patch);
+      cursor = 0;
+      return Page({ view, identity: "当前学员", query: "", onView: next => views.push(next), onBadges() {}, onAcademy() {}, onLab() {} });
+    },
+    openTask(index = 0) {
+      const card = elements(this.render(), hasClass("guild-arena-card"))[index];
+      elements(card, node => node.type === "button")[0].props.onClick();
+      return this.render();
+    },
+  };
 }
 test("initial render waits for the account response without a fabricated zero rank", () => {
   const html = renderGuild({ snapshot: null, account: null, error: "", busy: false, refreshing: true, refresh() {} });
   assert.match(html, /正在读取你的公会认证和徽章凭证/);
-  assert.doesNotMatch(html, /GUILD LEVEL|<strong>L0<\/strong>|尚未提交工会认证申请/);
+  assert.doesNotMatch(html, /GUILD LEVEL|<strong>L0<\/strong>|尚未提交公会认证申请/);
   const failed = renderGuild({ snapshot: null, account: null, error: "暂时无法连接", busy: false, refreshing: false, refresh() {} });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /重新读取/);
@@ -158,7 +210,7 @@ test("guild join selection never inherits the old global rank or another guild a
 test("task drafts and submissions are keyed by both guild and stage", () => {
   const state = snapshot();
   state.submissions = [
-    { guildId: "functional", level: 1, taskId: "same-task", artifact: "职能工会成果", revision: 4 },
+    { guildId: "functional", level: 1, taskId: "same-task", artifact: "职能公会成果", revision: 4 },
     { guildId: "multilingual", level: 2, taskId: "same-task", artifact: "多语种阶段二", revision: 2 },
     { guildId: "multilingual", level: 1, taskId: "same-task", artifact: "多语种阶段一", revision: 1 },
   ];
@@ -169,16 +221,18 @@ test("task drafts and submissions are keyed by both guild and stage", () => {
   assert.notEqual(model.guildTaskScope("multilingual", 1), model.guildTaskScope("multilingual", 2));
 });
 
-test("task completion requires 60 to 6000 characters and every server-defined checklist item", () => {
+test("task completion validates length and accepts empty or partial legacy checks without inventing them", () => {
   const task = snapshot().tasks[0];
-  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(59), checks: task.checks }));
-  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: task.checks }), "");
-  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(6000), checks: task.checks }), "");
-  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(6001), checks: task.checks }));
-  assert.ok(model.guildTaskValidation(task, { artifact: " ".repeat(60), checks: task.checks }));
-  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: task.checks.slice(1) }));
+  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(59), checks: [] }));
+  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: [] }), "");
+  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(6000), checks: [] }), "");
+  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(6001), checks: [] }));
+  assert.ok(model.guildTaskValidation(task, { artifact: " ".repeat(60), checks: [] }));
+  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: task.checks.slice(1) }), "");
   task.checks.push("新的服务端要求");
-  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: ["需求", "质量", "验收"] }));
+  assert.equal(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: ["需求", "质量", "验收"] }), "");
+  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: ["需求", "需求"] }));
+  assert.ok(model.guildTaskValidation(task, { artifact: "证".repeat(60), checks: ["伪造自查项"] }));
 });
 
 const renderState = state => ({ snapshot: state, account: economy.adaptMedals({ medals: [], redemptions: [], wallet: { badgeBalances: {} } }), error: "", busy: false, refreshing: false, refresh() {} });
@@ -190,8 +244,8 @@ test("hall renders eight selectable guilds and independent joined progress", () 
   assert.equal((html.match(/class="guild-hall-card/g) || []).length, 8);
   hallDefinitions.forEach(([, title]) => assert.ok(html.includes(title)));
   assert.match(html, /已加入 · 协同攻坚/);
-  assert.match(html, /切换回该工会/);
-  assert.match(html, /当前工会 · 待启用/);
+  assert.match(html, /切换回该公会/);
+  assert.match(html, /当前公会 · 待启用/);
   assert.doesNotMatch(html, /刷新或切换登录会清除/);
 });
 
@@ -201,6 +255,89 @@ test("arena uses backend task templates and never claims a fictional mentor publ
   assert.match(html, /认证任务模板/);
   assert.match(html, /管理员审核/);
   assert.doesNotMatch(html, /导师已发布|前端样例|确认进入下一阶段|会话演示/);
+});
+
+test("arena puts the selected guild in the hero and switching in the page heading without changing hall ranks", () => {
+  const harness = pageHarness(renderState(snapshot(1)));
+  const tree = harness.render();
+  const heading = elements(tree, hasClass("guild-growth-heading"))[0];
+  const hero = elements(tree, hasClass("guild-growth-hero"))[0];
+  assert.equal(textContent(elements(hero, node => node.type === "h2")[0]), "当前公会 · 多语种数据交付线");
+  assert.doesNotMatch(textContent(hero), /让每一次进阶/);
+  assert.equal(elements(tree, hasClass("guild-arena-heading")).length, 0);
+  assert.equal(elements(tree, node => node.type === "button" && textContent(node) === "切换公会").length, 1);
+  buttonNamed(heading, "切换公会").props.onClick();
+  assert.deepEqual(harness.views, ["hall"]);
+  const cards = elements(tree, hasClass("guild-arena-card"));
+  assert.equal(cards.length, 3);
+  for (const [index, rank] of ["见习成员", "正式成员", "公会骨干"].entries()) {
+    assert.equal(textContent(elements(cards[index], hasClass("module-eyebrow"))[0]), `G${index + 1}`);
+    assert.equal(textContent(elements(cards[index], hasClass("guild-arena-rank"))[0]), rank);
+  }
+  const hall = pageHarness(renderState(snapshot(1)), "hall").render();
+  assert.match(textContent(elements(hall, hasClass("guild-growth-hero"))[0]), /让每一次进阶/);
+  assert.equal(buttonNamed(elements(hall, hasClass("guild-growth-heading"))[0], "切换公会"), undefined);
+  assert.equal(model.guildStageNames[1], "规范实践");
+  assert.equal(model.guildLevelNames[1], "基础实践者");
+});
+
+test("an unjoined arena keeps its guild selection prompt", () => {
+  const state = snapshot();
+  state.joinedGuild = null;
+  state.halls.forEach(hall => { hall.joined = false; });
+  const harness = pageHarness(renderState(state));
+  const tree = harness.render();
+  const heading = elements(tree, hasClass("guild-arena-heading"))[0];
+  assert.match(textContent(heading), /请先加入公会/);
+  buttonNamed(heading, "去选择公会").props.onClick();
+  assert.deepEqual(harness.views, ["hall"]);
+});
+
+test("the task dialog submits text with empty checks and allows the saved revision to be applied without checkboxes", async () => {
+  const state = snapshot();
+  state.requirements[0] = { ...state.requirements[0], eligible: false, taskSubmitted: false };
+  const saves = [], applications = [];
+  const harness = pageHarness({ ...renderState(state),
+    async saveTask(guildId, level, draft, submit) { saves.push({ guildId, level, draft, submit }); return true; },
+    async submit(...args) { applications.push(args); return false; },
+  });
+  let tree = harness.openTask();
+  assert.equal(elements(tree, node => node.type === "input" && node.props.type === "checkbox").length, 0);
+  assert.equal(elements(tree, node => node.type === "fieldset")[0].props.disabled, false);
+  assert.equal(buttonNamed(tree, "提交认证申请").props.disabled, true);
+  const artifact = "真实认证任务成果".repeat(10);
+  elements(tree, node => node.type === "textarea")[0].props.onChange({ target: { value: artifact } });
+  tree = harness.render();
+  await buttonNamed(tree, "提交任务成果").props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].draft.artifact, artifact);
+  assert.deepEqual(Array.from(saves[0].draft.checks), []);
+  assert.equal(saves[0].draft.revision, 0);
+  assert.equal(saves[0].submit, true);
+  const submitted = { ...state,
+    requirements: state.requirements.map(row => row.level === 1 ? { ...row, eligible: true, taskSubmitted: true } : row),
+    submissions: [{ guildId: "multilingual", level: 1, taskId: "task-1", artifact, checks: [], status: "submitted", revision: 3 }],
+  };
+  tree = harness.render({ snapshot: submitted });
+  assert.equal(buttonNamed(tree, "提交认证申请").props.disabled, false);
+  await buttonNamed(tree, "提交认证申请").props.onClick();
+  assert.deepEqual(applications, [["multilingual", 1, 3]]);
+  elements(tree, node => node.type === "textarea")[0].props.onChange({ target: { value: `${artifact}补充说明` } });
+  tree = harness.render();
+  assert.equal(buttonNamed(tree, "提交认证申请").props.disabled, true, "Edited evidence must be submitted again");
+  assert.equal(elements(tree, node => node.type === "input" && node.props.type === "checkbox").length, 0);
+});
+
+test("removing checklist UI does not unlock tasks or applications without badge entry eligibility", () => {
+  const state = snapshot();
+  state.requirements[0] = { ...state.requirements[0], eligible: false, entryEligible: false, taskSubmitted: false, fulfilled: 0 };
+  const tree = pageHarness(renderState(state)).openTask();
+  assert.equal(elements(tree, node => node.type === "fieldset")[0].props.disabled, true);
+  assert.equal(buttonNamed(tree, "保存草稿").props.disabled, true);
+  assert.equal(buttonNamed(tree, "提交任务成果").props.disabled, true);
+  assert.equal(buttonNamed(tree, "提交认证申请").props.disabled, true);
+  assert.match(textContent(tree), /徽章条件尚未满足/);
 });
 
 test("legacy approvals stay in a separate global history and do not certify the selected guild", () => {
@@ -288,6 +425,20 @@ test("a pending save keeps its explicit guild, stage and revision and blocks a c
   assert.equal(harness.render().snapshot.joinedGuild, "multilingual");
 });
 
+test("task submission sends empty checks unchanged while retaining badge and stage gates", async () => {
+  const state = snapshot();
+  const harness = hookHarness(state);
+  await harness.render().refresh();
+  const draft = { artifact: "证".repeat(60), checks: [], revision: 2 };
+  assert.equal(await harness.render().saveTask("multilingual", 1, draft, true), true);
+  assert.deepEqual(harness.posts[0], { command: "task", guildId: "multilingual", level: 1,
+    artifact: draft.artifact, checks: [], expectedRevision: 2, submit: true });
+  state.requirements[0].entryEligible = false;
+  assert.equal(await harness.render().saveTask("multilingual", 1, draft, true), false);
+  assert.equal(await harness.render().saveTask("multilingual", 2, draft, true), false);
+  assert.equal(harness.posts.length, 1);
+});
+
 test("an old account mutation response never populates the next account", async () => {
   const harness = hookHarness(snapshot());
   await harness.render().refresh();
@@ -316,16 +467,16 @@ test("all eight guild card icons resolve to existing shared SVG resources", () =
 });
 
 
-test("certification applies with the exact submitted task revision the learner confirmed", async () => {
+test("certification applies with the exact submitted task revision and no checklist requirement", async () => {
   const state = snapshot();
-  state.submissions = [{ guildId: "multilingual", level: 1, taskId: "task-1", artifact: "证".repeat(60), checks: state.tasks[0].checks, status: "submitted", revision: 4 }];
+  state.submissions = [{ guildId: "multilingual", level: 1, taskId: "task-1", artifact: "证".repeat(60), checks: [], status: "submitted", revision: 4 }];
   const harness = hookHarness(state);
   await harness.render().refresh();
   assert.equal(await harness.render().submit("multilingual", 1, 4), true);
   assert.deepEqual(harness.posts[0], { command: "apply", guildId: "multilingual", level: 1, expectedRevision: 4 });
 });
 
-test("a stale confirmation cannot apply a newer task revision or a draft", async () => {
+test("a stale application cannot apply a newer task revision or a draft", async () => {
   const state = snapshot();
   state.submissions = [{ guildId: "multilingual", level: 1, taskId: "task-1", artifact: "证".repeat(60), checks: state.tasks[0].checks, status: "submitted", revision: 5 }];
   const harness = hookHarness(state);

@@ -10,7 +10,7 @@
 .task-department-options small { color: var(--m-dim); font-size: 10px; min-width: 12px; }
 .module-hub .task-department-options button.is-active { color: var(--m-cyan); border-color: var(--m-stroke); background: var(--m-raised); }
 .task-department-options button.is-active small { color: var(--m-cyan); }
-.task-secondary-filters { display: flex; align-items: center; gap: 30px; border-top: 1px solid var(--m-border); padding-top: 17px; margin-top: 20px; font-size: 11px; color: var(--m-muted); }
+.task-secondary-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; border-top: 1px solid var(--m-border); padding-top: 17px; margin-top: 20px; font-size: 11px; color: var(--m-muted); }
 .task-level-options { display: flex; align-items: center; gap: 8px; }
 .task-level-options > span { margin-right: 6px; }
 .module-hub .task-level-options button { padding: 5px 11px; border-radius: 5px; border: 1px solid transparent; color: var(--m-muted); white-space: nowrap; }

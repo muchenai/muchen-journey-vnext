@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     if (Buffer.byteLength(raw) > 30000) return reply({ error: "提交内容过长。" }, 413);
     let body;
     try { body = JSON.parse(raw); } catch { return reply({ error: "请求格式不正确。" }, 400); }
-    if (!body || Array.isArray(body) || !guildIds.has(body.guildId)) return reply({ error: "请选择有效的工会。" }, 400);
+    if (!body || Array.isArray(body) || !guildIds.has(body.guildId)) return reply({ error: "请选择有效的公会。" }, 400);
     let endpoint: string;
     let payload: Record<string, unknown> = { guildId: body.guildId };
     if (body.command === "join") {
