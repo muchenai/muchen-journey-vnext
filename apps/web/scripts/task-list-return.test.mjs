@@ -47,6 +47,7 @@ function createFlow(initialScreen = 'dashboard') {
     'next/navigation': { useRouter: () => ({ refresh() { calls.refresh += 1; }, push() { calls.push += 1; } }) },
     './index.css': {}, './loader.css': {}, './retained-controls.css': {},
     '@/lib/text-length': {}, '@/lib/feishu-client-login': {}, '../actions': {},
+    '@/lib/phone-password-validation': {}, '../project-ui/PhonePasswordField': { PhonePasswordField: component },
     './ExecutionPages': { ExecutionDetail: component, ExecutionView: component, TaskCards: component,
       executionTasks: [{ id: 'first', label: '探索启航' }] },
     './UpdatedDashboard': { UpdatedDashboard: component },
@@ -193,6 +194,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
   const scrolls = [];
   const ModuleSidebar = () => null;
   const ModuleHeader = () => null;
+  const DashboardSearchProvider = () => null;
   const DeliveryLab = () => null;
   const GuildGrowthPage = () => null;
   const WorldMap = () => null;
@@ -243,6 +245,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
     './deliveryLabModel': { createDeliveryLabSession: () => ({ status: 'available', answers: {} }) },
     './DeliveryLab': { DeliveryLab },
     './GuildGrowthPage': { GuildGrowthPage },
+    './dashboardSearch': { DashboardSearchProvider },
     '../actions': {}, './favoriteKnowledge.css': {}, './moduleHub.css': {},
   };
   for (const [file, names] of Object.entries({
@@ -296,7 +299,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
     assert.fail('ModuleHub effects did not settle');
   };
   return { render, calls, navigations, scrolls, setModule(value) { moduleName = value; },
-    ModuleSidebar, ModuleHeader, DeliveryLab, GuildGrowthPage, WorldMap, TaskClassifications };
+    ModuleSidebar, ModuleHeader, DashboardSearchProvider, DeliveryLab, GuildGrowthPage, WorldMap, TaskClassifications };
 }
 
 const mapTasks = [
@@ -396,7 +399,7 @@ test('world map task navigation stays unavailable in dashboard and does not leak
 });
 
 test('opening exploration tasks from a secondary section prepares the retained hall for return', () => {
-  const { render, calls, ModuleSidebar, ModuleHeader } = createModuleFlow();
+  const { render, calls, ModuleSidebar, ModuleHeader, DashboardSearchProvider } = createModuleFlow();
   for (const section of ['map', 'knowledge', 'profile']) {
     let tree = render();
     if (section === 'profile') find(tree, node => node.type === ModuleHeader).props.onProfile();
@@ -410,9 +413,48 @@ test('opening exploration tasks from a secondary section prepares the retained h
     tree = render(true);
     assert.equal(find(tree, node => node.type === ModuleSidebar).props.activeMenu, 'hall');
     assert.equal(find(tree, node => node.type === ModuleHeader).props.query, '');
-    assert.equal(find(tree, node => node.props?.className === 'module-dashboard-content').props.children, 'retained-dashboard');
+    const dashboard = find(tree, node => node.props?.className === 'module-dashboard-content');
+    assert.equal(dashboard.props.children.type, DashboardSearchProvider);
+    assert.equal(dashboard.props.children.props.children, 'retained-dashboard');
+    assert.equal(dashboard.props.children.props.query, '');
   }
   assert.deepEqual(calls, ['tasks', 'tasks', 'tasks']);
+});
+
+test('exploration header search reaches the retained dashboard and clear resets the same header query', () => {
+  const { render, ModuleHeader, DashboardSearchProvider } = createModuleFlow();
+  let tree = render();
+  find(tree, node => node.type === ModuleHeader).props.onQuery('  规则  ');
+  tree = render();
+  const provider = find(tree, node => node.type === DashboardSearchProvider);
+  assert.equal(provider.props.query, '  规则  ');
+  assert.equal(provider.props.children, 'retained-dashboard');
+  assert.equal(find(tree, node => node.type === ModuleHeader).props.query, '  规则  ');
+  provider.props.onClearSearch();
+  tree = render();
+  assert.equal(find(tree, node => node.type === ModuleHeader).props.query, '');
+  assert.equal(find(tree, node => node.type === DashboardSearchProvider).props.query, '');
+  assert.equal(find(tree, node => node.type === DashboardSearchProvider).props.children, 'retained-dashboard');
+});
+
+test('switching modules hides the previous search before any reset effect can run', () => {
+  for (const source of ['academy', 'guild', 'village']) {
+    const flow = createModuleFlow(source);
+    let tree = flow.render();
+    find(tree, node => node.type === flow.ModuleHeader).props.onQuery('上一板块的搜索');
+    tree = flow.render();
+    assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.query, '上一板块的搜索');
+    flow.setModule('dashboard');
+    tree = flow.render();
+    assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.query, '', 'The destination header must be clear on its first render');
+    assert.equal(find(tree, node => node.type === flow.DashboardSearchProvider).props.query, '', 'The first dashboard render must not briefly show the source module results');
+    find(tree, node => node.type === flow.ModuleHeader).props.onQuery('规则');
+    tree = flow.render();
+    assert.equal(find(tree, node => node.type === flow.DashboardSearchProvider).props.query, '规则');
+    flow.setModule(source);
+    tree = flow.render();
+    assert.equal(find(tree, node => node.type === flow.ModuleHeader).props.query, '', 'Dashboard searches must not leak to another module');
+  }
 });
 
 test('guild lab is available to real learners and retains search and work across hall navigation', () => {

@@ -213,6 +213,22 @@ const value={initialScreen:'dashboard',learnerName:'真实姓名',experience:dat
 const inside=(component,experience=data)=>renderToStaticMarkup(React.createElement(JourneyProvider,{value:{...value,experience}},component));
 const render=(props={})=>renderToStaticMarkup(React.createElement(App,{...value,...props}));
 
+test('exploration progress uses the same real count as its label on the first server render',()=>{
+  for(const completedStages of [0,1,4,8]) {
+    const html=render({experience:{...data,completedStages}});
+    const progress=html.match(/<progress\b[^>]*class="dashboard-exploration-progress"[^>]*>/)?.[0];
+    assert.ok(progress);
+    assert.ok(progress.includes(`value="${completedStages}"`));
+    assert.ok(progress.includes('max="8"'));
+    assert.ok(progress.includes(`aria-valuetext="${completedStages}/8 项已完成"`));
+    assert.match(html,new RegExp(`data-node-id="4062:590">${completedStages}/8<`));
+    assert.doesNotMatch(progress,/style=/);
+    assert.doesNotMatch(html,/w-\[72\.472px\]|data-node-id="4062:588"/);
+  }
+  const empty=render({experience:null});
+  assert.match(empty,/<progress\b[^>]*class="dashboard-exploration-progress"[^>]*value="0"[^>]*max="8"/);
+});
+
 test('new dashboard renders real learner state without browser globals or demo review controls',()=>{
   const html=render();
   assert.match(html,/updated-dashboard/);assert.match(html,/真实姓名/);

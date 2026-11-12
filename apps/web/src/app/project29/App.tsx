@@ -6,6 +6,8 @@ import "./retained-controls.css";
 import { FormEvent, MouseEvent, useState, useEffect, useId, useRef, useLayoutEffect, useCallback, CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { phonePasswordError, confirmPhonePasswordError } from "@/lib/phone-password-validation";
+import { PhonePasswordField } from "../project-ui/PhonePasswordField";
 import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/lib/feishu-client-login";
 import { ExecutionDetail, ExecutionView, TaskCards, executionTasks } from "./ExecutionPages";
 import { UpdatedDashboard } from "./UpdatedDashboard";
@@ -363,6 +365,10 @@ export function Login() {
   const [passwordPhone, setPasswordPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [validatePasswords, setValidatePasswords] = useState(false)
+  const passwordLabel = phoneMode === 'reset' ? '新密码' : '密码'
+  const passwordError = phonePasswordError(password, passwordLabel)
+  const confirmPasswordError = confirmPhonePasswordError(confirmPassword, password, passwordLabel)
   const [smsCode, setSmsCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -383,6 +389,7 @@ export function Login() {
   const switchPhoneMode = (mode: 'login' | 'register' | 'reset') => {
     if (phoneRequestInFlight.current) return;
     setPhoneMode(mode);
+    setValidatePasswords(false);
     setPassword('');
     setConfirmPassword('');
     setSmsCode('');
@@ -458,10 +465,10 @@ export function Login() {
     }
     if (joinPhase === 'feishu' && loginMode === 'password') {
       if (phoneRequestInFlight.current) return;
+      setValidatePasswords(true);
       if (!/^1[3-9]\d{9}$/.test(passwordPhone)) { setMessage('请输入正确的手机号'); return; }
-      if (password.length < 6 || password.length > 11 || /\s/.test(password)) { setMessage('密码需为 6–11 个字符，且不能包含空格'); return; }
+      if (passwordError || (phoneMode !== 'login' && confirmPasswordError)) { setMessage(''); return; }
       if (phoneMode !== 'login' && !/^\d{6}$/.test(smsCode)) { setMessage('请输入收到的 6 位短信验证码'); return; }
-      if (phoneMode !== 'login' && password !== confirmPassword) { setMessage('两次输入的密码不一致，请重新确认'); return; }
       phoneRequestInFlight.current = true;
       setIsLaunched(true);
       setMessage(phoneMode === 'reset' ? '正在重置密码…' : phoneMode === 'register' ? '正在验证并注册…' : '正在验证你的探索身份…');
@@ -470,6 +477,7 @@ export function Login() {
           const result = await resetPhonePassword(passwordPhone, smsCode, password);
           if (result.ok) {
             setPhoneMode('login');
+            setValidatePasswords(false);
             setPassword('');
             setConfirmPassword('');
             setSmsCode('');
@@ -587,14 +595,19 @@ export function Login() {
               </label>
               <button className="otp-button" type="button" disabled={isLaunched || sendingCode || smsCountdown > 0} onClick={sendCode}>{sendingCode ? '正在发送…' : smsCountdown > 0 ? `${smsCountdown} 秒后重发` : '获取验证码'}</button>
             </div>}
-            <label className={`password-input-row ${password ? 'filled' : ''}`}>
-              <input aria-label={phoneMode === 'login' ? '密码' : phoneMode === 'register' ? '设置密码' : '设置新密码'} disabled={isLaunched} value={password} onChange={(event) => setPassword(event.target.value.slice(0, 11))} placeholder={phoneMode === 'login' ? '请输入密码（6–11位）' : phoneMode === 'register' ? '设置密码（6–11位）' : '设置新密码（6–11位）'} type={showPassword ? 'text' : 'password'} autoComplete={phoneMode === 'login' ? 'current-password' : 'new-password'} maxLength={11} />
-              <button type="button" className="password-visibility" aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? '隐藏' : '显示'}</button>
-            </label>
-            {phoneMode !== 'login' && <label className="password-input-row">
-              <input aria-label={phoneMode === 'register' ? '确认密码' : '确认新密码'} disabled={isLaunched} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value.slice(0, 11))} placeholder={phoneMode === 'register' ? '请再次输入密码' : '请再次输入新密码'} type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={11} />
-              <button type="button" className="password-visibility" aria-label={showConfirmPassword ? '隐藏确认密码' : '显示确认密码'} aria-pressed={showConfirmPassword} onClick={() => setShowConfirmPassword(value => !value)}>{showConfirmPassword ? '隐藏' : '显示'}</button>
-            </label>}
+            <PhonePasswordField key={phoneMode}
+              label={phoneMode === 'login' ? '密码' : phoneMode === 'register' ? '设置密码' : '设置新密码'}
+              disabled={isLaunched} value={password} onChange={value => { setPassword(value); setMessage(''); }}
+              placeholder={phoneMode === 'login' ? '请输入密码（6–11位）' : phoneMode === 'register' ? '设置密码（6–11位）' : '设置新密码（6–11位）'}
+              autoComplete={phoneMode === 'login' ? 'current-password' : 'new-password'}
+              shown={showPassword} onToggle={() => setShowPassword(value => !value)} visibilityLabel="密码"
+              error={passwordError} validate={validatePasswords} />
+            {phoneMode !== 'login' && <PhonePasswordField key={phoneMode + '-confirm'}
+              label={phoneMode === 'register' ? '确认密码' : '确认新密码'}
+              disabled={isLaunched} value={confirmPassword} onChange={value => { setConfirmPassword(value); setMessage(''); }}
+              placeholder={phoneMode === 'register' ? '请再次输入密码' : '请再次输入新密码'} autoComplete="new-password"
+              shown={showConfirmPassword} onToggle={() => setShowConfirmPassword(value => !value)} visibilityLabel="确认密码"
+              error={confirmPasswordError} validate={validatePasswords} />}
             <div className="password-login-guidance">
               {phoneMode === 'login' ? <>
                 <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('register')}>注册账号</button>

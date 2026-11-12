@@ -1,4 +1,4 @@
-import { createContext, useContext, useId, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react"
 import { dashboardStatusLabels } from "./DashboardTaskGrid"
 import type { ModuleName } from "./moduleDemoData"
 import { SharedModuleNavigation } from "./SharedModuleNavigation"
@@ -89,7 +89,13 @@ const sectionTitles: Record<ModuleDestination, string> = {
   academy: "AI学院",
   guild: "交付线公会",
 }
+// A fixed server snapshot keeps the initial markup consistent during hydration.
+const subscribePlatform = () => () => {}
+const serverMacPlatform = () => false
+const clientMacPlatform = () => /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
+
 export function ModuleHeader({
+  active = true,
   module,
   menu,
   identity,
@@ -98,6 +104,7 @@ export function ModuleHeader({
   onHome,
   onProfile,
 }: {
+  active?: boolean
   module: ModuleDestination
   menu: string
   identity: string
@@ -106,6 +113,33 @@ export function ModuleHeader({
   onHome: () => void
   onProfile: () => void
 }) {
+  const searchInput = useRef<HTMLInputElement>(null)
+  const macPlatform = useSyncExternalStore(subscribePlatform, clientMacPlatform, serverMacPlatform)
+
+  useEffect(() => {
+    if (!active) return
+    const focusSearch = (event: KeyboardEvent) => {
+      if (document.hidden || event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat ||
+        event.altKey || event.shiftKey || event.key.toLowerCase() !== "k") return
+      if (macPlatform ? !event.metaKey || event.ctrlKey : !event.ctrlKey || event.metaKey) return
+
+      const input = searchInput.current
+      if (!input || input.disabled || input.closest('[hidden], [inert], [aria-hidden="true"]') || !input.getClientRects().length) return
+      if (["hidden", "collapse"].includes(window.getComputedStyle(input).visibility)) return
+      if (Array.from(document.querySelectorAll('dialog[open], [role="dialog"][aria-modal="true"]')).some(dialog => dialog.getClientRects().length > 0)) return
+
+      const editingElsewhere = (target: EventTarget | null) => target !== input && target instanceof HTMLElement &&
+        (target.isContentEditable || Boolean(target.closest('input, textarea, select, [role="textbox"]')))
+      if (editingElsewhere(event.target) || editingElsewhere(document.activeElement)) return
+
+      event.preventDefault()
+      input.focus()
+      input.select()
+    }
+    document.addEventListener("keydown", focusSearch)
+    return () => document.removeEventListener("keydown", focusSearch)
+  }, [active, macPlatform])
+
   const hall = {
     dashboard: "探索营大厅",
     village: "任务大厅",
@@ -128,12 +162,14 @@ export function ModuleHeader({
         <label className="module-search">
           <ModuleIcon file="095be" size={17} />
           <input
+            ref={searchInput}
             aria-label="搜索当前板块"
+            aria-keyshortcuts={macPlatform ? "Meta+K" : "Control+K"}
             placeholder="搜索内容"
             value={query}
             onChange={(e) => onQuery(e.target.value)}
           />
-          <kbd>⌘ K</kbd>
+          <kbd>{macPlatform ? "⌘ K" : "Ctrl + K"}</kbd>
         </label>
         <ReviewNotificationBell>
           <ModuleIcon file="99dd2" size={20} />

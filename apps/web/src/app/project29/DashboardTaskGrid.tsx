@@ -21,11 +21,12 @@ export function prioritizeDashboardTasks(entries: DashboardTaskEntry[]) {
     priority[a.status] - priority[b.status] || a.index - b.index);
 }
 
-export function DashboardTaskGrid({ entries, decoration }: {
+export function DashboardTaskGrid({ entries, decoration, showDescription = false }: {
   entries: DashboardTaskEntry[];
   decoration: ReactNode;
+  showDescription?: boolean;
 }) {
-  return <section className="dashboard-task-board" tabIndex={0} aria-label="任务，优先展示待修改、正在进行中和待审核，可向下滚动查看全部任务">
+  return <section className="dashboard-task-board" tabIndex={0} aria-label={showDescription ? "匹配的探索营任务，按任务状态排序，可滚动查看" : "任务，优先展示待修改、正在进行中和待审核，可向下滚动查看全部任务"}>
     <div className="dashboard-task-tiles">
       {entries.map(({ task, index, status }) =>
         <button type="button" key={task.id}
@@ -38,7 +39,7 @@ export function DashboardTaskGrid({ entries, decoration }: {
             <span className="dashboard-tile-copy">
               <strong>任务 · {task.title}</strong>
               <span className="dashboard-tile-status">{dashboardStatusLabels[status]}</span>
-              <span>{status === "locked" ? "上一任务提交后解锁" :
+              <span>{showDescription ? task.description.trim() : status === "locked" ? "上一任务提交后解锁" :
                 status === "pending" ? "已提交，等待审核" :
                 status === "revision" ? "审核未通过，请按评语修改后重新提交" :
                 status === "completed" ? "审核已通过，可回看任务" : task.description.trim()}</span>

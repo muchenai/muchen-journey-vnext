@@ -62,6 +62,37 @@
   scrollbar-width: none;
 }
 .dashboard-task-board::-webkit-scrollbar { display: none; }
+.dashboard-task-search {
+  position: absolute; top: 338px; left: 276px; width: 1122px; height: 710px;
+  display: flex; flex-direction: column; gap: 18px; min-height: 0;
+  font-family: "Source Han Sans SC", sans-serif; color: var(--dashboard-text);
+}
+.dashboard-task-search-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; border: 1px solid #294d70; border-radius: 10px;
+  background: var(--dashboard-panel-fill);
+}
+.dashboard-task-search-heading h2 { margin: 0; font-size: 21px; line-height: 1.5; }
+.dashboard-task-search-count { margin: 4px 0 0; color: var(--dashboard-cyan); font-size: 13px; }
+.dashboard-search-clear {
+  padding: 9px 18px; border: 1px solid #477eaa; border-radius: 6px;
+  background: #123658; color: #c9e8fa; font: inherit; font-size: 13px; cursor: pointer;
+}
+.dashboard-search-clear:hover { background: #1a4770; }
+.dashboard-search-clear:focus-visible { outline: 2px solid #86deec; outline-offset: 3px; }
+.dashboard-task-search .dashboard-task-board {
+  position: static; width: 100%; height: auto; flex: 1; min-height: 0;
+  scrollbar-width: thin; scrollbar-color: #477eaa #102138;
+}
+.dashboard-task-search .dashboard-task-board::-webkit-scrollbar { display: block; width: 5px; }
+.dashboard-task-search .dashboard-task-board::-webkit-scrollbar-thumb { background: #477eaa; border-radius: 5px; }
+.dashboard-task-search-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  min-height: 280px; padding: 32px; border: 1px solid #294d70; border-radius: 10px;
+  background: var(--dashboard-panel-fill); text-align: center;
+}
+.dashboard-task-search-empty h3 { margin: 0; font-size: 21px; }
+.dashboard-task-search-empty p { margin: 0; color: var(--dashboard-muted); font-size: 14px; }
 .dashboard-task-tiles {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 180px; column-gap: 27px; row-gap: 15px;
@@ -94,6 +125,30 @@
 .dashboard-tile-clock { flex-shrink: 0; color: var(--dashboard-muted); font-size: 21.433px; }
 
 /* The imported progress row fills its panel without fixed-width grid tracks. */
+.updated-dashboard .dashboard-exploration-progress {
+  appearance: none;
+  display: block;
+  flex: 232.484 0 0;
+  width: 0;
+  min-width: 1px;
+  height: 8.768px;
+  padding: 0;
+  border: .974px solid #6a90af;
+  border-radius: 4.871px;
+  overflow: hidden;
+  background: #152f4d;
+}
+.dashboard-exploration-progress::-webkit-progress-bar { background: #152f4d; }
+.dashboard-exploration-progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #1eb8e6, #68edff);
+  box-shadow: 0 0 9.742px #4adfff;
+}
+.dashboard-exploration-progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #1eb8e6, #68edff);
+  box-shadow: 0 0 9.742px #4adfff;
+}
+.dashboard-exploration-progress[value="0"]::-webkit-progress-value { box-shadow: none; }
+.dashboard-exploration-progress[value="0"]::-moz-progress-bar { box-shadow: none; }
 .updated-dashboard [data-node-id="4062:592"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: 85px;
