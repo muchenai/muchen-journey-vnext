@@ -1,4 +1,5 @@
 import { BadgeShop, type BadgeTab } from "./BadgeShop"
+import { DashboardSearchProvider } from "./dashboardSearch"
 import { TaskClassifications } from "./TaskClassifications"
 import { filterDepartmentTasks, taskDepartmentName, type TaskDepartmentFilter } from "./taskDepartments"
 import { filterVillageTaskStatus, sortVillageTasks, type VillageTaskStatusFilter } from "./villageTaskList"
@@ -97,7 +98,9 @@ export function ModuleHub({
   const [taskStatusFilter, setTaskStatusFilter] = useState<VillageTaskStatusFilter>("all")
   const resetTaskFilters = () => {setTaskDepartment("all"); setTaskLevel("全部"); setTaskReview("全部"); setTaskBadgeType("全部"); setTaskStatusFilter("all"); setQuery("")}
   const [filter, setFilter] = useState("全部")
-  const [query, setQuery] = useState("")
+  const [search, setSearch] = useState({ module, value: "" })
+  const query = search.module === module ? search.value : ""
+  const setQuery = useCallback((value: string) => setSearch({ module, value }), [module])
   const [sort, setSort] = useState("recommended")
   const [practice, setPractice] = useState<Record<string, PracticeState>>({})
   const [favorites] = useState<string[]>([])
@@ -338,6 +341,7 @@ export function ModuleHub({
           />
           <div className="module-main">
             <ModuleHeader
+              active={active}
               module={module}
               menu={menu}
               identity={displayName || identity}
@@ -356,7 +360,11 @@ export function ModuleHub({
               <WorldMap contextKey={module} active={active && menu === "map"} onViewTasks={module === "village" || module === "academy" || module === "guild" ? openMapDepartmentTasks : undefined} />
             </div>
             {module === "dashboard" && menu !== "profile" && menu !== "map" && menu !== "knowledge" ? (
-              <div className="module-dashboard-content">{dashboardContent}</div>
+              <div className="module-dashboard-content">
+                <DashboardSearchProvider query={query} onClearSearch={() => setQuery("")}>
+                  {dashboardContent}
+                </DashboardSearchProvider>
+              </div>
             ) : (
               <div
                 className="module-page-content"

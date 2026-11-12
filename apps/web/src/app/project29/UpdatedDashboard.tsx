@@ -3,6 +3,7 @@ import { executionTasks } from "./ExecutionPages";
 import type { PreviewIdentity } from "./previewStorage";
 import { useJourney, useTaskStatus } from "./journey-context";
 import { learningStreak } from "./taskRecords";
+import { filterDashboardTasks, useDashboardSearch } from "./dashboardSearch";
 
 import { DashboardTaskGrid, dashboardStatusLabels, prioritizeDashboardTasks } from "./DashboardTaskGrid";
 import "./updatedDashboard.css";
@@ -53,6 +54,8 @@ export function UpdatedDashboard({ identity, decoration, activeNavigationDecorat
   idleNavigationDecoration: ReactNode;
 }) {
 const { experience, learnerName } = useJourney();
+const { query, onClearSearch } = useDashboardSearch();
+const searching = Boolean(query.trim());
 const taskStatus = useTaskStatus();
 const submissions = (experience?.activityRecords ?? []).flatMap(item => {
   const task = executionTasks[item.position - 1];
@@ -72,6 +75,7 @@ const formatRecordDate = (date: string) => new Date(date).toLocaleString("zh-CN"
 });
 
 const orderedTasks = prioritizeDashboardTasks(executionTasks.map((task, index) => ({ task, index, status: taskStatus(index) })));
+const matchingTasks = filterDashboardTasks(orderedTasks, query);
 const currentEntry = orderedTasks[0];
 const currentTaskIndex = currentEntry.index;
 const task = currentEntry.task;
@@ -102,9 +106,9 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             <div className="content-stretch flex flex-col items-start relative shrink-0" data-node-id="4062:585" data-name="Bold Text">
               <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#8ed8ff] text-[15.587px] whitespace-nowrap" data-node-id="4062:586">完成{completed}项</p>
             </div>
-            <div className="bg-[#152f4d] border-[#6a90af] border-[0.974px] border-solid content-stretch flex flex-[232.484_0_0] flex-col h-[8.768px] items-start min-w-px overflow-clip relative rounded-[4.871px]" data-node-id="4062:587" data-name="Container">
-              <div className="bg-gradient-to-r from-[#1eb8e6] h-[6.819px] relative shadow-[0px_0px_9.742px_0px_#4adfff] shrink-0 to-[#68edff] w-[72.472px]" style={{ width: `${completed / executionTasks.length * 100}%` }} data-node-id="4062:588" data-name="Italic Text" />
-            </div>
+            <progress className="dashboard-exploration-progress" value={completed} max={executionTasks.length}
+              aria-label="探索营完成进度" aria-valuetext={`${completed}/${executionTasks.length} 项已完成`}
+              data-node-id="4062:587" />
             <div className="content-stretch flex flex-col items-start relative shrink-0" data-node-id="4062:589" data-name="Small">
               <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-normal leading-[normal] not-italic relative shrink-0 text-[#eff6ff] text-[12.989px] whitespace-nowrap" data-node-id="4062:590">{completed}/{executionTasks.length}</p>
             </div>
@@ -171,7 +175,7 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
               </div>)}
             </div>
         </div>
-        <div className="absolute contents left-[276px] top-[338px]" data-node-id="4043:200">
+        {!searching && <div className="absolute contents left-[276px] top-[338px]" data-node-id="4043:200">
           <div className="absolute contents left-[276px] top-[338px]" data-node-id="4043:201">
             <div className="figma-stroke figma-stroke-task -translate-y-1/2 absolute border border-[rgba(30,57,97,0.85)] border-solid h-[318px] left-[276px] rounded-[10px] top-[calc(50%-43px)] w-[708.526px]" data-node-id="4043:202" style={{ backgroundImage: "linear-gradient(266.87393614749124deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }}>{decoration}</div>
             <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-black leading-[normal] left-[308.08px] not-italic text-[#eff6ff] text-[24.094px] top-[361.01px] whitespace-nowrap" data-node-id="4043:203">
@@ -280,6 +284,7 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             </div>
           </div>
         </div>
+        }
         <div className="absolute contents left-[466px] top-[180.86px]" data-node-id="4062:677">
           <div className="absolute contents left-[466px] top-[180.86px]" data-node-id="4062:678">
             <div className="absolute border-[0.907px] border-[rgba(30,57,97,0.85)] border-solid h-[52.264px] left-[492.13px] rounded-[8.162px] top-[180.86px] w-[127.055px]" data-node-id="4062:679" style={{ backgroundImage: "linear-gradient(268.097420286487deg, rgba(0, 22, 58, 0.9) 4.2063%, rgba(0, 12, 34, 0.8) 27.99%, rgba(2, 18, 38, 0.86) 64.305%, rgba(4, 19, 44, 0.84) 99.341%)" }} />
@@ -470,7 +475,7 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
           <div className="relative shrink-0 size-[12px]" data-node-id="4043:315" data-name="Icon" />
           <div className="h-[20px] relative shrink-0 w-[60px]" data-node-id="4043:316" data-name="Bold Text" />
         </div>
-        <div className="figma-stroke figma-stroke-task absolute border border-[rgba(30,57,97,0.85)] border-solid content-stretch flex flex-col h-[318px] items-start left-[1004px] p-[13.639px] rounded-[10px] top-[338px] w-[394px]" data-node-id="4043:317" style={{ backgroundImage: "linear-gradient(268.2604542563795deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }} data-name="Section">{decoration}
+        {!searching && <div className="figma-stroke figma-stroke-task absolute border border-[rgba(30,57,97,0.85)] border-solid content-stretch flex flex-col h-[318px] items-start left-[1004px] p-[13.639px] rounded-[10px] top-[338px] w-[394px]" data-node-id="4043:317" style={{ backgroundImage: "linear-gradient(268.2604542563795deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }} data-name="Section">{decoration}
           <div className="content-stretch flex items-center relative shrink-0 w-full" data-node-id="4043:318" data-name="Heading 3">
             <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#eff6ff] text-[17.536px] whitespace-nowrap" data-node-id="4043:319">
               日志
@@ -486,7 +491,15 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             </div>)}
           </div>
         </div>
-        <DashboardTaskGrid key={identity} entries={orderedTasks.filter(entry => entry.index !== currentTaskIndex)} decoration={decoration} />
+        }
+        {searching ? <section className="dashboard-task-search" aria-label="探索营任务搜索结果">
+          <header className="dashboard-task-search-heading">
+            <div><h2>探索营任务搜索</h2><p className="dashboard-task-search-count" role="status" aria-live="polite">找到 {matchingTasks.length} 个任务</p></div>
+            <button type="button" className="dashboard-search-clear" onClick={onClearSearch}>清空搜索</button>
+          </header>
+          {matchingTasks.length ? <DashboardTaskGrid key={identity} entries={matchingTasks} decoration={decoration} showDescription /> :
+            <div className="dashboard-task-search-empty"><h3>暂无相关任务</h3><p>请尝试其他关键词。</p></div>}
+        </section> : <DashboardTaskGrid key={identity} entries={orderedTasks.filter(entry => entry.index !== currentTaskIndex)} decoration={decoration} />}
       </div>
     </div>
   );

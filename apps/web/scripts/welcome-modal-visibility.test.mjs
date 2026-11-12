@@ -65,6 +65,7 @@ function createWelcomeFlow() {
       useEffect() {}, useLayoutEffect() {},
     },
     './WelcomeNameDialog': { WelcomeNameDialog },
+    './dashboardSearch': { DashboardSearchProvider: component },
     './useVillageTasks': { isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available', useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
     './useCanvasScale': { useCanvasScale: () => 1 },
     './sharedAsset': { sharedAsset: name => name },
