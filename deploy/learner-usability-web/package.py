@@ -17,8 +17,8 @@ from disk_space import disk_budget
 
 BASE_PIN = {
     'release_kind': 'learner-usability-web',
-    'base_candidate': 'ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49',
-    'base_release': 'ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49-learner-refinements',
+    'base_candidate': '40cb1c2ce1899b8f3eaef780df431975fa7bf701',
+    'base_release': '40cb1c2ce1899b8f3eaef780df431975fa7bf701-learner-usability',
     'schema': '0056_guild_halls',
 }
 
