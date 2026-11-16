@@ -51,23 +51,23 @@ def web_environment(tmp_path, monkeypatch):
     (base / ".deployment.env").write_text(
         f"WEB_IMAGE={old_web}\nAPI_IMAGE={old_api}\nCANDIDATE_COMMIT={release.BASE}\n")
     (base / "secrets/web.env").write_text(f"APP_RELEASE={release.BASE}\n")
-    (base / "secrets/api.env").write_text(f"APP_RELEASE={release.API_BASE}\nDATABASE_URL=private\n")
+    (base / "secrets/api.env").write_text(f"APP_RELEASE={release.BACKEND_BASE}\nDATABASE_URL=private\n")
     for name in (*release.AI_SECRETS, "secrets/migration.env", "secrets/future-secret"):
         (base / name).write_bytes(b"preserve private settings")
         (base / name).chmod(0o600)
     # The current Web-only release has its own receipt; API provenance remains in the earlier release.
-    api_base = tmp_path / "releases" / release.API_BASE_RELEASE
+    api_base = tmp_path / "releases" / release.BACKEND_BASE_RELEASE
     api_base.mkdir()
     (base / "web-release-receipt.json").write_text(json.dumps({
         "result": "PASS", "release_kind": "learner-usability-web",
-        "web_candidate": release.BASE, "api_candidate": release.API_BASE, "schema": release.SCHEMA,
+        "web_candidate": release.BASE, "api_candidate": release.BACKEND_BASE, "schema": release.SCHEMA,
         "api_container_unchanged": True, "other_containers_unchanged": True, "database_writes": 0,
         "previous_release": str(api_base), "web_image_id": old_web, "web_config_digest": old_web_config}))
     (api_base / "activation-receipt.json").write_text(json.dumps({
-        "status": "PASS", "release": release.API_BASE, "schema": release.SCHEMA,
+        "status": "PASS", "release": release.BACKEND_BASE, "schema": release.SCHEMA,
         "database_schema_changed": False, "old_assignments_unchanged": True}))
     (api_base / "schema-upgrade-prepared.json").write_text(json.dumps({"manifest": {
-        "candidate": release.API_BASE, "images": {"api": old_api, "web": "older-api-release-web-image"},
+        "candidate": release.BACKEND_BASE, "images": {"api": old_api, "web": "older-api-release-web-image"},
         "migrations": {"from": release.SCHEMA, "to": release.SCHEMA}}}))
     (tmp_path / "current").symlink_to(base, target_is_directory=True)
     package = tmp_path / "exploration-runs/1-1-activate"
@@ -83,7 +83,7 @@ def web_environment(tmp_path, monkeypatch):
                "config_digest": config_digest,
                "reference": "ghcr.io/muchenai/muchen-journey-vnext-web:" + candidate}}
     (package / "manifest.json").write_text(json.dumps(pin))
-    before = {"services": {"api": {"image": old_api, "environment": {"APP_RELEASE": release.API_BASE}},
+    before = {"services": {"api": {"image": old_api, "environment": {"APP_RELEASE": release.BACKEND_BASE}},
                            "web": {"image": old_web, "environment": {"APP_RELEASE": release.BASE}}}}
     state = {"release": release.BASE, "failure": None, "operations": [], "commands": [], "loaded": []}
 
@@ -111,7 +111,7 @@ def web_environment(tmp_path, monkeypatch):
         return b""
 
     def container(service):
-        current = release.API_BASE if service == "api" else state["release"]
+        current = release.BACKEND_BASE if service == "api" else state["release"]
         requested = old_api if service == "api" else old_web if current == release.BASE else loaded_id
         if state["failure"] == "drift" and service == "api":
             requested = "sha256:" + "f" * 64
@@ -163,10 +163,10 @@ def test_switches_only_web_on_split_baseline_and_binds_loaded_config(web_environ
     receipt = json.loads((new / "web-release-receipt.json").read_text())
     assert receipt["release_kind"] == "learner-usability-web"
     assert receipt["web_candidate"] == env["candidate"]
-    assert release.BASE != release.API_BASE
+    assert release.BASE != release.BACKEND_BASE
     assert not (env["base"] / "activation-receipt.json").exists()
     assert not (env["base"] / "schema-upgrade-prepared.json").exists()
-    assert receipt["api_candidate"] == release.API_BASE
+    assert receipt["api_candidate"] == release.BACKEND_BASE
     assert receipt["schema"] == "0056_guild_halls" and receipt["database_writes"] == 0
     assert receipt["api_container_unchanged"] and receipt["other_containers_unchanged"]
     assert env["loaded_id"] != env["config_digest"]
@@ -402,7 +402,7 @@ def test_release_pins_successful_mainline_and_protects_api_database_and_ingress(
                    "schema": "0056_guild_halls"}
     assert (release.BASE, release.BASE_RELEASE, release.SCHEMA) == (
         pin["base_candidate"], pin["base_release"], pin["schema"])
-    assert (release.API_BASE, release.API_BASE_RELEASE) == (
+    assert (release.BACKEND_BASE, release.BACKEND_BASE_RELEASE) == (
         "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49",
         "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49-learner-refinements")
     workflow = (ROOT / ".github/workflows/learner-usability-web-release.yml").read_text()
