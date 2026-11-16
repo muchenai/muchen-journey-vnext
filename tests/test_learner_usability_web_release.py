@@ -1,4 +1,4 @@
-"""Learner usability must replace only Web on the proven learner refinements release."""
+"""Learner usability must replace only Web on the proven split Web/API release."""
 import ast
 import copy
 from contextlib import redirect_stdout
@@ -31,6 +31,7 @@ def web_environment(tmp_path, monkeypatch):
     candidate = "1" * 40
     loaded_id = "sha256:" + "2" * 64
     old_web, old_api = "sha256:" + "3" * 64, "sha256:" + "4" * 64
+    old_web_config = "sha256:" + "5" * 64
     config = b'{"architecture":"amd64","os":"linux","rootfs":{"type":"layers","diff_ids":[]}}'
     config_digest = "sha256:" + hashlib.sha256(config).hexdigest()
     config_name = config_digest[7:] + ".json"
@@ -50,16 +51,23 @@ def web_environment(tmp_path, monkeypatch):
     (base / ".deployment.env").write_text(
         f"WEB_IMAGE={old_web}\nAPI_IMAGE={old_api}\nCANDIDATE_COMMIT={release.BASE}\n")
     (base / "secrets/web.env").write_text(f"APP_RELEASE={release.BASE}\n")
-    (base / "secrets/api.env").write_text(f"APP_RELEASE={release.BASE}\nDATABASE_URL=private\n")
+    (base / "secrets/api.env").write_text(f"APP_RELEASE={release.API_BASE}\nDATABASE_URL=private\n")
     for name in (*release.AI_SECRETS, "secrets/migration.env", "secrets/future-secret"):
         (base / name).write_bytes(b"preserve private settings")
         (base / name).chmod(0o600)
-    # Learner refinements retains 0056 and writes these exact successful receipt shapes.
-    (base / "activation-receipt.json").write_text(json.dumps({
-        "status": "PASS", "release": release.BASE, "schema": release.SCHEMA,
+    # The current Web-only release has its own receipt; API provenance remains in the earlier release.
+    api_base = tmp_path / "releases" / release.API_BASE_RELEASE
+    api_base.mkdir()
+    (base / "web-release-receipt.json").write_text(json.dumps({
+        "result": "PASS", "release_kind": "learner-usability-web",
+        "web_candidate": release.BASE, "api_candidate": release.API_BASE, "schema": release.SCHEMA,
+        "api_container_unchanged": True, "other_containers_unchanged": True, "database_writes": 0,
+        "previous_release": str(api_base), "web_image_id": old_web, "web_config_digest": old_web_config}))
+    (api_base / "activation-receipt.json").write_text(json.dumps({
+        "status": "PASS", "release": release.API_BASE, "schema": release.SCHEMA,
         "database_schema_changed": False, "old_assignments_unchanged": True}))
-    (base / "schema-upgrade-prepared.json").write_text(json.dumps({"manifest": {
-        "candidate": release.BASE, "images": {"api": old_api, "web": old_web},
+    (api_base / "schema-upgrade-prepared.json").write_text(json.dumps({"manifest": {
+        "candidate": release.API_BASE, "images": {"api": old_api, "web": "older-api-release-web-image"},
         "migrations": {"from": release.SCHEMA, "to": release.SCHEMA}}}))
     (tmp_path / "current").symlink_to(base, target_is_directory=True)
     package = tmp_path / "exploration-runs/1-1-activate"
@@ -75,7 +83,7 @@ def web_environment(tmp_path, monkeypatch):
                "config_digest": config_digest,
                "reference": "ghcr.io/muchenai/muchen-journey-vnext-web:" + candidate}}
     (package / "manifest.json").write_text(json.dumps(pin))
-    before = {"services": {"api": {"image": old_api, "environment": {"APP_RELEASE": release.BASE}},
+    before = {"services": {"api": {"image": old_api, "environment": {"APP_RELEASE": release.API_BASE}},
                            "web": {"image": old_web, "environment": {"APP_RELEASE": release.BASE}}}}
     state = {"release": release.BASE, "failure": None, "operations": [], "commands": [], "loaded": []}
 
@@ -103,11 +111,16 @@ def web_environment(tmp_path, monkeypatch):
         return b""
 
     def container(service):
-        current = release.BASE if service == "api" else state["release"]
+        current = release.API_BASE if service == "api" else state["release"]
         requested = old_api if service == "api" else old_web if current == release.BASE else loaded_id
         if state["failure"] == "drift" and service == "api":
             requested = "sha256:" + "f" * 64
-        return {"Id": service + "-stable", "Image": requested if current == release.BASE else config_digest,
+        if state["failure"] == "api_version" and service == "api":
+            current = release.BASE
+        actual_image = requested
+        if service == "web":
+            actual_image = old_web_config if current == release.BASE else config_digest
+        return {"Id": service + "-stable", "Image": actual_image,
                 "State": {"Running": True, "Health": {"Status": "healthy"}},
                 "Config": {"Image": requested, "Env": ["APP_RELEASE=" + current],
                            "Labels": {"org.opencontainers.image.revision": current}}}
@@ -142,7 +155,7 @@ def web_environment(tmp_path, monkeypatch):
     return {**locals(), "root": tmp_path}
 
 
-def test_switches_only_web_on_refinements_baseline_and_binds_loaded_config(web_environment):
+def test_switches_only_web_on_split_baseline_and_binds_loaded_config(web_environment):
     env = web_environment
     release.activate(env["package"])
     new = (env["root"] / "current").resolve()
@@ -150,7 +163,10 @@ def test_switches_only_web_on_refinements_baseline_and_binds_loaded_config(web_e
     receipt = json.loads((new / "web-release-receipt.json").read_text())
     assert receipt["release_kind"] == "learner-usability-web"
     assert receipt["web_candidate"] == env["candidate"]
-    assert receipt["api_candidate"] == release.BASE
+    assert release.BASE != release.API_BASE
+    assert not (env["base"] / "activation-receipt.json").exists()
+    assert not (env["base"] / "schema-upgrade-prepared.json").exists()
+    assert receipt["api_candidate"] == release.API_BASE
     assert receipt["schema"] == "0056_guild_halls" and receipt["database_writes"] == 0
     assert receipt["api_container_unchanged"] and receipt["other_containers_unchanged"]
     assert env["loaded_id"] != env["config_digest"]
@@ -191,7 +207,7 @@ def test_other_release_package_stops_before_import(web_environment):
     assert not env["state"]["operations"] and not env["state"]["commands"]
 
 
-@pytest.mark.parametrize("failure", ["schema", "drift"])
+@pytest.mark.parametrize("failure", ["schema", "drift", "api_version"])
 def test_live_schema_or_api_drift_stops_before_import(web_environment, failure):
     env = web_environment
     env["state"]["failure"] = failure
@@ -201,11 +217,14 @@ def test_live_schema_or_api_drift_stops_before_import(web_environment, failure):
 
 
 @pytest.mark.parametrize("field,value", [
-    ("status", "ROLLED_BACK"), ("release", "f" * 40), ("schema", "0054_academy_covers"),
+    ("result", "ROLLED_BACK"), ("release_kind", "different-web-release"),
+    ("web_candidate", "f" * 40), ("api_candidate", release.BASE),
+    ("schema", "0054_academy_covers"), ("api_container_unchanged", False),
+    ("other_containers_unchanged", False), ("database_writes", 1),
 ])
 def test_baseline_receipt_drift_stops_before_import(web_environment, field, value):
     env = web_environment
-    path = env["base"] / "activation-receipt.json"
+    path = env["base"] / "web-release-receipt.json"
     receipt = json.loads(path.read_text())
     receipt[field] = value
     path.write_text(json.dumps(receipt))
@@ -215,12 +234,37 @@ def test_baseline_receipt_drift_stops_before_import(web_environment, field, valu
     assert (env["root"] / "current").resolve() == env["base"]
 
 
-@pytest.mark.parametrize("change,category", [
-    ("candidate", "BASE_PREPARED_CANDIDATE"), ("api", "BASE_IMAGE_DRIFT"), ("web", "BASE_IMAGE_DRIFT"),
-])
-def test_baseline_prepared_evidence_must_match_live_images(web_environment, change, category):
+def test_current_web_receipt_cannot_redirect_api_provenance(web_environment):
     env = web_environment
-    path = env["base"] / "schema-upgrade-prepared.json"
+    path = env["base"] / "web-release-receipt.json"
+    receipt = json.loads(path.read_text())
+    receipt["previous_release"] = str(env["base"])
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(release.UpgradeError, match="API_BASE_RELEASE"):
+        release.activate(env["package"])
+    assert not env["state"]["operations"] and not env["state"]["commands"]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "ROLLED_BACK"), ("release", release.BASE), ("schema", "0054_academy_covers"),
+])
+def test_earlier_api_activation_receipt_must_match_pinned_api(web_environment, field, value):
+    env = web_environment
+    path = env["api_base"] / "activation-receipt.json"
+    receipt = json.loads(path.read_text())
+    receipt[field] = value
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(release.UpgradeError, match="API_BASE_RECEIPT"):
+        release.activate(env["package"])
+    assert not env["state"]["operations"] and not env["state"]["commands"]
+
+
+@pytest.mark.parametrize("change,category", [
+    ("candidate", "BASE_PREPARED_CANDIDATE"), ("api", "BASE_IMAGE_DRIFT"),
+])
+def test_earlier_api_prepared_evidence_must_match_live_api(web_environment, change, category):
+    env = web_environment
+    path = env["api_base"] / "schema-upgrade-prepared.json"
     prepared = json.loads(path.read_text())
     if change == "candidate":
         prepared["manifest"]["candidate"] = "f" * 40
@@ -228,6 +272,36 @@ def test_baseline_prepared_evidence_must_match_live_images(web_environment, chan
         prepared["manifest"]["images"][change] = "sha256:" + "f" * 64
     path.write_text(json.dumps(prepared))
     with pytest.raises(release.UpgradeError, match=category):
+        release.activate(env["package"])
+    assert not env["state"]["operations"] and not env["state"]["commands"]
+
+
+@pytest.mark.parametrize("field,category", [
+    ("web_image_id", "BASE_IMAGE_DRIFT"), ("web_config_digest", "WEB_IMAGE_CHANGED"),
+])
+def test_current_web_receipt_must_match_live_web_image(web_environment, field, category):
+    env = web_environment
+    path = env["base"] / "web-release-receipt.json"
+    receipt = json.loads(path.read_text())
+    receipt[field] = "sha256:" + "f" * 64
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(release.UpgradeError, match=category):
+        release.activate(env["package"])
+    assert not env["state"]["operations"] and not env["state"]["commands"]
+
+
+def test_api_revision_must_stay_on_pinned_earlier_commit(web_environment, monkeypatch):
+    env = web_environment
+    original = release.container
+
+    def container(service):
+        item = original(service)
+        if service == "api":
+            item["Config"]["Labels"]["org.opencontainers.image.revision"] = release.BASE
+        return item
+
+    monkeypatch.setattr(release, "container", container)
+    with pytest.raises(release.UpgradeError, match="API_REVISION"):
         release.activate(env["package"])
     assert not env["state"]["operations"] and not env["state"]["commands"]
 
@@ -323,11 +397,14 @@ def test_release_pins_successful_mainline_and_protects_api_database_and_ingress(
                if isinstance(node, ast.Assign) and any(
                    isinstance(target, ast.Name) and target.id == "BASE_PIN" for target in node.targets))
     assert pin == {"release_kind": "learner-usability-web",
-                   "base_candidate": "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49",
-                   "base_release": "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49-learner-refinements",
+                   "base_candidate": "40cb1c2ce1899b8f3eaef780df431975fa7bf701",
+                   "base_release": "40cb1c2ce1899b8f3eaef780df431975fa7bf701-learner-usability",
                    "schema": "0056_guild_halls"}
     assert (release.BASE, release.BASE_RELEASE, release.SCHEMA) == (
         pin["base_candidate"], pin["base_release"], pin["schema"])
+    assert (release.API_BASE, release.API_BASE_RELEASE) == (
+        "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49",
+        "ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49-learner-refinements")
     workflow = (ROOT / ".github/workflows/learner-usability-web-release.yml").read_text()
     package = (ROOT / "deploy/learner-usability-web/package.py").read_text()
     source = (ROOT / "deploy/learner-usability-web/activate.py").read_text()

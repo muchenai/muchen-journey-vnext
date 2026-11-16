@@ -1,4 +1,4 @@
-"""Publish learner usability on the verified learner refinements baseline, replacing only Web."""
+"""Publish learner usability on the verified split Web/API baseline, replacing only Web."""
 import gzip
 import hashlib
 import json
@@ -18,8 +18,10 @@ from canary_schema_upgrade import (
 from disk_space import DiskSpaceError, check_space
 from image_transport import source_config_digest, verify_loaded_image
 
-BASE = 'ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49'
-BASE_RELEASE = BASE + '-learner-refinements'
+BASE = '40cb1c2ce1899b8f3eaef780df431975fa7bf701'
+BASE_RELEASE = BASE + '-learner-usability'
+API_BASE = 'ef06970c1658f8d583bdaf9bd3a4fd90c13fdc49'
+API_BASE_RELEASE = API_BASE + '-learner-refinements'
 SCHEMA = '0056_guild_halls'
 PROJECT = 'journey-next-greenfield-canary'
 AI_SECRETS = {'secrets/ai_api_key', 'secrets/ai_feishu_app_secret'}
@@ -171,19 +173,29 @@ def activate(package, recovery_id=None):
     new = ROOT / 'releases' / (candidate + suffix)
     require((ROOT / 'current').is_symlink() and (ROOT / 'current').resolve(strict=True) == base and
             base.resolve() == base and not os.path.lexists(new), 'BASE_RELEASE')
-    receipt = json.loads(read_file(base / 'activation-receipt.json'))
-    require(receipt['status'] == 'PASS' and receipt['release'] == BASE and receipt['schema'] == SCHEMA, 'BASE_RECEIPT')
+    receipt = json.loads(read_file(base / 'web-release-receipt.json'))
+    require(receipt.get('result') == 'PASS' and receipt.get('release_kind') == 'learner-usability-web' and
+            receipt.get('web_candidate') == BASE and receipt.get('api_candidate') == API_BASE and
+            receipt.get('schema') == SCHEMA and receipt.get('api_container_unchanged') is True and
+            receipt.get('other_containers_unchanged') is True and receipt.get('database_writes') == 0,
+            'BASE_RECEIPT')
+    api_base = ROOT / 'releases' / API_BASE_RELEASE
+    require(api_base.resolve() == api_base and receipt.get('previous_release') == str(api_base), 'API_BASE_RELEASE')
+    api_receipt = json.loads(read_file(api_base / 'activation-receipt.json'))
+    require(api_receipt.get('status') == 'PASS' and api_receipt.get('release') == API_BASE and
+            api_receipt.get('schema') == SCHEMA, 'API_BASE_RECEIPT')
     api_before, web_before = container('api'), container('web')
-    require('APP_RELEASE=' + BASE in api_before['Config']['Env'] and api_before['State']['Running'] and
+    require('APP_RELEASE=' + API_BASE in api_before['Config']['Env'] and api_before['State']['Running'] and
             api_before['State'].get('Health', {}).get('Status') == 'healthy', 'API_BASELINE')
-    require(api_before['Config']['Labels'].get('org.opencontainers.image.revision') == BASE, 'API_REVISION')
+    require(api_before['Config']['Labels'].get('org.opencontainers.image.revision') == API_BASE, 'API_REVISION')
     before = json.loads(compose(base, 'config', '--format', 'json'))
-    previous = json.loads(read_file(base / 'schema-upgrade-prepared.json'))['manifest']
-    require(previous['candidate'] == BASE, 'BASE_PREPARED_CANDIDATE')
-    for service, item in (('api', api_before), ('web', web_before)):
-        require(item['Config']['Image'] == before['services'][service]['image'] ==
-                previous['images'][service], 'BASE_IMAGE_DRIFT')
-    healthy_web(BASE, web_before['Config']['Image'], {web_before['Image']})
+    previous = json.loads(read_file(api_base / 'schema-upgrade-prepared.json'))['manifest']
+    require(previous['candidate'] == API_BASE, 'BASE_PREPARED_CANDIDATE')
+    require(api_before['Config']['Image'] == before['services']['api']['image'] ==
+            previous['images']['api'], 'BASE_IMAGE_DRIFT')
+    require(web_before['Config']['Image'] == before['services']['web']['image'] ==
+            receipt.get('web_image_id'), 'BASE_IMAGE_DRIFT')
+    healthy_web(BASE, receipt['web_image_id'], {receipt['web_image_id'], receipt.get('web_config_digest')})
     verify_schema(base)
     protected = protected_containers()
     entry = pin['archive']
@@ -223,7 +235,7 @@ def activate(package, recovery_id=None):
         healthy_web(candidate, image['Id'], {image['Id'], config_digest})
         verify_schema(base)
         receipt = {'result': 'PASS', 'release_kind': 'learner-usability-web',
-            'web_candidate': candidate, 'api_candidate': BASE, 'schema': SCHEMA,
+            'web_candidate': candidate, 'api_candidate': API_BASE, 'schema': SCHEMA,
             'api_container_unchanged': True, 'other_containers_unchanged': True, 'database_writes': 0,
             'previous_release': str(base), 'package_run_id': pin['package_run_id'],
             'web_image_id': image['Id'], 'web_config_digest': config_digest, 'configuration_hashes': hashes}
