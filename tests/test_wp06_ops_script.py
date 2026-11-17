@@ -12,6 +12,11 @@ from scripts.wp06_ops import (
     release_gate,
 )
 
+EXPLORATION_FACT_TABLES = (
+    "exploration_catalog_tasks", "exploration_work", "exploration_progress",
+    "exploration_materials", "exploration_self_checks",
+)
+
 
 def evidence(status: str = "PASS") -> dict[str, object]:
     from scripts.wp06_ops import REQUIRED_RELEASE_CHECKS
@@ -114,7 +119,7 @@ def test_http_request_rejects_invalid_local_api_port(monkeypatch):
         ops.http_request("/health/ready")
 
 
-def test_migration_check_rehearses_ai_and_review_release_range(
+def test_migration_check_rehearses_ai_through_exploration_release_range(
     monkeypatch, tmp_path
 ):
     calls: list[tuple[str, ...]] = []
@@ -129,7 +134,7 @@ def test_migration_check_rehearses_ai_and_review_release_range(
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, "learner_notification_reads")},
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -149,13 +154,16 @@ def test_migration_check_rehearses_ai_and_review_release_range(
         },
     }
     fact_results = iter((current_facts, base_facts, current_facts))
+    fact_tables = []
+
+    def facts(_service, _database, *, tables=ops.CURRENT_FACT_TABLES):
+        fact_tables.append(tables)
+        return next(fact_results)
 
     monkeypatch.setattr(ops, "ensure_local_services", lambda: None)
     monkeypatch.setattr(ops, "psql", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(ops, "compose", lambda *args: calls.append(args))
-    monkeypatch.setattr(
-        ops, "database_facts", lambda *_args, **_kwargs: next(fact_results)
-    )
+    monkeypatch.setattr(ops, "database_facts", facts)
     monkeypatch.setattr(ops, "make_run_directory", lambda: tmp_path)
     monkeypatch.setattr(
         ops,
@@ -181,12 +189,21 @@ def test_migration_check_rehearses_ai_and_review_release_range(
     assert report["upgrade_to_head"] == "PASS"
     assert report["downgrade_to_base"] == "PASS"
     assert report["base_revision"] == "0035_phone_password_login"
-    assert report["head_revision"] == "0056_guild_halls"
+    assert report["head_revision"] == "0057_dynamic_exploration"
     assert report["business_facts_preserved"] is True
+    # The five tables exist at head and are dropped below 0057. Querying them
+    # at the old baseline would fail; omitting them at head would hide data.
+    assert set(EXPLORATION_FACT_TABLES).issubset(fact_tables[0])
+    assert set(EXPLORATION_FACT_TABLES).isdisjoint(fact_tables[1])
+    assert fact_tables[2] == fact_tables[0]
+    assert all(report["facts"]["counts"][table] == 0 for table in EXPLORATION_FACT_TABLES)
 
 
 def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables():
-    assert ops.EXPECTED_MIGRATION_HEAD == "0056_guild_halls"
+    from scripts.wp07_candidate import migration
+
+    assert ops.EXPECTED_MIGRATION_HEAD == migration()["head"] == "0057_dynamic_exploration"
+    assert set(ops.EXPLORATION_TABLES) == set(EXPLORATION_FACT_TABLES)
     assert set(ops.REVIEW_TABLES) == {
         "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
         "review_admin_access", "review_claims", "directory_sync", "directory_members",
@@ -215,7 +232,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
-        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES,
         "learner_notification_reads",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
@@ -227,14 +244,14 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
-        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES,
         "learner_notification_reads",
     }
 
 
 def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0056_guild_halls",
+        "migration_revision": "0057_dynamic_exploration",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -244,14 +261,14 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, "learner_notification_reads")},
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0056_guild_halls",
+            "migration_revision": "0057_dynamic_exploration",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -260,16 +277,17 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, "learner_notification_reads")},
                 protected_fact: 1,
             },
         }
         with pytest.raises(OpsError, match="prevent adjacent schema rollback"):
             ops.require_safe_schema_rollback(populated)
 
-    facts["migration_revision"] = "0025_formal_result_gate"
-    with pytest.raises(OpsError, match="current migration head"):
-        ops.require_safe_schema_rollback(facts)
+    for stale_revision in ("0056_guild_halls", "0025_formal_result_gate"):
+        facts["migration_revision"] = stale_revision
+        with pytest.raises(OpsError, match="current migration head"):
+            ops.require_safe_schema_rollback(facts)
 
 
 ACADEMY_AND_GUILD_FACT_TABLES = (
@@ -280,8 +298,8 @@ ACADEMY_AND_GUILD_FACT_TABLES = (
 )
 
 
-@pytest.mark.parametrize("table", ACADEMY_AND_GUILD_FACT_TABLES)
-def test_current_schema_rollback_requires_empty_academy_and_guild_facts(table):
+@pytest.mark.parametrize("table", (*ACADEMY_AND_GUILD_FACT_TABLES, *EXPLORATION_FACT_TABLES))
+def test_current_schema_rollback_requires_all_later_owned_facts_to_be_empty(table):
     assert table in ops.CURRENT_FACT_TABLES
     assert table in ops.POST_AI_BASE_TABLES
     assert table in ops.ROLLBACK_OWNED_FACT_TABLES
@@ -298,7 +316,7 @@ def test_current_schema_rollback_requires_empty_academy_and_guild_facts(table):
         ops.require_safe_schema_rollback(facts)
 
 
-@pytest.mark.parametrize("table", ("academy_learning_records", "guild_task_submissions"))
+@pytest.mark.parametrize("table", ("academy_learning_records", "guild_task_submissions", *EXPLORATION_FACT_TABLES))
 def test_migration_drill_refuses_downgrade_before_touching_current_business_facts(
     monkeypatch, table
 ):
@@ -314,6 +332,60 @@ def test_migration_drill_refuses_downgrade_before_touching_current_business_fact
     with pytest.raises(OpsError, match=table):
         ops.migration_check()
     assert not any("downgrade" in call for call in calls)
+    assert calls[-1][-2:] == ("--if-exists", "journey_next_wp06_migration")
+
+
+def test_database_facts_collects_each_exploration_table_for_preservation_and_rollback(monkeypatch):
+    expected = {table: count for count, table in enumerate(EXPLORATION_FACT_TABLES, 1)}
+    queried = []
+
+    def query(_service, _database, sql):
+        if sql == "SELECT version_num FROM alembic_version":
+            return ops.EXPECTED_MIGRATION_HEAD
+        if sql.startswith('SELECT count(*) FROM "'):
+            table = sql.split('"')[1]
+            queried.append(table)
+            return str(expected.get(table, 0))
+        return "fixed-version-fingerprint" if "md5(" in sql else "0"
+
+    monkeypatch.setattr(ops, "psql", query)
+    facts = ops.database_facts("db-test", "journey_next_wp06_migration")
+
+    assert {table: facts["counts"][table] for table in expected} == expected
+    assert all(queried.count(table) == 1 for table in expected)
+    with pytest.raises(OpsError, match="prevent adjacent schema rollback") as error:
+        ops.require_safe_schema_rollback(facts)
+    assert all(table in str(error.value) for table in expected)
+
+
+@pytest.mark.parametrize("table", EXPLORATION_FACT_TABLES)
+def test_migration_check_rejects_changed_exploration_facts_after_reupgrade(monkeypatch, table):
+    calls = []
+    current = {
+        "migration_revision": ops.EXPECTED_MIGRATION_HEAD,
+        "counts": dict.fromkeys((*ops.CURRENT_FACT_TABLES, "assignment_bound_reentry_invites"), 0),
+        "task_version_fingerprint": "fixed",
+        "invalid_constraints": 0,
+        "critical_invariant_violations": 0,
+    }
+    baseline = {
+        **current,
+        "migration_revision": ops.AI_BASE_REVISION,
+        "counts": {name: count for name, count in current["counts"].items()
+                   if name not in ops.POST_AI_BASE_TABLES},
+    }
+    changed = copy.deepcopy(current)
+    changed["counts"][table] = 1
+    snapshots = iter((current, baseline, changed))
+    monkeypatch.setattr(ops, "ensure_local_services", lambda: None)
+    monkeypatch.setattr(ops, "psql", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(ops, "compose", lambda *args: calls.append(args))
+    monkeypatch.setattr(ops, "database_facts", lambda *_args, **_kwargs: next(snapshots))
+
+    with pytest.raises(OpsError, match="re-upgrade changed persistent business facts"):
+        ops.migration_check()
+    assert any(call[-2:] == ("downgrade", ops.AI_BASE_REVISION) for call in calls)
+    assert calls[-1][-2:] == ("--if-exists", "journey_next_wp06_migration")
 
 
 def test_application_rollback_requires_immutable_images_and_preserves_facts(
@@ -322,7 +394,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0056_guild_halls",
+        "migration_revision": "0057_dynamic_exploration",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []
