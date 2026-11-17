@@ -36,7 +36,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0056_guild_halls"
+EXPECTED_MIGRATION_HEAD = "0057_dynamic_exploration"
 AI_BASE_REVISION = "0035_phone_password_login"
 AI_TABLES = ("ai_self_checks",)
 REVIEW_TABLES = (
@@ -52,9 +52,15 @@ GUILD_TABLES = (
     "guild_certification_requests", "guild_memberships", "guild_selections",
     "guild_task_submissions",
 )
+# Downgrading below 0057 removes these tables. Snapshot them at head and
+# require them empty before any schema rollback, including isolated drills.
+EXPLORATION_TABLES = (
+    "exploration_catalog_tasks", "exploration_work", "exploration_progress",
+    "exploration_materials", "exploration_self_checks",
+)
 POST_AI_BASE_TABLES = (
     *AI_TABLES, *REVIEW_TABLES, "learner_notification_reads",
-    *ADMIN_COMMUNITY_TABLES, *ACADEMY_TABLES, *GUILD_TABLES,
+    *ADMIN_COMMUNITY_TABLES, *ACADEMY_TABLES, *GUILD_TABLES, *EXPLORATION_TABLES,
 )
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 PHONE_LOGIN_TABLES = (
@@ -66,6 +72,7 @@ ROLLBACK_OWNED_FACT_TABLES = (
     *ADMIN_COMMUNITY_TABLES,
     *ACADEMY_TABLES,
     *GUILD_TABLES,
+    *EXPLORATION_TABLES,
     "learner_notification_reads",
     "coaching_feedback",
     "ai_advisory_records",
@@ -78,6 +85,7 @@ CURRENT_FACT_TABLES = (
     *ADMIN_COMMUNITY_TABLES,
     *ACADEMY_TABLES,
     *GUILD_TABLES,
+    *EXPLORATION_TABLES,
     "learner_notification_reads",
     *PHONE_LOGIN_TABLES,
     *AI_TABLES,
