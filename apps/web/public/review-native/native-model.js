@@ -1,5 +1,6 @@
 // Translate the existing server contract without changing the supplied view's design.
 import { learnerTaskTitle } from './task-titles.js';
+import { explorationCompletionMode } from './exploration-completion.js';
 const toBadge = { tech: 'dev', 'ai-eval': 'evaluation' };
 const fromBadge = { dev: 'tech', evaluation: 'ai-eval' };
 export const reasonNames = { materials_incomplete: '提交材料不完整', incorrect_answer: '答案错误', requirements_not_met: '未达到任务要求', insufficient_evidence: '依据或论证不足', other: '其他' };
@@ -11,10 +12,11 @@ export function reviewFeedbackError(decision, value) {
   return '';
 }
 export function taskView(task) {
-  return { ...task, title: learnerTaskTitle(task.stableKey, task.title), badges: (task.badges || []).map(b => ({ ...b, id: toBadge[b.id] || b.id })), questions: task.questions || [], rubric: task.rubric || [], rubricAttachments: task.rubricAttachments || [], materials: task.materials || [], participants: task.participants ?? 0, completions: task.completions ?? 0 };
+  return { ...task, ...(task.camp==='exploration'?{completionMode:explorationCompletionMode(task),assessmentUrl:task.assessmentUrl||'',taskFiles:task.taskFiles||[]}:{}), title: learnerTaskTitle(task.stableKey, task.title), badges: (task.badges || []).map(b => ({ ...b, id: toBadge[b.id] || b.id })), questions: task.questions || [], rubric: task.rubric || [], rubricAttachments: task.rubricAttachments || [], materials: task.materials || [], participants: task.participants ?? 0, completions: task.completions ?? 0 };
 }
 export function taskWrite(task) {
-  return { ...task, passScore: task.passScore ?? 60, revision: task.revision || 0, badges: (task.badges || []).map(b => ({ ...b, id: fromBadge[b.id] || b.id })) };
+  const assessment = explorationCompletionMode(task) === 'assessment';
+  return { ...task, ...(task.camp==='exploration'?{completionMode:explorationCompletionMode(task),assessmentUrl:assessment?String(task.assessmentUrl||'').trim():'',taskFiles:assessment?(task.taskFiles||[]):[]}:{}), passScore: task.passScore ?? 60, revision: task.revision || 0, badges: (task.badges || []).map(b => ({ ...b, id: fromBadge[b.id] || b.id })) };
 }
 export function reviewView(item, task) {
   return { id: item.id, taskId: item.task_id, taskStableKey: task?.stableKey, studentId: item.learner_id, studentName: item.learner_name,
@@ -52,8 +54,11 @@ export function detailView(base, detail, task, origin) {
     reviewComment: evaluation?.overall_feedback || base.reviewComment || '',
     attachments: (detail.materials?.attachments || []).map(a => ({ name: a.original_filename, url: a.status === 'READY' && a.scan_status === 'CLEAN' ? `${origin}/review/${encodeURIComponent(detail.id)}/attachments/${encodeURIComponent(a.id)}` : '' })),
     taskSnapshot: { ...(task || base.taskSnapshot), title: learnerTaskTitle(task?.stableKey || base.taskStableKey, detail.task_title), summary: detail.task_purpose, camp: base.camp, reviewMode: 'manual',
+      ...(base.camp==='exploration'?{completionMode:detail.task_completion_mode||'assessment'}:{}),
       questions: (detail.completion_criteria || []).map(title => ({ title })),
-      materials: (detail.task_learning_materials || []).map(m => ({ name: m.title, url: m.url || '', text: m.body || '', type: m.url ? 'link' : 'text' })),
+      materials: (detail.task_learning_materials || []).filter(m=>!['任务题目文件','任务测试入口'].includes(m.source_label)).map(m => ({ name: m.title, url: m.url || '', text: m.body || '', type: m.url ? 'link' : 'text' })),
+      taskFiles: (detail.task_task_files || []).map(m => ({...m, name:m.name||m.title, url:m.url||'', text:m.body||'', type:m.type||(m.url?'link':'text')})),
+      assessmentUrl: detail.task_assessment_url || '',
       rubric: (detail.rubric?.dimensions || []).map(d => ({ name: d.title, description: d.evidence_expected, points: d.max_points })),
     },
     hasAi: !!detail.document_ai_checks?.length,

@@ -1,6 +1,10 @@
+import {requireTaskConfiguration} from './task-publication-access.js';
 import { taskView, taskWrite, reviewView, detailView, reasonNames, reviewFeedbackError } from './native-model.js?v=20261028-publication-local';
 import { applyDifficultyPreset, normalizeBadgeWeights } from './core.js?v=20261030-member-action-spacing';
 import { createAcademyApi } from './academy-api.js?v=20261105-sources';
+import { nextExplorationOrder, validExplorationOrder, isPinnedExplorationTask } from './exploration-order.js';
+import {validateTaskFieldLimits} from './task-field-limits.js';
+import {taskResourceLinks} from './exploration-completion.js';
 let activeStore;
 export async function request(body, reviewId) {
   const response = await fetch('/api/review-native' + (reviewId ? `?review=${encodeURIComponent(reviewId)}` : ''), {
@@ -23,8 +27,10 @@ export const onInviteSessionChange = () => {};
 export const renderInviteLogin = () => '';
 export const bindInviteLogin = () => {};
 export async function clearInviteSession() { await request({ command: 'logout' }); location.assign('/review/login'); }
+const preferredCamp = () => new URLSearchParams(globalThis.location?.search || '').get('camp') === 'exploration' && activeStore?.capabilities?.isSuperAdmin === true ? 'exploration' : 'novice';
 export function newDraft() {
-  return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp: 'novice', domain: '产品开发', publishingDepartment: '', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
+  const camp = preferredCamp();
+  return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp, ...(camp==='exploration'?{order:nextExplorationOrder(activeStore?.data.tasks),completionMode:'learning',assessmentUrl:'',taskFiles:[]}:{}), domain: '产品开发', publishingDepartment: '', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
 }
 export class ApiStore {
   reviewLeases = new Map();
@@ -46,6 +52,18 @@ export class ApiStore {
     try { draft = JSON.parse(localStorage.getItem(store.storageKey)); } catch { /* No actor draft. */ }
     store.data.draft = draft && typeof draft.id === 'string' && Array.isArray(draft.badges) && Array.isArray(draft.materials) ? draft : newDraft();
     store.data.draft = normalizeBadgeWeights(store.data.draft);
+    if(store.data.draft.camp==='exploration'){
+      const saved=store.getTask(store.data.draft.id);
+      if(saved){
+        store.data.draft.stableKey=saved.stableKey;
+        store.data.draft.pinnedLast=isPinnedExplorationTask(saved);
+        if(store.data.draft.pinnedLast)store.data.draft.order=saved.order;
+      }
+      store.data.draft.completionMode ??= saved?.completionMode ?? 'assessment';
+      store.data.draft.assessmentUrl ??= saved?.assessmentUrl ?? '';
+      store.data.draft.taskFiles ??= saved?.taskFiles ?? [];
+      if(!validExplorationOrder(store.data.draft.order))store.data.draft.order=saved?.order ?? nextExplorationOrder(store.data.tasks);
+    }
     return store;
   }
   async refresh() {
@@ -63,9 +81,12 @@ export class ApiStore {
       level: ({ 初级: 1, 中级: 2, 高级: 3 })[m.certification.level] || 1, levelName: m.certification.level, method: 'admin', status: 'verified' }));
   }
   getTask(id) { return this.data.tasks.find(t => t.id === id); }
-  save() { localStorage.setItem(this.storageKey, JSON.stringify(this.data.draft)); }
+  save() { requireTaskConfiguration(this.data.draft, this.capabilities?.isSuperAdmin, this.getTask(this.data.draft.id)); localStorage.setItem(this.storageKey, JSON.stringify(this.data.draft)); }
   async saveTask(task) {
+    requireTaskConfiguration(task, this.capabilities?.isSuperAdmin, this.getTask(task?.id));
     if (!this.operatorId) throw new Error('当前账号没有任务配置权限。');
+    const errors = validateTaskFieldLimits(task);
+    if (errors.length) throw new Error(errors.join('；'));
     const saved = taskView(await request({ command: 'saveTask', task: taskWrite(task) }));
     this.data.draft = structuredClone(saved);
     this.data.tasks = [saved, ...this.data.tasks.filter(t => t.id !== saved.id)];
@@ -73,7 +94,20 @@ export class ApiStore {
     try { await this.refresh(); } catch { /* Keep the acknowledged saved task; poll retries. */ }
     return saved;
   }
-  async archiveTask(task) { await request({ command: 'archiveTask', task: taskWrite(task) }); await this.refresh(); }
+  async archiveTask(task) { requireTaskConfiguration(task, this.capabilities?.isSuperAdmin, this.getTask(task?.id)); await request({ command: 'archiveTask', task: taskWrite(task) }); await this.refresh(); }
+  async deleteTask(task) {
+    requireTaskConfiguration(task, this.capabilities?.isSuperAdmin, this.getTask(task?.id));
+    if (!this.operatorId) throw new Error('当前账号没有任务配置权限。');
+    if (!this.getTask(task?.id)) throw new Error('任务已删除或不存在，请刷新列表。');
+    const result = await request({ command: 'deleteTask', task: taskWrite(task), key: crypto.randomUUID() });
+    this.data.tasks = this.data.tasks.filter(row => row.id !== task.id && row.sourceTaskId !== task.id);
+    if (this.data.draft?.id === task.id || this.data.draft?.sourceTaskId === task.id) {
+      this.data.draft = newDraft();
+      try { await this.save(); } catch { /* The deleted task stays removed even if the empty editor draft cannot be cached. */ }
+    }
+    try { await this.refresh(); } catch { /* Keep the acknowledged deletion; background polling retries. */ }
+    return result;
+  }
   async loadSubmission(id) {
     const base = this.data.submissions.find(s => s.id === id);
     if (!base) throw new Error('未找到该提交，请刷新列表。');
@@ -108,20 +142,24 @@ export function createJourneyService({ store }) {
   return {
     tasks: {
     submitPublication: async (task, verified) => {
+      requireTaskConfiguration(task, store.capabilities?.isSuperAdmin, store.getTask?.(task?.id));
+      if (task.camp === 'exploration') throw new Error('探索营任务由超级管理员直接发布，无需提交发布审核。');
       const saved=taskView(await request({command:'submitPublication',id:task.id,payload:{expected_revision:task.revision,verified_material_urls:verified}}));
       store.data.draft=structuredClone(saved);store.save();await store.refresh();return saved;
     },
     reviewPublication: async (id, {decision,comment}) => {
       const row=store.data.publicationRequests.find(r=>r.id===id);
       if(!row)throw new Error('申请已更新，请刷新。');
+      if(row.task?.camp==='exploration' && decision==='approved')throw new Error('探索营任务由超级管理员直接发布，请退回此历史申请。');
       const result=await request({command:'reviewPublication',id,payload:{expected_revision:row.revision,decision,comment}});
       await store.refresh();return result;
     },
     publish: async (task, reviewerId, verified, key) => {
-      if (!store.members.some(m => m.id === reviewerId && m.roles.includes('REVIEWER'))) throw new Error('请选择内容复核人。');
-      const links = [...new Set(task.materials.filter(m => m.type === 'link').map(m => m.url))];
-      if (links.some(url => !verified.includes(url))) throw new Error('请确认全部学习材料链接可供学员访问。');
-      const saved = taskView(await request({ command: 'publishTask', task: taskWrite(task), payload: { reviewerId, verified: links }, key }));
+      requireTaskConfiguration(task, store.capabilities?.isSuperAdmin, store.getTask?.(task?.id));
+      if (task.camp !== 'exploration' && !store.members.some(m => m.id === reviewerId && m.roles.includes('REVIEWER'))) throw new Error('请选择内容复核人。');
+      const links = taskResourceLinks(task);
+      if (links.some(url => !verified.includes(url))) throw new Error('请确认全部学习材料与任务链接可供学员访问。');
+      const saved = taskView(await request({ command: 'publishTask', task: taskWrite(task), payload: { ...(task.camp === 'exploration' ? {} : {reviewerId}), verified: links }, key }));
       store.data.draft = structuredClone(saved);
       store.data.tasks = [saved, ...store.data.tasks.filter(t => t.id !== saved.id)];
       try { store.save(); } catch { /* Published record is durable on server. */ }

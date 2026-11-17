@@ -15,6 +15,10 @@ const submissionComposer = await readFile(
 const actions = await readFile(new URL("../src/app/actions.ts", import.meta.url), "utf8");
 const feishuUrl = await readFile(new URL("../src/lib/feishu-url.ts", import.meta.url), "utf8");
 const learnerHome = await readFile(new URL("../src/app/app/page.tsx", import.meta.url), "utf8");
+const reviewerQueue = await readFile(
+  new URL("../src/app/review/route.ts", import.meta.url),
+  "utf8",
+);
 const liveStatusSignal = await readFile(
   new URL("../src/app/live-status-signal.tsx", import.meta.url),
   "utf8",
@@ -65,4 +69,12 @@ test("draft saving always gives a visible result and remains manually actionable
   assert.match(submissionComposer, /当前内容已经保存/);
   assert.match(submissionComposer, /保存失败，修改仍保留在本机/);
   assert.doesNotMatch(submissionComposer, /disabled=\{submitPending \|\| draftPending \|\| !isOnline \|\| currentSnapshot === savedSnapshot\}/);
+});
+
+test("the reviewer route serves the retained management system after checking reviewer identity", () => {
+  assert.match(reviewerQueue, /export async function GET\(\)/);
+  assert.match(reviewerQueue, /identityPageRequest\("\/api\/v1\/reviews\?kind=FORMAL_EVALUATION", "REVIEWER"\)/);
+  assert.match(reviewerQueue, /public\/review-native\/index\.html/);
+  assert.match(reviewerQueue, /x-nonce/);
+  assert.match(reviewerQueue, /"Cache-Control": "no-store"/);
 });

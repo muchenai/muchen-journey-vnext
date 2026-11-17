@@ -7,13 +7,24 @@ export type VillageTaskCommand = "claim" | "draft" | "submit" | "cancel";
 export type VillageTask = PracticeTask & {
   status:ModuleStatusName; versionId:string; assignmentId:string|null; revision:number|null;
   claimed?:boolean;
+  completionMode?: "learning" | "assessment" | "checkin";
+  assessmentUrl?: string;
+  openedMaterials?: number[];
+  completedAt?: string | null;
+  checkinConfirmed?: boolean;
+  minimumAnswerLength?: number;
   answer:string; publishedAt:string; criteria:string[]; reviewMode:string; passScore:number;
   unlockTaskPoints:number;
   publishingDepartment:string;
   rewardAllocations?:{id:string; points:number}[];
-  materials:{name:string; type:string; text:string; url:string}[];
+  materials:{name:string; type:string; text:string; url:string; mime?:string; size?:number}[];
+  taskFiles?: VillageTask["materials"];
   rubric:{id:string; name:string; description:string; points:number}[];
   feedback:{text:string; at:string; decision:string}|null;
+  order?: number;
+  submittedAt?: string | null;
+  activityRecords?: { id: string; body: string; submittedAt: string; status: string }[];
+  feedbackRecords?: { id: string; text: string; decision: string; reviewedAt: string }[];
 };
 
 export function isVillageTaskClaimed(task: Pick<VillageTask, "status" | "claimed">) {

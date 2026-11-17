@@ -27,7 +27,8 @@ test("the runtime projection is an exact hash-bound view of the four canonical p
   assert.deepEqual(index.packages.map(({ module_key }) => module_key), expectedKeys);
 
   for (const indexed of index.packages) {
-    const bytes = await readFile(new URL(indexed.path, root));
+    // Git's canonical package bytes use LF even when Windows checks out CRLF.
+    const bytes = Buffer.from((await readFile(new URL(indexed.path, root), "utf8")).replace(/\r\n/g, "\n"));
     assert.equal(createHash("sha256").update(bytes).digest("hex"), indexed.file_sha256);
     const canonical = JSON.parse(bytes.toString("utf8"));
     const projected = bindings.modules.find(({ module_key }) => module_key === indexed.module_key);

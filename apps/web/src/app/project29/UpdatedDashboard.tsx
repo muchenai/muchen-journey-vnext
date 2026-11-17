@@ -1,11 +1,14 @@
-import { useState, useEffect, type ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { executionTasks } from "./ExecutionPages";
 import type { PreviewIdentity } from "./previewStorage";
 import { useJourney, useTaskStatus } from "./journey-context";
 import { learningStreak } from "./taskRecords";
 import { filterDashboardTasks, useDashboardSearch } from "./dashboardSearch";
+import { canOpenExplorationTask } from "./explorationTaskState";
 
-import { DashboardTaskGrid, dashboardStatusLabels, prioritizeDashboardTasks } from "./DashboardTaskGrid";
+import { DashboardTaskGrid, dashboardStatusLabels, prioritizeDashboardTasks, type DashboardTaskEntry } from "./DashboardTaskGrid";
+import type { VillageTask } from "./useVillageTasks";
+import type { ExplorationTreasures } from "@/lib/exploration-treasures";
 import "./updatedDashboard.css";
 const assetPathPrefix = "/assets/project29/home-4062";
 const img0454321 = `${assetPathPrefix}/0ba79.webp`;
@@ -47,25 +50,63 @@ const imgFrame8 = `${assetPathPrefix}/dafc4.svg`;
 const imgFrame9 = `${assetPathPrefix}/35d7d.svg`;
 
 
-export function UpdatedDashboard({ identity, decoration, activeNavigationDecoration, idleNavigationDecoration }: {
+type PublishedDashboardTask = VillageTask & {
+  order?: number;
+  submittedAt?: string | null;
+  activityRecords?: { id: string; body: string; submittedAt: string; status: string }[];
+  feedbackRecords?: { id: string; text: string; decision: string; reviewedAt: string }[];
+};
+const publishedStatus = (task: PublishedDashboardTask): DashboardTaskEntry["status"] =>
+  task.status === "returned" ? "revision" : task.status === "available" ? "active" : task.status;
+
+export function UpdatedDashboard({ identity, decoration, activeNavigationDecoration, idleNavigationDecoration,
+  publishedTasks, onOpenTask, onOpenFeedback, treasures, onOpenTreasures }: {
   identity: PreviewIdentity | null;
   decoration: ReactNode;
   activeNavigationDecoration: ReactNode;
   idleNavigationDecoration: ReactNode;
+  publishedTasks?: PublishedDashboardTask[];
+  onOpenTask?: (taskId: string) => void;
+  onOpenFeedback?: (taskId: string) => void;
+  treasures?: ExplorationTreasures;
+  onOpenTreasures?: () => void;
 }) {
 const { experience, learnerName } = useJourney();
 const { query, onClearSearch } = useDashboardSearch();
 const searching = Boolean(query.trim());
 const taskStatus = useTaskStatus();
-const submissions = (experience?.activityRecords ?? []).flatMap(item => {
+const configurable = publishedTasks !== undefined;
+const treasureCount = Math.max(0, Math.min(4, Number.isFinite(treasures?.count) ? Math.floor(treasures!.count) : 0));
+const configuredTasks = [...(publishedTasks ?? [])].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+const configuredEntries: DashboardTaskEntry[] = configuredTasks.map((task, index) => ({
+  task: { id: task.id, title: task.title, name: task.title, description: task.description, completionMode: task.completionMode },
+  index, order: task.order ?? index + 1, status: publishedStatus(task),
+}));
+const validDate = (value: string | null | undefined): value is string => !!value && Number.isFinite(Date.parse(value));
+const submissions = configurable ? configuredTasks.flatMap((task, index) => {
+  const records = task.activityRecords?.length ? task.activityRecords : validDate(task.submittedAt)
+    ? [{ id: `${task.id}:submission`, body: task.answer, submittedAt: task.submittedAt, status: task.status }] : [];
+  return records.filter(record => validDate(record.submittedAt)).map(record => ({
+    id: record.id, task: configuredEntries[index].task, index,
+    evidence: { record: record.body, submittedAt: record.submittedAt, status: record.status },
+  }));
+}) : (experience?.activityRecords ?? []).flatMap(item => {
   const task = executionTasks[item.position - 1];
-  return task ? [{task, index:item.position - 1, evidence:{record:item.body, submittedAt:item.submittedAt, status:item.status}}] : [];
+  return task ? [{id: task.id, task, index:item.position - 1, evidence:{record:item.body, submittedAt:item.submittedAt, status:item.status}}] : [];
 });
-const completed = experience?.completedStages ?? 0;
-const inProgress = executionTasks.filter((_, index) => ["active", "revision"].includes(taskStatus(index))).length;
-const pending = submissions.filter(item => ["SUBMITTED", "IN_REVIEW"].includes(item.evidence.status))
+const completed = configurable ? configuredTasks.filter(task => task.status === "completed").length : experience?.completedStages ?? 0;
+const totalTasks = configurable ? configuredTasks.length : executionTasks.length;
+const pending = (configurable ? configuredTasks.flatMap((task, index) => task.status === "pending" ? [{
+  task: configuredEntries[index].task, index,
+  evidence: { record: task.answer, submittedAt: task.submittedAt || task.activityRecords?.at(-1)?.submittedAt || "", status: "SUBMITTED" },
+}] : []) : submissions.filter(item => ["SUBMITTED", "IN_REVIEW"].includes(item.evidence.status)))
   .sort((a,b)=>Date.parse(b.evidence.submittedAt)-Date.parse(a.evidence.submittedAt));
-const feedback = (experience?.reviewFeedback ?? []).flatMap(item => item.records.map(record => ({
+const feedback = configurable ? configuredTasks.flatMap((task, index) => {
+  const records = task.feedbackRecords?.length ? task.feedbackRecords : task.feedback
+    ? [{ id: `${task.id}:feedback`, text: task.feedback.text, decision: task.feedback.decision, reviewedAt: task.feedback.at }] : [];
+  return records.map(record => ({ id: record.id, task: configuredEntries[index].task, index, assignmentId: task.id,
+    createdAt: record.reviewedAt, message: record.text, decision: record.decision }));
+}).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)) : (experience?.reviewFeedback ?? []).flatMap(item => item.records.map(record => ({
   ...record, task:executionTasks[item.position - 1], index:item.position - 1,
   assignmentId:item.assignmentId, createdAt:record.reviewedAt, message:record.comment,
 }))).filter(item=>item.task).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
@@ -74,13 +115,20 @@ const formatRecordDate = (date: string) => new Date(date).toLocaleString("zh-CN"
   month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
 });
 
-const orderedTasks = prioritizeDashboardTasks(executionTasks.map((task, index) => ({ task, index, status: taskStatus(index) })));
-const matchingTasks = filterDashboardTasks(orderedTasks, query);
-const currentEntry = orderedTasks[0];
-const currentTaskIndex = currentEntry.index;
-const task = currentEntry.task;
-const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.slice(-2),actorName:learnerName,
-  taskTitle:item.task.title,action:"submitted",createdAt:item.evidence.submittedAt}));
+const orderedTasks = configurable ? configuredEntries : prioritizeDashboardTasks(executionTasks.map((task, index) => ({ task, index, status: taskStatus(index) })));
+const matchingTasks = filterDashboardTasks(prioritizeDashboardTasks(orderedTasks), query);
+const currentEntry = configurable ? prioritizeDashboardTasks(configuredEntries)[0] : orderedTasks[0];
+const currentTaskIndex = currentEntry?.index ?? -1;
+const task = currentEntry?.task ?? { id: "", title: "暂无已发布任务", name: "暂无已发布任务", description: "管理员发布探索营任务后，会在这里显示。" };
+const currentTaskUnavailable = configurable && !!currentEntry && !canOpenExplorationTask(currentEntry);
+const reviewerName = configurable ? configuredTasks[currentTaskIndex]?.mentor || "审核人待分配" : "李魔王老师";
+const openPublishedTask = (event: MouseEvent, taskId: string) => {
+  if (!configurable) return;
+  event.stopPropagation();
+  if (taskId && configuredEntries.some(entry => entry.task.id === taskId && canOpenExplorationTask(entry))) onOpenTask?.(taskId);
+};
+const activity = submissions.map(item=>({id:item.id, actorId:learnerName.slice(-2),actorName:learnerName,
+  taskTitle:item.task.title,action:item.evidence.status === "LEARNING_COMPLETED" ? "完成了学习" : item.evidence.status === "CHECKIN_COMPLETED" ? "完成了培训签退" : "提交了任务",createdAt:item.evidence.submittedAt})).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
   return (
     <div className="updated-dashboard content-stretch flex flex-col items-center justify-center relative size-full" data-node-id="4062:426" style={{ backgroundImage: "linear-gradient(203.81643124441072deg, rgb(0, 6, 12) 30.098%, rgb(21, 45, 76) 82.87%, rgb(0, 8, 17) 95.576%), url(\"data:image/svg+xml;utf8,<svg viewBox='0 0 1920 1080' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)' opacity='1'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(0 -106.96 -190.15 0 1305.6 302.4)'><stop stop-color='rgba(11,67,132,1)' offset='0'/><stop stop-color='rgba(9,51,103,1)' offset='0.135'/><stop stop-color='rgba(6,35,73,1)' offset='0.27'/><stop stop-color='rgba(3,19,41,1)' offset='0.63'/></radialGradient></defs></svg>\"), linear-gradient(180deg, rgb(4, 24, 46) 0%, rgb(2, 14, 30) 100%)" }} data-name="学习成长中枢">
       <div className="h-[1080px] relative shrink-0 w-full" data-node-id="4043:10" data-name="Container">
@@ -106,11 +154,11 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             <div className="content-stretch flex flex-col items-start relative shrink-0" data-node-id="4062:585" data-name="Bold Text">
               <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#8ed8ff] text-[15.587px] whitespace-nowrap" data-node-id="4062:586">完成{completed}项</p>
             </div>
-            <progress className="dashboard-exploration-progress" value={completed} max={executionTasks.length}
-              aria-label="探索营完成进度" aria-valuetext={`${completed}/${executionTasks.length} 项已完成`}
+            <progress className="dashboard-exploration-progress" value={completed} max={totalTasks || 1}
+              aria-label="探索营完成进度" aria-valuetext={`${completed}/${totalTasks} 项已完成`}
               data-node-id="4062:587" />
             <div className="content-stretch flex flex-col items-start relative shrink-0" data-node-id="4062:589" data-name="Small">
-              <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-normal leading-[normal] not-italic relative shrink-0 text-[#eff6ff] text-[12.989px] whitespace-nowrap" data-node-id="4062:590">{completed}/{executionTasks.length}</p>
+              <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-normal leading-[normal] not-italic relative shrink-0 text-[#eff6ff] text-[12.989px] whitespace-nowrap" data-node-id="4062:590">{completed}/{totalTasks}</p>
             </div>
           </div>
           <div className="absolute content-stretch flex flex-col items-start left-[14.34px] pt-[11.69px] right-[14.34px] top-[125.57px]" data-node-id="4062:591" data-name="Container:margin">
@@ -135,7 +183,14 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
                   <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[0] not-italic relative shrink-0 text-[#ffd65d] text-[0px] whitespace-nowrap" data-node-id="4062:602"><span className="leading-[normal] text-[19.607px]">{completed} </span><span className="leading-[normal] text-[13.071px] text-white">个</span></p>
                 </div>
               </div>
-              <div className="border-[#274c73] border-[1.089px] border-solid col-3 content-stretch flex flex-col h-[85px] items-start justify-self-stretch px-[8.714px] py-[7.625px] relative rounded-[6.536px] row-1 self-start shrink-0" data-node-id="4062:603" data-name="Container">
+              {configurable ? <button type="button" className="dashboard-treasure-stat col-3 row-1 self-start justify-self-stretch" data-node-id="4062:603" data-complete={treasureCount === 4}
+                aria-label={`已探索 ${treasureCount} 个宝藏，共4个，查看宝藏收藏`}
+                title="首尾学习任务首次完成后必掉宝藏，中间任务随机掉落；总共 4 件，集齐后不再掉落。点击查看宝藏收藏。"
+                onClick={event => { event.stopPropagation(); onOpenTreasures?.(); }}>
+                <span className="dashboard-treasure-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10V7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3M3 10h18v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" strokeWidth="1.4" /><path d="M3 13h7m4 0h7M8 4v6m8-6v6m-6 2h4v4h-4v-4Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg><span>已探索宝藏</span><span className="dashboard-treasure-arrow" aria-hidden="true">›</span></span>
+                <span className="dashboard-treasure-value"><strong>{treasureCount}</strong><span> / 4</span>{treasureCount === 4 && <small>已集齐</small>}</span>
+                <span className="dashboard-treasure-slots" aria-hidden="true">{[0, 1, 2, 3].map(index => <i key={index} data-found={index < treasureCount} />)}</span>
+              </button> : <div className="border-[#274c73] border-[1.089px] border-solid col-3 content-stretch flex flex-col h-[85px] items-start justify-self-stretch px-[8.714px] py-[7.625px] relative rounded-[6.536px] row-1 self-start shrink-0" data-node-id="4062:603" data-name="Container">
                 <div className="h-[15.256px] relative shrink-0 w-full" data-node-id="4062:604" data-name="Container">
                   <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-normal leading-[normal] left-0 not-italic text-[#a0b7d1] text-[10.893px] top-0 whitespace-nowrap" data-node-id="4062:605">
                     ♛ 累计获得经验
@@ -144,7 +199,7 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
                 <div className="content-stretch flex flex-col h-[29.422px] items-start pt-[10px] relative shrink-0 w-[123.399px]" data-node-id="4062:606" data-name="Bold Text">
                   <p className="[word-break:break-word] font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#ffd65d] text-[19.607px] whitespace-nowrap" data-node-id="4062:607">— 经验</p>
                 </div>
-              </div>
+              </div>}
             </div>
           </div>
         </div>
@@ -154,8 +209,8 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
           </div>
           <div className="dashboard-records" data-node-id="2006:153">
               {pending.length === 0 ? <p className="dashboard-record-empty">暂无待审核任务，提交任务后将在这里显示。</p> : pending.map(({ task, index, evidence }) => <div className="dashboard-record" key={task.id}>
-                <button type="button" className="dashboard-record-title" data-action="open-task" data-task-index={index}>{task.title} →</button>
-                <div className="dashboard-record-meta"><time dateTime={evidence.submittedAt}>{formatRecordDate(evidence.submittedAt)} 提交</time><span>待审核</span></div>
+                <button type="button" className="dashboard-record-title" data-action={configurable ? undefined : "open-task"} data-task-index={index} onClick={event => openPublishedTask(event, task.id)}>{task.title} →</button>
+                <div className="dashboard-record-meta">{validDate(evidence.submittedAt) && <time dateTime={evidence.submittedAt}>{formatRecordDate(evidence.submittedAt)} 提交</time>}<span>待审核</span></div>
                 <p className="dashboard-record-preview">{evidence.record}</p>
 
               </div>)}
@@ -169,8 +224,8 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
           </div>
           <div className="dashboard-records" data-node-id="2006:166">
               {feedback.length === 0 ? <p className="dashboard-record-empty">暂无任务反馈。审核完成后将在这里显示。</p> : feedback.map(entry => <div className="dashboard-record" key={`${entry.task.id}-${entry.id}`}>
-                <button type="button" className="dashboard-record-title" data-action="review-feedback" data-assignment-id={entry.assignmentId}>{entry.task.title} →</button>
-                <div className="dashboard-record-meta"><time dateTime={entry.createdAt}>{formatRecordDate(entry.createdAt)}</time><span>{entry.decision === "PASS" ? "审核通过" : "退回修改"}</span></div>
+                <button type="button" className="dashboard-record-title" data-action={configurable ? undefined : "review-feedback"} data-assignment-id={entry.assignmentId} onClick={configurable ? event => {event.stopPropagation(); (onOpenFeedback ?? onOpenTask)?.(entry.task.id)} : undefined}>{entry.task.title} →</button>
+                <div className="dashboard-record-meta">{validDate(entry.createdAt) && <time dateTime={entry.createdAt}>{formatRecordDate(entry.createdAt)}</time>}<span>{entry.decision === "PASS" || entry.decision === "APPROVE" ? "审核通过" : "退回修改"}</span></div>
                 <p className="dashboard-record-message">{entry.message}</p>
               </div>)}
             </div>
@@ -180,23 +235,23 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             <div className="figma-stroke figma-stroke-task -translate-y-1/2 absolute border border-[rgba(30,57,97,0.85)] border-solid h-[318px] left-[276px] rounded-[10px] top-[calc(50%-43px)] w-[708.526px]" data-node-id="4043:202" style={{ backgroundImage: "linear-gradient(266.87393614749124deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }}>{decoration}</div>
             <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-black leading-[normal] left-[308.08px] not-italic text-[#eff6ff] text-[24.094px] top-[361.01px] whitespace-nowrap" data-node-id="4043:203">
               当前任务
-            </p><span className="dashboard-current-status" data-status={currentEntry.status}>{dashboardStatusLabels[currentEntry.status]}</span>
+            </p><span className="dashboard-current-status" data-status={currentEntry?.status}>{currentEntry ? dashboardStatusLabels[currentEntry.status] : "等待发布"}</span>
             <div className="absolute contents left-[423.14px] top-[369.38px]" data-node-id="4043:204">
-              <div className="dashboard-current-task-tag" data-node-id="4043:205"><span data-node-id="4043:206">探索任务·{String(currentTaskIndex + 1).padStart(2, "0")}</span></div>
+              <div className="dashboard-current-task-tag" data-node-id="4043:205" title={currentEntry ? `探索任务·${String(currentEntry.order ?? currentTaskIndex + 1).padStart(2, "0")}` : undefined}><span data-node-id="4043:206">探索任务·{currentEntry ? String(currentEntry.order ?? currentTaskIndex + 1).padStart(2, "0") : "—"}</span></div>
             </div>
             <div className="absolute border-[1.49px] border-[rgba(30,57,97,0.85)] border-solid h-[140.808px] left-[308.08px] rounded-[13.41px] top-[417.88px] w-[119.947px]" data-node-id="4043:207" data-name="image 87">
               <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[13.41px]">
                 <img alt="" className="absolute h-[108.09%] left-[-7.39%] max-w-none top-[-4.62%] w-[113.72%]" src={imgImage87} />
               </div>
             </div>
-            <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-bold leading-[normal] left-[447.55px] not-italic text-[#eff6ff] text-[20.921px] top-[414.01px] tracking-[0.9489px] whitespace-nowrap" data-node-id="4043:208">{currentTaskIndex === 0 ? "公司基础介绍材料" : task.name}</p>
+            <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-bold leading-[normal] left-[447.55px] not-italic text-[#eff6ff] text-[20.921px] top-[414.01px] tracking-[0.9489px] whitespace-nowrap" data-node-id="4043:208" title={task.title}>{configurable ? task.title : currentTaskIndex === 0 ? "公司基础介绍材料" : task.name}</p>
             <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-normal h-[87.171px] leading-[normal] left-[447.55px] not-italic text-[#9ab0c6] text-[13.947px] text-justify top-[460.04px] tracking-[2.0921px] w-[223.855px]" data-node-id="4043:209">{task.description.trim()}</p>
             <div className="[word-break:break-word] absolute contents left-[703.49px] not-italic top-[417.8px]" data-node-id="4043:210">
               <p className="absolute font-['Source_Han_Sans_SC'] font-normal leading-[normal] left-[703.49px] text-[#9ab0c6] text-[8.91px] top-[417.8px] whitespace-nowrap" data-node-id="4043:211">
                 ◷ 预计用时
               </p>
               <p className="absolute font-['Source_Han_Sans_SC'] font-black leading-[normal] left-[703.49px] text-[#ebf5ff] text-[10.395px] top-[437.99px] whitespace-nowrap" data-node-id="4043:212">
-                {experience?.stagePosition === currentTaskIndex + 1 ? `${experience.estimatedMinutes} 分钟` : "—"}
+                {!configurable && experience?.stagePosition === currentTaskIndex + 1 ? `${experience.estimatedMinutes} 分钟` : "—"}
               </p>
               <p className="absolute font-['Source_Han_Sans_SC'] font-normal leading-[normal] left-[703.49px] text-[#9ab0c6] text-[8.91px] top-[459.75px] whitespace-nowrap" data-node-id="4043:213">
                 ▣ 截止时间
@@ -239,13 +294,13 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
                 </p>
               </div>
             </div>
-            <button type="button" className="absolute bg-gradient-to-r border-[#75f5ff] border-[0.611px] border-solid content-stretch flex from-[#42dced] h-[38.679px] items-center justify-center left-[308.08px] px-[3.667px] py-[0.611px] rounded-[6.722px] shadow-[0px_0px_9.778px_0px_#2edfff,0px_0px_19.556px_0px_rgba(18,195,255,0.55)] to-[#5ceeff] top-[586.1px] via-[#31c9f5] via-[45%] w-[500.013px]" data-action="open-task" data-task-index={currentTaskIndex} data-node-id="4043:227" data-name="Button">
+            <button type="button" className="absolute bg-gradient-to-r border-[#75f5ff] border-[0.611px] border-solid content-stretch flex from-[#42dced] h-[38.679px] items-center justify-center left-[308.08px] px-[3.667px] py-[0.611px] rounded-[6.722px] shadow-[0px_0px_9.778px_0px_#2edfff,0px_0px_19.556px_0px_rgba(18,195,255,0.55)] to-[#5ceeff] top-[586.1px] via-[#31c9f5] via-[45%] w-[500.013px]" data-action={configurable ? undefined : "open-task"} data-task-index={currentTaskIndex} data-node-id="4043:227" data-name="Button" disabled={!currentEntry || currentTaskUnavailable} onClick={event => openPublishedTask(event, task.id)}>
               <div className="content-stretch flex gap-[6.329px] items-center relative shrink-0" data-node-id="4043:228">
                 <div className="h-[14.667px] relative shrink-0 w-[12.833px]" data-node-id="4043:229" data-name="Vector (Stroke)">
                   <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVectorStroke} />
                 </div>
                 <p className="font-['Source_Han_Sans_SC'] font-black leading-[normal] not-italic relative shrink-0 text-[#03245f] text-[12.833px] text-center tracking-[2.4444px] w-max whitespace-nowrap" data-node-id="4043:230">
-                  点击查看当前任务详情
+                  {currentTaskUnavailable ? "当前任务暂不可用" : currentEntry ? "点击查看当前任务详情" : "等待管理员发布任务"}
                 </p>
               </div>
             </button>
@@ -257,14 +312,14 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
               <p className="leading-[normal]">和独特视角!”</p>
             </div>
             <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-normal leading-[normal] left-[880.63px] not-italic text-[#b1cae3] text-[12.426px] top-[472.24px] whitespace-nowrap" data-node-id="4043:233">
-              李魔王老师
+              {reviewerName}
             </p>
             <p className="[word-break:break-word] absolute font-['Source_Han_Sans_SC'] font-normal leading-[normal] left-[874.54px] not-italic text-[#69c9d6] text-[12.426px] top-[498.12px] whitespace-nowrap" data-node-id="4043:234">
-              产品设计导师
+              {configurable ? "任务审核人" : "产品设计导师"}
             </p>
             <div className="absolute border-[#86bbdf] border-[0.902px] border-solid grid grid-cols-[_33.38px] grid-rows-[_33.38px] left-[893.56px] rounded-[17.591px] size-[35.181px] top-[428.1px]" data-node-id="4043:235" style={{ backgroundImage: "linear-gradient(145.0000003379585deg, rgb(240, 217, 192) 6.1733%, rgb(85, 115, 143) 93.827%)" }} data-name="Container">
               <p className="[word-break:break-word] col-1 font-['Source_Han_Sans_SC'] font-black justify-self-center leading-[normal] not-italic relative row-1 self-center shrink-0 text-[#09223c] text-[14.433px] whitespace-nowrap" data-node-id="4043:236">
-                李
+                {configurable ? reviewerName.slice(0, 1) : "李"}
               </p>
             </div>
             <div className="absolute flex h-[263.605px] items-center justify-center left-[837.38px] top-[361.01px] w-0" data-node-id="4043:237">
@@ -277,8 +332,8 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
               </div>
             </div>
             <div className="absolute contents left-[859px] top-[592.54px]" data-node-id="4043:238">
-              <button type="button" className="absolute border-[1.395px] border-[rgba(30,57,97,0.85)] border-solid h-[32.079px] left-[859px] rounded-[12.553px] top-[592.54px] w-[104.605px]" data-action="mentor-profile" data-node-id="4043:239" style={{ backgroundImage: "linear-gradient(265.4300515964736deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }}></button>
-              <button type="button" className="absolute flex items-center justify-center font-['Source_Han_Sans_SC'] font-normal leading-none left-[859px] h-[32.079px] w-[104.605px] not-italic text-[#b1cae3] text-[12.426px] top-[592.54px] whitespace-nowrap" data-action="mentor-profile" data-node-id="4043:240">
+              <button type="button" className="absolute border-[1.395px] border-[rgba(30,57,97,0.85)] border-solid h-[32.079px] left-[859px] rounded-[12.553px] top-[592.54px] w-[104.605px]" data-action="mentor-profile" data-mentor-name={reviewerName} data-node-id="4043:239" style={{ backgroundImage: "linear-gradient(265.4300515964736deg, rgba(14, 25, 43, 0.86) 1.1026%, rgba(22, 39, 71, 0.76) 16.424%, rgba(12, 26, 44, 0.86) 62.839%, rgba(10, 35, 76, 0.84) 98.83%)" }}></button>
+              <button type="button" className="absolute flex items-center justify-center font-['Source_Han_Sans_SC'] font-normal leading-none left-[859px] h-[32.079px] w-[104.605px] not-italic text-[#b1cae3] text-[12.426px] top-[592.54px] whitespace-nowrap" data-action="mentor-profile" data-mentor-name={reviewerName} data-node-id="4043:240">
                 查看导师资料
               </button>
             </div>
@@ -485,7 +540,7 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             {activity.length === 0 ? <p className="dashboard-task-activity-empty">暂无任务日志，完成或修改任务后将在这里显示。</p> : activity.map(entry => <div className="dashboard-task-activity-row" key={entry.id}>
               <div className="dashboard-task-activity-avatar" aria-hidden="true">{entry.actorId}</div>
               <div className="dashboard-task-activity-content">
-                <p><strong>{entry.actorName}</strong> 提交了任务 <span>{entry.taskTitle}</span></p>
+                <p><strong>{entry.actorName}</strong> {entry.action} <span>{entry.taskTitle}</span></p>
                 <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</time>
               </div>
             </div>)}
@@ -497,9 +552,9 @@ const activity = submissions.map(item=>({id:item.task.id, actorId:learnerName.sl
             <div><h2>探索营任务搜索</h2><p className="dashboard-task-search-count" role="status" aria-live="polite">找到 {matchingTasks.length} 个任务</p></div>
             <button type="button" className="dashboard-search-clear" onClick={onClearSearch}>清空搜索</button>
           </header>
-          {matchingTasks.length ? <DashboardTaskGrid key={identity} entries={matchingTasks} decoration={decoration} showDescription /> :
+          {matchingTasks.length ? <DashboardTaskGrid key={identity} entries={matchingTasks} decoration={decoration} showDescription onOpenTask={configurable ? onOpenTask : undefined} /> :
             <div className="dashboard-task-search-empty"><h3>暂无相关任务</h3><p>请尝试其他关键词。</p></div>}
-        </section> : <DashboardTaskGrid key={identity} entries={orderedTasks.filter(entry => entry.index !== currentTaskIndex)} decoration={decoration} />}
+        </section> : <DashboardTaskGrid key={identity} entries={orderedTasks.filter(entry => entry.index !== currentTaskIndex)} decoration={decoration} onOpenTask={configurable ? onOpenTask : undefined} />}
       </div>
     </div>
   );

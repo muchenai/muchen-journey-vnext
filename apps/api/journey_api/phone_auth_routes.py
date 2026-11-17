@@ -636,6 +636,17 @@ def get_completion_code(
     )
     if temporary_identity is None:
         return envelope(request, {"status": "NOT_REQUIRED", "code": None})
+    # Dynamic exploration issues its code only after the explicit graduation
+    # action. Existing codes and their redemption lifetime remain authoritative.
+    from journey_api.exploration_models import ExplorationProgress
+    progress = session.get(ExplorationProgress, (actor.organization_id, actor.learner_record_id))
+    existing_code = session.scalar(select(CompletionCode).where(CompletionCode.user_id == actor.learner_record_id,
+        CompletionCode.organization_id == actor.organization_id))
+    if progress and existing_code:
+        if existing_code.used_at:
+            return envelope(request, {"status": "MIGRATED", "code": None})
+        return envelope(request, {"status": "READY", "code": decrypt_completion_code(existing_code.code_ciphertext),
+            "expires_at": existing_code.expires_at})
     enrollment = session.scalar(
         select(Enrollment)
         .where(
@@ -751,7 +762,14 @@ def migrate_completion_code(
             Enrollment.organization_id == actor.organization_id,
         ).with_for_update()
     )
-    if source_enrollment is None:
+    from journey_api.exploration_models import ExplorationWork
+    dynamic_source = session.scalar(select(ExplorationWork.assignment_id).where(
+        ExplorationWork.organization_id == actor.organization_id, ExplorationWork.user_id == source_user_id).limit(1))
+    dynamic_target = session.scalar(select(ExplorationWork.assignment_id).where(
+        ExplorationWork.organization_id == actor.organization_id, ExplorationWork.user_id == actor.id).limit(1))
+    if dynamic_target:
+        raise ApiError(409, "TARGET_ACCOUNT_HAS_PROGRESS", "公司飞书账号已有学习记录，请联系管理员合并。")
+    if source_enrollment is None and dynamic_source is None:
         raise ApiError(409, "COMPLETION_CODE_SOURCE_INVALID", "手机账号没有可迁移的探索营记录。")
     if target_enrollment is not None:
         has_target_activity = session.scalar(
@@ -832,6 +850,8 @@ def migrate_completion_code(
         },
     )
     session.commit()
-    return envelope(request, {"status": "MIGRATED", "migrated_tasks": session.scalar(
-        select(func.count(Assignment.id)).where(Assignment.enrollment_id == source_enrollment.id)
-    )})
+    migrated_tasks = session.scalar(select(func.count(ExplorationWork.assignment_id)).where(
+        ExplorationWork.organization_id == actor.organization_id, ExplorationWork.user_id == source_user_id)) or 0
+    if source_enrollment:
+        migrated_tasks += session.scalar(select(func.count(Assignment.id)).where(Assignment.enrollment_id == source_enrollment.id)) or 0
+    return envelope(request, {"status": "MIGRATED", "migrated_tasks": migrated_tasks})

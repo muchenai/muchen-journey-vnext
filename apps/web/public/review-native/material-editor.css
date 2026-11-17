@@ -1,0 +1,9 @@
+#material-form .material-field-error {
+  color: #d73745;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+#material-form .material-field-error[hidden] { display: none; }
+#material-form input[aria-invalid="true"] { border-color: #d73745; }
+.material-row .material-edit-btn { flex-shrink: 0; white-space: nowrap; padding: 7px 10px; }

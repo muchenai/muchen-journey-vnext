@@ -838,11 +838,12 @@ function assertFixtureBoundary() {
   }
 }
 
-export async function apiRequest<T>(
+/** Uses the same scoped session for JSON APIs and private streamed materials. */
+export async function apiResponse(
   path: string,
   role: Role,
   init: RequestInit = {},
-): Promise<T> {
+): Promise<Response> {
   const baseUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
   const cookieStore = await cookies();
   const sessionCookie = role === "LEARNER" ? SESSION_COOKIE : STAFF_SESSION_COOKIE;
@@ -877,11 +878,19 @@ export async function apiRequest<T>(
     assertFixtureBoundary();
     requestHeaders.set("X-Fixture-Role", role);
   }
-  const response = await fetch(new URL(path, baseUrl), {
+  return fetch(new URL(path, baseUrl), {
     ...init,
     cache: "no-store",
     headers: requestHeaders,
   });
+}
+
+export async function apiRequest<T>(
+  path: string,
+  role: Role,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await apiResponse(path, role, init);
   const payload = (await response.json()) as Envelope<T> | ErrorEnvelope;
   if (!response.ok || "error" in payload) {
     const code = "error" in payload ? payload.error.code : "INVALID_RESPONSE";

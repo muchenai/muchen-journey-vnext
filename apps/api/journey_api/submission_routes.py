@@ -637,6 +637,8 @@ def save_submission_draft(
     task = session.get(TaskVersion, assignment.task_version_id)
     if task is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
+    from journey_api.exploration_service import ensure_assessment_submission
+    ensure_assessment_submission(session, assignment)
     ensure_required_materials_completed(session, assignment, task)
     lock_ready_attachments(
         session,
@@ -683,7 +685,8 @@ def save_submission_draft(
         payload=payload,
         response=result.model_dump(mode="json"),
     )
-    session.commit()
+    if not getattr(request.state, "defer_exploration_commit", False):
+        session.commit()
     return envelope(request, result)
 
 
@@ -975,6 +978,8 @@ def submit_assignment(
     task = session.get(TaskVersion, assignment.task_version_id)
     if task is None:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
+    from journey_api.exploration_service import ensure_assessment_submission
+    ensure_assessment_submission(session, assignment)
     attachments = lock_ready_attachments(
         session,
         actor=actor,
@@ -1099,7 +1104,8 @@ def submit_assignment(
             ),
         },
     )
-    session.commit()
+    if not getattr(request.state, "defer_exploration_commit", False):
+        session.commit()
     return envelope(request, result)
 
 

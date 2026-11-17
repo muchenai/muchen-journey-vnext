@@ -108,8 +108,20 @@ export async function POST(request: NextRequest) {
         if (!uuid(task?.id) || !Number.isInteger(task.revision) || task.revision < 0) break;
         if (command === "saveTask") return reply(await saveAdminTask(task as AdminTask));
         if (command === "archiveTask") return reply(await archiveAdminTask(task as AdminTask));
-        if (!uuid(payload?.reviewerId) || !uuid(key) || !Array.isArray(payload?.verified)) break;
+        if (!uuid(key) || !Array.isArray(payload?.verified)) break;
+        if (task.camp === "exploration" ? payload.reviewerId != null && !uuid(payload.reviewerId) : !uuid(payload.reviewerId)) break;
         return reply(await publishAdminTask(task as AdminTask, payload.reviewerId, payload.verified, key));
+      case "deleteTask":
+        if (!uuid(task?.id) || !Number.isInteger(task.revision) || task.revision < 1 || !uuid(key)) break;
+        try {
+          const data = await apiRequest(`/api/v1/review-admin/tasks/${task.id}/delete`, "REVIEWER", {
+            method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify({ expected_revision: task.revision }),
+          });
+          return reply({ ok: true, data });
+        } catch (error) {
+          if (error instanceof ApiRequestError) return reply({ ok: false, error: error.message, status: error.status }, error.status);
+          throw error;
+        }
       case "decide":
         if (!uuid(id) || !uuid(key) || !payload || !Number.isInteger(payload.expected_revision)) break;
         return reply(await decideAdminReview(id, payload, key));

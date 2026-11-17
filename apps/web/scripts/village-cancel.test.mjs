@@ -14,6 +14,7 @@ function reactHarness() {
     react: {
       useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial; return [slots[index], value => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }]; },
       useRef(initial) { const index = cursor++; if (!(index in slots)) slots[index] = { current: initial }; return slots[index]; },
+      useId() { const index = cursor++; if (!(index in slots)) slots[index] = `village-test-${index}`; return slots[index]; },
       useCallback: callback => callback, useEffect() {},
     },
     reset() { cursor = 0; },

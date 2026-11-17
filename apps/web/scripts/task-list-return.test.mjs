@@ -13,7 +13,7 @@ function find(node, predicate) {
   return predicate(node) ? node : find(node.props?.children, predicate);
 }
 
-function createFlow(initialScreen = 'dashboard') {
+function createFlow(initialScreen = 'dashboard', { configurableExploration = true, originalTasks = [] } = {}) {
   const slots = [];
   let cursor = 0;
   let href = `http://localhost:3000/app?view=${initialScreen}`;
@@ -38,10 +38,11 @@ function createFlow(initialScreen = 'dashboard') {
     useEffect() {}, useLayoutEffect() {}, useId() { return 'test-id'; },
   };
   const ModuleHub = () => null;
+  const ExplorationTaskList = () => null;
   const component = () => null;
   const experience = { assignmentId: 'current-assignment', currentAssignmentId: 'current-assignment',
     stagePosition: 1, taskVersion: 1, revision: 1, status: 'AVAILABLE', materials: [],
-    allowedCommands: [], journeyTasks: [], reviewFeedback: [] };
+    allowedCommands: [], journeyTasks: originalTasks, reviewFeedback: [] };
   const dependencies = {
     react,
     'next/navigation': { useRouter: () => ({ refresh() { calls.refresh += 1; }, push() { calls.push += 1; } }) },
@@ -52,13 +53,19 @@ function createFlow(initialScreen = 'dashboard') {
       executionTasks: [{ id: 'first', label: '探索启航' }] },
     './UpdatedDashboard': { UpdatedDashboard: component },
     './ModuleHub': { ModuleHub },
+    './ExplorationTaskHall': { ExplorationTaskHall: component, useExplorationTasks: () => ({
+      tasks: [], treasures: [], loading: false, error: null, busy: false, refresh() {},
+    }) },
+    './ExplorationTaskList': { ExplorationTaskList },
+    './explorationTaskState': { canOpenExplorationTask: () => true },
+    './ExplorationTreasureExperience': { ExplorationTreasureExperience: component },
     './useCanvasScale': { useCanvasScale: () => 0.8 },
     './SelfCheckHistory': { SelfCheckHistory: component },
     './TaskFeedbackDialog': { TaskFeedbackDialog: component },
     './useWorkspaceRecovery': { useWorkspaceRecovery: () => ({ record: '', updateRecord() {},
       selfCheckInFlight: { current: false }, beginSelfCheck() {}, finishSelfCheck() {} }) },
     './journey-context': { JourneyProvider: component,
-      useJourney: () => ({ learnerName: '真实学员', experience, initialScreen, joinPhase: 'invite', joinError: '' }),
+      useJourney: () => ({ learnerName: '真实学员', experience, initialScreen, configurableExploration, joinPhase: 'invite', joinError: '' }),
       useTaskStatus: () => () => 'active' },
     './EntryLoader': { ProjectResourceLoader: component },
   };
@@ -71,7 +78,7 @@ function createFlow(initialScreen = 'dashboard') {
   vm.runInNewContext(source, { module: compiledModule, exports: compiledModule.exports, window, URL,
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : nativeRequire(name) });
   const { ExperienceScreen, Tasks, ClickBurst } = compiledModule.exports.returnProbe;
-  return { calls, ModuleHub, ClickBurst, experience, get href() { return href; },
+  return { calls, ModuleHub, ExplorationTaskList, ClickBurst, experience, get href() { return href; },
     render() { cursor = 0; return ExperienceScreen(); },
     returnButton() {
       const button = find(Tasks(), node => node.type === 'button' && node.props['data-node-id'] === '2006:454');
@@ -103,8 +110,13 @@ test('exploration task list returns to the retained dashboard without document o
       assert.equal(new URL(flow.href).searchParams.get('view'), 'tasks');
       const taskPage = find(tree, node => node.type === 'main' && node.props['data-screen'] === 'tasks');
       assert.ok(taskPage);
-      const button = flow.returnButton();
-      await taskPage.props.onClick({ clientX: 10, clientY: 10, target: { closest: () => button } });
+      const publishedList = find(taskPage, node => node.type === flow.ExplorationTaskList);
+      assert.ok(publishedList, 'the default task screen uses the published exploration list');
+      if (pass === 0) publishedList.props.onBack();
+      else {
+        const button = flow.returnButton();
+        await taskPage.props.onClick({ clientX: 10, clientY: 10, target: { closest: () => button } });
+      }
       tree = flow.render();
       assert.equal(tree.props.children[0].type, firstWrapper.type);
       assert.equal(tree.props.children[0].props.hidden, false);
@@ -129,19 +141,39 @@ test('opening a real assignment still loads its server-backed execution route', 
     { textContent: '开始执行', dataset: { action: 'open-task', taskIndex: '0' } },
     { textContent: '继续当前任务', dataset: { action: 'true' } },
   ]) {
-    const flow = createFlow('tasks');
+    const flow = createFlow('tasks', { configurableExploration: false });
     const tree = flow.render();
     const taskPage = find(tree, node => node.type === 'main');
     await taskPage.props.onClick({ clientX: 10, clientY: 10, target: { closest: () => button } });
     assert.deepEqual(flow.calls.assign, ['/app/tasks/current-assignment']);
     assert.deepEqual(flow.calls.replace, []);
   }
-  const detail = createFlow('detail');
+  const detail = createFlow('detail', { configurableExploration: false });
   const taskDetail = find(detail.render(), node => node.type === 'main');
   const returnButton = { textContent: '返回任务列表', dataset: { action: 'true' } };
   await taskDetail.props.onClick({ clientX: 10, clientY: 10, target: { closest: () => returnButton } });
-  assert.deepEqual(detail.calls.assign, ['/app?view=tasks']);
+  assert.deepEqual(detail.calls.assign, ['/app?view=legacy-tasks']);
   assert.deepEqual(detail.calls.replace, []);
+});
+
+test('the retained original task list returns to the new dashboard through its canonical entry',async()=>{
+  const flow=createFlow('tasks',{configurableExploration:false});
+  const taskPage=find(flow.render(),node=>node.type==='main');
+  const button=flow.returnButton();
+  await taskPage.props.onClick({clientX:10,clientY:10,target:{closest:()=>button}});
+  assert.deepEqual(flow.calls.assign,['/app?view=dashboard']);
+  assert.deepEqual(flow.calls.replace,[]);
+});
+
+test('the original-task entry uses actual retained assignments and stays outside the dashboard canvas content',()=>{
+  for(const originalTasks of [[],[{assignmentId:'retained-assignment',position:1}]]){
+    const flow=createFlow('dashboard',{originalTasks});
+    const hub=find(flow.render(),node=>node.type===flow.ModuleHub);
+    assert.equal(hub.props.legacyTasksAvailable,originalTasks.length>0);
+    assert.equal(find(hub.props.dashboardContent,node=>node.type==='a'&&node.props.href==='/app?view=legacy-tasks'),null);
+  }
+  const legacy=createFlow('dashboard',{originalTasks:[{assignmentId:'retained-assignment',position:1}],configurableExploration:false});
+  assert.equal(find(legacy.render(),node=>node.type===legacy.ModuleHub).props.legacyTasksAvailable,false);
 });
 
 test('return navigation clears click ripples while ordinary in-page clicks retain their feedback', async () => {

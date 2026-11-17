@@ -1,12 +1,14 @@
 import {departmentLabel} from './publishing-departments.js';
 import { escapeHtml as e, rewardBreakdown, BADGES, getReviewCamp } from './core.js?v=20261030-member-action-spacing';
+import { localMaterialUrl } from './exploration-material-files.js';
+import {explorationTaskFiles, requiresTaskAssessment, taskCompletionLabel, validAssessmentUrl} from './exploration-completion.js';
 
 const labels = { pending: '待审核', approved: '已通过', rejected: '已退回' };
 const text = value => String(value ?? '');
 const date = value => value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '—';
 const count = value => Math.max(0, Math.round(Number(value) || 0)).toLocaleString('zh-CN');
 const safeUrl = value => { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
-const downloadable = value => /^data:[a-z0-9.+\-/]+(?:;charset=[a-z0-9-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/i.test(value || '');
+const downloadable = value => Boolean(localMaterialUrl(value)) || /^data:[a-z0-9.+\-/]+(?:;charset=[a-z0-9-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/i.test(value || '');
 const statusTag = status => `<span class="pub-status pub-status-${e(status)}">${e(labels[status] || status)}</span>`;
 const campName = task => getReviewCamp({}, task) === 'exploration' ? '探索营' : '新手村';
 
@@ -25,7 +27,7 @@ export function createPublicationReviewController({ store, service, ui }) {
   const requests = () => visiblePublications(Array.isArray(store.data.publicationRequests) ? store.data.publicationRequests : [], ui.currentUser?.id, ui.isSuperAdmin);
   const find = id => requests().find(request => request.id === id);
   const guard = () => { if (ui.isSuperAdmin) return true; ui.toast('仅超级管理员可审核任务发布', 'error'); return false; };
-  const canRevise = request => !ui.isSuperAdmin && request?.status === 'rejected'
+  const canRevise = request => getReviewCamp({},request?.task || {}) !== 'exploration' && !ui.isSuperAdmin && request?.status === 'rejected'
     && request.submittedBy?.id === ui.currentUser?.id
     && store.getTask(request.taskId)?.authorId === ui.currentUser?.id
     && store.getTask(request.taskId)?.publication?.id === request.id
@@ -60,40 +62,45 @@ export function createPublicationReviewController({ store, service, ui }) {
     }).join('') : '<p class="pub-muted">未添加材料</p>';
   }
   function taskContent(task) {
+    const exploration = getReviewCamp({}, task) === 'exploration';
     let rewards;
     try { rewards = rewardBreakdown(task); } catch { rewards = { xp: task.xp, totalPoints: 0, allocations: [] }; }
     const materials = Array.isArray(task.materials) ? task.materials : [];
+    const taskFiles = explorationTaskFiles(task);
+    const assessment = requiresTaskAssessment(task);
     const rubricFiles = Array.isArray(task.rubricAttachments) ? task.rubricAttachments : [];
     const dimensions = Array.isArray(task.rubric) ? task.rubric : [];
-    return `<div class="pub-task-meta"><span>所属营地<strong>${e(campName(task))}</strong></span><span>发布部门<strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>任务难度<strong>${e(task.difficulty || '—')}</strong></span><span>预计耗时<strong>${count(task.minutes)} 分钟</strong></span></div>
+    return `<div class="pub-task-meta"><span>所属营地<strong>${e(campName(task))}</strong></span>${exploration?`<span>是否需要做任务<strong>${assessment?'需要':'不需要'}</strong></span><span>完成方式<strong>${e(taskCompletionLabel(task))}</strong></span>`:`<span>发布部门<strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>任务难度<strong>${e(task.difficulty || '—')}</strong></span><span>预计耗时<strong>${count(task.minutes)} 分钟</strong></span>`}</div>
       <section class="pub-detail-section"><h3>任务简述</h3><p class="pub-summary">${e(task.summary || '未填写任务简述')}</p></section>
       <section class="pub-detail-section"><h3>学习材料 <small>${materials.length}</small></h3>${materialRows(materials)}</section>
-      <section class="pub-detail-section"><h3>任务奖励</h3><div class="pub-reward-summary"><span><strong>${count(rewards.xp)}</strong> 经验值</span><span><strong>${count(rewards.totalPoints)}</strong> 徽章点</span><span>发布后可直接领取</span></div><div class="pub-reward-list">${(rewards.allocations || []).map(item => `<div><span>${e(BADGES.find(badge => badge.id === item.id)?.category || item.name || item.id)}徽章点 <small>${count(item.weight)}%</small></span><strong>${count(item.points)} 点</strong></div>`).join('')}</div></section>
-      <section class="pub-detail-section"><h3>学员答案审核方式</h3><p class="pub-summary">${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</p></section>
-      ${task.reviewMode === 'ai' ? `<section class="pub-detail-section"><h3>AI 评分标准 <small>通过分数 ${count(task.passScore)} 分</small></h3><div class="pub-rubric">${dimensions.map(dimension => `<article><header><strong>${e(dimension.name || '未命名维度')}</strong><span>${count(dimension.points)} 分</span></header><p>${e(dimension.description || '未填写评分描述')}</p></article>`).join('') || '<p class="pub-muted">未配置评分标准</p>'}</div>${rubricFiles.length ? `<div class="pub-rubric-files">${materialRows(rubricFiles, materials.length)}</div>` : ''}</section>` : ''}`;
+      ${exploration&&assessment?`<section class="pub-detail-section"><h3>任务文件 <small>${taskFiles.length}</small></h3>${materialRows(taskFiles, materials.length)}${task.assessmentUrl&&validAssessmentUrl(task.assessmentUrl)?`<p><a class="text-btn" href="${e(task.assessmentUrl)}" target="_blank" rel="noopener noreferrer">打开培训测试链接 ↗</a></p>`:''}</section>`:''}
+      ${exploration?'':`<section class="pub-detail-section"><h3>任务奖励</h3><div class="pub-reward-summary"><span><strong>${count(rewards.xp)}</strong> 经验值</span><span><strong>${count(rewards.totalPoints)}</strong> 徽章点</span><span>发布后可直接领取</span></div><div class="pub-reward-list">${(rewards.allocations || []).map(item => `<div><span>${e(BADGES.find(badge => badge.id === item.id)?.category || item.name || item.id)}徽章点 <small>${count(item.weight)}%</small></span><strong>${count(item.points)} 点</strong></div>`).join('')}</div></section>`}
+      ${assessment?`<section class="pub-detail-section"><h3>学员答案审核方式</h3><p class="pub-summary">${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</p></section>`:''}
+      ${assessment&&task.reviewMode === 'ai' ? `<section class="pub-detail-section"><h3>AI 评分标准 <small>通过分数 ${count(task.passScore)} 分</small></h3><div class="pub-rubric">${dimensions.map(dimension => `<article><header><strong>${e(dimension.name || '未命名维度')}</strong><span>${count(dimension.points)} 分</span></header><p>${e(dimension.description || '未填写评分描述')}</p></article>`).join('') || '<p class="pub-muted">未配置评分标准</p>'}</div>${rubricFiles.length ? `<div class="pub-rubric-files">${materialRows(rubricFiles, materials.length+taskFiles.length)}</div>` : ''}</section>` : ''}`;
   }
   function open(id) {
     const request = find(id);
     if (!request) { ui.toast('未找到该发布申请', 'error'); return; }
     const task = request.task || {};
     const pending = request.status === 'pending' && ui.isSuperAdmin;
-    ui.openModal(`<div class="modal-header pub-modal-header"><div class="pub-request-status">${statusTag(request.status)}${request.isDemo ? '<span class="pub-demo">演示任务</span>' : ''}</div><h2>${e(task.title || '任务发布审核')}</h2><p>${e(request.submittedBy?.name || '未记录')} 提交 · ${e(date(request.submittedAt))}</p></div><div class="pub-detail-body">${taskContent(task)}${request.status === 'pending' && !ui.isSuperAdmin ? '<section class="pub-decision-section"><h3>发布审核</h3><p class="pub-muted">等待超级管理员审核，审核期间暂不能修改。</p></section>' : pending ? `<section class="pub-decision-section"><h3>发布审核</h3><div class="pub-decision-options" role="radiogroup" aria-label="审核决定"><button type="button" role="radio" aria-checked="true" class="active" data-pub-decision="approved">${ui.icon('checkCircle', 16)} 通过发布</button><button type="button" role="radio" aria-checked="false" data-pub-decision="rejected">${ui.icon('arrowLeft', 16)} 退回修改</button></div><label class="pub-return-field" data-pub-return-field hidden><span>退回原因 <i>*</i></span><textarea data-pub-comment rows="3" maxlength="1000" placeholder="写明需要修改的内容，便于提交人调整后重新提交"></textarea></label><p class="pub-decision-hint" data-pub-decision-hint>通过后任务立即发布，学员可直接领取。</p><p class="pub-error" role="alert" data-pub-error></p></section>` : `<section class="pub-decision-section"><h3>审核记录</h3><div class="pub-reviewed-meta"><span>审核人：${e(request.reviewedBy?.name || '未记录')}</span><span>${e(date(request.reviewedAt))}</span></div>${request.status === 'rejected' ? `<p class="pub-return-reason">${e(request.comment || '未填写退回原因')}</p>` : `<p class="pub-muted">任务已审核通过并发布。</p>${request.comment ? `<p class="pub-summary">${e(request.comment)}</p>` : ''}`}</section>`}</div><div class="modal-footer pub-modal-footer"><button class="btn btn-secondary" type="button" data-pub-close>${pending ? '取消' : '关闭'}</button>${pending ? '<button class="btn btn-primary" type="button" data-pub-submit>审核通过并发布</button>' : canRevise(request) ? `<button class="btn btn-primary" type="button" data-pub-revise="${e(request.id)}">修改并重新提交</button>` : ''}</div>`, modal => {
+    const legacyExploration = getReviewCamp({},task) === 'exploration';
+    ui.openModal(`<div class="modal-header pub-modal-header"><div class="pub-request-status">${statusTag(request.status)}${request.isDemo ? '<span class="pub-demo">演示任务</span>' : ''}</div><h2>${e(task.title || '任务发布审核')}</h2><p>${e(request.submittedBy?.name || '未记录')} 提交 · ${e(date(request.submittedAt))}</p></div><div class="pub-detail-body">${taskContent(task)}${request.status === 'pending' && !ui.isSuperAdmin ? '<section class="pub-decision-section"><h3>发布审核</h3><p class="pub-muted">等待超级管理员审核，审核期间暂不能修改。</p></section>' : pending ? `<section class="pub-decision-section"><h3>发布审核</h3><div class="pub-decision-options" role="radiogroup" aria-label="审核决定">${legacyExploration?'':`<button type="button" role="radio" aria-checked="true" class="active" data-pub-decision="approved">${ui.icon('checkCircle', 16)} 通过发布</button>`}<button type="button" role="radio" aria-checked="${legacyExploration?'true':'false'}" class="${legacyExploration?'active':''}" data-pub-decision="rejected">${ui.icon('arrowLeft', 16)} 退回修改</button></div><label class="pub-return-field" data-pub-return-field ${legacyExploration?'':'hidden'}><span>退回原因 <i>*</i></span><textarea data-pub-comment rows="3" maxlength="1000" placeholder="写明需要修改的内容，便于提交人调整后重新提交"></textarea></label><p class="pub-decision-hint" data-pub-decision-hint>${legacyExploration?'探索营现仅限超级管理员直接发布，请退回此历史申请后，由超级管理员配置并发布。':'通过后任务立即发布，学员可直接领取。'}</p><p class="pub-error" role="alert" data-pub-error></p></section>` : `<section class="pub-decision-section"><h3>审核记录</h3><div class="pub-reviewed-meta"><span>审核人：${e(request.reviewedBy?.name || '未记录')}</span><span>${e(date(request.reviewedAt))}</span></div>${request.status === 'rejected' ? `<p class="pub-return-reason">${e(request.comment || '未填写退回原因')}</p>` : `<p class="pub-muted">任务已审核通过并发布。</p>${request.comment ? `<p class="pub-summary">${e(request.comment)}</p>` : ''}`}</section>`}</div><div class="modal-footer pub-modal-footer"><button class="btn btn-secondary" type="button" data-pub-close>${pending ? '取消' : '关闭'}</button>${pending ? `<button class="btn ${legacyExploration?'btn-danger':'btn-primary'}" type="button" data-pub-submit>${legacyExploration?'确认退回':'审核通过并发布'}</button>` : canRevise(request) ? `<button class="btn btn-primary" type="button" data-pub-revise="${e(request.id)}">修改并重新提交</button>` : ''}</div>`, modal => {
       modal.classList.add('pub-review-modal');
       modal.querySelector('[data-pub-close]').onclick = ui.closeModal;
       modal.querySelector('[data-pub-revise]')?.addEventListener('click', () => revise(id));
-      const files = [...(task.materials || []), ...(task.rubricAttachments || [])];
+      const files = [...(task.materials || []), ...explorationTaskFiles(task), ...(task.rubricAttachments || [])];
       modal.querySelectorAll('[data-pub-download]').forEach(button => button.onclick = () => {
         const file = files[Number(button.dataset.pubDownload)];
         if (!file || !downloadable(file.url)) return;
-        const link = document.createElement('a'); link.href = file.url; link.download = file.name || '任务材料'; link.click();
+        const link = document.createElement('a'); link.href = localMaterialUrl(file.url) || file.url; link.download = file.name || '任务材料'; link.click();
       });
       if (!pending) return;
-      let decision = 'approved';
+      let decision = legacyExploration ? 'rejected' : 'approved';
       const submit = modal.querySelector('[data-pub-submit]');
       const comment = modal.querySelector('[data-pub-comment]');
       const error = modal.querySelector('[data-pub-error]');
       modal.querySelectorAll('[data-pub-decision]').forEach(button => button.onclick = () => {
-        if (state.saving) return;
+        if (state.saving || (legacyExploration && button.dataset.pubDecision !== 'rejected')) return;
         decision = button.dataset.pubDecision;
         modal.querySelectorAll('[data-pub-decision]').forEach(option => { const selected = option === button; option.classList.toggle('active', selected); option.setAttribute('aria-checked', String(selected)); });
         modal.querySelector('[data-pub-return-field]').hidden = decision !== 'rejected';

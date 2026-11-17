@@ -957,7 +957,7 @@
     {
       "order": 4,
       "key": "delivery-guild",
-      "name": "交付线工会",
+      "name": "交付线公会",
       "mission": "在真实交付协作中积累项目证据、反馈、复盘与导师评价。",
       "people_ai_output": "delivery-capability-evidence",
       "workstream": {

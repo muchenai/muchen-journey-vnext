@@ -53,6 +53,22 @@ def envelope(request: Request, data: object) -> dict[str, object]:
     return {"data": data, "request_id": request.state.request_id}
 
 
+def require_exploration_content_super(session: Session, actor: Actor, task_id: uuid.UUID) -> bool:
+    """Legacy content APIs must obey the same camp authority as Review admin."""
+    from journey_api.review_admin_access import require_super
+    from journey_api.review_admin_models import ReviewAdminTask
+    from journey_api.review_camps import task_camp
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
+        TaskDefinition.organization_id == actor.organization_id).with_for_update())
+    if definition and task_camp(
+        definition, session.get(ReviewAdminTask, task_id)
+    ) == "exploration":
+        require_super(session, actor)
+        return True
+    return False
+
+
 def ensure_revision(actual: int, expected: int) -> None:
     if actual != expected:
         raise ApiError(
@@ -235,6 +251,7 @@ def create_content_draft(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.CONTENT_EDITOR)
+    require_exploration_content_super(session, actor, task_definition_id)
     payload = {
         "task_definition_id": str(task_definition_id),
         **command.model_dump(mode="json"),
@@ -303,6 +320,8 @@ def update_content_draft(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.CONTENT_EDITOR)
+    existing_draft = owned_draft(session, actor, draft_id)
+    require_exploration_content_super(session, actor, existing_draft.task_definition_id)
     payload = {"draft_id": str(draft_id), **command.model_dump(mode="json")}
     replay = find_replay(
         session,
@@ -356,6 +375,8 @@ def submit_content_draft(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.CONTENT_EDITOR)
+    existing_draft = owned_draft(session, actor, draft_id)
+    require_exploration_content_super(session, actor, existing_draft.task_definition_id)
     payload = {"draft_id": str(draft_id), **command.model_dump(mode="json")}
     replay = find_replay(
         session,
@@ -531,6 +552,11 @@ def publish_content_draft(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.OPERATOR)
+    existing_draft = session.scalar(select(ContentDraft).where(ContentDraft.id == draft_id,
+        ContentDraft.organization_id == actor.organization_id))
+    exploration = bool(existing_draft and require_exploration_content_super(session, actor, existing_draft.task_definition_id))
+    if exploration:
+        command = command.model_copy(update={"reviewed_by": actor.id})
     payload = {"draft_id": str(draft_id), **command.model_dump(mode="json")}
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     replay = find_replay(
@@ -581,7 +607,7 @@ def publish_content_draft(
     ensure_revision(definition.revision, command.expected_definition_revision)
     if definition.status == TaskDefinitionStatus.WITHDRAWN:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已撤销的任务定义不能发布。")
-    reviewer = session.scalar(
+    reviewer = session.get(User, actor.id) if exploration else session.scalar(
         select(User)
         .join(RoleAssignment, RoleAssignment.user_id == User.id)
         .where(

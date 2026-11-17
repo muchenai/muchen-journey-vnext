@@ -5,7 +5,7 @@ import pytest
 from journey_api.db import SessionLocal
 from journey_api.models import JourneyCompletionPolicy, JourneyStageKind, Outcome
 from sqlalchemy import select, func
-from journey_api.fixtures import REVIEWER_ID
+from journey_api.fixtures import ORGANIZATION_ID, OPERATOR_ID, REVIEWER_ID
 from journey_api.formal_journey_catalog import FORMAL_JOURNEY_KEY
 from scripts.p0_journey_v3_browser_fixture import STAGES, task_payload
 from test_wp26_learning_materials import (
@@ -13,8 +13,41 @@ from test_wp26_learning_materials import (
 )
 
 
+@pytest.fixture
+def exploration_operator_publisher():
+    """Give only this synthetic content author the explicit publication grant.
+
+    Role.OPERATOR alone no longer authorizes exploration publication. Preserve
+    any preexisting access record exactly when the publication scenario ends.
+    """
+    from journey_api.review_admin_models import ReviewAdminAccess
+
+    with SessionLocal.begin() as session:
+        original = session.get(ReviewAdminAccess, OPERATOR_ID)
+        snapshot = {column.key: getattr(original, column.key)
+                    for column in ReviewAdminAccess.__table__.columns} if original else None
+        if original is None:
+            session.add(ReviewAdminAccess(user_id=OPERATOR_ID, organization_id=ORGANIZATION_ID,
+                access_role="super_admin", level="初级", domain="产品开发", granted_by=OPERATOR_ID))
+        else:
+            original.access_role, original.revoked_at = "super_admin", None
+    try:
+        yield
+    finally:
+        with SessionLocal.begin() as session:
+            granted = session.get(ReviewAdminAccess, OPERATOR_ID)
+            if snapshot is None:
+                if granted is not None:
+                    session.delete(granted)
+            elif granted is None:
+                session.add(ReviewAdminAccess(**snapshot))
+            else:
+                for key, value in snapshot.items():
+                    setattr(granted, key, value)
+
+
 @pytest.mark.parametrize("legacy_policy", [False, True])
-def test_all_eight_stages_persist_materials_and_allow_completed_stage_review(legacy_policy):
+def test_all_eight_stages_persist_materials_and_allow_completed_stage_review(legacy_policy, exploration_operator_publisher):
     operator = client_for("material-progress-operator")
     learner = client_for("material-progress-learner")
     reviewer = client_for("material-progress-reviewer")

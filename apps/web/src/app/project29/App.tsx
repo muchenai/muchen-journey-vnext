@@ -12,6 +12,10 @@ import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/li
 import { ExecutionDetail, ExecutionView, TaskCards, executionTasks } from "./ExecutionPages";
 import { UpdatedDashboard } from "./UpdatedDashboard";
 import { ModuleHub } from "./ModuleHub";
+import { ExplorationTaskHall, useExplorationTasks } from "./ExplorationTaskHall";
+import { ExplorationTaskList } from "./ExplorationTaskList";
+import { canOpenExplorationTask } from "./explorationTaskState";
+import { ExplorationTreasureExperience } from "./ExplorationTreasureExperience";
 import { SelfCheckHistory } from "./SelfCheckHistory";
 import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
 import { useWorkspaceRecovery } from "./useWorkspaceRecovery";
@@ -28,10 +32,26 @@ export default function App(props: Partial<JourneyContextValue>) {
 
 function ExperienceScreen() {
  const router = useRouter();
- const { learnerName, experience, initialScreen, initialNotice, joinPhase, joinError } = useJourney();
+ const { learnerName, experience, initialScreen, initialNotice, joinPhase, joinError, localVillagePreview = false,
+   configurableExploration = true, explorationVariant, explorationTaskId, explorationScope } = useJourney();
  const taskStatus = useTaskStatus();
  const identity = learnerName;
  const [screen, setScreen] = useState<Screen>(initialScreen);
+ const exploration = useExplorationTasks(configurableExploration && screen !== "login");
+ const [publishedTaskId, setPublishedTaskId] = useState<string | null>(explorationTaskId ?? null);
+ const [treasureCollectionOpen, setTreasureCollectionOpen] = useState(false);
+ useEffect(() => { if (!configurableExploration || new URL(window.location.href).searchParams.get("treasures") !== "1") return; const timer = window.setTimeout(() => setTreasureCollectionOpen(true), 0); return () => window.clearTimeout(timer); }, [configurableExploration]);
+ useEffect(() => { if (!explorationTaskId) return; const timer = window.setTimeout(() => setPublishedTaskId(explorationTaskId), 0); return () => window.clearTimeout(timer); }, [explorationTaskId]);
+ const openPublishedTask = (id: string) => {
+   const selected = exploration.tasks.find(task => task.id === id);
+   if (!selected) return;
+   if (!canOpenExplorationTask(selected)) { setNotice("需要提交上一任务"); return; }
+   setPublishedTaskId(id);
+ };
+ const closePublishedTask = () => {
+   setPublishedTaskId(null);
+   const url = new URL(window.location.href); url.searchParams.delete("task"); window.history.replaceState(window.history.state, "", url);
+ };
  const [lastModule, setLastModule] = useState<"dashboard" | "village" | "academy" | "guild">("dashboard");
  const isModuleScreen = ["dashboard", "village", "academy", "guild"].includes(screen);
  const [entryResourcesReady, setEntryResourcesReady] = useState(initialScreen !== "login");
@@ -85,13 +105,14 @@ function ExperienceScreen() {
    });
  }, [screen, router]);
  useEffect(() => {
-   if (screen !== "dashboard") return;
+   if (screen !== "dashboard" || configurableExploration) return;
    const refresh = () => { if (document.visibilityState === "visible") router.refresh(); };
    window.addEventListener("focus", refresh);
    document.addEventListener("visibilitychange", refresh);
    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
- }, [screen, router]);
+ }, [screen, router, configurableExploration]);
  const navigate = (target: Screen) => {
+   if (!configurableExploration && target === "dashboard") { window.location.assign("/app?view=dashboard"); return; }
    if (["dashboard", "village", "academy", "guild"].includes(target)) setLastModule(target as typeof lastModule);
    setBurst(null);
    if (["village","academy","guild"].includes(target)) {setScreen(target);setNotice("");return;}
@@ -99,7 +120,7 @@ function ExperienceScreen() {
    if (target === "dashboard" || target === "tasks" || target === "welcome") {
      url.pathname = "/app";
      if (target === "welcome") url.searchParams.delete("view");
-     else url.searchParams.set("view", target);
+     else url.searchParams.set("view", target === "tasks" && !configurableExploration ? "legacy-tasks" : target);
    } else if (target === "detail" || target === "view") {
      if (target === "view") url.searchParams.set("view", "evidence");
      else url.searchParams.delete("view");
@@ -200,7 +221,7 @@ function ExperienceScreen() {
      const result = await submitAssignment({}, data);
      if (result.error) setNotice(result.error);
      else if (result.success && result.assignmentStatus) {
-       window.location.assign("/app?view=tasks");
+       window.location.assign(configurableExploration ? "/app?view=tasks" : "/app?view=legacy-tasks");
      } else setNotice("暂未取得提交结果，请刷新页面核对提交记录后再操作。");
    } catch {
      setNotice("暂未确认提交结果，请检查网络并刷新页面核对提交记录，避免重复提交。");
@@ -216,7 +237,7 @@ function ExperienceScreen() {
    else setNotice("当前任务暂无题目链接");
    return;
  }
- if (action === "mentor-profile") { setNotice("李魔王老师 · 产品设计导师"); return; }
+ if (action === "mentor-profile") { setNotice(button.dataset.mentorName || "李魔王老师 · 产品设计导师"); return; }
  if (action === "material-1" || action === "material-2") {
    const index = action === "material-1" ? 0 : 1;
    const material = experience?.materials[index];
@@ -288,7 +309,7 @@ function ExperienceScreen() {
  }
  if (text.includes("返回登录")) window.location.assign("/join");
  else if (text.includes("返回主页面")) navigate("dashboard");
- else if (text.includes("返回任务列表")) window.location.assign("/app?view=tasks");
+ else if (text.includes("返回任务列表")) window.location.assign(configurableExploration ? "/app?view=tasks" : "/app?view=legacy-tasks");
  else if (text.includes("开启旅程")) navigate("dashboard");
  else if (text.includes("开始执行") || text.includes("继续当前")) {
    const current = experience?.journeyTasks.find(item => item.assignmentId === experience.currentAssignmentId);
@@ -305,32 +326,39 @@ function ExperienceScreen() {
    setChoice(value);
  }
  else if (text.includes("未解锁")) setNotice("需要先提交上一任务");
- else if (text.includes("回看任务") || text.includes("进入任务")) window.location.assign("/app?view=tasks");
+ else if (text.includes("回看任务") || text.includes("进入任务")) window.location.assign(configurableExploration ? "/app?view=tasks" : "/app?view=legacy-tasks");
  else if (text.includes("探索营")) navigate("dashboard");
  else if (text.includes("我的任务")) navigate("tasks");
  else if (text.includes("切换身份")) window.location.assign("/join");
  else setNotice("该功能尚未提供对应设计稿");
  };
- const revealLogin = useCallback(() => setEntryResourcesReady(true), []);
+ const revealLogin = useCallback(() => setEntryResourcesReady(true), [setEntryResourcesReady]);
  if (screen === "login" && !entryResourcesReady) return <ProjectResourceLoader onReady={revealLogin} />;
  if (screen === "login") return <Login key={`${joinPhase}:${joinError}`} />;
  const moduleContent = <div hidden={!isModuleScreen}>
  <ModuleHub
    active={isModuleScreen}
+   localVillagePreview={localVillagePreview}
+   configurableExploration={configurableExploration}
+   explorationVariant={explorationVariant}
+   explorationTaskId={explorationTaskId}
+   explorationScope={explorationScope}
+   legacyTasksAvailable={configurableExploration && !!experience?.journeyTasks.length}
    module={isModuleScreen ? screen as "dashboard" | "village" | "academy" | "guild" : lastModule} identity={learnerName}
    nicknameRequired={joinPhase === "nickname"}
    onNavigate={navigate}
    decoration={<GradientStroke variant="task" strokeWidth={1} />}
    activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />}
    idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />}
-   explorationTaskCount={executionTasks.filter((_,index)=>["active", "revision"].includes(taskStatus(index))).length}
+   explorationTaskCount={configurableExploration ? exploration.tasks.filter(task => ["active", "returned", "pending"].includes(task.status)).length : executionTasks.filter((_,index)=>["active", "revision"].includes(taskStatus(index))).length}
    onExplorationMenu={menu=>{ if(menu==="hall")navigate("dashboard"); else if(menu==="tasks")navigate("tasks");else setNotice("暂未开放"); }}
    dashboardContent={<><div onClick={click} onPointerMove={event=>{energizePanels(event.currentTarget,event.clientX,event.clientY);if(event.pointerType==="mouse")magnetizeControl(event.currentTarget,event.target,event.clientX,event.clientY);}} onPointerLeave={event=>resetControlMagnet(event.currentTarget)}>
-     <UpdatedDashboard identity={identity} decoration={<GradientStroke variant="task" strokeWidth={1} />} activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />} idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />} />
+     <UpdatedDashboard identity={identity} decoration={<GradientStroke variant="task" strokeWidth={1} />} activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />} idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />}
+       publishedTasks={configurableExploration ? exploration.tasks : undefined} treasures={configurableExploration ? exploration.treasures : undefined} onOpenTreasures={configurableExploration ? ()=>setTreasureCollectionOpen(true) : undefined} onOpenTask={configurableExploration ? openPublishedTask : undefined} onOpenFeedback={configurableExploration ? openPublishedTask : undefined} />
    </div>{selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position-1]?.title ?? selectedFeedback.title} onClose={()=>setFeedbackAssignmentId(null)} />}
    {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={()=>setBurst(null)} />}{notice && <div className="module-toast" role="status">{notice}</div>}</>}
  /></div>;
- return <>{moduleContent}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
+ return <>{moduleContent}{configurableExploration && <div className="restored-exploration-dialog-root"><ExplorationTaskHall detailOnly sharedExploration={exploration} initialTaskId={publishedTaskId ?? undefined} onTaskClose={closePublishedTask} onTaskBlocked={()=>setNotice("需要提交上一任务")} /><ExplorationTreasureExperience treasures={exploration.treasures} collectionOpen={treasureCollectionOpen} onCollectionClose={()=>setTreasureCollectionOpen(false)} canReveal={["dashboard", "tasks"].includes(screen) && !publishedTaskId && !exploration.busy} busy={exploration.busy} onAcknowledge={exploration.acknowledgeTreasure} onUnlockGraduation={exploration.unlockGraduation} /></div>}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
    energizePanels(event.currentTarget, event.clientX, event.clientY);
    if (screen === "dashboard" && event.pointerType === "mouse") magnetizeControl(event.currentTarget, event.target, event.clientX, event.clientY);
  }} onPointerLeave={event => {
@@ -339,7 +367,7 @@ function ExperienceScreen() {
  }}>
  <div className="design-stage journey-scaled-canvas origin-top-left" key={screen} data-selection={choice}>
  {screen === "welcome" && <Welcome />}
- {screen === "tasks" && <Tasks />}
+ {screen === "tasks" && (configurableExploration ? <ExplorationTaskList tasks={exploration.tasks} treasures={exploration.treasures} identity={learnerName} loading={exploration.loading} error={exploration.error} onBack={()=>navigate("dashboard")} onOpenTask={openPublishedTask} onOpenGraduation={()=>setTreasureCollectionOpen(true)} onRefresh={()=>void exploration.refresh()} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} /> : <Tasks />)}
  {screen === "detail" && (executing ? <ExecutionDetail task={task} openedMaterials={[Boolean(openedMaterials[`${task.id}-material-1`]), Boolean(openedMaterials[`${task.id}-material-2`])]} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} /> : <Detail />)}
  {screen === "view" && <ExecutionView selfCheckRecovering={selfCheckRecovering} selfCheckBusy={selfCheckBusy} task={task} record={record} setRecord={updateExecutionRecord} readOnly={!canSubmit} revisionBusy={revisionBusy} canRevise={!submitting && experience?.allowedCommands.includes("start_evidence_revision")} canCancelRevision={!submitting && experience?.allowedCommands.includes("cancel_evidence_revision")} submitting={submitting} submitDisabled={selfCheckRecovering || selfCheckBusy || submitting || revisionBusy || !canSubmit} submitLabel={submitLabel} panelDecoration={<><GradientStroke variant="panel" /><PanelFX /></>} backDecoration={<GradientStroke variant="back" />} />}
  </div>

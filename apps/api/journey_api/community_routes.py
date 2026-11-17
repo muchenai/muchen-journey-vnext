@@ -247,7 +247,7 @@ def guild_change(session,actor,data,action,p):
             row.update(fields)
         else:row=dict(id=str(uuid.uuid4()),**fields,createdAt=now,createdBy=editor,enabledAt=now if enabled else None);data['rules'].insert(0,row)
         return row
-    fail('不支持的工会操作。')
+    fail('不支持的公会操作。')
 
 
 class Command(BaseModel):

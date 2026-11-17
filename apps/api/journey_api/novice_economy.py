@@ -4,7 +4,7 @@ No demo balance or browser state is authoritative. Old published snapshots keep
 their original reward schedule; updated publications opt into reward rules v2.
 """
 from decimal import Decimal, ROUND_FLOOR
-from sqlalchemy import select, func, literal, union_all
+from sqlalchemy import select, func, literal, union_all, or_
 from journey_api.models import Assignment, AssignmentStatus, Enrollment, Evaluation, Decision
 from journey_api.review_admin_models import PublishedTaskContent, MedalRedemption, NoviceUnlockDebit
 
@@ -56,6 +56,7 @@ def completed_rewards_query(actor):
         approvals.c.assignment_id == Assignment.id).where(
         Assignment.organization_id == actor.organization_id, Enrollment.organization_id == actor.organization_id,
         PublishedTaskContent.organization_id == actor.organization_id, Enrollment.learner_id == actor.id,
+        or_(PublishedTaskContent.content["camp"].as_string() == "novice", PublishedTaskContent.content["camp"].as_string().is_(None)),
         Enrollment.novice_task_id.is_not(None), Assignment.status == AssignmentStatus.COMPLETED)
 
 

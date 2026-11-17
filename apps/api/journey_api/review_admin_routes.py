@@ -5,13 +5,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Request, Query
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_validator
 from sqlalchemy import func, select, delete, update, or_
 from sqlalchemy.orm import Session
 
 from journey_api.auth import Actor, get_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
+from journey_api.admin_task_limits import ADMIN_TASK_TITLE_LIMIT, ADMIN_TASK_SUMMARY_LIMIT, validate_admin_task_text
 from journey_api.identity import add_audit
 from journey_api.idempotency import find_replay, store_result
 from journey_api.models import (Assignment, AssignmentStatus, EnrollmentStatus,
@@ -19,7 +20,7 @@ from journey_api.models import (Assignment, AssignmentStatus, EnrollmentStatus,
     TaskDefinitionStatus, TaskVersion, User, UserStatus, ExternalIdentity, IdentitySession, Organization, CompletionCode)
 from journey_api.review_admin_models import ReviewAdminTask, ReviewAdminDecision, ReviewAdminCertification, ReviewAdminAccess, ReviewClaim
 from journey_api.review_claims import LEASE_SECONDS, live_claim, busy, check_write, claim_views
-from journey_api.review_admin_access import access_for, permissions, require_super, require_publisher, STAFF_ROLES
+from journey_api.review_admin_access import access_for, permissions, require_super, require_publisher, require_camp_publisher, STAFF_ROLES
 from journey_api.review_camps import task_camp
 from journey_api.review_routes import (ReviewContext, scoped_context_query, get_scoped_context,
     queue_item, review_detail, start_review, finalize_review, effective_review_rubric, lock_scoped_context)
@@ -73,7 +74,7 @@ def review_credits(session, pairs):
     return result
 
 
-def task_data(session, definition):
+def task_data(session, definition, *, catalog_positions=None):
     profile = session.get(ReviewAdminTask, definition.id)
     version = latest_version(session, definition)
     owner = session.get(User, definition.created_by)
@@ -99,6 +100,13 @@ def task_data(session, definition):
         author=owner.display_name if owner else "", authorId=str(definition.created_by),
         participants=count, completions=completed, minutes=minutes, xp=xp, taskPoints=points,
         version=version.version if version else 0, versionId=str(version.id) if version else None)
+    if content.get("camp") == "exploration":
+        from journey_api.exploration_models import ExplorationCatalogTask
+        from journey_api.exploration_service import TRAINING_CHECKOUT_TASK_KEY, effective_catalog_positions
+        catalog = session.get(ExplorationCatalogTask, definition.id)
+        positions = catalog_positions if catalog_positions is not None else effective_catalog_positions(session, definition.organization_id)
+        content.update(publishedOrder=positions.get(definition.id, catalog.position if catalog else None),
+            pinnedLast=definition.stable_key == TRAINING_CHECKOUT_TASK_KEY, minutes=0, xp=0, taskPoints=0)
     from journey_api.review_admin_models import TaskPublicationRequest
     publication = session.scalar(select(TaskPublicationRequest).where(TaskPublicationRequest.task_id == definition.id)
         .order_by(TaskPublicationRequest.created_at.desc()).limit(1))
@@ -110,9 +118,12 @@ def task_data(session, definition):
 @router.get("/tasks")
 def tasks(request: Request, actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     staff(actor)
+    from journey_api.exploration_service import effective_catalog_positions
+    positions = effective_catalog_positions(session, actor.organization_id)
     definitions = session.scalars(select(TaskDefinition).where(TaskDefinition.organization_id == actor.organization_id)
                                   .order_by(TaskDefinition.created_at.desc())).all()
-    return envelope(request, {"items": [task_data(session, d) for d in definitions]})
+    return envelope(request, {"items": [task_data(session, d, catalog_positions=positions) for d in definitions
+        if not (session.get(ReviewAdminTask, d.id) and session.get(ReviewAdminTask, d.id).status == "deleted")]})
 
 
 def review_learner_identity_ids(session, organization_id, learner_ids):
@@ -208,6 +219,13 @@ def detail(review_id:uuid.UUID, request:Request, actor:Actor=Depends(get_actor),
     original=review_detail(review_id,request,actor,session)["data"]
     data=original.model_dump(mode="json")
     data["task_learning_materials"]=context.task.learning_materials
+    from journey_api.review_admin_models import PublishedTaskContent
+    published = session.get(PublishedTaskContent, context.task.id)
+    content = published.content if published else {}
+    assessment = content.get("camp") == "exploration" and (content.get("completionMode") or "assessment") == "assessment"
+    data["task_completion_mode"] = (content.get("completionMode") or "assessment") if content.get("camp") == "exploration" else None
+    data["task_task_files"] = content.get("taskFiles", []) if assessment else []
+    data["task_assessment_url"] = content.get("assessmentUrl", "") if assessment else ""
     history = session.execute(select(Review, Evaluation, CoachingFeedback)
         .outerjoin(Evaluation, Evaluation.review_id == Review.id)
         .outerjoin(CoachingFeedback, CoachingFeedback.review_id == Review.id)
@@ -224,12 +242,20 @@ def detail(review_id:uuid.UUID, request:Request, actor:Actor=Depends(get_actor),
 class Material(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1, max_length=100)
-    name: str = Field(min_length=1, max_length=160)
+    name: str = Field(min_length=1, max_length=240)
     type: Literal["link", "file", "image", "text"]
     url: str = Field(default="", max_length=2_800_000)
     text: str = Field(default="", max_length=20000)
     mime: str = Field(default="", max_length=100)
-    size: int = Field(default=0, ge=0, le=2097152)
+    size: int = Field(default=0, ge=0, le=104857600)
+
+    @field_validator("name")
+    @classmethod
+    def nonblank_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("材料名称不能为空")
+        return value
 
     @model_validator(mode="after")
     def safe_url(self):
@@ -239,6 +265,12 @@ class Material(BaseModel):
             if len(self.url) > 2000 or u.scheme != "https" or not u.hostname or u.username or u.password:
                 raise ValueError("学习材料需要有效 HTTPS 链接")
         if self.type in {"file", "image"}:
+            if self.url.startswith("exploration-material:"):
+                try:
+                    uuid.UUID(self.url.split(":", 1)[1])
+                except ValueError as exc:
+                    raise ValueError("学习材料标识无效") from exc
+                return self
             allowed = {"application/pdf", "text/plain", "text/markdown", "text/csv", "image/png", "image/jpeg", "image/webp",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -264,18 +296,23 @@ class Rubric(BaseModel):
     description: str = Field(max_length=2000)
 
 
-class TaskContent(BaseModel):
+class _TaskContentFields(BaseModel):
     model_config = ConfigDict(extra="ignore")
     title: str = Field(default="", max_length=180)
     summary: str = Field(default="", max_length=2000)
     camp: Literal["exploration", "novice"] = "novice"
     domain: str = "产品开发"
     publishingDepartment: PublishingDepartment | Literal[""] = ""
-    difficulty: Literal["入门", "进阶", "挑战"] = "入门"
+    difficulty: Literal["入门", "进阶", "挑战", ""] = "入门"
+    order: int | None = Field(default=None, ge=1, le=9999)
+    completionMode: Literal["learning", "assessment", "checkin"] | None = None
+    assessmentUrl: str = Field(default="", max_length=2048)
+    requirements: list[str] = Field(default_factory=list, max_length=20)
     unlockTaskPoints: int = Field(default=0, strict=True, ge=0, le=1000000)
     rewardRulesVersion: Literal[1, 2, 3] = 3
     badges: list[Badge] = Field(default_factory=list, max_length=2)
-    materials: list[Material] = Field(default_factory=list, max_length=12)
+    materials: list[Material] = Field(default_factory=list, max_length=20)
+    taskFiles: list[Material] = Field(default_factory=list, max_length=20)
     reviewMode: Literal["manual", "ai"] = "manual"
     passScore: float = Field(default=60, ge=0, le=100)
     rubric: list[Rubric] = Field(default_factory=list, max_length=12)
@@ -285,10 +322,44 @@ class TaskContent(BaseModel):
     def choices(self):
         self.unlockTaskPoints = 0
         self.rewardRulesVersion = 3
+        if self.camp == "exploration":
+            self.domain, self.difficulty, self.publishingDepartment = "", "", ""
+            self.badges = []
+            self.completionMode = self.completionMode or "assessment"
+            if self.completionMode != "assessment":
+                self.taskFiles, self.assessmentUrl, self.rubric, self.rubricAttachments = [], "", [], []
+                self.reviewMode = "manual"
+            if self.assessmentUrl:
+                from urllib.parse import urlparse
+                parsed = urlparse(self.assessmentUrl.strip())
+                if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+                    raise ValueError("测试链接需要有效 HTTPS 地址")
+                self.assessmentUrl = self.assessmentUrl.strip()
+            return self
+        if self.taskFiles:
+            raise ValueError("任务文件仅支持探索营任务")
+        if self.difficulty not in PRESETS or len(self.materials) > 12 or any(
+            len(m.name) > 160 or m.size > 2097152 or m.url.startswith("exploration-material:") for m in self.materials):
+            raise ValueError("新手村材料或难度不符合要求")
         if self.domain not in DOMAINS or any(b.id not in BADGES for b in self.badges):
             raise ValueError("未知任务方向或徽章")
         if len({b.id for b in self.badges}) != len(self.badges):
             raise ValueError("徽章不能重复")
+        return self
+
+
+class TaskContent(_TaskContentFields):
+    title: str = Field(default="", max_length=ADMIN_TASK_TITLE_LIMIT)
+    summary: str = Field(default="", max_length=ADMIN_TASK_SUMMARY_LIMIT)
+
+    @field_validator("title", "summary", mode="before")
+    @classmethod
+    def admin_text_limit(cls, value: object, info: ValidationInfo) -> object:
+        return validate_admin_task_text(info.field_name, value)
+
+    @model_validator(mode="after")
+    def summary_limit(self):
+        validate_admin_task_text("summary", self.summary)
         return self
 
 
@@ -301,7 +372,7 @@ class SaveTask(BaseModel):
 @router.put("/tasks/{task_id}")
 def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
               actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_publisher(session, actor, command.content.difficulty)
+    require_camp_publisher(session, actor, command.content.camp, command.content.difficulty or None)
     if task_id != command.id:
         raise ApiError(422, "VALIDATION_FAILED", "任务编号不一致。")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
@@ -311,6 +382,16 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_id)
     row = session.get(ReviewAdminTask, task_id)
+    if definition and task_camp(definition, row) == "exploration":
+        require_super(session, actor)
+    if row and row.status == "deleted":
+        raise ApiError(404, "NOT_FOUND", "该任务已删除。")
+    if definition:
+        from journey_api.exploration_service import ensure_published_camp
+        ensure_published_camp(session, definition, command.content.camp)
+    from journey_api.exploration_models import ExplorationCatalogTask
+    if row and command.content.camp != "exploration" and session.get(ExplorationCatalogTask, task_id):
+        raise ApiError(409, "CAMP_FIXED", "已发布的探索营任务不能更换营地，请复制为新任务。")
     if (row.revision if row else 0) != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "草稿已在其他窗口修改，请重新打开。")
     if not definition:
@@ -319,13 +400,19 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
         session.add(definition)
         session.flush()
     if not row:
-        row = ReviewAdminTask(task_definition_id=task_id, organization_id=actor.organization_id, revision=0)
+        row = ReviewAdminTask(task_definition_id=task_id, organization_id=actor.organization_id, revision=0, content={})
         session.add(row)
     from journey_api.models import Enrollment
-    if command.content.camp != "novice" and session.scalar(select(Enrollment.id).where(
+    if command.content.camp != "novice" and (not row.content or row.content.get("camp") != "exploration") and session.scalar(select(Enrollment.id).where(
         Enrollment.novice_task_id == task_id).limit(1)) is not None:
         raise ApiError(409, "TASK_ALREADY_CLAIMED", "已有学员领取的新手村任务不能改为探索营任务。")
-    row.content = command.content.model_dump(mode="json")
+    content = command.content.model_dump(mode="json")
+    if command.content.camp == "exploration":
+        from journey_api.exploration_service import requirements_for_save, validate_material_references
+        content["requirements"] = requirements_for_save(content, row.content,
+            seed=definition.stable_key.startswith("EXPLORATION-DYNAMIC-20261117-"))
+        validate_material_references(session, actor.organization_id, content)
+    row.content = content
     row.revision += 1
     # Saving editable content must not unpublish the immutable live version.
     # An explicit archive remains in effect until restore/publish is requested.
@@ -338,36 +425,57 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
 
 class PublishTask(BaseModel):
     expected_revision: int = Field(ge=1)
-    reviewed_by: uuid.UUID
+    reviewed_by: uuid.UUID | None = None
     verified_material_urls: list[str] = Field(default_factory=list)
 
 
 def task_content_for_publish(content):
-    d = TaskContent.model_validate(content)
-    if not d.publishingDepartment:
+    try:
+        d = TaskContent.model_validate(content)
+    except ValidationError as exc:
+        raise ApiError(422, "VALIDATION_FAILED", "任务内容不符合要求，请检查基础信息和学习材料后重试。") from exc
+    exploration = d.camp == "exploration"
+    if not exploration and not d.publishingDepartment:
         raise ApiError(422, "VALIDATION_FAILED", "请选择发布部门。")
-    if len(d.title.strip()) < 3:
-        raise ApiError(422, "VALIDATION_FAILED", "任务标题至少需要 3 个字。")
-    if len(d.summary.strip()) < 10:
-        raise ApiError(422, "VALIDATION_FAILED", f"任务简述至少需要 10 个字，当前 {len(d.summary.strip())} 个字。")
-    if not d.materials:
+    minimum_title, minimum_summary = (1, 1) if exploration else (3, 10)
+    if not d.title.strip():
+        raise ApiError(422, "VALIDATION_FAILED", "任务标题不能只包含空格。" if d.title else "请填写任务标题。")
+    if not d.summary.strip():
+        raise ApiError(422, "VALIDATION_FAILED", "任务简述不能只包含空格。" if d.summary else "请填写任务简述。")
+    if len(d.title.strip()) < minimum_title:
+        raise ApiError(422, "VALIDATION_FAILED", f"任务标题至少需要 {minimum_title} 个字。")
+    if len(d.summary.strip()) < minimum_summary:
+        raise ApiError(422, "VALIDATION_FAILED", f"任务简述至少需要 {minimum_summary} 个字，当前 {len(d.summary.strip())} 个字。")
+    if not d.materials and (not exploration or d.completionMode == "assessment"):
         raise ApiError(422, "VALIDATION_FAILED", "请至少添加一份学习材料。")
-    if not d.badges or abs(sum(b.weight for b in d.badges) - 100) > 0.001:
+    if exploration and d.completionMode == "assessment" and not d.taskFiles and not d.assessmentUrl:
+        raise ApiError(422, "VALIDATION_FAILED", "请上传任务文件，或填写已有的测试链接。")
+    if not exploration and (not d.badges or abs(sum(b.weight for b in d.badges) - 100) > 0.001):
         raise ApiError(422, "VALIDATION_FAILED", "请选择 1–2 个徽章，且总占比为 100%。")
     if d.reviewMode == "ai" and (not d.rubric or any(not r.name.strip() or not r.description.strip() for r in d.rubric)
                                 or abs(sum(r.points for r in d.rubric) - 100) > 0.001):
         raise ApiError(422, "VALIDATION_FAILED", "AI 评分标准必须完整，合计 100 分。")
     criteria = ["按照学习材料完成任务，提交可核验的答案与依据。"]
-    materials = [{"key": "material-" + str(i), "title": m.name if len(m.name)>1 else m.name+"材料",
+    materials = [{"key": "material-" + str(i), "title": m.name[:160] if len(m.name)>1 else m.name+"材料",
         "kind": "HTTPS_LINK" if m.type == "link" else "TEXT", "source_label": "任务发布者提供",
         "url": m.url if m.type == "link" else None,
         "body": None if m.type == "link" else (m.text if len(m.text)>=20 else "本任务附带学习文件，请在任务详情中查看并下载：" + m.name),
         "estimated_duration_minutes": 5, "required": False} for i,m in enumerate(d.materials)]
+    if exploration and d.completionMode == "assessment":
+        materials.extend({"key": "task-file-" + str(i), "title": m.name[:160] if len(m.name)>1 else m.name+"文件",
+            "kind": "HTTPS_LINK" if m.type == "link" else "TEXT", "source_label": "任务题目文件",
+            "url": m.url if m.type == "link" else None,
+            "body": None if m.type == "link" else (m.text if len(m.text)>=20 else "本任务附带题目文件，请打开任务文件并按题目要求提交成果：" + m.name),
+            "estimated_duration_minutes": 5, "required": False} for i, m in enumerate(d.taskFiles))
+        if d.assessmentUrl:
+            materials.append({"key": "assessment-entry", "title": "任务测试链接", "kind": "HTTPS_LINK",
+                "source_label": "任务测试入口", "url": d.assessmentUrl, "body": None,
+                "estimated_duration_minutes": 5, "required": False})
     return dict(title=d.title, purpose=d.summary, learner_outcome=d.summary, instructions=criteria,
         completion_criteria=criteria, required_deliverables=["提交任务答案或可访问的飞书文档链接"],
         content_source_notes=["由管理系统任务配置页创建并保存"], change_summary="通过新版任务管理页面发布任务版本。",
         reviewer_calibration_note="按任务说明及学习材料进行独立复核。", learning_materials=materials,
-        estimated_duration_minutes=PRESETS[d.difficulty][0], feedback_sla_business_days=2,
+        estimated_duration_minutes=PRESETS.get(d.difficulty, PRESETS["入门"])[0], feedback_sla_business_days=2,
         rubric={"version":1,"dimensions":[{"dimension_key":"task_completion","title":"任务完成情况",
             "purpose":"核对学员是否完成全部任务要求。", "evidence_expected":"查看提交答案及学习材料中的具体依据。",
             "levels":{"MEETS":"已达到任务要求","NEEDS_WORK":"仍需修改补充"},"required":True,
@@ -385,6 +493,11 @@ def publish_task(task_id: uuid.UUID, command: PublishTask, request: Request,
     row = session.get(ReviewAdminTask, task_id)
     if not definition or definition.organization_id != actor.organization_id or definition.created_by != actor.id or not row:
         raise ApiError(404, "NOT_FOUND", "任务草稿不存在。")
+    exploration = task_camp(definition, row) == "exploration"
+    if not exploration and command.reviewed_by is None:
+        raise ApiError(422, "VALIDATION_FAILED", "请选择内容复核人。")
+    if exploration:
+        command = command.model_copy(update={"reviewed_by": actor.id})
     require_publisher(session, actor, row.content.get("difficulty", "入门"))
     if row.revision != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "任务草稿已更新，请重新打开。")
@@ -394,11 +507,14 @@ def publish_task(task_id: uuid.UUID, command: PublishTask, request: Request,
     if replay:
         return envelope(request, task_data(session, definition))
     body = task_content_for_publish(row.content)
+    from journey_api.exploration_service import ensure_published_camp
+    ensure_published_camp(session, definition, row.content.get("camp", "novice"))
     # The original publication service remains responsible for reviewer, links,
     # immutable versions, audit and outbox enforcement.
     row.status = "published"
     store_result(session, actor_id=actor.id, command="review_admin.publish", key=idempotency_key, payload=payload, response={"id":str(task_id)})
-    publish_task_version(task_id, PublishTaskVersionCommand(**body, expected_revision=definition.revision,
+    from journey_api.exploration_service import publication_command
+    publish_task_version(task_id, publication_command(row.content, **body, expected_revision=definition.revision,
         reviewed_by=command.reviewed_by, verified_material_urls=command.verified_material_urls), request,
         idempotency_key="admin-"+idempotency_key, actor=actor, session=session)
     return envelope(request, task_data(session, definition))
@@ -420,20 +536,50 @@ def archive_task(task_id: uuid.UUID, command: ArchiveTask, request: Request,
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_id)
     data = task_data(session, definition)
+    if data.get("camp") == "exploration":
+        require_super(session, actor)
     if not command.archived:
         require_publisher(session, actor, data.get("difficulty", "入门"))
     if data["revision"] != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "任务已更新，请刷新。")
     row = session.get(ReviewAdminTask, task_id)
     if not row:
+        # Archiving/restoring existing versions does not edit their legacy content.
         row = ReviewAdminTask(task_definition_id=task_id, organization_id=actor.organization_id, revision=0,
-                              content=TaskContent.model_validate(data).model_dump(mode="json"))
+                              content=_TaskContentFields.model_validate(data).model_dump(mode="json"))
         session.add(row)
     row.status = "archived" if command.archived else "published" if data["version"] else "draft"
     row.revision += 1
+    if row.content.get("camp") == "exploration":
+        from journey_api.exploration_service import publish_catalog
+        publish_catalog(session, definition, row, move=not command.archived, requested_position=data.get("publishedOrder"))
     audit(session,request,actor,"review_admin.task_archived" if command.archived else "review_admin.task_restored", task_id)
     session.commit()
     return envelope(request, task_data(session,definition))
+
+
+@router.post("/tasks/{task_id}/delete")
+def delete_exploration_task(task_id: uuid.UUID, command: RevisionCommand, request: Request,
+    actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
+    require_publisher(session, actor)
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
+        TaskDefinition.organization_id == actor.organization_id, TaskDefinition.created_by == actor.id).with_for_update())
+    row = session.get(ReviewAdminTask, task_id) if definition else None
+    if not row or row.content.get("camp") != "exploration":
+        raise ApiError(404, "NOT_FOUND", "没有找到可删除的探索营任务。")
+    require_super(session, actor)
+    if row.status == "deleted":
+        return envelope(request, {"id": str(task_id), "deleted": True, "revision": row.revision})
+    from journey_api.publication_routes import ensure_editable
+    ensure_editable(session, task_id)
+    if row.revision != command.expected_revision:
+        raise ApiError(409, "VERSION_CONFLICT", "任务已更新，请刷新。")
+    row.status, row.revision = "deleted", row.revision + 1
+    from journey_api.exploration_service import publish_catalog
+    publish_catalog(session, definition, row, move=False)
+    audit(session, request, actor, "exploration.task_deleted", task_id, {"historical_records_preserved": True})
+    session.commit()
+    return envelope(request, {"id": str(task_id), "deleted": True, "revision": row.revision})
 
 
 class ClaimCommand(BaseModel):
@@ -897,7 +1043,7 @@ class SandboxCommand(BaseModel):
 def sandbox(command:SandboxCommand,request:Request,actor:Actor=Depends(get_actor),session:Session=Depends(get_db)):
     from journey_api.ai_self_check_clients import get_reviewer
     from journey_api.config import get_settings
-    require_publisher(session,actor,command.task.difficulty)
+    require_camp_publisher(session,actor,command.task.camp,command.task.difficulty)
     task_content_for_publish(command.task.model_dump(mode="json"))
     if not get_settings().ai_self_check_enabled:
         raise ApiError(503,"AI_UNAVAILABLE","AI 服务未启用。")

@@ -19,5 +19,5 @@ export function filterDashboardTasks(entries: DashboardTaskEntry[], query: strin
   const keyword = query.trim().toLowerCase();
   if (!keyword) return entries;
   return entries.filter(({ task }) => [task.title, task.name, task.description]
-    .some(value => value.toLowerCase().includes(keyword)));
+    .some(value => value?.toLowerCase().includes(keyword)));
 }

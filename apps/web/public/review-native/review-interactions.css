@@ -12,3 +12,10 @@
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
+
+.task-summary-hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+#summary-counter { flex-shrink: 0; font-variant-numeric: tabular-nums; }

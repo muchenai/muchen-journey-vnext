@@ -1,0 +1,8 @@
+.exploration-graduation-task-card { text-align: left; cursor: pointer; width: 100%; }
+.exploration-graduation-task-card .exploration-graduation-task-icon { color: #69d9e5; }
+.exploration-graduation-task-card.journey-task-completed .exploration-graduation-task-icon { color: #77ffcf; }
+.exploration-graduation-task-card.journey-task-active .journey-task-status { color: #7cf0e5; }
+.exploration-graduation-task-card .journey-task-number { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exploration-graduation-task-card .journey-task-description { max-width: 100%; }
+.exploration-graduation-task-code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9cf4e3; font: 500 12px/19px Consolas, monospace; letter-spacing: .6px; }
+.exploration-graduation-task-card:focus-visible { outline: 2px solid #86f7ff; outline-offset: 3px; }

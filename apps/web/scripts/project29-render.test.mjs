@@ -41,6 +41,20 @@ const {ProfileBadgeWall}=load(path.join(root,'app/project29/ProfileBadgeWall.tsx
 const {parseProfileCollection}=load(path.join(root,'app/project29/profileBadges.ts'));
 const {GrowthHistoryContent}=load(path.join(root,'app/project29/GrowthHistoryDialog.tsx'));
 const {AccountSwitchDialog}=load(path.join(root,'app/project29/AccountSwitchDialog.tsx'));
+const {ModuleHeader}=load(path.join(root,'app/project29/ModuleShell.tsx'));
+
+test('retained original exploration tasks are linked from header tools without shifting the dashboard canvas',()=>{
+  const props={module:'dashboard',menu:'hall',identity:'真实学员',query:'',onQuery(){},onHome(){},onProfile(){}};
+  for(const available of [false,true]){
+    const html=renderToStaticMarkup(React.createElement(ModuleHeader,{...props,legacyTasksAvailable:available}));
+    assert.equal(html.includes('href="/app?view=legacy-tasks"'),available);
+    if(available)assert.match(html,/<div class="module-header-tools"><a[^>]*>查看原探索营任务<\/a>/);
+  }
+  for(const destination of ['village','academy','guild']){
+    const html=renderToStaticMarkup(React.createElement(ModuleHeader,{...props,module:destination,legacyTasksAvailable:true}));
+    assert.doesNotMatch(html,/href="\/app\?view=legacy-tasks"/);
+  }
+});
 
 test('personal profile shows actual rewards and growth levels with mall exchange still unavailable',()=>{
   const props={name:'真实学员',wallet:{xp:200,availableXp:200,redeemedXp:0,ownedMedalCount:0,badgeBalances:{product:20,data:5}},badges:[],error:'',onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){},onBadgeCatalog(){},onBadgeOwned(){}};
@@ -209,9 +223,15 @@ test('review notification panel contains only reminders and independent read act
   assert.match(allRead,/暂无未读通知/);assert.doesNotMatch(allRead,/宝藏一测试任务|标为已读/);
 });
 const data={assignmentId:'a1',status:'IN_PROGRESS',revision:3,taskVersion:2,title:'真实任务',purpose:'学习',shortDescription:'学习',learnerOutcome:'记录',referenceMaterials:[],estimatedMinutes:10,stageKind:'DAY_0',stageKey:'DAY-0',stagePosition:1,currentAssignmentId:'a1',currentStagePosition:1,allowedCommands:['submit'],materials:[],draftBody:'',completedStages:0,totalStages:8,reviewerDisplayName:'真实审核员',latestSubmissionBody:null,latestSubmissionVersion:null,latestSubmissionCreatedAt:null,latestFeedback:null,latestFeedbackAt:null,pendingReviewAssignmentId:null,activityRecords:[],reviewFeedback:[],journeyTasks:Array.from({length:8},(_,i)=>({assignmentId:'a'+(i+1),position:i+1,status:i===0?'CURRENT':'LOCKED',assignmentStatus:i===0?'IN_PROGRESS':'AVAILABLE',title:executionTasks[i].title,shortDescription:''}))};
-const value={initialScreen:'dashboard',learnerName:'真实姓名',experience:data,joinPhase:'feishu',joinError:''};
+const value={initialScreen:'dashboard',learnerName:'真实姓名',experience:data,joinPhase:'feishu',joinError:'',configurableExploration:false};
 const inside=(component,experience=data)=>renderToStaticMarkup(React.createElement(JourneyProvider,{value:{...value,experience}},component));
 const render=(props={})=>renderToStaticMarkup(React.createElement(App,{...value,...props}));
+
+test('learners with original exploration assignments can find their retained tasks from the new dashboard',()=>{
+  assert.match(render({configurableExploration:true}),/href="\/app\?view=legacy-tasks"[^>]*>查看原探索营任务/);
+  assert.doesNotMatch(render({configurableExploration:true,experience:null}),/查看原探索营任务/);
+  assert.doesNotMatch(render({initialScreen:'tasks',configurableExploration:false}),/restored-exploration-dialog-root/);
+});
 
 test('exploration progress uses the same real count as its label on the first server render',()=>{
   for(const completedStages of [0,1,4,8]) {
@@ -317,8 +337,6 @@ test('phone nickname setup renders the supplied welcome dialog over the explorat
   assert.match(html,/updated-dashboard/);
   assert.doesNotMatch(html,/当前为前端演示|仅保存在本机浏览器|code-field|autocomplete="current-password"/i);
 });
-
-
 
 test('released village uses real departments and does not render demo tasks',()=>{
   const {practiceTasks}=load(path.join(root,'app/project29/moduleDemoData.ts'));
