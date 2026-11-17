@@ -1,0 +1,23 @@
+.material-dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;margin:16px 0;padding:24px 18px;min-height:154px;border:1.5px dashed var(--border);border-radius:9px;background:var(--bg);color:var(--text);text-align:center;cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s}
+.material-dropzone:hover,.material-dropzone:focus-visible,.material-dropzone.is-dragover{border-color:var(--primary);background:var(--primary-soft)}
+.material-dropzone:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.material-dropzone.is-dragover{box-shadow:inset 0 0 0 1px var(--primary);border-style:solid}
+.material-dropzone[aria-busy=true]{opacity:.65;cursor:progress}
+.material-dropzone-icon{display:flex;align-items:center;justify-content:center;width:43px;height:43px;border-radius:10px;background:var(--surface);color:var(--primary);border:1px solid var(--border)}
+.material-dropzone>strong{font-size:13px;font-weight:600;color:var(--ink)}
+.material-dropzone>span:not(.material-dropzone-icon){font-size:11px;line-height:1.8;color:var(--text)}
+.material-dropzone>small{font-size:10px;color:var(--muted)}
+.material-dropzone kbd{display:inline-block;padding:0 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font:inherit;font-size:10px;line-height:1.8;color:var(--ink)}
+.material-row .material-thumbnail{flex:none;overflow:hidden;background:var(--bg);border:1px solid var(--border);padding:0}
+.material-thumbnail img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:760px){.material-dropzone{padding:19px 12px}.material-dropzone>strong{font-size:12px}}
+.material-dropzone:focus{border-color:var(--primary)}
+.exploration-task-choice{margin:0;padding:0;border:0;min-width:0}
+.exploration-task-choice .review-options{margin-top:4px}
+.exploration-task-choice .review-option{min-width:0;padding:18px;gap:12px}
+.exploration-task-choice .review-option>div{flex:1;min-width:0}
+.exploration-task-choice .review-option p{margin-bottom:0;line-height:1.6}
+.exploration-task-file-intro{margin:0 0 18px;color:var(--text);font-size:13px;line-height:1.8}
+.exploration-assessment-link{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.exploration-config-restricted > #new-task{margin-top:20px}
+@media(max-width:760px){.exploration-task-choice .review-options{grid-template-columns:1fr}}

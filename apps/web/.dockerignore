@@ -1,6 +1,7 @@
 .git
 .next
 node_modules
+proof
 *.tsbuildinfo
 npm-debug.log*
 src/app/project6

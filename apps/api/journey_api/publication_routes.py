@@ -12,6 +12,7 @@ from journey_api.errors import ApiError
 from journey_api.models import TaskDefinition, User, UserStatus, RoleAssignment, Role
 from journey_api.review_admin_models import TaskPublicationRequest, ReviewAdminTask
 from journey_api.review_admin_access import require_publisher, require_super, access_for, permissions
+from journey_api.review_camps import task_camp
 from journey_api.review_admin_routes import envelope, audit, task_data, task_content_for_publish
 
 router = APIRouter(prefix='/api/v1/review-admin')
@@ -56,17 +57,20 @@ def submit(task_id: uuid.UUID, command: SubmitPublication, request: Request,
     row = session.get(ReviewAdminTask, task_id)
     if not row or row.revision != command.expected_revision:
         raise ApiError(409, 'VERSION_CONFLICT', '草稿已更新，请重新打开。')
+    if task_camp(definition, row) == 'exploration':
+        require_super(session, actor)
+        raise ApiError(409, 'EXPLORATION_DIRECT_PUBLISH_ONLY', '探索营任务由超级管理员直接发布，无需提交发布审核。')
     require_publisher(session, actor, row.content.get('difficulty'))
     previous = session.scalar(select(TaskPublicationRequest).where(TaskPublicationRequest.task_id == task_id,
         TaskPublicationRequest.task_revision == row.revision))
     if previous: return envelope(request, task_data(session, definition))
     ensure_editable(session, task_id)
     if row.status == 'archived': raise ApiError(409, 'INVALID_STATE', '请先恢复任务再提交审核。')
-    task_content_for_publish(row.content)
-    if row.content.get('camp') != 'novice': raise ApiError(409, 'NOT_AVAILABLE', '探索营发布暂未开放。')
-    links = list(dict.fromkeys(m['url'] for m in row.content['materials'] if m['type'] == 'link'))
+    body = task_content_for_publish(row.content)
+    from journey_api.learning_materials import reviewable_material_links
+    links = [material["url"] for material in reviewable_material_links(body["learning_materials"])]
     if command.verified_material_urls != links:
-        raise ApiError(422, 'MATERIAL_LINK_VERIFICATION_REQUIRED', '请确认全部学习材料链接可供学员访问。')
+        raise ApiError(422, 'MATERIAL_LINK_VERIFICATION_REQUIRED', '请确认全部学习材料、任务文件和测试链接可供学员访问。')
     approval = TaskPublicationRequest(id=uuid.uuid4(), organization_id=actor.organization_id,
         task_id=task_id, submitted_by=actor.id, task_revision=row.revision, revision=1, status='pending',
         content=dict(row.content), verified_material_urls=links, comment='')
@@ -100,6 +104,8 @@ def decide(publication_id: uuid.UUID, command: DecidePublication, request: Reque
     profile = session.get(ReviewAdminTask, row.task_id)
     if not profile or profile.revision != row.task_revision or profile.content != row.content:
         raise ApiError(409, 'VERSION_CONFLICT', '提交版本已变化，不能发布。')
+    if command.decision == 'approved' and task_camp(definition, profile) == 'exploration':
+        raise ApiError(409, 'EXPLORATION_DIRECT_PUBLISH_ONLY', '探索营任务由超级管理员直接发布，请退回旧申请后按直接发布流程处理。')
     if command.decision == 'approved':
         owner = session.get(User, row.submitted_by)
         access = access_for(session, row.submitted_by, actor.organization_id)
@@ -114,9 +120,12 @@ def decide(publication_id: uuid.UUID, command: DecidePublication, request: Reque
         from journey_api.routes import publish_task_version
         from journey_api.schemas import PublishTaskVersionCommand
         body = task_content_for_publish(row.content)
+        from journey_api.exploration_service import ensure_published_camp
+        ensure_published_camp(session, definition, row.content.get('camp', 'novice'))
         profile.status = 'published'
         request.state.approved_publication_task_id = row.task_id
-        publish_task_version(row.task_id, PublishTaskVersionCommand(**body, expected_revision=definition.revision,
+        from journey_api.exploration_service import publication_command
+        publish_task_version(row.task_id, publication_command(row.content, **body, expected_revision=definition.revision,
             reviewed_by=actor.id, verified_material_urls=row.verified_material_urls), request,
             idempotency_key='publication-'+str(row.id), actor=actor, session=session)
     else:

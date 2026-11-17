@@ -309,6 +309,10 @@ def create_task_definition(
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.OPERATOR)
+    from journey_api.review_camps import EXPLORATION_TASK_KEYS
+    if command.stable_key in EXPLORATION_TASK_KEYS:
+        from journey_api.review_admin_access import require_super
+        require_super(session, actor)
     payload = command.model_dump(mode="json")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     replay = find_replay(
@@ -401,6 +405,16 @@ def publish_task_version(
 ) -> dict[str, object]:
     from journey_api.review_admin_access import require_version_publisher
     require_version_publisher(session, actor, task_definition_id)
+    from journey_api.review_admin_models import ReviewAdminTask
+    from journey_api.review_camps import task_camp
+    camp_definition = session.get(TaskDefinition, task_definition_id)
+    profile = session.get(ReviewAdminTask, task_definition_id)
+    exploration = bool(camp_definition and camp_definition.organization_id == actor.organization_id
+        and task_camp(camp_definition, profile) == "exploration")
+    if exploration:
+        # The authorized publisher is the accountable person; no second reviewer
+        # selection may impersonate a different staff member in the audit.
+        command = command.model_copy(update={"reviewed_by": actor.id})
     payload = {
         **command.model_dump(mode="json"),
         "task_definition_id": str(task_definition_id),
@@ -441,7 +455,7 @@ def publish_task_version(
     ensure_revision(definition.revision, command.expected_revision)
     if definition.status == TaskDefinitionStatus.WITHDRAWN:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已撤销的任务定义不能发布新版本。")
-    reviewer = session.scalar(
+    reviewer = session.get(User, actor.id) if exploration else session.scalar(
         select(User)
         .join(RoleAssignment, RoleAssignment.user_id == User.id)
         .where(
@@ -515,6 +529,9 @@ def publish_task_version(
     if profile is not None and profile.organization_id == actor.organization_id:
         session.add(PublishedTaskContent(task_version_id=version.id,
             organization_id=actor.organization_id, content=profile.content))
+        if profile.content.get("camp") == "exploration":
+            from journey_api.exploration_service import publish_catalog
+            publish_catalog(session, definition, profile)
     definition.status = TaskDefinitionStatus.PUBLISHED
     definition.revision += 1
     result = {"id": str(version.id), "task_definition_id": str(definition.id)}

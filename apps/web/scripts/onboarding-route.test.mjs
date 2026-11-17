@@ -9,7 +9,7 @@ function compile(file,overrides){
   const source=ts.transpileModule(readFileSync(new URL('../src/app/'+file,import.meta.url),'utf8'),{
     compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}
   }).outputText;
-  const compiledModule={exports:{}};
+  const compiledModule ={exports:{}};
   vm.runInThisContext('(function(require,module,exports){'+source+'\n})')(name=>name in overrides?overrides[name]:nativeRequire(name),compiledModule,compiledModule.exports);
   return compiledModule.exports;
 }
@@ -23,7 +23,7 @@ function routes(needsNickname){
   }};
   const navigation={redirect:path=>{throw Error('REDIRECT '+path)}};
   const experience=compile('project-ui/experience-data.ts',{'server-only':{},'next/navigation':navigation,'@/lib/server/api':api,'./review-feedback':{},'./exploration-links':{}});
-  const overrides={'next/navigation':navigation,'@/lib/server/api':api,'@/app/project-ui/experience-data':experience,'@/app/project29/App':{default:()=>null}};
+  const overrides={'@/lib/server/local-preview':compile('../lib/server/local-preview.ts',{}),'next/navigation':navigation,'@/lib/server/api':api,'@/app/project-ui/experience-data':experience,'@/app/project29/App':{default:()=>null}};
   return {home:compile('app/page.tsx',overrides).default,profile:compile('app/profile/page.tsx',overrides).default};
 }
 test('new phone learner sees introduction before required name dialog',async()=>{

@@ -103,6 +103,7 @@ export function ModuleHeader({
   onQuery,
   onHome,
   onProfile,
+  legacyTasksAvailable = false,
 }: {
   active?: boolean
   module: ModuleDestination
@@ -112,6 +113,7 @@ export function ModuleHeader({
   onQuery: (value: string) => void
   onHome: () => void
   onProfile: () => void
+  legacyTasksAvailable?: boolean
 }) {
   const searchInput = useRef<HTMLInputElement>(null)
   const macPlatform = useSyncExternalStore(subscribePlatform, clientMacPlatform, serverMacPlatform)
@@ -147,7 +149,7 @@ export function ModuleHeader({
     guild: "公会大厅",
   }
   const page =
-    ({ mine: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库", lab: "模拟实验室", certification: "能力地图", "capability-map": "能力地图", arena: "认证竞技场" } as Record<string, string>)[menu] ||
+    ({ mine: "我的任务", tasks: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库", lab: "模拟实验室", certification: "能力地图", "capability-map": "能力地图", arena: "认证竞技场" } as Record<string, string>)[menu] ||
     hall[module]
   return (
     <header className="module-header">
@@ -159,6 +161,7 @@ export function ModuleHeader({
         <span>{page}</span>
       </div>
       <div className="module-header-tools">
+        {module === "dashboard" && legacyTasksAvailable && <a className="module-secondary" href="/app?view=legacy-tasks">查看原探索营任务</a>}
         <label className="module-search">
           <ModuleIcon file="095be" size={17} />
           <input
@@ -196,6 +199,7 @@ export function ModuleSidebar({
   activeDecoration,
   idleDecoration,
   taskCount = 0,
+  configurableTasks = false,
 }: {
   module: ModuleDestination
   onNavigate: (page: ModuleDestination) => void
@@ -205,12 +209,13 @@ export function ModuleSidebar({
   activeDecoration: ReactNode
   idleDecoration: ReactNode
   taskCount?: number
+  configurableTasks?: boolean
 }) {
   const menu =
     module === "dashboard"
       ? [
           ["hall", "探索营大厅", "8c48a"],
-          ["tasks", "探索任务", "eec40"],
+          ["tasks", configurableTasks ? "我的任务" : "探索任务", "eec40"],
         ]
       : module === "academy"
         ? [

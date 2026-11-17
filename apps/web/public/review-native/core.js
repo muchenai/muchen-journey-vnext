@@ -1,4 +1,7 @@
+import {isMaterialLink} from './material-validation.js';
+import {validateTaskFieldLimits as fieldLimits} from './task-field-limits.js';
 import {isPublishingDepartment} from './publishing-departments.js';
+import { EXPLORATION_COMPLETION_MODES, requiresTaskAssessment, explorationTaskResourceErrors } from './exploration-completion.js';
 /** JOURNEY prototype domain model. All persistence stays in this browser. */
 export const BADGES = Object.freeze([
   { id: 'data', name: '数据交付徽章', category: '数据交付', color: '#648b83' },
@@ -61,6 +64,9 @@ const RULES_VERSION = 'difficulty-v2';
 
 /** Difficulty is the only configurable source of time and reward values. */
 export function applyDifficultyPreset(task = {}) {
+  if (getReviewCamp({}, task) === 'exploration') {
+    return { ...task, publishingDepartment: undefined, difficulty: '', badges: [], minutes: 0, xp: 0, taskPoints: 0, unlockTaskPoints: 0 };
+  }
   const preset = DIFFICULTY_PRESETS.find(item => item.name === task.difficulty);
   return preset
     ? { ...task, minutes: preset.minutes, xp: preset.xp, taskPoints: preset.taskPoints, rulesVersion: RULES_VERSION, rewardRulesVersion:3, unlockTaskPoints: 0 }
@@ -107,12 +113,6 @@ function validateFailureReasons(reasonCodes) {
   return [...new Set(reasonCodes)];
 }
 
-function fieldLimits(task = {}) {
-  const errors = [];
-  if (text(task.title).length > 80) errors.push('任务标题不能超过 80 字');
-  if (text(task.summary).length > 500) errors.push('任务简述不能超过 500 字');
-  return errors;
-}
 
 export function escapeHtml(value = '') {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -121,6 +121,7 @@ export function escapeHtml(value = '') {
 }
 
 export function rewardBreakdown(task = {}) {
+  if (getReviewCamp({}, task) === 'exploration') return { xp: 0, taskPoints: 0, totalPoints: 0, allocations: [] };
   if (Object.hasOwn(task, 'difficulty') && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) {
     throw new Error('请选择入门、进阶或挑战难度');
   }
@@ -159,9 +160,14 @@ export function validateTask(task = {}) {
   const errors = fieldLimits(task);
   if (text(task.title).length < 3) errors.push('任务标题至少需要 3 个字');
   if (text(task.summary).length < 10) errors.push(`任务简述至少需要 10 个字，当前 ${text(task.summary).length} 个字`);
-  if (!isPublishingDepartment(task.publishingDepartment)) errors.push('请选择发布部门');
-  if (!DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
+  const exploration = getReviewCamp({}, task) === 'exploration';
+  const assessment = requiresTaskAssessment(task);
+  if(exploration&&task.completionMode!=null&&!EXPLORATION_COMPLETION_MODES.some(mode=>mode.id===task.completionMode))errors.push('请选择有效的任务完成方式');
+  if (exploration && task.order != null && (!Number.isInteger(task.order) || task.order < 1 || task.order > 9999)) errors.push('任务排序需为 1～9999 的整数');
+  if (!exploration && !isPublishingDepartment(task.publishingDepartment)) errors.push('请选择发布部门');
+  if (!exploration && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
 
+  if (!exploration) {
   const badges = Array.isArray(task.badges) ? task.badges : [];
   if (badges.length < 1 || badges.length > 2) errors.push('每个任务需选择 1～2 个徽章');
   if (new Set(badges.map(badge => badge.id)).size !== badges.length) errors.push('不能重复选择同一徽章');
@@ -169,21 +175,21 @@ export function validateTask(task = {}) {
   if (badges.some(badge => !BADGES.some(option => option.id === badge.id))) errors.push('请选择系统已有的徽章');
   if (badges.some(badge => !Number.isFinite(Number(badge.weight)) || Number(badge.weight) <= 0 || Number(badge.weight) > 100)) errors.push('每个徽章的占比需大于 0% 且不超过 100%');
   if (Math.abs(badges.reduce((sum, badge) => sum + number(badge.weight), 0) - 100) > 0.000001) errors.push('徽章占比合计需为 100%');
+  }
 
   const materials = Array.isArray(task.materials) ? task.materials : [];
-  if (!materials.length) errors.push('请至少添加一份学习材料');
+  if (exploration && materials.length > 20) errors.push('每个任务最多添加 20 份材料');
+  if (assessment&&!materials.length) errors.push('请至少添加一份学习材料');
   materials.forEach((material, index) => {
     if (!text(material.name)) errors.push(`请填写材料 ${index + 1} 的名称`);
+    const nameLimit = exploration && material.type !== 'link' ? 240 : 160;
+    if (text(material.name).length > nameLimit) errors.push(`材料 ${index + 1} 的名称不能超过 ${nameLimit} 字`);
     if (!['link', 'file', 'image'].includes(material.type)) errors.push(`材料 ${index + 1} 的类型无效`);
-    if (material.type === 'link') {
-      try {
-        const url = new URL(material.url);
-        if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
-      } catch { errors.push(`材料 ${index + 1} 需填写有效的 http 或 https 链接`); }
-    }
+    if (material.type === 'link' && !isMaterialLink(material.url)) errors.push(`材料 ${index + 1} 需填写有效的 HTTPS 链接，不能包含账号或密码`);
   });
-  if (!['manual', 'ai'].includes(task.reviewMode)) errors.push('请选择人工审核或 AI 自测');
-  if (task.reviewMode === 'ai') {
+  errors.push(...explorationTaskResourceErrors(task));
+  if (assessment&&!['manual', 'ai'].includes(task.reviewMode)) errors.push('请选择人工审核或 AI 自测');
+  if (assessment&&task.reviewMode === 'ai') {
     const rubric = Array.isArray(task.rubric) ? task.rubric : [];
     if (!rubric.length) errors.push('请至少配置一个评分维度');
     rubric.forEach((dimension, index) => {
@@ -387,16 +393,36 @@ export class Store {
     return this.data;
   }
 
-  getTask(id) {
-    return this.data.tasks.find(task => task.id === id) || (this.data.draft?.id === id ? this.data.draft : null);
+  getTask(id, { includeDeleted = false } = {}) {
+    return this.data.tasks.find(task => task.id === id) || (this.data.draft?.id === id ? this.data.draft : null)
+      || (includeDeleted ? this.data.deletedTaskSnapshots?.[id] : null);
+  }
+
+  deleteTask(task) {
+    const current = this.data.tasks.find(item => item.id === task?.id);
+    if (!current) throw new Error('任务已删除或不存在，请刷新列表。');
+    if ((current.revision != null || task.revision != null) && current.revision !== task.revision) throw new Error('任务已更新，请刷新后再删除。');
+    const snapshot = clone(this.data);
+    const removed = this.data.tasks.filter(item => item.id === current.id || item.sourceTaskId === current.id);
+    this.data.deletedTaskSnapshots ||= {};
+    for (const item of removed) this.data.deletedTaskSnapshots[item.id] = { ...clone(item), deleted: true, deletedAt: now() };
+    this.data.tasks = this.data.tasks.filter(item => !removed.some(deleted => deleted.id === item.id));
+    if (this.data.draft?.id === current.id || this.data.draft?.sourceTaskId === current.id || removed.some(item => item.id === this.data.draft?.id)) {
+      this.data.draft = { id: uid('draft'), revision: 0, title: '', summary: '', camp: getReviewCamp({}, current),
+        domain: current.domain, difficulty: '入门', badges: [], materials: [], questions: [], rubric: [], rubricAttachments: [],
+        reviewMode: 'manual', passScore: 60, status: 'draft', author: current.author, participants: 0, completions: 0 };
+    }
+    try { this.save(); } catch (error) { this.data = snapshot; throw error; }
+    return { id: current.id, deleted: true };
   }
 
   saveTask(task) {
     if (!task || typeof task !== 'object') throw new Error('任务数据无效');
+    if (this.data.deletedTaskSnapshots?.[task.id]) throw new Error('原任务已删除，请新建任务。');
     task = applyDifficultyPreset(task);
     const errors = fieldLimits(task);
-    if (!DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
-    if (task.reviewMode === 'ai') {
+    if (getReviewCamp({}, task) !== 'exploration' && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
+    if (requiresTaskAssessment(task)&&task.reviewMode === 'ai') {
       if (task.passScore !== undefined && task.passScore !== '' && !isNumeric(task.passScore)) errors.push('任务数值需为有限数字');
       if (isNumeric(task.passScore) && Number(task.passScore) < 0) errors.push('任务数值不能为负数');
       if (isNumeric(task.passScore) && Number(task.passScore) > 100) errors.push('通过分数需在 0～100 分之间');
@@ -441,6 +467,7 @@ export class Store {
       throw error;
     }
     const current = applyDifficultyPreset(this.data.draft);
+    if (this.data.deletedTaskSnapshots?.[current.id] || this.data.deletedTaskSnapshots?.[current.sourceTaskId]) throw new Error('原任务已删除，请新建任务。');
     const existing = this.data.tasks.find(task => task.id === (current.sourceTaskId || current.id));
     if (current.sourceTaskId && !existing) throw new Error('待发布的原任务不存在');
     const content = clone(current);
@@ -478,9 +505,9 @@ export class Store {
     const reviewComment = text(comment);
     if (decision === 'returned' && !reviewComment) throw new Error('退回任务时请填写修改建议');
     const failureReasons = decision === 'returned' ? validateFailureReasons(reasonCodes) : [];
-    const task = this.getTask(submission.taskId);
+    const task = this.getTask(submission.taskId, { includeDeleted: true });
     if (!task) throw new Error('未找到对应任务');
-    if (!DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) throw new Error('请选择入门、进阶或挑战难度');
+    if (getReviewCamp({}, task) !== 'exploration' && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) throw new Error('请选择入门、进阶或挑战难度');
     const key = `${submission.studentId}:${submission.taskId}`;
     const alreadyRewarded = Boolean(this.data.claims[key] || submission.rewarded);
     if (submission.status !== 'pending') {
@@ -624,6 +651,7 @@ export function icon(name, size = 20) {
 
 // Normalize only editable drafts; immutable published/reward snapshots are retained.
 export function normalizeBadgeWeights(task) {
+  if (getReviewCamp({}, task) === 'exploration') return applyDifficultyPreset(structuredClone(task));
   const result=structuredClone(task);
   result.unlockTaskPoints=0;result.rewardRulesVersion=3;result.taskPoints=0;
   if(result.badges?.length===1)result.badges[0].weight=100;

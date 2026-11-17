@@ -3,6 +3,7 @@ import { apiRequest } from "@/lib/server/api";
 import ProjectExperience from "@/app/project29/App";
 import { loadProjectExperience } from "@/app/project-ui/experience-data";
 
+import { localVillagePreviewEnabled } from "@/lib/server/local-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function TaskPage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const [{ assignmentId }, query] = await Promise.all([params, searchParams]);
-  {
+  if (localVillagePreviewEnabled()) {
     let taskId: string | null = null;
     try { taskId = (await apiRequest<{taskId:string|null}>(`/api/v1/me/novice/assignments/${assignmentId}`, "LEARNER")).taskId; } catch { /* Existing page handles authentication errors. */ }
     if (taskId) redirect(`/app?view=village&task=${encodeURIComponent(taskId)}`);
@@ -29,6 +30,8 @@ export default async function TaskPage({
       joinError=""
       learnerName={learnerName}
       experience={experience}
+      configurableExploration={false}
+      localVillagePreview={localVillagePreviewEnabled()}
     />
   );
 }

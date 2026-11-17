@@ -11,6 +11,11 @@ export type JourneyContextValue = {
   joinError: string;
   feishuClient?: boolean;
   initialNotice?: string;
+  localVillagePreview?: boolean;
+  configurableExploration?: boolean;
+  explorationVariant?: "cards" | "list" | "path";
+  explorationTaskId?: string;
+  explorationScope?: "all" | "mine";
 };
 
 const Context = createContext<JourneyContextValue | null>(null);

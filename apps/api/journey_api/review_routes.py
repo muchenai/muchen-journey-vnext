@@ -314,7 +314,10 @@ def review_materials(session: Session, context: ReviewContext) -> ReviewMaterial
         .order_by(SubmissionVersionAttachment.position)
     ).all()
     missing_items: list[str] = []
-    if len(context.version.body.strip()) < 40:
+    from journey_api.review_admin_models import PublishedTaskContent
+    published = session.get(PublishedTaskContent, context.task.id)
+    dynamic_assessment = published and published.content.get("camp") == "exploration" and published.content.get("completionMode") == "assessment"
+    if len(context.version.body.strip()) < (1 if dynamic_assessment else 40):
         missing_items.append("固定提交正文不可用或不符合最小长度合同")
     attachments: list[ReviewAttachmentOut] = []
     for _link, attachment in rows:
@@ -1138,5 +1141,16 @@ def finalize_review(
             "overall_feedback_characters": len(command.overall_feedback),
         },
     )
+    # Settle exploration loot in the same transaction as its genuine PASS.
+    from journey_api.exploration_models import ExplorationWork
+    work = session.scalar(select(ExplorationWork).where(
+        ExplorationWork.assignment_id == context.assignment.id,
+        ExplorationWork.organization_id == actor.organization_id))
+    if work and decision == Decision.PASS:
+        from journey_api.exploration_service import treasure_view
+        session.flush()
+        learner = Actor(id=work.user_id, organization_id=work.organization_id,
+            roles=frozenset({Role.LEARNER}), display_name=context.learner.display_name)
+        treasure_view(session, learner)
     session.commit()
     return envelope(request, result)

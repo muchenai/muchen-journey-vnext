@@ -32,9 +32,9 @@ export async function saveAdminTask(task: AdminTask): Promise<Result<AdminTask>>
   method: "PUT", body: JSON.stringify({ id: task.id, expected_revision: task.revision, content: task }),
  }));
 }
-export async function publishAdminTask(task: AdminTask, reviewerId: string, verified: string[], key: string): Promise<Result<AdminTask>> {
+export async function publishAdminTask(task: AdminTask, reviewerId: string | undefined, verified: string[], key: string): Promise<Result<AdminTask>> {
  return safely(() => apiRequest<AdminTask>(`/api/v1/review-admin/tasks/${encodeURIComponent(task.id)}/publish`, "OPERATOR", {
-  method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify({ expected_revision: task.revision, reviewed_by: reviewerId, verified_material_urls: verified }),
+  method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify({ expected_revision: task.revision, ...(task.camp === "exploration" ? {} : { reviewed_by: reviewerId }), verified_material_urls: verified }),
  }));
 }
 export async function archiveAdminTask(task: AdminTask): Promise<Result<AdminTask>> {

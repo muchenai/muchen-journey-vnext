@@ -66,6 +66,9 @@ def published(session, actor, task_id):
 
 
 def context(session, actor, task_id):
+    from journey_api.exploration_models import ExplorationCatalogTask
+    if session.get(ExplorationCatalogTask, task_id):
+        raise ApiError(404, "NOT_FOUND", "没有找到该新手村任务。")
     enrollment = owned_claim(session, actor, task_id)
     if enrollment is not None:
         assignment = session.scalar(select(Assignment).where(Assignment.enrollment_id == enrollment.id,
@@ -145,6 +148,8 @@ def list_tasks(request: Request, actor: Actor = Depends(get_learner_actor), sess
             TaskVersion.id.in_(visible), latest, ReviewAdminTask.status == "published")
     mine = select(Enrollment.novice_task_id).where(Enrollment.organization_id == actor.organization_id,
         Enrollment.learner_id == actor.id, Enrollment.novice_task_id.is_not(None))
+    from journey_api.exploration_models import ExplorationCatalogTask
+    mine = mine.where(Enrollment.novice_task_id.not_in(select(ExplorationCatalogTask.task_id)))
     ids = session.scalars(select(TaskDefinition.id).where(TaskDefinition.organization_id == actor.organization_id,
         or_((TaskDefinition.id.in_(available)) & (TaskDefinition.status == TaskDefinitionStatus.PUBLISHED),
             TaskDefinition.id.in_(mine))).order_by(TaskDefinition.id)).all()

@@ -82,9 +82,9 @@ function controllerHarness(items,extra={}){
 test('admin guild retains existing tabs and shows pending applications with escaped evidence',()=>{
  const controller=controllerHarness([request({studentName:'<img src=x onerror=alert(1)>',evidence:[{id:'id',name:'<script>徽章</script>',grade:1}]})]);
  const html=controller.render();
- for(const label of ['晋级审核','能力认证','模拟实验室','工会贡献','待审核','已通过','已退回','查看并审核','刷新申请'])assert.ok(html.includes(label));
+ for(const label of ['晋级审核','能力认证','模拟实验室','公会贡献','待审核','已通过','已退回','查看并审核','刷新申请'])assert.ok(html.includes(label));
  assert.ok(html.includes('&lt;script&gt;徽章&lt;/script&gt;'));assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<script>'));
- assert.ok(html.includes('审核通过只更新该工会的阶段'));
+ assert.ok(html.includes('审核通过只更新该公会的阶段'));
  assert.ok(html.includes('旧版全局认证'));
 });
 
@@ -126,9 +126,9 @@ test('new guild request preserves immutable guild and complete task evidence in 
 });
 
 test('request list shows scoped guild, named stage and task while keeping legacy records separate',()=>{
- const html=controllerHarness([scopedRequest({guildTitle:'<工会 & 测试>'}),request({id:'legacy-1',studentName:'旧学员'})]).render();
- for(const text of ['所属工会','申请阶段 / 任务','规范实践','需求澄清与验收边界','旧版全局认证','独立保留，不计入具体工会阶段'])assert.ok(html.includes(text),text);
- assert.ok(html.includes('&lt;工会 &amp; 测试&gt;'));assert.ok(!html.includes('<工会 & 测试>'));
+ const html=controllerHarness([scopedRequest({guildTitle:'<公会 & 测试>'}),request({id:'legacy-1',studentName:'旧学员'})]).render();
+ for(const text of ['所属公会','申请阶段 / 任务','规范实践','需求澄清与验收边界','旧版全局认证','独立保留，不计入具体公会阶段'])assert.ok(html.includes(text),text);
+ assert.ok(html.includes('&lt;公会 &amp; 测试&gt;'));assert.ok(!html.includes('<公会 & 测试>'));
 });
 
 test('request search matches guild, certification stage and task title independently',()=>{
@@ -165,7 +165,7 @@ test('review detail includes untruncated escaped task artifact, self-checks and 
   assert.ok(html.includes('完整成果'.repeat(1400)));assert.ok(h.classes.includes('gd-request-modal'));
   for(const check of taskSnapshot().checks)assert.ok(html.includes(check));
   h.buttons.get('[data-gd-approve-request]')();
-  assert.ok(h.html().includes('其他工会的进度不变'));assert.ok(h.html().includes('多语种数据交付线'));
+  assert.ok(h.html().includes('其他公会的进度不变'));assert.ok(h.html().includes('多语种数据交付线'));
  }finally{h.controller.deactivate();}
 });
 
@@ -173,6 +173,6 @@ test('legacy request detail and decision explain no concrete guild credit is gra
  const h=detailHarness(request());
  try{
   assert.ok(h.html().includes('旧版全局认证'));assert.ok(h.html().includes('提交时未要求认证任务成果'));
-  h.buttons.get('[data-gd-approve-request]')();assert.ok(h.html().includes('不计入具体工会阶段'));
+  h.buttons.get('[data-gd-approve-request]')();assert.ok(h.html().includes('不计入具体公会阶段'));
  }finally{h.controller.deactivate();}
 });

@@ -88,18 +88,25 @@ function find(node, predicate) {
   return predicate(node) ? node : find(node.props?.children, predicate);
 }
 
-function createDashboard(experience = createExperience()) {
+function createDashboard(experience = createExperience(), publishedTasks) {
   let query = '';
   let tree;
   let clearCount = 0;
+  const openedTasks = [];
   function DashboardProbe() {
-    tree = UpdatedDashboard({ identity: '真实学员', decoration: null, activeNavigationDecoration: null, idleNavigationDecoration: null });
+    tree = UpdatedDashboard({ identity: '真实学员', decoration: null, activeNavigationDecoration: null, idleNavigationDecoration: null,
+      publishedTasks, onOpenTask: id => openedTasks.push(id) });
     return tree;
   }
   return {
     setQuery(value) { query = value; },
     get query() { return query; },
     get clearCount() { return clearCount; },
+    get openedTasks() { return openedTasks; },
+    openCurrent() {
+      const button = find(tree, node => node.type === 'button' && node.props['data-node-id'] === '4043:227');
+      button.props.onClick({ stopPropagation() {} });
+    },
     render({ withProvider = true } = {}) {
       const dashboard = React.createElement(DashboardProbe);
       return renderToStaticMarkup(React.createElement(JourneyProvider, { value: {
@@ -220,4 +227,75 @@ test('task filtering never changes the completed total, progress maximum or supp
       assert.match(html, /请补充真实任务证据/);
     }
   }
+});
+
+test('published exploration tasks keep administrator order and use real task IDs for navigation and search', () => {
+  const tasks = [
+    { id: 'done', order: 4, title: '完成的学习', description: '这是已完成材料', status: 'completed', completionMode: 'learning', mentor: '审核甲' },
+    { id: 'new', order: 2, title: '可开始的学习', description: '新的学习内容', status: 'available', completionMode: 'learning', mentor: '审核乙' },
+    { id: 'revision', order: 7, title: '待修改测试', description: '需要补充结果', status: 'returned', completionMode: 'assessment', mentor: '审核丙' },
+  ];
+  const dashboard = createDashboard(null, tasks);
+  const original = dashboard.render();
+  assert.match(original, /value="1" max="3"/);
+  assert.match(original, /aria-valuetext="1\/3 项已完成"/);
+  assert.match(original, /已探索宝藏/);
+  assert.match(original, /探索任务·07/);
+  assert.match(original, /审核丙/);
+  assert.deepEqual(tiles(original).map(tile => tile.index), [0, 1]);
+  dashboard.openCurrent();
+  assert.deepEqual(dashboard.openedTasks, ['revision']);
+  dashboard.setQuery('学习');
+  const matching = dashboard.render();
+  assert.match(matching, /找到 2 个任务/);
+  assert.deepEqual(tiles(matching).map(tile => tile.index), [0, 1]);
+  assert.doesNotMatch(matching, /data-action="open-task"/);
+  dashboard.setQuery('不存在的动态课程');
+  assert.match(dashboard.render(), /暂无相关任务/);
+  dashboard.clear();
+  assert.equal(dashboard.render(), original);
+});
+
+test('empty published exploration catalog has a zero progress value and waits for real publication', () => {
+  const dashboard = createDashboard(null, []);
+  const html = dashboard.render();
+  assert.match(html, /value="0" max="1"/);
+  assert.match(html, /aria-valuetext="0\/0 项已完成"/);
+  assert.match(html, /暂无已发布任务/);
+  assert.match(html, /等待管理员发布任务/);
+  assert.deepEqual(tiles(html), []);
+});
+
+test('published learning and signout events retain their distinct action text and the newest activity first', () => {
+  const tasks = [
+    { id: 'learning', order: 1, title: '材料学习', description: '学习说明', status: 'completed', completionMode: 'learning',
+      activityRecords: [{ id: 'learning-event', body: '完成学习', submittedAt: '2026-11-17T02:00:00Z', status: 'LEARNING_COMPLETED' }] },
+    { id: 'checkout', order: 2, title: '培训签退', description: '签退说明', status: 'completed', completionMode: 'checkin',
+      activityRecords: [{ id: 'checkout-event', body: '签退确认', submittedAt: '2026-11-17T03:00:00Z', status: 'CHECKIN_COMPLETED' }] },
+  ];
+  const html = createDashboard(null, tasks).render();
+  assert.match(html, /完成了学习/);
+  assert.match(html, /完成了培训签退/);
+  assert.ok(html.indexOf('完成了培训签退') < html.indexOf('完成了学习'));
+  assert.match(html, /value="2" max="2"/);
+});
+
+test('published exploration dashboard uses the old lock status and prevents search cards bypassing the sequence', () => {
+  const tasks = [
+    { id: 'first', order: 1, title: '首项学习', description: '说明', status: 'active', claimed: false },
+    { id: 'later', order: 2, title: '后项学习', description: '说明', status: 'locked', claimed: false },
+  ];
+  const dashboard = createDashboard(null, tasks);
+  const original = dashboard.render();
+  assert.match(original, /正在进行中/);
+  assert.match(original, /待解锁/);
+  assert.match(original, /上一任务提交后解锁/);
+  assert.doesNotMatch(original, /可接取/);
+  const locked = tiles(original).find(tile => tile.status === 'locked');
+  assert.match(locked.markup, /disabled=""/);
+  dashboard.setQuery('后项');
+  const search = dashboard.render();
+  assert.match(search, /找到 1 个任务/);
+  assert.match(tiles(search)[0].markup, /data-status="locked"[^>]*disabled=""/);
+  assert.deepEqual(dashboard.openedTasks, []);
 });

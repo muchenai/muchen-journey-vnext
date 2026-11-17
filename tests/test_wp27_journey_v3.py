@@ -6,6 +6,7 @@ from journey_api.fixtures import REVIEWER_ID
 from journey_api.formal_journey_catalog import FORMAL_JOURNEY_KEY
 from journey_api.journey_service import FORMAL_V3_STAGE_KEYS
 from journey_api.main import app
+from test_material_review_progress import exploration_operator_publisher
 
 
 client = TestClient(app, base_url="http://localhost")
@@ -78,7 +79,7 @@ def task_payload(stable_key: str, revision: int) -> dict:
     }
 
 
-def test_v3_composition_requires_eight_approved_material_bearing_versions():
+def test_v3_composition_requires_eight_approved_material_bearing_versions(exploration_operator_publisher):
     existing = data(
         client.get("/api/v1/ops/formal-journeys", headers=OPERATOR)
     )["items"]

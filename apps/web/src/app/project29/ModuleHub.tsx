@@ -68,6 +68,9 @@ export function ModuleHub({
   onExplorationMenu,
   explorationTaskCount = 0,
   nicknameRequired = false,
+  configurableExploration = false,
+  explorationScope = "all",
+  legacyTasksAvailable = false,
 }: {
   active?: boolean
   module: ModuleDestination
@@ -80,12 +83,18 @@ export function ModuleHub({
   onExplorationMenu: (menu: string) => void
   explorationTaskCount?: number
   nicknameRequired?: boolean
+  localVillagePreview?: boolean
+  configurableExploration?: boolean
+  explorationVariant?: "cards" | "list" | "path"
+  explorationTaskId?: string
+  explorationScope?: "all" | "mine"
+  legacyTasksAvailable?: boolean
 }) {
   const villageEnabled = module === "village"
   const modulePagesEnabled = ["academy", "guild"].includes(module)
   const village = useVillageTasks(villageEnabled)
   const practiceTasks = village.tasks
-  const [menu, setMenu] = useState("hall")
+  const [menu, setMenu] = useState(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : "hall")
   const [profileReturn, setProfileReturn] = useState("hall")
   const [badgeEntryTab, setBadgeEntryTab] = useState<BadgeTab>("shop")
   const [badgeEntryVersion, setBadgeEntryVersion] = useState(0)
@@ -150,7 +159,7 @@ export function ModuleHub({
     const initial = window.setTimeout(() => {
       const mapDepartment = module === "village" ? pendingMapTaskDepartment.current : null
       pendingMapTaskDepartment.current = null
-      setMenu(module === "village" && pendingVillageMenu.current ? pendingVillageMenu.current : module === "academy" && pendingAcademyFavorites.current ? "saved" : "hall")
+      setMenu(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : module === "village" && pendingVillageMenu.current ? pendingVillageMenu.current : module === "academy" && pendingAcademyFavorites.current ? "saved" : "hall")
       if (!(module === "village" && pendingVillageMenu.current === "badges")) setBadgeEntryTab("shop")
       pendingVillageMenu.current = null
       pendingAcademyFavorites.current = false
@@ -224,6 +233,14 @@ export function ModuleHub({
       return
     }
     if (module === "dashboard") {
+      if (configurableExploration) {
+        if (next === "hall" || next === "tasks") {
+          setMenu("hall"); setQuery(""); onExplorationMenu(next)
+        } else if (next === "settings") {
+          setDialog({type:"info",title:"探索营设置",body:"按后台发布的探索营任务展示学习内容。按任务顺序完成学习或提交测试结果后可以继续下一项；审核结果同步到任务详情。"})
+        }
+        return
+      }
       if (next === "hall" || next === "tasks") {
         setMenu("hall")
         setQuery("")
@@ -338,9 +355,11 @@ export function ModuleHub({
             activeDecoration={activeNavigationDecoration}
             idleDecoration={idleNavigationDecoration}
             taskCount={explorationTaskCount}
+            configurableTasks={configurableExploration}
           />
           <div className="module-main">
             <ModuleHeader
+              legacyTasksAvailable={configurableExploration && legacyTasksAvailable}
               active={active}
               module={module}
               menu={menu}
@@ -348,7 +367,7 @@ export function ModuleHub({
               query={query}
               onQuery={(value) => {
                 setQuery(value)
-                if (menu !== "profile" && menu !== "map" && menu !== "knowledge" && menu !== "badges" && menu !== "hall" && !(module === "guild" && ["lab", "certification", "capability-map", "arena"].includes(menu)) && !(module === "academy" && menu === "saved")) setMenu("hall")
+                if (menu !== "profile" && menu !== "map" && menu !== "knowledge" && menu !== "badges" && menu !== "hall" && !(module === "dashboard" && configurableExploration) && !(module === "guild" && ["lab", "certification", "capability-map", "arena"].includes(menu)) && !(module === "academy" && menu === "saved")) setMenu("hall")
               }}
               onHome={() => { setMenu("hall"); setQuery(""); onNavigate("dashboard") }}
               onProfile={() => {

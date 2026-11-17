@@ -1,0 +1,39 @@
+.exploration-original-task-list{position:relative;width:1920px;height:1080px;overflow:hidden;color:#e9f9ff;font-family:"Source Han Sans SC","Microsoft YaHei",sans-serif;isolation:isolate}
+.exploration-original-task-list *{box-sizing:border-box}
+.exploration-original-task-list p,.exploration-original-task-list h1,.exploration-original-task-list h2{margin:0}
+.eotl-background{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:-1;max-width:none}
+.eotl-back{position:absolute;isolation:isolate;left:114px;top:105px;display:flex;align-items:center;justify-content:center;width:261px;height:68px;padding:0;border:1.6px solid transparent;border-radius:16px;background:transparent;color:#fff;font:500 21px/normal "Source Han Sans SC","Microsoft YaHei",sans-serif;overflow:visible;cursor:pointer}
+.eotl-back>.journey-back-tint,.eotl-back-inset{position:absolute;inset:0;pointer-events:none;border-radius:14.4px}
+.eotl-back-inset{box-shadow:inset 16px 3px 44.8px 2px rgba(114,133,255,.64)}
+.eotl-back-content{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:24px;width:221.245px}
+.eotl-back-arrow{display:flex;align-items:center;justify-content:center;width:20.961px;height:20.956px;flex:none}
+.eotl-back-arrow>img{width:16.722px;height:16.922px;max-width:none;transform:rotate(134.03deg) scaleY(-1);flex:none;pointer-events:none}
+.eotl-back-label{width:124px;flex:none;text-align:left}
+.eotl-next{position:absolute;left:107px;top:331px;width:425px}
+.eotl-greeting{display:inline-block;max-width:100%;height:29px;padding:4px 12px;background:#1a4669;color:#8defff;font-size:12px;line-height:20px;letter-spacing:1.44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eotl-next h1{margin-top:16px;font-size:56px;line-height:60.48px;letter-spacing:3.36px;font-weight:700}
+.eotl-next h1>span,.eotl-next h1>strong{display:block;font:inherit}
+.eotl-next h1>span{color:#3ed8ef}
+.eotl-description{margin-top:0!important;padding-top:14px;width:425px;min-height:88px;color:#9bbad3;font-size:16px;line-height:28.8px}
+.eotl-continue{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 20px;margin-top:12px;border:1px solid #75f5ff;border-radius:7px;background:linear-gradient(90deg,#42dced,#31c9f5 45%,#5ceeff);box-shadow:0 0 14px #2edfff,0 0 26px #12c3ff8c;color:#03245f;font:900 16px/26.4px "Source Han Sans SC","Microsoft YaHei",sans-serif;letter-spacing:1.28px;cursor:pointer}
+.eotl-continue:disabled{opacity:.6;cursor:default}
+.eotl-progress{position:relative;width:150px;height:150px;margin-top:34px;border:10px solid #194a6a;border-radius:50%;box-shadow:0 0 25px #2edfff3d;text-align:center}
+.eotl-progress>p{position:absolute;left:0;right:0;top:17px;white-space:nowrap;line-height:75.9px}
+.eotl-progress strong{color:#eafdff;font-size:46px;font-weight:700}
+.eotl-progress>p>span{font-size:16px;line-height:26.4px;color:#75a6c4}
+.eotl-progress>small{position:absolute;left:0;right:0;top:93px;color:#86c9e5;font-size:12px;line-height:19.8px;letter-spacing:1.8px}
+.eotl-panel{position:absolute;isolation:isolate;left:654px;top:86px;display:flex;flex-direction:column;width:1180px;height:852.6px;padding:24px;border:1.6px solid transparent;border-radius:16px;box-shadow:0 0 39.9px rgba(0,112,191,.66);overflow:visible}
+.eotl-panel-tint,.eotl-panel-inset{position:absolute;inset:0;pointer-events:none;border-radius:14.4px}
+.eotl-panel-inset{box-shadow:inset 16px 3px 44.8px 0 rgba(114,133,255,.36)}
+.eotl-panel-heading{position:relative;display:flex;align-items:flex-end;justify-content:space-between;flex:none;min-height:77.391px;padding-bottom:14px;border-bottom:1px solid #41a4d640}
+.eotl-panel-heading>div>span{color:#59e6f4;font-size:11px;line-height:26.4px;letter-spacing:1.98px}
+.eotl-panel-heading h2{font-size:25px;line-height:36px;font-weight:700;color:#e9f9ff}
+.eotl-refresh{padding:3px 0 3px 12px;border:0;background:none;color:#8ed5eb;font:400 12px/24px "Source Han Sans SC",sans-serif;cursor:pointer}
+.eotl-task-scroll{position:relative;flex:1;min-height:0;padding-top:22px;padding-right:2px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#376d9a transparent}
+.eotl-task-scroll .journey-task-card{text-align:left;cursor:pointer;width:100%}
+.eotl-task-scroll .journey-task-available{border-color:#48eaff;box-shadow:0 0 18px #2edfff1a,inset 0 0 28px #23b0f11a}
+.eotl-task-scroll .journey-task-available .journey-task-status{color:#a7e8ed}
+.eotl-task-scroll .journey-task-title{max-width:100%;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}
+.eotl-task-scroll .journey-task-card:focus-visible,.eotl-back:focus-visible,.eotl-continue:focus-visible,.eotl-refresh:focus-visible{outline:2px solid #86f7ff;outline-offset:3px}
+.eotl-empty{padding:90px 24px!important;text-align:center;color:#9bbad3;font-size:18px;line-height:1.8}
+.eotl-error{padding:12px 16px!important;margin-bottom:15px!important;border:1px solid #9d6666;border-radius:6px;background:#3d1f35cc;color:#ffc8c8;font-size:14px;line-height:1.7}

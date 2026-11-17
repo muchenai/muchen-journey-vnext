@@ -46,6 +46,7 @@ def require_super(session, actor):
 
 
 def require_publisher(session, actor, difficulty=None):
+    difficulty = difficulty or None
     access_for(session, actor.id, actor.organization_id, lock=True)
     rights = permissions(session, actor)
     if not rights["canPublish"]:
@@ -54,8 +55,20 @@ def require_publisher(session, actor, difficulty=None):
         raise ApiError(403, "PUBLISH_LEVEL_REQUIRED", "该任务难度超出当前认证等级，请联系超级管理员调整认证等级。")
 
 
+def require_camp_publisher(session, actor, camp, difficulty=None):
+    if camp == "exploration":
+        require_super(session, actor)
+    require_publisher(session, actor, difficulty)
+
+
 def require_version_publisher(session, actor, task_id):
+    from journey_api.models import TaskDefinition
+    from journey_api.review_camps import task_camp
+    session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
     profile = session.get(ReviewAdminTask, task_id)
+    if definition and definition.organization_id == actor.organization_id and task_camp(definition, profile) == "exploration":
+        require_super(session, actor)
     # Generic endpoints must not bypass the Review difficulty check.
     if profile and profile.organization_id == actor.organization_id:
         require_super(session, actor)

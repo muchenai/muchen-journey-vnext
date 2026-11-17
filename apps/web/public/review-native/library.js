@@ -1,7 +1,11 @@
-import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown } from './core.js?v=20261030-member-action-spacing';
+import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from './task-publication-access.js';
+import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown, getReviewCamp } from './core.js?v=20261030-member-action-spacing';
+import { localMaterialUrl } from './exploration-material-files.js';
+import { EXPLORATION_COMPLETION_MODES, explorationCompletionMode, requiresTaskAssessment, taskCompletionLabel, validAssessmentUrl, explorationTaskFiles } from './exploration-completion.js';
+import { isPinnedExplorationTask } from './exploration-order.js';
 
 import {PUBLISHING_DEPARTMENTS, departmentLabel} from './publishing-departments.js';
-const state = { tab: 'tasks', search: '', domain: 'all', status: 'all' };
+const state = { tab: 'tasks', search: '', domain: 'all', status: 'all', camp: typeof location !== 'undefined' && new URLSearchParams(location.search || '').get('camp') === 'exploration' ? 'exploration' : 'all' };
 const badgeList = () => Array.isArray(BADGES) ? BADGES : Object.values(BADGES);
 const badgeName = id => badgeList().find(b => b.id === id)?.name || id;
 const badgeColor = id => badgeList().find(b => b.id === id)?.color || '#7771dd';
@@ -15,13 +19,15 @@ const badgeLevel = points => Math.min(3, Math.floor(points / 100));
 const safeUrl = value => { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
 const modalRoot = root => root?.querySelector ? root : document.querySelector('.modal') || document;
 const taskAuthor = task => typeof task.author === 'object' ? task.author?.name || '未指定' : task.author || '未指定';
+const taskOrder = task => task.publishedOrder ?? task.order;
 const chip = (badge, showWeight = true) => `<span class="badge-chip"><span class="badge-dot" data-badge="${e(badge.id)}" aria-hidden="true"></span>${e(badgeName(badge.id))}${showWeight ? `<span class="muted">${fmt(badge.weight)}%</span>` : ''}</span>`;
 
 function filteredTasks(store) {
-  return (store.data.tasks || []).filter(task => {
+  const matching = (store.data.tasks || []).filter(task => {
     const haystack = `${task.title || ''} ${task.id || ''} ${taskAuthor(task)} ${task.summary || ''}`.toLowerCase();
-    return (!state.search || haystack.includes(state.search.toLowerCase())) && (state.domain === 'all' || task.publishingDepartment === state.domain) && (state.status === 'all' || task.status === state.status);
+    return (!state.search || haystack.includes(state.search.toLowerCase())) && (state.camp === 'exploration' || state.domain === 'all' || task.publishingDepartment === state.domain) && (state.status === 'all' || task.status === state.status) && (state.camp === 'all' || getReviewCamp({}, task) === state.camp);
   });
+  return state.camp === 'exploration' ? matching.sort((a,b) => Number(isPinnedExplorationTask(a)) - Number(isPinnedExplorationTask(b)) || (Number(taskOrder(a)) || 9999) - (Number(taskOrder(b)) || 9999)) : matching;
 }
 
 function stats(store) {
@@ -33,30 +39,32 @@ function stats(store) {
     <div class="card stat-card"><span class="stat-label">任务总数</span><strong class="stat-value">${fmt(tasks.length)}</strong><span class="stat-note">覆盖全部导师与 NPC</span></div>
     <div class="card stat-card"><span class="stat-label">已发布任务</span><strong class="stat-value">${fmt(tasks.filter(t => t.status === 'published').length)}</strong><span class="stat-note">${fmt(tasks.filter(t => t.status === 'draft').length)} 个草稿待完善</span></div>
     <div class="card stat-card"><span class="stat-label">累计参与人次</span><strong class="stat-value">${fmt(totalParticipants)}</strong><span class="stat-note">${fmt(submissions.length)} 份学员提交</span></div>
-    <div class="card stat-card"><span class="stat-label">任务完成人次</span><strong class="stat-value">${fmt(completions)}</strong><span class="stat-note">通过后发放任务奖励</span></div>
+    <div class="card stat-card"><span class="stat-label">任务完成人次</span><strong class="stat-value">${fmt(completions)}</strong><span class="stat-note">${state.camp==='exploration'?'审核通过后计为完成':'通过后发放任务奖励'}</span></div>
   </div>`;
 }
 
-function tasksTable(store) {
+function tasksTable(store, ui) {
   const tasks = filteredTasks(store);
+  const showOrder = state.camp !== 'novice';
   if (!tasks.length) return `<div class="empty-state"><strong>没有找到相关任务</strong><p>试试调整筛选条件，或创建一个新任务。</p><button class="btn btn-secondary" data-library-action="reset">重置筛选</button></div>`;
-  return `<div class="table-wrap"><table class="data-table library-table"><thead><tr><th>任务名称</th><th>发布者</th><th>关联徽章</th><th>审核方式</th><th>完成 / 参与</th><th>状态</th><th class="text-right">操作</th></tr></thead><tbody>${tasks.map(task => `<tr>
-    <td><button class="table-title" data-task-view="${e(task.id)}">${e(task.title || '未命名任务')}</button><div class="table-subtitle">${e(task.id)} · ${e(departmentLabel(task.publishingDepartment))}</div></td>
+  return `<div class="table-wrap"><table class="data-table library-table"><thead><tr>${showOrder?`<th>${state.camp==='exploration'?'排序':'探索营排序'}</th>`:''}<th>任务名称</th><th>发布者</th><th>${state.camp==='exploration'?'学习材料':state.camp==='novice'?'关联徽章':'材料 / 徽章'}</th><th>${state.camp==='novice'?'审核方式':'完成方式 / 审核'}</th><th>完成 / 参与</th><th>状态</th><th class="text-right">操作</th></tr></thead><tbody>${tasks.map(task => `<tr>
+    ${showOrder?`<td>${getReviewCamp({},task)==='exploration'?isPinnedExplorationTask(task)?'<strong>固定在毕业码前</strong>':`<strong>${Number.isInteger(taskOrder(task))&&taskOrder(task)>0?taskOrder(task):'—'}</strong>${task.publishedOrder!=null&&task.order!==task.publishedOrder?`<div class="table-subtitle">草稿：${e(task.order)}</div>`:''}`:'<span class="muted">—</span>'}</td>`:''}
+    <td><button class="table-title" data-task-view="${e(task.id)}">${e(task.title || '未命名任务')}</button><div class="table-subtitle">${getReviewCamp({},task)==='exploration'?'探索营':'新手村'} · ${e(task.id)}${getReviewCamp({},task)==='exploration'?'':` · ${e(departmentLabel(task.publishingDepartment))}`}</div></td>
     <td>${e(taskAuthor(task))}</td>
-    <td><div class="badge-cell">${(task.badges || []).map(b => chip(b, false)).join('') || '<span class="muted">尚未设置</span>'}</div></td>
-    <td><span class="tag ${task.reviewMode === 'ai' ? 'tag-purple' : 'tag-neutral'}">${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</span></td>
+    <td><div class="badge-cell">${getReviewCamp({},task)==='exploration'?`${(task.materials||[]).length} 份学习材料${requiresTaskAssessment(task)?` · ${explorationTaskFiles(task).length} 份任务文件`:''}`:(task.badges || []).map(b => chip(b, false)).join('') || '<span class="muted">尚未设置</span>'}</div></td>
+    <td><span class="tag ${requiresTaskAssessment(task)&&task.reviewMode === 'ai' ? 'tag-purple' : 'tag-neutral'}">${e(taskCompletionLabel(task))}</span></td>
     <td><strong>${fmt(task.completions)}</strong><span class="muted"> / ${fmt(task.participants)}</span></td>
     <td><span class="tag ${task.status === 'published' ? 'tag-success' : task.status === 'archived' ? 'tag-neutral' : 'tag-warning'}">${e(publicationLabel(task))}</span></td>
-    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button><button class="text-btn" data-task-edit="${e(task.id)}">编辑</button><button class="text-btn" data-task-copy="${e(task.id)}">复制为新任务</button><button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button></div></td>
+    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button>${canConfigureTask(task,ui?.isSuperAdmin)?`<button class="text-btn" data-task-edit="${e(task.id)}">编辑</button><button class="text-btn" data-task-copy="${e(task.id)}">复制为新任务</button><button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button>${getReviewCamp({},task)==='exploration'?`<button class="text-btn task-delete-action" data-task-delete="${e(task.id)}">删除</button>`:''}`:''}</div></td>
   </tr>`).join('')}</tbody></table></div><div class="table-footer">共 ${fmt(tasks.length)} 个任务<span>展示所有 NPC 与导师发布的任务</span></div>`;
 }
 
-function taskTab(store) {
+function taskTab(store, ui) {
   const availableDomains = PUBLISHING_DEPARTMENTS;
   return `${stats(store)}<section class="card library-main-card"><div class="card-heading"><div><h2>全部任务</h2></div><button class="btn btn-secondary" data-library-action="export">${icon('download')} 导出数据</button></div>
-    <div class="filter-bar"><label class="search-field">${icon('search')}<input id="library-search" type="search" placeholder="搜索任务名称、编号或发布者" value="${e(state.search)}" aria-label="搜索任务"></label><select id="library-domain" aria-label="按发布部门筛选"><option value="all">全部部门</option>${availableDomains.map(domain => `<option value="${e(domain)}" ${state.domain === domain ? 'selected' : ''}>${e(domain)}</option>`).join('')}</select><select id="library-status" aria-label="按任务状态筛选"><option value="all">全部状态</option>${['published', 'draft', 'archived'].map(status => `<option value="${status}" ${state.status === status ? 'selected' : ''}>${statusText(status)}</option>`).join('')}</select></div>
-    <div id="library-task-results">${tasksTable(store)}</div>
-  </section>`;
+    <div class="filter-bar"><label class="search-field">${icon('search')}<input id="library-search" type="search" placeholder="搜索任务名称、编号或发布者" value="${e(state.search)}" aria-label="搜索任务"></label><select id="library-camp" aria-label="按所属营地筛选"><option value="all">全部营地</option>${[['exploration','探索营'],['novice','新手村']].map(([value,label])=>`<option value="${value}" ${state.camp===value?'selected':''}>${label}</option>`).join('')}</select><select id="library-domain" aria-label="按发布部门筛选"><option value="all">全部部门</option>${availableDomains.map(domain => `<option value="${e(domain)}" ${state.domain === domain ? 'selected' : ''}>${e(domain)}</option>`).join('')}</select><select id="library-status" aria-label="按任务状态筛选"><option value="all">全部状态</option>${['published', 'draft', 'archived'].map(status => `<option value="${status}" ${state.status === status ? 'selected' : ''}>${statusText(status)}</option>`).join('')}</select></div>
+    <div id="library-task-results">${tasksTable(store, ui)}</div>
+  </section>`.replace(/<select id="library-domain"[\s\S]*?<\/select>/, value => state.camp === 'exploration' ? '' : value);
 }
 
 function badgeTab(store) {
@@ -73,22 +81,55 @@ function badgeTab(store) {
 }
 
 export function renderLibrary(store, ui) {
-  return `<div class="content-actions"><button class="btn btn-primary" data-library-action="new">${icon('plus')} 发布新任务</button></div>
+  return `<div class="content-actions">${state.camp==='exploration'&&!ui.isSuperAdmin?`<span class="muted">${EXPLORATION_CONFIGURATION_NOTICE}</span>`:`<button class="btn btn-primary" data-library-action="new">${icon('plus')} 发布新任务</button>`}</div>
     <div class="tabs" role="tablist"><button class="tab ${state.tab === 'tasks' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'tasks'}" data-library-tab="tasks">任务总览</button><button class="tab ${state.tab === 'badges' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'badges'}" data-library-tab="badges">标签与徽章</button></div>
-    ${state.tab === 'tasks' ? taskTab(store) : badgeTab(store)}`;
+    ${state.tab === 'tasks' ? taskTab(store, ui) : badgeTab(store)}`;
 }
 
 function attachTaskActions(root, store, ui) {
   root.querySelectorAll('[data-task-view]').forEach(button => button.addEventListener('click', () => openTask(store.getTask(button.dataset.taskView), store, ui)));
   root.querySelectorAll('[data-task-edit]').forEach(button => button.addEventListener('click', () => ui.editTask(store.getTask(button.dataset.taskEdit))));
   root.querySelectorAll('[data-task-copy]').forEach(button => button.addEventListener('click', () => ui.copyTask(store.getTask(button.dataset.taskCopy))));
+  root.querySelectorAll('[data-task-delete]').forEach(button => button.addEventListener('click', () => openDeleteTask(store.getTask(button.dataset.taskDelete), store, ui)));
   root.querySelectorAll('[data-task-archive]').forEach(button => button.addEventListener('click', async () => {
     const task = store.getTask(button.dataset.taskArchive);
     if (!task || button.disabled) return;
+    if (!canConfigureTask(task,ui.isSuperAdmin)) { ui.toast(EXPLORATION_CONFIGURATION_NOTICE,'error'); return; }
     button.disabled = true;
     try { await store.archiveTask(task); ui.toast(task.status === 'archived' ? '任务已恢复' : '任务已归档'); ui.refresh(); }
     catch (error) { ui.toast(error.message, 'error'); button.disabled = false; }
   }));
+}
+
+function openDeleteTask(task, store, ui) {
+  if (!canConfigureTask(task,ui.isSuperAdmin)) { ui.toast(EXPLORATION_CONFIGURATION_NOTICE,'error'); return; }
+  if (!task) { ui.toast('任务不存在，请刷新任务库。', 'error'); return; }
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">任务库</div><h2>删除任务</h2></div></div><div class="modal-body"><p>确认删除「${e(task.title || '未命名任务')}」？</p><div class="notice">删除后，任务会从任务库及学员任务列表移除。已经保存的学习成果、审核记录和已获得的宝藏会保留。</div><p class="inline-error" data-delete-error role="alert" hidden></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-delete-cancel>取消</button><button type="button" class="btn btn-danger" data-delete-confirm>确认删除</button></div>`, modal => {
+    const root = modalRoot(modal);
+    const confirm = root.querySelector('[data-delete-confirm]');
+    const error = root.querySelector('[data-delete-error]');
+    let deleting = false;
+    root.querySelector('[data-delete-cancel]').addEventListener('click', () => { if (!deleting) ui.closeModal(); });
+    confirm.addEventListener('click', async () => {
+      if (deleting) return;
+      deleting = true;
+      root.dataset.operationPending = 'true';
+      root.querySelectorAll('button').forEach(button => { button.disabled = true; });
+      confirm.textContent = '正在删除…';
+      error.hidden = true;
+      try {
+        if (typeof store.deleteTask !== 'function') throw new Error('当前任务暂不支持删除。');
+        await store.deleteTask(task);
+        deleting = false; root.dataset.operationPending = 'false';
+        ui.closeModal(); ui.toast('任务已删除'); ui.refresh();
+      } catch (failure) {
+        deleting = false; root.dataset.operationPending = 'false';
+        root.querySelectorAll('button').forEach(button => { button.disabled = false; });
+        confirm.textContent = '确认删除';
+        error.textContent = failure.message || '任务删除失败，请重试。'; error.hidden = false;
+      }
+    });
+  });
 }
 
 export function bindLibrary(root, store, ui) {
@@ -100,14 +141,15 @@ export function bindLibrary(root, store, ui) {
     const a = document.createElement('a'); a.href = url; a.download = `JOURNEY-任务库-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     ui.toast('任务库数据已导出');
   });
-  root.querySelector('[data-library-action="reset"]')?.addEventListener('click', () => { state.search = ''; state.domain = 'all'; state.status = 'all'; ui.refresh(); });
+  root.querySelector('[data-library-action="reset"]')?.addEventListener('click', () => { state.search = ''; state.domain = 'all'; state.status = 'all'; state.camp = 'all'; ui.refresh(); });
   const refreshResults = () => {
     const target = root.querySelector('#library-task-results');
     if (!target) return;
-    target.innerHTML = tasksTable(store); attachTaskActions(target, store, ui);
-    target.querySelector('[data-library-action="reset"]')?.addEventListener('click', () => { state.search = ''; state.domain = 'all'; state.status = 'all'; ui.refresh(); });
+    target.innerHTML = tasksTable(store, ui); attachTaskActions(target, store, ui);
+    target.querySelector('[data-library-action="reset"]')?.addEventListener('click', () => { state.search = ''; state.domain = 'all'; state.status = 'all'; state.camp = 'all'; ui.refresh(); });
   };
   root.querySelector('#library-search')?.addEventListener('input', event => { state.search = event.target.value; refreshResults(); });
+  root.querySelector('#library-camp')?.addEventListener('change', event => { state.camp = event.target.value; if(state.camp==='exploration')state.domain='all'; refreshResults(); ui.refresh(); });
   root.querySelector('#library-domain')?.addEventListener('change', event => { state.domain = event.target.value; refreshResults(); });
   root.querySelector('#library-status')?.addEventListener('change', event => { state.status = event.target.value; refreshResults(); });
   attachTaskActions(root, store, ui);
@@ -116,27 +158,34 @@ export function bindLibrary(root, store, ui) {
 
 export function openTask(task, store, ui) {
   if (!task) { ui.toast('任务不存在', 'error'); return; }
+  const exploration = getReviewCamp({},task)==='exploration';
+  const assessment=requiresTaskAssessment(task);
+  const completion=exploration?EXPLORATION_COMPLETION_MODES.find(mode=>mode.id===explorationCompletionMode(task)):null;
+  const assessmentUrl=exploration&&assessment&&validAssessmentUrl(task.assessmentUrl)?safeUrl(task.assessmentUrl):'';
   let rewards;
   try { rewards = rewardBreakdown(task); } catch { rewards = null; }
   const badgeRewards = rewards?.allocations || (task.badges || []).map(badge => ({ ...badge, points: Number(task.xp || 0) / 10 * Number(badge.weight || 0) / 100 }));
-  const materialHtml = (task.materials || []).map((material, index) => {
+  const materialHtml = (files, kind='material') => files.map((material, index) => {
     const url = safeUrl(material.url);
-    const uploaded = /^data:[^,]*;base64,/i.test(material.url || '');
-    return `<div class="detail-material"><span>${icon(material.type === 'image' ? 'image' : 'file')} ${e(material.name || '未命名材料')}</span>${url ? `<a class="text-btn" href="${e(url)}" target="_blank" rel="noopener noreferrer">打开材料 ↗</a>` : uploaded ? `<button class="text-btn" data-material-download="${index}">下载材料</button>` : '<span class="muted">示例附件</span>'}</div>`;
+    const uploaded = Boolean(localMaterialUrl(material.url)) || /^data:[^,]*;base64,/i.test(material.url || '');
+    return `<div class="detail-material"><span>${icon(material.type === 'image' ? 'image' : 'file')} ${e(material.name || '未命名材料')}</span>${url ? `<a class="text-btn" href="${e(url)}" target="_blank" rel="noopener noreferrer">打开${kind==='task-file'?'任务文件':'材料'} ↗</a>` : uploaded ? `<button class="text-btn" data-${kind}-download="${index}">下载${kind==='task-file'?'任务文件':'材料'}</button>` : '<span class="muted">示例附件</span>'}</div>`;
   }).join('');
   const taskSubmissions = (store.data.submissions || []).filter(submission => submission.taskId === task.id);
-  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(publicationLabel(task))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body">${task.publication?.status==='rejected'?`<div class="notice">发布退回原因：${e(task.publication.comment)}</div>`:""}<p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span><span>发布部门 <strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span><span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>${task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
-    <section class="detail-section"><h3>奖励与徽章</h3><div class="reward-summary"><span><strong>${fmt(task.xp)}</strong> 经验值</span><span>直接领取</span><span><strong>${fmt(Number(task.xp || 0) / 10)}</strong> 总徽章点</span></div><div class="badge-cell">${badgeRewards.map(badge => `${chip(badge)}<span class="muted">+${fmt(badge.points)} 点</span>`).join('')}</div></section>
-    <section class="detail-section"><h3>学习材料 <span class="count-pill">${(task.materials || []).length}</span></h3>${materialHtml || '<p class="muted">尚未添加学习材料</p>'}</section>
-    <section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>
-    ${task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt((task.rubric || []).reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${(task.rubric || []).map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${(task.rubricAttachments || []).map((attachment, index) => `<div class="detail-material"><span>${icon('file')} ${e(attachment.name)}</span>${/^data:[^,]*;base64,/i.test(attachment.url || '') ? `<button class="text-btn" data-rubric-download="${index}">下载评分文档</button>` : '<span class="muted">附加评分文档</span>'}</div>`).join('')}</section>` : ''}
-    <section class="detail-section"><h3>参与情况</h3><p class="muted">${fmt(task.participants)} 人次参与，${fmt(task.completions)} 人次完成，${fmt(taskSubmissions.length)} 份答案已提交。</p>${taskSubmissions.length ? '<button class="btn btn-secondary" data-task-review>前往审核任务</button>' : ''}</section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button><button class="btn btn-primary" data-detail-edit>编辑任务</button></div>`, modal => {
+  ui.openModal(`<div class="modal-header"><div><div class="eyebrow">${e(task.id)} · ${e(publicationLabel(task))}</div><h2>${e(task.title || '未命名任务')}</h2></div></div><div class="modal-body task-detail-body">${task.publication?.status==='rejected'?`<div class="notice">发布退回原因：${e(task.publication.comment)}</div>`:""}<p class="detail-summary">${e(task.summary || '暂无任务简述')}</p><div class="detail-meta"><span>发布者 <strong>${e(taskAuthor(task))}</strong></span>${exploration?`<span>任务排序 <strong>${isPinnedExplorationTask(task)?'固定在毕业码前':`第 ${Number.isInteger(taskOrder(task))&&taskOrder(task)>0?taskOrder(task):'—'} 个`}</strong></span><span>完成方式 <strong>${e(taskCompletionLabel(task))}</strong></span>`:`<span>发布部门 <strong>${e(departmentLabel(task.publishingDepartment))}</strong></span><span>难度 <strong>${e(task.difficulty || '未设置')}</strong></span><span>预计耗时 <strong>${fmt(task.minutes)} 分钟</strong></span>`}${assessment?`<span>审核 <strong>${task.reviewMode === 'ai' ? 'AI 自测' : '人工审核'}</strong></span>`:''}${assessment&&task.reviewMode === 'ai' ? `<span>通过分数 <strong>${fmt(task.passScore)} 分</strong></span>` : ''}</div>
+    ${completion?`<section class="detail-section"><h3>完成方式</h3><p>${e(completion.description)}</p>${assessmentUrl?`<a class="text-btn" href="${e(assessmentUrl)}" target="_blank" rel="noopener noreferrer">打开培训测试链接 ↗</a>`:''}</section>`:''}
+    ${exploration?'':`<section class="detail-section"><h3>奖励与徽章</h3><div class="reward-summary"><span><strong>${fmt(task.xp)}</strong> 经验值</span><span>直接领取</span><span><strong>${fmt(Number(task.xp || 0) / 10)}</strong> 总徽章点</span></div><div class="badge-cell">${badgeRewards.map(badge => `${chip(badge)}<span class="muted">+${fmt(badge.points)} 点</span>`).join('')}</div></section>`}
+    <section class="detail-section"><h3>学习材料 <span class="count-pill">${(task.materials || []).length}</span></h3>${materialHtml(task.materials||[]) || '<p class="muted">尚未添加学习材料</p>'}</section>
+    ${exploration&&assessment?`<section class="detail-section"><h3>任务文件 <span class="count-pill">${explorationTaskFiles(task).length}</span></h3>${materialHtml(explorationTaskFiles(task),'task-file')||'<p class="muted">使用已有培训测试链接完成任务</p>'}</section>`:''}
+    ${assessment?`<section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || (task.requirements||[]).map(item=>`<p>${e(item)}</p>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>`:''}
+    ${assessment&&task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt((task.rubric || []).reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${(task.rubric || []).map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${(task.rubricAttachments || []).map((attachment, index) => `<div class="detail-material"><span>${icon('file')} ${e(attachment.name)}</span>${/^data:[^,]*;base64,/i.test(attachment.url || '') ? `<button class="text-btn" data-rubric-download="${index}">下载评分文档</button>` : '<span class="muted">附加评分文档</span>'}</div>`).join('')}</section>` : ''}
+    <section class="detail-section"><h3>参与情况</h3><p class="muted">${fmt(task.participants)} 人次参与，${fmt(task.completions)} 人次完成，${fmt(taskSubmissions.length)} 份答案已提交。</p>${taskSubmissions.length ? '<button class="btn btn-secondary" data-task-review>前往审核任务</button>' : ''}</section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button>${canConfigureTask(task,ui.isSuperAdmin)?'<button class="btn btn-primary" data-detail-edit>编辑任务</button>':''}</div>`, modal => {
     const root = modalRoot(modal);
     root.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', ui.closeModal));
     root.querySelector('[data-detail-edit]')?.addEventListener('click', () => { ui.closeModal(); ui.editTask(task); });
     root.querySelector('[data-task-review]')?.addEventListener('click', () => { ui.closeModal(); ui.navigate('review'); });
-    const download = material => { if (!material?.url || !/^data:[^,]*;base64,/i.test(material.url)) return; const a = document.createElement('a'); a.href = material.url; a.download = material.name || '任务材料'; a.click(); ui.toast('材料下载已开始'); };
+    const download = material => { const local=localMaterialUrl(material?.url); if (!material?.url || (!local&&!/^data:[^,]*;base64,/i.test(material.url))) return; const a = document.createElement('a'); a.href = local||material.url; a.download = material.name || '任务材料'; a.click(); ui.toast('材料下载已开始'); };
     root.querySelectorAll('[data-material-download]').forEach(button => button.addEventListener('click', () => download(task.materials[Number(button.dataset.materialDownload)])));
+    root.querySelectorAll('[data-task-file-download]').forEach(button => button.addEventListener('click', () => download(explorationTaskFiles(task)[Number(button.dataset.taskFileDownload)])));
     root.querySelectorAll('[data-rubric-download]').forEach(button => button.addEventListener('click', () => download(task.rubricAttachments[Number(button.dataset.rubricDownload)])));
   });
 }
