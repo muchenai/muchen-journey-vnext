@@ -65,12 +65,13 @@ def submission_out(session: Session, submission: Submission) -> SubmissionOut:
         attachments_by_version.setdefault(link.submission_version_id, []).append(
             attachment_out(attachment)
         )
-    return SubmissionOut(
-        id=submission.id,
-        assignment_id=submission.assignment_id,
-        current_version_no=submission.current_version_no,
-        versions=[
-            SubmissionVersionOut(
+    versions = []
+    for version, review, evaluation, coaching in rows:
+        proof = (version.ai_use or {}).get("exploration_ai_evaluation") or {}
+        ai_completed = (proof.get("kind") == "EXPLORATION_AI" and proof.get("source") == "AI"
+            and proof.get("validated") is True and proof.get("passed") is True
+            and proof.get("assignmentId") == str(submission.assignment_id))
+        versions.append(SubmissionVersionOut(
                 id=version.id,
                 version_no=version.version_no,
                 body=version.body,
@@ -83,21 +84,22 @@ def submission_out(session: Session, submission: Submission) -> SubmissionOut:
                 review_finalized_at=review.finalized_at if review is not None else None,
                 decision=(evaluation or coaching).decision.value
                 if evaluation is not None or coaching is not None
-                else None,
+                else "PASS" if ai_completed else None,
                 feedback=(evaluation or coaching).feedback
                 if evaluation is not None or coaching is not None
-                else None,
+                else proof["feedback"] if ai_completed else None,
                 rubric_feedback=(
                     evaluation.structured_feedback or []
                     if evaluation is not None
                     else coaching.structured_feedback
                     if coaching is not None
+                    else [{**item, "source": "AI"} for item in proof["dimensions"]]
+                    if ai_completed
                     else []
                 ),
-            )
-            for version, review, evaluation, coaching in rows
-        ],
-    )
+            ))
+    return SubmissionOut(id=submission.id, assignment_id=submission.assignment_id,
+        current_version_no=submission.current_version_no, versions=versions)
 
 
 def assignment_workspace(

@@ -61,6 +61,14 @@ test('exploration rejects invalid origins, commands and identifiers before backe
   assert.equal((await route.GET(new Request('http://localhost:3000/api/learner/exploration?task=bad'))).status, 400);
   assert.equal(route.calls.length, 0);
 });
+test('exploration cancellation is rejected locally without forwarding a backend write', async () => {
+  const route = loadRoute('app/api/learner/exploration/route.ts');
+  const response = await route.POST(post({ command: 'cancel', taskId, key, revision: 3 }));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, '探索营任务接取后不能取消。');
+  assert.equal(route.calls.length, 0);
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+});
 test('private material download resolves learner task scope before streaming', async () => {
   const route = loadRoute('app/api/learner/exploration/route.ts', { result: { id: key, name: '培训视频.mp4', mime: 'video/mp4' } });
   const result = await route.GET(new Request(`http://localhost:3000/api/learner/exploration?task=${taskId}&material=0&inline=1`));

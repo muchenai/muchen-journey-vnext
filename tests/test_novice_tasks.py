@@ -50,6 +50,22 @@ def claim(pair, task_id, version_id):
     return assert_ok(post(pair, f'me/novice/tasks/{task_id}/claim', {'version_id':version_id}))
 
 
+def test_private_scoring_answers_are_not_returned_to_novice_learner(setup):
+    staff, learner, task_id, published, data = setup
+    secret = "发布人的私有标准答案，不得下发给学员。"
+    changed = {**data, "reviewMode": "ai", "rubric": [
+        dict(id="facts", name="事实准确性", points=100, description=secret)]}
+    draft = assert_ok(staff[0].put(f"/api/v1/review-admin/tasks/{task_id}",
+        headers={"X-CSRF-Token": staff[1]},
+        json={"id": task_id, "expected_revision": published["revision"], "content": changed}))
+    assert_ok(post(staff, f"review-admin/tasks/{task_id}/publish",
+        dict(expected_revision=draft["revision"], reviewed_by=published["authorId"],
+            verified_material_urls=["https://example.com/material"])))
+    task = read(learner, task_id)
+    assert secret not in str(task)
+    assert task["rubric"] == [dict(id="facts", name="事实准确性", points=100, description="")]
+
+
 def test_mapping_materials_repeat_claim_and_exploration_isolation(setup):
     staff, learner, task_id, published, data = setup
     old_current = assert_ok(learner[0].get('/api/v1/me/current-action'))

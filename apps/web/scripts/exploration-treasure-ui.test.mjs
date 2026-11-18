@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
-import React from 'react';
 import * as jsxRuntime from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
@@ -22,18 +21,19 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function hooks() {
-  const slots = []; let cursor = 0; let effects = []; let id = 0;
+  const slots = []; let cursor = 0; let effects = []; let id = 0; let mounted = true; let updatesAfterUnmount = 0;
   const same = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
   return {
     react: {
-      useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial; return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }]; },
+      useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial; return [slots[index], value => { if (!mounted) updatesAfterUnmount++; slots[index] = typeof value === 'function' ? value(slots[index]) : value; }]; },
       useRef(initial) { return slots[cursor++] ??= { current: initial }; },
       useId() { return `test-treasure-${++id}`; },
       useEffect(callback, dependencies) { const index = cursor++; if (!slots[index] || !same(slots[index].dependencies, dependencies)) { const previous = slots[index]; slots[index] = { dependencies }; effects.push(() => { previous?.cleanup?.(); slots[index].cleanup = callback(); }); } },
     },
     render(callback) { cursor = 0; return callback(); },
     commit() { const pending = effects; effects = []; pending.forEach(effect => effect()); },
-    unmount() { slots.forEach(slot => slot?.cleanup?.()); },
+    unmount() { mounted = false; slots.forEach(slot => slot?.cleanup?.()); },
+    updatesAfterUnmount: () => updatesAfterUnmount,
   };
 }
 function find(node, predicate) {
@@ -45,13 +45,13 @@ const byClass = (tree, className) => find(tree, node => node.props?.className?.s
 const byLabel = (tree, label) => find(tree, node => node.props?.['aria-label'] === label);
 function harness(initial = {}, { reduced = true } = {}) {
   const h = hooks(); let timer;
-  const calls = []; const compiledModule = { exports: {} };
-  vm.runInNewContext(code, { module: compiledModule, exports: compiledModule.exports,
+  const calls = []; const loadedModule = { exports: {} };
+  vm.runInNewContext(code, { module: loadedModule, exports: loadedModule.exports,
     require: name => ({ react: h.react, 'react/jsx-runtime': jsxRuntime, '@/lib/exploration-treasures': { TREASURE_CATALOG: catalog } })[name] ?? {},
     window: { matchMedia: () => ({ matches: reduced }), setTimeout: callback => { timer = callback; return 1; }, clearTimeout() { timer = undefined; } },
   });
   const props = { treasures: state(), collectionOpen: true, canReveal: true, busy: false, onCollectionClose() { calls.push('close-collection'); }, onAcknowledge: async id => { calls.push(id); return true; }, ...initial };
-  return { ...h, calls, props, render(patch = {}) { Object.assign(props, patch); return h.render(() => compiledModule.exports.ExplorationTreasureExperience(props)); }, fireTimer() { const callback = timer; timer = undefined; callback?.(); } };
+  return { ...h, calls, props, render(patch = {}) { Object.assign(props, patch); return h.render(() => loadedModule.exports.ExplorationTreasureExperience(props)); }, fireTimer() { const callback = timer; timer = undefined; callback?.(); } };
 }
 
 test('collection presents four distinct empty slots and explains the exact task and cap rules', () => {
@@ -186,4 +186,95 @@ test('a failed acknowledgment can be deferred for this session without removing 
   const refreshed = harness({ treasures: treasureState, collectionOpen: false });
   refreshed.render(); refreshed.commit();
   assert.equal(refreshed.render().props['data-mode'], 'reveal');
+});
+
+test('controlled presentations show only the coordinated drop and never consume other pending discoveries', () => {
+  const discovery = drop(), later = drop('later-drop', 'key');
+  const h = harness({ treasures: state([discovery, later]), collectionOpen: false, presentedDrop: null });
+  h.render(); h.commit();
+  assert.equal(h.render().props['data-mode'], 'closed');
+  h.render({ presentedDrop: later }); h.commit();
+  let tree = h.render();
+  assert.equal(tree.props['data-mode'], 'reveal');
+  assert.equal(byClass(tree, 'treasure-discovery').props['data-treasure'], 'key');
+  byClass(tree, 'treasure-primary').props.onClick();
+  tree = h.render();
+  assert.match(renderToStaticMarkup(tree), /远航密钥/);
+  assert.equal(h.calls.length, 0);
+});
+
+test('a controlled chest settles once only after acknowledgment and ignores stale parent data', async () => {
+  const discovery = drop(), pending = deferred(), settled = [], acknowledgments = [];
+  const h = harness({ treasures: state([discovery]), collectionOpen: false, presentedDrop: discovery,
+    onDropSettled: id => settled.push(id),
+    onAcknowledge: id => { acknowledgments.push(id); return pending.promise; } });
+  h.render(); h.commit();
+  const close = byClass(h.render(), 'treasure-close');
+  close.props.onClick(); close.props.onClick();
+  assert.deepEqual(acknowledgments, [discovery.id]);
+  assert.deepEqual(settled, [], 'Task continuation waits until the acknowledgment succeeds');
+  pending.resolve(true); await settle();
+  h.render(); h.commit();
+  assert.equal(h.render().props['data-mode'], 'closed');
+  assert.deepEqual(settled, [discovery.id]);
+  close.props.onClick(); await settle();
+  assert.deepEqual(acknowledgments, [discovery.id]);
+  assert.deepEqual(settled, [discovery.id]);
+});
+
+test('controlled acknowledgment failure retains the chest until success or explicit deferral', async () => {
+  const discovery = drop(), settled = [];
+  const h = harness({ treasures: state([discovery]), collectionOpen: false, presentedDrop: discovery,
+    onDropSettled: id => settled.push(id), onAcknowledge: async () => false });
+  h.render(); h.commit();
+  byClass(h.render(), 'treasure-close').props.onClick(); await settle();
+  let tree = h.render();
+  assert.equal(tree.props['data-mode'], 'reveal');
+  assert.deepEqual(settled, []);
+  const later = find(tree, node => node.type === 'button' && node.props.children === '稍后查看');
+  later.props.onClick(); later.props.onClick();
+  h.render(); h.commit();
+  assert.equal(h.render().props['data-mode'], 'closed');
+  assert.deepEqual(settled, [discovery.id]);
+  assert.equal(h.props.treasures.pendingDrops.length, 1, 'Deferral must not remove the saved discovery');
+});
+
+test('a newer controlled drop cannot replace an unopened chest before its current discovery settles', async () => {
+  const first = drop(), second = drop('second', 'starmap'), settled = [];
+  const h = harness({ treasures: state([first, second]), collectionOpen: false, presentedDrop: first,
+    onDropSettled: id => settled.push(id) });
+  h.render(); h.commit();
+  h.render({ presentedDrop: second }); h.commit();
+  let tree = h.render();
+  assert.equal(byClass(tree, 'treasure-discovery').props['data-treasure'], first.treasureId);
+  byClass(tree, 'treasure-close').props.onClick(); await settle();
+  h.render(); h.commit();
+  tree = h.render();
+  assert.equal(byClass(tree, 'treasure-discovery').props['data-treasure'], second.treasureId);
+  assert.deepEqual(settled, [first.id]);
+});
+
+test('unmounting during acknowledgment cannot resume a task or update an abandoned chest', async () => {
+  const discovery = drop(), pending = deferred(), settled = [];
+  const h = harness({ treasures: state([discovery]), collectionOpen: false, presentedDrop: discovery,
+    onDropSettled: id => settled.push(id), onAcknowledge: () => pending.promise });
+  h.render(); h.commit();
+  byClass(h.render(), 'treasure-close').props.onClick();
+  h.unmount();
+  pending.resolve(true); await settle();
+  assert.deepEqual(settled, []);
+  assert.equal(h.updatesAfterUnmount(), 0);
+});
+
+test('controlled collection preview never settles or acknowledges a real discovery', async () => {
+  const settled = [];
+  const h = harness({ presentedDrop: null, onDropSettled: id => settled.push(id) });
+  byClass(h.render(), 'treasure-preview-button').props.onClick();
+  let tree = h.render();
+  byClass(tree, 'treasure-primary').props.onClick();
+  tree = h.render();
+  byClass(tree, 'treasure-primary').props.onClick(); await settle();
+  assert.equal(h.render().props['data-mode'], 'collection');
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(settled, []);
 });

@@ -20,11 +20,11 @@ export type VillageTask = PracticeTask & {
   materials:{name:string; type:string; text:string; url:string; mime?:string; size?:number}[];
   taskFiles?: VillageTask["materials"];
   rubric:{id:string; name:string; description:string; points:number}[];
-  feedback:{text:string; at:string; decision:string}|null;
+  feedback:{text:string; at:string; decision:string; source?: "AI" | "HUMAN"}|null;
   order?: number;
   submittedAt?: string | null;
-  activityRecords?: { id: string; body: string; submittedAt: string; status: string }[];
-  feedbackRecords?: { id: string; text: string; decision: string; reviewedAt: string }[];
+  activityRecords?: { id: string; body: string; submittedAt: string; status: string; source?: "AI" | "HUMAN" }[];
+  feedbackRecords?: { id: string; text: string; decision: string; reviewedAt: string; source?: "AI" | "HUMAN" }[];
 };
 
 export function isVillageTaskClaimed(task: Pick<VillageTask, "status" | "claimed">) {

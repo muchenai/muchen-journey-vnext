@@ -10,5 +10,5 @@ GRANT_SQL = "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + ", ".join("public
 if __name__ == "__main__":
     with create_engine(os.environ["DATABASE_URL"]).begin() as connection:
         assert connection.execute(text("SELECT current_database()")).scalar_one() == "journey_next_canary_20260901_c72fea5"
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0057_dynamic_exploration"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0060_migrated_ai_ownership"
         connection.execute(text(GRANT_SQL))

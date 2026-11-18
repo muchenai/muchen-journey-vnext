@@ -3,19 +3,22 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import ssl
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from http.client import HTTPException, IncompleteRead
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from journey_api.config import Settings, get_settings
 from journey_api.errors import ApiError
 
 AI_UNAVAILABLE_MESSAGE = "AI 接口暂时不可用，请联系管理员进行检查"
+LOW_REASONING_MODELS = {"deepseek-v4.1-flash", "deepseek-v4-flash-0731", "deepseek-v4-pro-0813"}
 logger = logging.getLogger(__name__)
 
 
@@ -24,43 +27,86 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+def _is_feishu_read(url: str, method: str, body: dict | None) -> bool:
+    """Only official read requests may wait longer or repeat after interruption."""
+    try:
+        target = urlsplit(url)
+        if (target.scheme != "https" or target.hostname != "open.feishu.cn"
+                or target.port not in {None, 443} or target.username or target.password or target.fragment):
+            return False
+        if method == "GET" and body is None:
+            return True
+        if method != "POST" or not isinstance(body, dict):
+            return False
+        query = parse_qsl(target.query, keep_blank_values=True, strict_parsing=True)
+        if (target.path == "/open-apis/drive/v1/metas/batch_query"
+                and query == [("user_id_type", "open_id")] and set(body) == {"request_docs"}):
+            requested = body["request_docs"]
+            return (isinstance(requested, list) and 1 <= len(requested) <= 50
+                    and all(isinstance(item, dict) and set(item) == {"doc_token", "doc_type"}
+                            and item["doc_type"] == "docx" and isinstance(item["doc_token"], str)
+                            and TOKEN.fullmatch(item["doc_token"]) for item in requested))
+        if (re.fullmatch(r"/open-apis/drive/v1/files/[A-Za-z0-9]{10,100}/comments/batch_query", target.path)
+                and query == [("file_type", "docx")] and set(body) == {"comment_ids"}):
+            requested = body["comment_ids"]
+            return (isinstance(requested, list) and len(requested) == 1
+                    and isinstance(requested[0], str) and bool(re.fullmatch(r"[A-Za-z0-9_-]{1,160}", requested[0])))
+        return False
+    except ValueError:
+        return False
+
+
 def request_json(url: str, *, token: str = "", body: dict | None = None,
-                 timeout: float = 20, service: str = "FEISHU", method: str | None = None) -> dict:
+                 timeout: float | None = None, service: str = "FEISHU", method: str | None = None) -> dict:
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    request_method = (method or ("POST" if body is not None else "GET")).upper()
     request = Request(url, data=json.dumps(body, ensure_ascii=False).encode() if body is not None else None,
-                      headers=headers, method=method or ("POST" if body is not None else "GET"))
-    try:
-        with build_opener(NoRedirect()).open(request, timeout=timeout) as response:
-            raw = response.read(2_000_001)
-        if len(raw) > 2_000_000:
-            raise ValueError("oversized response")
-        result = json.loads(raw)
-        if not isinstance(result, dict):
-            raise ValueError("unexpected response")
-        return result
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-        if service == "FEISHU" and isinstance(exc, HTTPError) and 400 <= exc.code < 500:
-            # Feishu returns permission failures with HTTP 400/403 as well as
-            # HTTP 200. Preserve its numeric error code, never echo its body.
-            try:
-                rejected = json.loads(exc.read(65_536))
-                if isinstance(rejected, dict) and isinstance(rejected.get("code"), int) and rejected["code"] != 0:
-                    return {"code": rejected["code"]}
-            except (ValueError, OSError):
-                pass
-        # Provider bodies may contain credentials or private input. Do not echo them.
-        status = exc.code if isinstance(exc, HTTPError) else None
-        reason = exc.reason if isinstance(exc, URLError) else exc
-        transient = (status in {408, 429, 500, 502, 503, 504} if status is not None else
-                     isinstance(exc, (URLError, TimeoutError, OSError))
-                     and not isinstance(reason, ssl.SSLCertVerificationError))
-        raise ApiError(502, f"{service}_REQUEST_FAILED",
-                       (AI_UNAVAILABLE_MESSAGE if service == "AI"
-                        else "飞书接口未返回可确认的结果，请稍后重试或联系管理员。"),
-                       details={"upstream_status": status},
-                       retryable=transient if service == "AI" else True) from exc
+                      headers=headers, method=request_method)
+    read_only = service == "FEISHU" and _is_feishu_read(url, request_method, body)
+    request_timeout = timeout if timeout is not None else (60 if read_only else 20)
+    # Retry reads only. A failed comment write may already have reached Feishu,
+    # and model generation has its own bounded retry policy in AIReviewer.
+    attempts = 2 if read_only else 1
+    for attempt in range(attempts):
+        try:
+            with build_opener(NoRedirect()).open(request, timeout=request_timeout) as response:
+                raw = response.read(2_000_001)
+            if len(raw) > 2_000_000:
+                raise ValueError("oversized response")
+            result = json.loads(raw)
+            if not isinstance(result, dict):
+                raise ValueError("unexpected response")
+            return result
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, HTTPException) as exc:
+            status = exc.code if isinstance(exc, HTTPError) else None
+            reason = exc.reason if isinstance(exc, URLError) else exc
+            transient = (status in {408, 429, 500, 502, 503, 504} if status is not None else
+                         isinstance(exc, (URLError, TimeoutError, OSError, IncompleteRead))
+                         and not isinstance(reason, ssl.SSLCertVerificationError))
+            if transient and attempt + 1 < attempts:
+                if isinstance(exc, HTTPError):
+                    exc.close()
+                continue
+            if service == "FEISHU" and isinstance(exc, HTTPError) and 400 <= exc.code < 500:
+                # Preserve explicit permission failures, never their private body.
+                try:
+                    rejected = json.loads(exc.read(65_536))
+                    if isinstance(rejected, dict) and isinstance(rejected.get("code"), int) and rejected["code"] != 0:
+                        return {"code": rejected["code"]}
+                except (ValueError, OSError, HTTPException):
+                    pass
+                finally:
+                    exc.close()
+            elif isinstance(exc, HTTPError):
+                exc.close()
+            # Provider bodies may contain credentials or private input. Do not echo them.
+            raise ApiError(502, f"{service}_REQUEST_FAILED",
+                           (AI_UNAVAILABLE_MESSAGE if service == "AI"
+                            else "飞书接口未返回可确认的结果，请稍后重试或联系管理员。"),
+                           details={"upstream_status": status},
+                           retryable=transient if service == "AI" else True) from exc
 
 
 TOKEN = re.compile(r"^[A-Za-z0-9]{10,100}$")
@@ -398,6 +444,43 @@ class FeishuDocuments:
                 raise ApiError(502, "COMMENT_VISIBILITY_UNCONFIRMED", "原 AI 评论仍是已解决状态，尚未确认恢复。")
 
 
+def _ai_response_metadata(response: dict) -> dict:
+    """Describe the response envelope without exposing provider or learner text."""
+    choices = response.get("choices") if isinstance(response, dict) else None
+    choice = choices[0] if isinstance(choices, list) and choices else None
+    choice = choice if isinstance(choice, dict) else {}
+    message = choice.get("message")
+    message = message if isinstance(message, dict) else {}
+    content = message.get("content")
+    reasoning = message.get("reasoning_content")
+    reason = choice.get("finish_reason")
+    allowed_reasons = {"stop", "length", "content_filter", "tool_calls", "function_call"}
+    metadata = {
+        "finish_reason": (reason if isinstance(reason, str) and reason in allowed_reasons
+                          else "missing" if reason is None else "other"),
+        "choices_count": len(choices) if isinstance(choices, list) else None,
+        "content_type": next((name for kind, name in (
+            (str, "str"), (list, "list"), (dict, "dict"), (int, "int"),
+            (float, "float"), (bool, "bool"), (type(None), "NoneType"))
+            if type(content) is kind), "other"),
+        "content_length": len(content) if isinstance(content, str) else 0,
+        "reasoning_length": len(reasoning) if isinstance(reasoning, str) else 0,
+    }
+    usage = response.get("usage") if isinstance(response, dict) else None
+    if isinstance(usage, dict):
+        numeric_usage = {}
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            value = usage.get(key)
+            if type(value) in (int, float) and value >= 0 and (type(value) is int or math.isfinite(value)):
+                numeric_usage[key] = value
+        details = usage.get("completion_tokens_details")
+        value = details.get("reasoning_tokens") if isinstance(details, dict) else None
+        if type(value) in (int, float) and value >= 0 and (type(value) is int or math.isfinite(value)):
+            numeric_usage["reasoning_tokens"] = value
+        metadata["usage"] = numeric_usage
+    return metadata
+
+
 class AIReviewer:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -414,35 +497,79 @@ class AIReviewer:
         deadline = time.monotonic() + 180
         fallback = self.settings.ai_fallback_model.strip()
         models = [self.settings.ai_model, self.settings.ai_model, fallback or self.settings.ai_model]
+        length_retried = False
         for attempt, model in enumerate(models, 1):
             body = {**body, "model": model}
+            body.pop("reasoning_effort", None)
+            if length_retried and model in LOW_REASONING_MODELS:
+                body["reasoning_effort"] = "low"
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ApiError(502, "AI_REQUEST_FAILED", AI_UNAVAILABLE_MESSAGE)
             try:
                 response = request_json(self.settings.ai_base_url.rstrip("/") + "/chat/completions",
                                         token=self.settings.ai_api_key,
-                                        timeout=max(0.001, min(60 if fallback else 180,
-                                                              deadline - time.monotonic())),
+                                        timeout=max(0.001, min(60 if fallback else 180, remaining)),
                                         service="AI", body=body)
-                break
             except ApiError as exc:
                 delay = float(attempt)
                 retry = (exc.code == "AI_REQUEST_FAILED" and exc.retryable
                          and attempt < 3 and deadline - time.monotonic() > delay + 1)
                 # Never log provider bodies, credentials, prompts or learner evidence.
+                status = exc.details.get("upstream_status")
                 logger.warning(json.dumps({"event": "ai.request_failed", "attempt": attempt,
                                            "model": model,
-                                           "upstream_status": exc.details.get("upstream_status"),
+                                           "upstream_status": status if type(status) is int else None,
                                            "error_type": type(exc.__cause__).__name__,
                                            "will_retry": retry}))
                 if not retry:
                     raise
                 time.sleep(delay)
-        choices = response.get("choices", [])
-        choice = choices[0] if choices else {}
-        content = choice.get("message", {}).get("content")
-        if choice.get("finish_reason") != "stop" or not isinstance(content, str):
-            raise ApiError(502, "AI_INCOMPLETE_RESULT", "AI 未返回完整评价，尚未发表评论，请稍后重试。")
-        self.last_model = model
-        return content
+                continue
+
+            metadata = {"event": "ai.generation_result", "attempt": attempt, "model": model,
+                        **_ai_response_metadata(response), "will_retry": False}
+            choices = response.get("choices") if isinstance(response, dict) else None
+            choice = choices[0] if isinstance(choices, list) and choices else None
+            message = choice.get("message") if isinstance(choice, dict) else None
+            content = message.get("content") if isinstance(message, dict) else None
+            reason = choice.get("finish_reason") if isinstance(choice, dict) else None
+            if not isinstance(choices, list) or (choices and not isinstance(choice, dict)):
+                error = ApiError(502, "AI_INVALID_RESPONSE", "AI 返回的数据结构异常，尚未发表评论，请稍后重试。")
+            elif not choices:
+                error = ApiError(502, "AI_EMPTY_RESULT", "AI 未返回评价结果，尚未发表评论，请稍后重试。")
+            elif reason == "content_filter":
+                error = ApiError(502, "AI_CONTENT_FILTERED", "AI 评价被内容安全规则拦截，请检查提交内容后重试。")
+            elif reason == "length":
+                retry = (not length_retried and attempt < len(models)
+                         and deadline - time.monotonic() > 1)
+                metadata["will_retry"] = retry
+                logger.warning(json.dumps(metadata))
+                if not retry:
+                    raise ApiError(502, "AI_INCOMPLETE_RESULT", "AI 评价生成达到长度上限，尚未生成完整评价，请稍后重试。")
+                length_retried = True
+                body = {**body, "max_tokens": 8000, "messages": [
+                    {"role": "system", "content": system + "\n本次输出请保持精炼并完整闭合严格JSON。"
+                    "保留原规定的所有字段、任务匹配判断和全部评价规则，不输出推理过程或Markdown。"
+                     "summary不超过200字；如采用findings数组则最多8项，每个字段不超过100字；"
+                     "如采用dimensions数组则必须完整覆盖所有配置维度，证据及建议分别不超过100字，不得遗漏维度。"
+                     "next_steps最多3项，每项不超过100字；task_match.reason不超过150字。"
+                     "任务不匹配或无法确认时，仍按原规则返回空summary、对应的空评价数组和空next_steps。"},
+                    body["messages"][1],
+                ]}
+                continue
+            elif reason != "stop":
+                error = ApiError(502, "AI_INCOMPLETE_RESULT", "AI 未返回完整评价，尚未发表评论，请稍后重试。")
+            elif not isinstance(message, dict) or (content is not None and not isinstance(content, str)):
+                error = ApiError(502, "AI_INVALID_RESPONSE", "AI 返回的数据结构异常，尚未发表评论，请稍后重试。")
+            elif content is None or not content.strip():
+                error = ApiError(502, "AI_EMPTY_CONTENT", "AI 返回的评价正文为空，尚未发表评论，请稍后重试。")
+            else:
+                logger.info(json.dumps(metadata))
+                self.last_model = model
+                return content
+            logger.warning(json.dumps(metadata))
+            raise error
 
 
 def get_documents() -> FeishuDocuments:

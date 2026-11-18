@@ -45,6 +45,11 @@ def lock_learner(session, actor):
     session.scalar(select(User.id).where(User.id == actor.id, User.organization_id == actor.organization_id).with_for_update(key_share=True))
 
 
+def reject_cancel(command):
+    if command == "cancel":
+        raise ApiError(409, "EXPLORATION_CANCEL_NOT_ALLOWED", "探索营任务接取后不能取消。")
+
+
 def snapshot(session, actor):
     unlocked = unlocked_task_ids(session, actor)
     positions = effective_catalog_positions(session, actor.organization_id, user_id=actor.id)
@@ -61,8 +66,8 @@ def snapshot(session, actor):
 
 
 def self_check_record(row):
-    return dict(id=str(row.id), createdAt=row.created_at.isoformat(), body=row.answer, result=row.result,
-        status=row.status, commentId=None, mode="AI", taskVersionId=str(row.task_version_id), assignmentId=str(row.assignment_id))
+    from journey_api.exploration_ai_self_check import record
+    return record(row)
 
 
 def self_check_history(session, actor, task_id):
@@ -70,7 +75,19 @@ def self_check_history(session, actor, task_id):
     rows = session.scalars(select(ExplorationSelfCheck).where(ExplorationSelfCheck.organization_id == actor.organization_id,
         ExplorationSelfCheck.user_id == actor.id, ExplorationSelfCheck.assignment_id == assignment.id)
         .order_by(ExplorationSelfCheck.created_at.desc())) if assignment else []
-    return {"items": [self_check_record(row) for row in rows]}
+    from journey_api.exploration_ai_self_check import refresh_document_record
+    items = []
+    for row in rows:
+        if (row.details or {}).get("canonicalRecordId"):
+            continue
+        refresh_document_record(session, row)
+        items.append(self_check_record(row))
+    return {"items": items}
+
+
+def self_check_response(session, actor, task_id, row):
+    return {"record": self_check_record(row), **self_check_history(session, actor, task_id),
+        "task": task_view(session, actor, task_id)}
 
 
 @router.get("/me/exploration")
@@ -101,6 +118,9 @@ def write_exploration(body: ExplorationCommand, request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
     lock_learner(session, actor)
+    # Apply the current rule before replay: a historical successful cancellation
+    # must not reappear as a successful response after cancellation is disabled.
+    reject_cancel(body.command)
     key = body.key or body.idempotencyKey or idempotency_key
     if not key:
         raise ApiError(400, "INVALID_REQUEST", "请提供本次操作的请求标识。")
@@ -112,6 +132,19 @@ def write_exploration(body: ExplorationCommand, request: Request,
             session.commit()
             return envelope(request, current)
         return envelope(request, replay)
+    if body.command == "selfCheck":
+        # The attempt row is durable before model/network work, unlike a final
+        # response cache. It also handles concurrent retransmissions and keeps
+        # comment state fresh after a RUNNING/SENDING response was returned.
+        from journey_api.exploration_ai_self_check import replay as self_check_replay
+        previous = self_check_replay(session, actor, body, key)
+        if previous is not None:
+            complete_scored_attempt(session, actor, body, request, previous)
+        result = (self_check_response(session, actor, body.taskId, previous) if previous is not None
+            else task_command(session, actor, body, request, key))
+        audit(session, request, actor, "exploration.selfCheck", body.taskId or actor.id)
+        session.commit()
+        return envelope(request, result)
     if body.command == "unlockGraduation":
         result = {"treasures": unlock_graduation(session, actor)}
     elif body.command in {"ackTreasure", "acknowledgeTreasure"}:
@@ -133,6 +166,7 @@ def write_exploration(body: ExplorationCommand, request: Request,
 
 
 def task_command(session, actor, body, request, key):
+    reject_cancel(body.command)
     if body.taskId is None:
         raise ApiError(422, "INVALID_REQUEST", "请选择探索任务。")
     task_id = body.taskId
@@ -176,13 +210,11 @@ def task_command(session, actor, body, request, key):
             assignment.status, assignment.revision = AssignmentStatus.COMPLETED, assignment.revision + 1
             enrollment = session.get(Enrollment, assignment.enrollment_id)
             enrollment.status, enrollment.revision = EnrollmentStatus.COMPLETED, enrollment.revision + 1
-    elif body.command == "cancel":
-        if assignment.status != AssignmentStatus.IN_PROGRESS:
-            raise ApiError(409, "INVALID_STATE_TRANSITION", "只有进行中的任务可以取消接取。")
-        assignment.status, assignment.revision = AssignmentStatus.CANCELLED, assignment.revision + 1
     elif body.command in {"draft", "submit"}:
         if mode != "assessment":
             raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务无需提交文字作业。")
+        if body.command == "submit" and published.content.get("reviewMode") == "ai":
+            raise ApiError(409, "AI_ASSESSMENT_REQUIRED", "本任务按 AI 评分标准自动评测，请完成 AI 自测，达到通过分数后直接完成任务。")
         from journey_api.schemas import SaveSubmissionDraftCommand, SubmissionCommand
         from journey_api.submission_routes import save_submission_draft, submit_assignment
         request.state.defer_exploration_commit = True
@@ -200,7 +232,7 @@ def task_command(session, actor, body, request, key):
             command = SubmissionCommand.model_construct(expected_revision=assignment.revision, body=answer)
             submit_assignment(assignment.id, command, request, idempotency_key=key, actor=actor, session=session)
     elif body.command == "selfCheck":
-        return run_self_check(session, actor, body, assignment, version, published.content)
+        return run_self_check(session, actor, body, assignment, version, published.content, key, request)
     else:
         raise ApiError(422, "INVALID_REQUEST", "不支持的探索营操作。")
     session.flush()
@@ -210,33 +242,39 @@ def task_command(session, actor, body, request, key):
     return result
 
 
-def run_self_check(session, actor, body, assignment, version, content):
-    if content.get("completionMode") != "assessment" or assignment.status not in {AssignmentStatus.IN_PROGRESS, AssignmentStatus.NEEDS_REVISION}:
-        raise ApiError(409, "INVALID_STATE_TRANSITION", "当前任务不能进行 AI 自测。")
-    if not body.answer.strip():
-        raise ApiError(422, "ANSWER_REQUIRED", "请填写测试结果后再进行自测。")
-    from journey_api.ai_self_check_clients import get_reviewer
-    from journey_api.ai_self_check_rules import SYSTEM_PROMPT, render_feedback
-    from journey_api.learner_write_limits import enforce_learner_write_limit
-    enforce_learner_write_limit(actor, "ai")
-    row = ExplorationSelfCheck(id=uuid.uuid4(), organization_id=actor.organization_id, user_id=actor.id,
-        assignment_id=assignment.id, task_version_id=version.id, answer=body.answer, status="COMPLETED", result="")
-    try:
-        from journey_api.config import get_settings
-        if not get_settings().ai_self_check_enabled:
-            raise ApiError(503, "AI_UNAVAILABLE", "AI 自测当前未启用，请联系管理员检查模型配置。")
-        evidence = {"task": {"title": content["title"], "description": content["summary"], "requirements": content.get("requirements", [])},
-            "answer": body.answer, "materials": [{"title": item["name"], "text": item.get("text", ""), "url": item.get("url") if item["type"] == "link" else None}
-                for item in content.get("materials", [])],
-            "task_files": [{"title": item["name"], "text": item.get("text", ""), "url": item.get("url") if item["type"] == "link" else None}
-                for item in content.get("taskFiles", [])], "read_scope": "已提供的文字和任务说明。外部链接正文、附件正文、图片和视频尚未读取。"}
-        raw = get_reviewer().review(SYSTEM_PROMPT, evidence)
-        row.result = render_feedback(raw, "DYNAMIC-EXPLORATION", body.answer)
-    except ApiError as error:
-        row.status, row.result = "FAILED", error.message
-    session.add(row)
+def run_self_check(session, actor, body, assignment, version, content, key, request=None):
+    from journey_api.exploration_ai_self_check import evaluate
+    row = evaluate(session, actor, body, assignment, version, content, key)
+    complete_scored_attempt(session, actor, body, request=request, row=row)
+    return self_check_response(session, actor, body.taskId, row)
+
+
+def complete_scored_attempt(session, actor, body, request, row):
+    from journey_api.exploration_ai_completion import complete
+    details = row.details or {}
+    grading = details.get("grading") or {}
+    if (row.status != "COMPLETED" or not details.get("analysisCompleted")
+            or not grading.get("validated") or not grading.get("passed")
+            or details.get("inputKind") == "document" and not details.get("gradingDocumentValidated")):
+        return
+    # An unchanged document can reuse its canonical prior attempt under a new
+    # request key. Bind it to this user's requested task/version, then use the
+    # canonical attempt's original input and revision for its persisted proof.
+    task_id = session.scalar(select(ExplorationWork.task_id).where(
+        ExplorationWork.assignment_id == row.assignment_id,
+        ExplorationWork.organization_id == actor.organization_id,
+        ExplorationWork.user_id == actor.id))
+    if row.task_version_id != body.versionId or task_id != body.taskId:
+        return
+    # Grading is already durable. Release external workflow locks before
+    # entering the completion service's consistent learner/assignment lock order.
+    session.commit()
+    complete(session, actor, attempt_id=row.id, expected_request_hash=details.get("requestHash"),
+        expected_answer=row.answer, validated_result=grading,
+        request_id=str(getattr(getattr(request, "state", None), "request_id", None) or row.id),
+        expected_assignment_revision=details.get("assignmentRevision"))
     session.flush()
-    return {"record": self_check_record(row), **self_check_history(session, actor, body.taskId), "task": task_view(session, actor, body.taskId)}
+    session.refresh(row)
 
 
 @router.post("/review-admin/exploration/materials")

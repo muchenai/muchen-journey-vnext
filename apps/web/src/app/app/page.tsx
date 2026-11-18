@@ -5,7 +5,7 @@ import { localVillagePreviewEnabled } from "@/lib/server/local-preview";
 
 export const dynamic = "force-dynamic";
 
-export default async function LearnerHome({ searchParams }: { searchParams: Promise<{ view?: string; notice?: string }> }) {
+export default async function LearnerHome({ searchParams }: { searchParams: Promise<{ view?: string; notice?: string; task?: string; feedback?: string }> }) {
   const query = await searchParams;
   const legacyTasks = query.view === "legacy-tasks";
   const initialScreen = query.view === "village" ? "village" : query.view === "tasks" || legacyTasks ? "tasks" : query.view === "dashboard" ? "dashboard" : "welcome";
@@ -21,6 +21,8 @@ export default async function LearnerHome({ searchParams }: { searchParams: Prom
       learnerName={learnerName}
       experience={experience}
       configurableExploration={!legacyTasks}
+      explorationTaskId={!legacyTasks && initialScreen === "tasks" && typeof query.task === "string" ? query.task : undefined}
+      explorationOpenFeedback={!legacyTasks && initialScreen === "tasks" && !!query.task && query.feedback === "1"}
       localVillagePreview={localVillagePreviewEnabled()}
     />
   );

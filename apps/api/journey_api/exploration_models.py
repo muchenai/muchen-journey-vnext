@@ -57,4 +57,5 @@ class ExplorationSelfCheck(Base):
     answer: Mapped[str] = mapped_column(String(8000))
     result: Mapped[str] = mapped_column(String(20000))
     status: Mapped[str] = mapped_column(String(16))
+    details: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

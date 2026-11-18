@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { apiRequest } from "@/lib/server/api";
+import { learnerPageRequest } from "@/lib/server/api";
 import ProjectExperience from "@/app/project29/App";
 import { loadProjectExperience } from "@/app/project-ui/experience-data";
 
@@ -15,10 +15,15 @@ export default async function TaskPage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const [{ assignmentId }, query] = await Promise.all([params, searchParams]);
-  if (localVillagePreviewEnabled()) {
-    let taskId: string | null = null;
-    try { taskId = (await apiRequest<{taskId:string|null}>(`/api/v1/me/novice/assignments/${assignmentId}`, "LEARNER")).taskId; } catch { /* Existing page handles authentication errors. */ }
-    if (taskId) redirect(`/app?view=village&task=${encodeURIComponent(taskId)}`);
+  const destination = await learnerPageRequest<{
+    module: "exploration" | "village" | "legacy";
+    taskId: string | null;
+  }>(`/api/v1/me/assignments/${encodeURIComponent(assignmentId)}/destination`);
+  if (destination.module === "exploration" && destination.taskId) {
+    redirect(`/app?view=tasks&task=${encodeURIComponent(destination.taskId)}${query.view === "review" ? "&feedback=1" : ""}`);
+  }
+  if (destination.module === "village" && destination.taskId && localVillagePreviewEnabled()) {
+    redirect(`/app?view=village&task=${encodeURIComponent(destination.taskId)}`);
   }
   const { learnerName, experience } = await loadProjectExperience(assignmentId);
   const screen = query.view === "evidence" || query.view === "review" ? "view" : "detail";

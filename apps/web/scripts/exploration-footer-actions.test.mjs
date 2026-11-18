@@ -158,6 +158,7 @@ test("claimed assessments forward the footer and validation limits, and pending/
     assert.equal(form.props.minLength, 7);
     assert.equal(form.props.beforeActions, "测试反馈");
     assert.equal(form.props.savedMessage, "草稿保存成功");
+    assert.equal(form.props.allowCancel, false);
     assert.equal(buttons(body).length, 0);
     assert.equal(h.portals.length, ["pending", "completed"].includes(status) ? 1 : 0);
     if (h.portals.length) {
@@ -169,6 +170,39 @@ test("claimed assessments forward the footer and validation limits, and pending/
 });
 
 const formProps = { task, answer: task.answer, busy: false, savedMessage: "草稿已保存", beforeActions: "自测反馈", minLength: 7, actionsContainer: footer, onAnswer() {}, onAction: async () => true };
+
+test("exploration manual forms hide cancellation inline and in the footer while retaining save and submit", () => {
+  for (const actionsContainer of [undefined, null, footer]) {
+    const commands = [];
+    const h = harness("VillageTaskForm.tsx", "VillageTaskForm", {
+      ...formProps, actionsContainer, allowCancel: false,
+      onAction: async command => { commands.push(command); return true; },
+    });
+    const body = h.render();
+    const controls = actionsContainer ? h.portals[0].children : body;
+    assert.doesNotMatch(text(body) + text(controls), /取消接取|暂不取消/);
+    assert.deepEqual(buttons(controls).map(node => node.props.children), ["保存草稿", "提交审核"]);
+    assert.equal(all(body, node => node.type === "textarea")[0].props.disabled, false);
+    assert.match(text(body), /自测反馈/);
+    button(controls, "保存草稿").props.onClick();
+    body.props.onSubmit({ preventDefault() {} });
+    assert.deepEqual(commands, ["draft", "submit"]);
+  }
+});
+
+test("disabling cancellation also removes an existing confirmation without blocking editing", () => {
+  const h = harness("VillageTaskForm.tsx", "VillageTaskForm", formProps);
+  h.render();
+  button(h.portals[0].children, "取消接取").props.onClick();
+  h.render();
+  assert.match(text(h.portals[0].children), /确认取消接取这个任务/);
+  const body = h.render({ allowCancel: false });
+  assert.doesNotMatch(text(h.portals[0].children), /取消接取|暂不取消/);
+  assert.equal(all(body, node => node.type === "textarea")[0].props.disabled, false);
+  assert.equal(button(h.portals[0].children, "保存草稿").props.disabled, false);
+  assert.equal(button(h.portals[0].children, "提交审核").props.disabled, false);
+  assert.match(text(body), /自测反馈/);
+});
 
 test("a portalled form keeps one native submit associated with a stable form and its required answer constraints", () => {
   const commands = [];

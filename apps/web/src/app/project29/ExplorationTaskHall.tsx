@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { JourneyDialogSurface } from "./JourneyDialogSurface";
 import { ExplorationSelfCheck } from "./ExplorationSelfCheck";
 import { ExplorationLearningMaterial } from "./ExplorationLearningMaterial";
@@ -26,12 +27,24 @@ function failureMessage(value: unknown, fallback: string) {
   return fallback;
 }
 const noTreasures = (): ExplorationTreasures => ({ total: 4, count: 0, items: [], pendingDrops: [] });
+const isAiAssessment = (task: VillageTask) => task.reviewMode === "AI" && (task.completionMode ?? "assessment") === "assessment";
+type SelfCheckState = {
+  taskId: string;
+  versionId: string;
+  pending: boolean;
+  items?: ExplorationSelfCheckRecord[];
+};
+function assessmentHref(value?: string) {
+  try { const url = new URL(value || ""); return ["http:", "https:"].includes(url.protocol) ? url.href : null; }
+  catch { return null; }
+}
 
 export function useExplorationTasks(enabled = true) {
   const [tasks, setTasks] = useState<VillageTask[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [selfCheckState, setSelfCheckState] = useState<SelfCheckState | null>(null);
   const [treasures, setTreasures] = useState<ExplorationTreasures>(noTreasures);
   const writing = useRef(false);
   const generation = useRef(0);
@@ -41,6 +54,7 @@ export function useExplorationTasks(enabled = true) {
   const learningQueue = useRef<Promise<unknown>>(Promise.resolve());
   const materialRequests = useRef(new Map<string, Promise<VillageTask | null>>());
   const refreshInFlight = useRef<Promise<VillageTask[] | undefined> | null>(null);
+  const selfCheckRequests = useRef(new Map<string, { key: string; revision: VillageTask["revision"] }>());
   const refresh = useCallback(() => {
     if (!enabled || writing.current) return Promise.resolve(undefined);
     if (refreshInFlight.current) return refreshInFlight.current;
@@ -89,7 +103,15 @@ export function useExplorationTasks(enabled = true) {
   }
 
   async function mutate(task: VillageTask, command: VillageTaskCommand, answer: string) {
+    if (command === "cancel") {
+      setError("探索营任务接取后不能取消。");
+      return null;
+    }
     if (writing.current || !canOpenExplorationTask(task)) return null;
+    if (command === "submit" && isAiAssessment(task)) {
+      setError("本任务使用 AI 评测，请达到通过线后自动完成任务。");
+      return null;
+    }
     beginWriting();
     try {
       const key = crypto.randomUUID();
@@ -104,18 +126,57 @@ export function useExplorationTasks(enabled = true) {
     finally { finishWriting(); }
   }
   async function runSelfCheck(task: VillageTask, answer: string) {
-    if (!enabled || writing.current || !canOpenExplorationTask(task)) return null;
+    const current = currentTasks.current.find(row => row.id === task.id) ?? task;
+    if (!enabled || writing.current || !isAiAssessment(task) || !isAiAssessment(current)
+        || current.versionId !== task.versionId || !canOpenExplorationTask(current)
+        || !["active", "returned"].includes(current.status)) return null;
+    const identity = JSON.stringify([task.id, task.versionId, answer]);
+    const request = selfCheckRequests.current.get(identity) ?? { key: crypto.randomUUID(), revision: task.revision };
+    selfCheckRequests.current.set(identity, request);
+    setSelfCheckState(previous => ({
+      taskId: task.id, versionId: task.versionId, pending: true,
+      ...(previous?.taskId === task.id && previous.versionId === task.versionId ? { items: previous.items } : {}),
+    }));
     beginWriting();
     try {
-      const response = await fetch("/api/learner/exploration", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "selfCheck", taskId: task.id, versionId: task.versionId, revision: task.revision, key: crypto.randomUUID(), answer }) });
+      const response = await fetch("/api/learner/exploration", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "selfCheck", taskId: task.id, versionId: task.versionId, revision: request.revision, key: request.key, answer }) });
       const result = await response.json();
-      if (!response.ok) throw new Error(failureMessage(result.error, "自测未完成，请查看历史记录后重试。"));
+      if (!response.ok) {
+        // A rejected request can be retried with a fresh catalog revision. Network
+        // failures and 5xx responses may follow a side effect, so retain that key.
+        if (response.status >= 400 && response.status < 500) selfCheckRequests.current.delete(identity);
+        throw new Error(failureMessage(result.error, "自测未完成，请查看历史记录后重试。"));
+      }
       const updated = result as { record: ExplorationSelfCheckRecord; items: ExplorationSelfCheckRecord[]; task: VillageTask };
       if (updated.task?.id !== task.id || !updated.record?.id || !Array.isArray(updated.items)) throw new Error("暂未确认自测结果，请读取历史记录核对后重试。");
+      // Keep an unconfirmed request's key so a network retry only retrieves its result.
+      // An explicit completed/failed attempt may start a new check and retain history.
+      if (updated.record.status !== "RUNNING" && !["PENDING", "UNCERTAIN"].includes(updated.record.commentStatus ?? "")) selfCheckRequests.current.delete(identity);
+      setSelfCheckState({ taskId: task.id, versionId: task.versionId, pending: true, items: updated.items });
       replaceTask(updated.task);
+      if (updated.task.status === "completed") {
+        try {
+          const catalogResponse = await fetch("/api/learner/exploration", { cache: "no-store" });
+          const catalog = await catalogResponse.json();
+          if (!catalogResponse.ok || !Array.isArray(catalog.items)) throw new Error("任务目录暂未更新");
+          // Keep the authoritative completed task even if a replica's catalog is stale.
+          const freshTasks = catalog.items as VillageTask[];
+          currentTasks.current = freshTasks.some(row => row.id === updated.task.id)
+            ? freshTasks.map(row => row.id === updated.task.id ? updated.task : row)
+            : [...freshTasks, updated.task];
+          setTasks(currentTasks.current);
+          if (catalog.treasures) setTreasures(catalog.treasures);
+        } catch {
+          setError("评测结果已保存，任务目录暂未刷新，请重新读取任务状态。");
+        }
+      }
       return updated;
     } catch (error) { setError(error instanceof Error ? error.message : "自测未完成，请查看历史记录后重试。"); return null; }
-    finally { finishWriting(); }
+    finally {
+      setSelfCheckState(previous => previous?.taskId === task.id && previous.versionId === task.versionId
+        ? { ...previous, pending: false } : previous);
+      finishWriting();
+    }
   }
   async function acknowledgeTreasure(id: string) {
     if (!enabled || writing.current) return false;
@@ -181,7 +242,7 @@ export function useExplorationTasks(enabled = true) {
     return operation;
   }
   const completeLearning = (task: VillageTask, checkinConfirmed = false) => learningCommand(task, "completeLearning", { checkinConfirmed });
-  return { tasks, loading, error, busy, refresh, mutate, runSelfCheck, readMaterial, completeLearning, treasures, acknowledgeTreasure, unlockGraduation };
+  return { tasks, loading, error, busy, selfCheckState, refresh, mutate, runSelfCheck, readMaterial, completeLearning, treasures, acknowledgeTreasure, unlockGraduation };
 }
 
 function TaskSymbol({ index = 0 }: { index?: number }) {
@@ -194,11 +255,45 @@ function TaskStatus({ task }: { task: VillageTask }) {
 function actionLabel(task: VillageTask) {
   if (task.status === "locked") return "等待上一任务提交";
   if (task.status === "unavailable") return "暂不可用";
-  return task.status === "available" ? "查看并接取" : task.status === "active" ? "继续任务" : task.status === "returned" ? "修改并重交" : task.status === "pending" ? "查看提交" : "查看成果";
+  return task.status === "available" ? "查看并接取" : task.status === "active" ? "继续任务" : task.status === "returned" ? isAiAssessment(task) ? "修改并重测" : "修改并重交" : task.status === "pending" ? "查看提交" : "查看成果";
+}
+
+export function ExplorationAiAssessmentActions({ task, answer, busy, selfCheckPending, selfCheckRecords, savedMessage, hasNext, actionsContainer, onAnswer, onAction, onRun, onContinue }: {
+  task: VillageTask;
+  answer: string;
+  busy: boolean;
+  selfCheckPending?: boolean;
+  selfCheckRecords?: ExplorationSelfCheckRecord[];
+  savedMessage: string;
+  hasNext: boolean;
+  actionsContainer?: HTMLElement | null;
+  onAnswer: (answer: string) => void;
+  onAction: (command: VillageTaskCommand) => Promise<boolean>;
+  onRun: () => Promise<{ record: ExplorationSelfCheckRecord; items: ExplorationSelfCheckRecord[] } | null>;
+  onContinue: () => void;
+}) {
+  const editable = task.status === "active" || task.status === "returned";
+  const completed = task.status === "completed";
+  const renderActions = (actions: ReactNode) => actionsContainer ? createPortal(actions, actionsContainer) : actions;
+  if (needsExplorationClaim(task)) return <div className="ex-claim-section"><p>先开始任务并阅读材料，完成作答后运行 AI 评测。达到通过线后自动完成任务。</p>{renderActions(<button type="button" className="module-primary" disabled={busy} onClick={() => void onAction("claim")}>{busy ? "正在准备…" : "开始任务 →"}</button>)}</div>;
+  return <div className="ex-ai-assessment-actions">
+    <label className="module-field">任务成果或飞书文档链接<textarea rows={5} maxLength={8000} value={answer}
+      disabled={busy || !editable} onChange={event => onAnswer(event.target.value)}
+      placeholder="填写你的作答，或粘贴飞书结果文档链接；链接旁可以补充说明。完成后运行 AI 评测。" /></label>
+    <ExplorationSelfCheck key={`${task.id}:${task.versionId}`} task={task} answer={answer} busy={busy} pending={selfCheckPending} records={selfCheckRecords} onRun={onRun} />
+    {completed && <p className="ex-self-check-hint" role="status">任务已完成，评测及完成记录已保存，可以继续下一板块。</p>}
+    {renderActions(<>
+      {savedMessage && <p className="village-draft-feedback" role="status">✓ {savedMessage}</p>}
+      <div className="village-task-actions">
+        {editable && <button type="button" className="module-secondary" disabled={busy} onClick={() => { if (!busy && editable) void onAction("draft"); }}>保存草稿</button>}
+        {completed && <button type="button" className="module-primary" disabled={busy} onClick={onContinue}>{hasNext ? "进入下一板块 →" : "返回任务目录，查看毕业码 →"}</button>}
+      </div>
+    </>)}
+  </div>;
 }
 
 export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVariant = "cards", initialTab = "all", scope, onScopeChange, onTaskCountChange, onClearSearch,
-  detailOnly = false, sharedExploration, onTaskClose, onTaskBlocked }: {
+  detailOnly = false, sharedExploration, onTaskClose, onTaskBlocked, openFeedback = false, suspended = false, continuationReady = true, onTransitionBusyChange }: {
   searchQuery?: string;
   initialTaskId?: string;
   initialVariant?: ExplorationLayout;
@@ -211,6 +306,10 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
   sharedExploration?: ReturnType<typeof useExplorationTasks>;
   onTaskClose?: () => void;
   onTaskBlocked?: () => void;
+  openFeedback?: boolean;
+  suspended?: boolean;
+  continuationReady?: boolean;
+  onTransitionBusyChange?: (busy: boolean) => void;
 }) {
   const standaloneExploration = useExplorationTasks(!sharedExploration);
   const exploration = sharedExploration ?? standaloneExploration;
@@ -225,13 +324,26 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
   const [notice, setNotice] = useState("");
   const [savedTaskId, setSavedTaskId] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
-  const taskBusy = exploration.busy || advancing;
+  const [continuation, setContinuation] = useState<{ task: VillageTask } | null>(null);
+  useLayoutEffect(() => {
+    onTransitionBusyChange?.(advancing);
+    return () => { onTransitionBusyChange?.(false); };
+  }, [advancing, onTransitionBusyChange]);
+  const taskBusy = exploration.busy || advancing || suspended;
+  const canCloseTask = !suspended && !advancing && (!exploration.busy || exploration.selfCheckState?.pending === true);
   const dialog = useRef<HTMLDialogElement>(null);
+  const feedback = useRef<HTMLElement>(null);
   const [actionsContainer, setActionsContainer] = useState<HTMLDivElement | null>(null);
   const selectedTask = tasks.find(task => task.id === selectedId);
   const selected = selectedTask && canOpenExplorationTask(selectedTask) ? selectedTask : null;
-  const dialogReady = useCanvasDialogBounds(dialog, !!selected);
+  const feedbackAvailable = !!selected?.feedback;
+  const dialogReady = useCanvasDialogBounds(dialog, !!selected && !suspended);
   const selectedMode = selected?.completionMode ?? "assessment";
+  const selectedAi = !!selected && isAiAssessment(selected);
+  const selectedSelfCheck = selected && exploration.selfCheckState?.taskId === selected.id
+    && exploration.selfCheckState.versionId === selected.versionId ? exploration.selfCheckState : null;
+  const selectedFeedbackAi = selected?.feedback?.source === "AI" || (!selected?.feedback?.source && selectedAi);
+  const selectedAssessmentHref = assessmentHref(selected?.assessmentUrl);
   const taskFileCount = selectedMode === "assessment" ? selected?.taskFiles?.length ?? 0 : 0;
   const selectedIdRef = useRef(selectedId);
   useLayoutEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
@@ -251,10 +363,16 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
   useEffect(() => { const timer = window.setTimeout(() => { setTab(initialTab); setFilter("all"); }, 0); return () => clearTimeout(timer); }, [initialTab]);
   useEffect(() => { const timer = window.setTimeout(() => setFilter("all"), 0); return () => clearTimeout(timer); }, [scope]);
   useEffect(() => { onTaskCountChange?.(mine.length); }, [mine.length, onTaskCountChange]);
-  useEffect(() => { if (!initialTaskId) return; const timer = window.setTimeout(() => setSelectedId(initialTaskId), 0); return () => clearTimeout(timer); }, [initialTaskId]);
+  useEffect(() => {
+    if (!initialTaskId || selectedIdRef.current === initialTaskId) return;
+    selectedIdRef.current = initialTaskId;
+    setContinuation(null);
+    setSelectedId(initialTaskId);
+  }, [initialTaskId]);
   useEffect(() => {
     if (!selectedTask || canOpenExplorationTask(selectedTask)) return;
     const timer = window.setTimeout(() => {
+      selectedIdRef.current = null;
       setSelectedId(null);
       onTaskBlocked?.();
       onTaskClose?.();
@@ -263,13 +381,18 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
   }, [selectedTask?.id, selectedTask?.status, onTaskBlocked, onTaskClose]);
   useEffect(() => {
     const element = dialog.current;
-    if (selected && dialogReady && element && !element.open) element.showModal();
-    if ((!selected || !dialogReady) && element?.open) element.close();
-  }, [selected?.id, dialogReady]);
+    if (selected && !suspended && dialogReady && element && !element.open) element.showModal();
+    if ((!selected || suspended || !dialogReady) && element?.open) element.close();
+  }, [selected?.id, suspended, dialogReady]);
   useEffect(() => {
     const body = dialog.current?.querySelector<HTMLElement>(".ex-detail-scroll");
     if (body) body.scrollTop = 0;
   }, [selected?.id]);
+  useEffect(() => {
+    if (!openFeedback || !dialogReady || selected?.id !== initialTaskId || !feedbackAvailable) return;
+    feedback.current?.scrollIntoView({ block: "center" });
+    feedback.current?.focus({ preventScroll: true });
+  }, [openFeedback, dialogReady, selected?.id, selected?.feedback?.at, initialTaskId, feedbackAvailable]);
 
   function changeLayout(next: ExplorationLayout) {
     setLayout(next);
@@ -277,19 +400,33 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
     url.searchParams.set("variant", next);
     window.history.replaceState(null, "", url);
   }
-  function openTask(task: VillageTask) { if (canOpenExplorationTask(task)) { setSelectedId(task.id); setNotice(""); setSavedTaskId(null); } }
+  function openTask(task: VillageTask) { if (canOpenExplorationTask(task)) { setContinuation(null); selectedIdRef.current = task.id; setSelectedId(task.id); setNotice(""); setSavedTaskId(null); } }
   function changeTab(next: "all" | "mine") { setTab(next); onScopeChange?.(next); setFilter("all"); }
-  function closeTask() { if (!taskBusy) { setSelectedId(null); setNotice(""); onTaskClose?.(); } }
-  function continueAfter(task: VillageTask, latestTasks = tasks) {
+  const closeTask = useCallback(() => { if (canCloseTask) { selectedIdRef.current = null; setContinuation(null); setSelectedId(null); setNotice(""); onTaskClose?.(); } }, [canCloseTask, onTaskClose]);
+  const continueAfter = useCallback((task: VillageTask, latestTasks = tasks) => {
+    if (suspended) return;
     const ordered = [...latestTasks].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
     const next = ordered[ordered.findIndex(row => row.id === task.id) + 1];
     if (next && !canOpenExplorationTask(next)) { setNotice("需要提交上一任务"); return; }
     if (next) {
-      setSelectedId(next.id); setNotice(""); setSavedTaskId(null);
+      selectedIdRef.current = next.id; setSelectedId(next.id); setNotice(""); setSavedTaskId(null);
       const body = dialog.current?.querySelector<HTMLElement>(".ex-detail-scroll");
       if (body) body.scrollTop = 0;
     } else closeTask();
-  }
+  }, [tasks, suspended, closeTask]);
+  useEffect(() => {
+    if (!continuation) return;
+    const obsolete = selectedIdRef.current !== continuation.task.id || selected?.id !== continuation.task.id || selected.versionId !== continuation.task.versionId;
+    if (!obsolete && (advancing || exploration.busy || suspended || !continuationReady)) return;
+    // Defer the state transition until after the current dialog commit. A change
+    // to the selected task or treasure presentation cancels this transition.
+    const timer = window.setTimeout(() => {
+      setContinuation(null);
+      if (obsolete || selectedIdRef.current !== continuation.task.id) return;
+      continueAfter(continuation.task);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [continuation, selected?.id, selected?.versionId, advancing, exploration.busy, suspended, continuationReady, continueAfter]);
   async function finishLearning(task: VillageTask, checkinConfirmed: boolean) {
     if (taskBusy) return false;
     setAdvancing(true);
@@ -298,23 +435,22 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
       if (!updated) return false;
       const latestTasks = await exploration.refresh();
       if (selectedIdRef.current === task.id) {
-        if (latestTasks) continueAfter(updated, latestTasks);
+        if (latestTasks) setContinuation({ task: updated });
         else setNotice("完成记录已保存，任务状态暂未刷新，请稍后重试。");
       }
       return true;
     } finally { setAdvancing(false); }
   }
   async function act(task: VillageTask, command: VillageTaskCommand) {
-    if (taskBusy || !canOpenExplorationTask(task)) return false;
+    if (taskBusy || command === "cancel" || !canOpenExplorationTask(task)) return false;
     setAdvancing(true);
     try {
       const updated = await exploration.mutate(task, command, answers[task.id] ?? task.answer ?? "");
       if (!updated) return false;
-      if (command === "claim") setNotice("任务已接取。阅读材料后，完成任务并提交审核。");
+      if (command === "claim") setNotice(isAiAssessment(task) ? "任务已接取。阅读材料并作答，AI 评测达标后自动完成。" : "任务已接取。阅读材料后，完成任务并提交审核。");
       if (command === "draft") { setNotice("草稿保存成功"); setSavedTaskId(task.id); }
       if (command === "submit") { setNotice("提交成功。审核结果会在任务详情中显示。"); setSavedTaskId(null); }
-      if (command === "cancel") { setNotice("已取消接取，你可以随时重新开始。"); setSavedTaskId(null); }
-      if (command === "submit" || command === "cancel") await exploration.refresh();
+      if (command === "submit") await exploration.refresh();
       return true;
     } finally { setAdvancing(false); }
   }
@@ -325,7 +461,7 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
 
     <section className="ex-welcome-grid" aria-label="探索营学习概览">
       <div className="ex-hero"><div className="ex-hero-copy"><span className="ex-eyebrow">EXPLORE · LEARN · BELONG</span><h2>每一次探索，<br />都让你更靠近沐晨。</h2><p>选择一份任务，阅读材料、留下思考，<br />让理解成为行动的起点。</p><button className="ex-primary" type="button" disabled={!nextTask || exploration.loading} onClick={() => nextTask && openTask(nextTask)}>{allCompleted ? "回顾我的探索" : inProgress.length ? "继续我的探索" : "开始第一份任务"}<span aria-hidden="true">↗</span></button></div><div className="ex-orbit" aria-hidden="true"><i /><i /><i /><span className="ex-orbit-star">✦</span><div className="ex-orbit-core"><span>MUCHEN</span><strong>JOURNEY</strong><small>你的下一种可能</small></div><span className="ex-orbit-dot" /><span className="ex-orbit-label">A BRIGHTER YOU</span></div></div>
-      <div className="ex-progress-card"><div className="ex-progress-heading"><span>我的探索进度</span><strong>{completed}<small> / {tasks.length}</small></strong></div><div className="ex-progress-track" role="progressbar" aria-label="探索任务完成进度" aria-valuenow={completed} aria-valuemin={0} aria-valuemax={tasks.length || 1}><span style={{ width: `${progress}%` }} /></div><p>学习板块学完即完成，测试任务审核通过后完成。</p><div className="ex-progress-numbers"><div><strong>{inProgress.length}</strong><span>进行中</span></div><div><strong>{pending}</strong><span>待审核</span></div><div><strong>{completed}</strong><span>已完成</span></div></div><div className="ex-process"><span>打开学习</span><i>→</i><span>完成板块</span><i>→</i><span>解锁毕业码</span></div></div>
+      <div className="ex-progress-card"><div className="ex-progress-heading"><span>我的探索进度</span><strong>{completed}<small> / {tasks.length}</small></strong></div><div className="ex-progress-track" role="progressbar" aria-label="探索任务完成进度" aria-valuenow={completed} aria-valuemin={0} aria-valuemax={tasks.length || 1}><span style={{ width: `${progress}%` }} /></div><p>学习板块学完即完成；AI 任务评测达标后完成，人工审核任务审核通过后完成。</p><div className="ex-progress-numbers"><div><strong>{inProgress.length}</strong><span>进行中</span></div><div><strong>{pending}</strong><span>待审核</span></div><div><strong>{completed}</strong><span>已完成</span></div></div><div className="ex-process"><span>打开学习</span><i>→</i><span>完成板块</span><i>→</i><span>解锁毕业码</span></div></div>
     </section>
 
     <section className="ex-catalog" aria-labelledby="ex-catalog-title">
@@ -346,17 +482,22 @@ export function ExplorationTaskHall({ searchQuery = "", initialTaskId, initialVa
     </section>
 
     </>}
-    <dialog ref={dialog} className="exploration-task-modal" aria-labelledby="ex-task-detail-title" onCancel={event => { if (taskBusy) event.preventDefault(); else closeTask(); }} onClick={event => { if (event.target === event.currentTarget) closeTask(); }}>
+    <dialog ref={dialog} className="exploration-task-modal" aria-labelledby="ex-task-detail-title" onCancel={event => { if (!canCloseTask) event.preventDefault(); else closeTask(); }} onClick={event => { if (event.target === event.currentTarget) closeTask(); }}>
       <div className="module-dialog journey-dialog exploration-task-dialog"><JourneyDialogSurface>
-      <header className="ex-detail-header"><div className="ex-detail-heading"><span className="ex-eyebrow">探索营 / 任务详情</span><button type="button" aria-label="关闭探索任务详情" disabled={taskBusy} onClick={closeTask}>关闭 ×</button></div>{selected && <><div className="ex-detail-topline"><TaskStatus task={selected} /></div><h2 id="ex-task-detail-title">{selected.title}</h2></>}</header>
+      <header className="ex-detail-header"><div className="ex-detail-heading"><span className="ex-eyebrow">探索营 / 任务详情</span><button type="button" aria-label="关闭探索任务详情" disabled={!canCloseTask} onClick={closeTask}>关闭 ×</button></div>{selected && <><div className="ex-detail-topline"><TaskStatus task={selected} /></div><h2 id="ex-task-detail-title">{selected.title}</h2></>}</header>
       <div className="ex-detail-scroll" role="region" aria-label="任务详情内容，可向下滚动" tabIndex={0}>{selected && <>
         <p className="ex-detail-description">{selected.description}</p><div className="ex-detail-meta"><span>{selectedMode === "learning" ? "学习完成后直接记录" : selectedMode === "checkin" ? "完成签退及入群后确认" : selected.review || "人工审核"}</span><span>{selected.materials?.length || 0} 份学习材料</span></div>
-        {selectedMode === "assessment" && (selected.assessmentUrl || !taskFileCount) && <ExplorationAssessmentEntry url={selected.assessmentUrl} onStart={needsExplorationClaim(selected) ? () => { void act(selected, "claim"); } : undefined} />}
-        <section className="ex-detail-section"><h3><span>01</span>{selectedMode === "checkin" ? "签退与入群材料" : "学习材料"} · {selected.materials?.length || 0} 份</h3><p>{selectedMode === "learning" ? "打开每份材料后，完成下方确认即可进入下一板块，无需提交学习心得。" : selectedMode === "checkin" ? "请按任务说明完成签退及入群，二维码图片会直接显示在下方。" : taskFileCount ? "先查看学习材料，再打开下方任务文件完成作答，提交任务成果供审核。" : "查看下列材料，完成测试后提交测试结果。"}</p><ul className="ex-materials">{selected.materials?.map((material, index) => <ExplorationLearningMaterial key={`${selected.id}:${selected.versionId}:${index}:${material.name}`} taskId={selected.id} index={index} material={material} opened={selected.openedMaterials?.includes(index)} onOpened={selectedMode !== "assessment" && selected.status !== "completed" ? () => exploration.readMaterial(selected, index) : undefined} />)}{!selected.materials?.length && <li><p>{selectedMode === "checkin" ? "本任务暂未配置二维码，请根据任务说明完成签退及入群；管理员补充图片后会在这里显示。" : "本板块暂未配置附件，请阅读下方任务说明。"}</p></li>}</ul></section>
-        {taskFileCount > 0 && <section className="ex-detail-section ex-task-files-section"><h3><span>02</span>任务文件 · {taskFileCount} 份</h3><p>这里是管理员发布的题目或作答要求。打开或下载文件，完成后在下方填写任务成果或结果文档链接，提交审核。</p>{needsExplorationClaim(selected) ? <div className="ex-claim-section"><button type="button" className="module-primary" disabled={taskBusy} onClick={() => void act(selected, "claim")}>{taskBusy ? "正在准备…" : "开始任务，查看任务文件 →"}</button></div> : <ul className="ex-materials">{selected.taskFiles?.map((material, index) => <ExplorationLearningMaterial key={`${selected.id}:${selected.versionId}:task:${index}:${material.name}`} taskId={selected.id} index={index} material={material} group="task" />)}</ul>}</section>}
-        <section className="ex-detail-section"><h3><span>{taskFileCount ? "03" : "02"}</span>任务要求</h3><ol>{selected.requirements?.length ? selected.requirements.map((item, index) => <li key={index}>{item}</li>) : <li>{selectedMode === "learning" ? "阅读本板块材料与说明，完成学习后确认并进入下一板块。" : selectedMode === "checkin" ? "完成签退并进入项目培训群后，勾选确认。" : taskFileCount ? "完成任务文件中的题目，并提交任务成果或结果文档链接供审核。" : "完成测试，并提交测试结果或结果文档链接供审核。"}</li>}</ol>{selected.criteria?.length > 0 && <div className="ex-criteria"><strong>完成标准</strong>{selected.criteria.map((item, index) => <p key={index}>✓ {item}</p>)}</div>}</section>
-        {selected.feedback && <section className="ex-review-feedback" data-decision={selected.feedback.decision}><strong>{["PASS", "APPROVE"].includes(selected.feedback.decision) ? "审核通过 · 这一步完成了" : "审核反馈 · 期待你的进一步完善"}</strong><p>{selected.feedback.text}</p><time>{new Date(selected.feedback.at).toLocaleString("zh-CN")}</time></section>}
-        <section className="ex-detail-section ex-submit-section"><h3><span>{taskFileCount ? "04" : "03"}</span>{selectedMode === "learning" ? "完成本板块学习" : selectedMode === "checkin" ? "确认签退与入群" : taskFileCount ? selected.status === "completed" ? "你的任务成果" : "提交任务成果" : selected.status === "completed" ? "你的测试结果" : "提交测试结果"}</h3>{selectedMode === "assessment" ? <ExplorationAssessmentActions key={`${selected.id}:${selected.status}`} task={selected} answer={answers[selected.id] ?? selected.answer ?? ""} busy={taskBusy} savedMessage={savedTaskId === selected.id ? "草稿保存成功" : ""} actionsContainer={actionsContainer} hasNext={!!followingTask} onContinue={() => continueAfter(selected)} onAnswer={answer => { setAnswers(previous => ({ ...previous, [selected.id]: answer })); setSavedTaskId(null); }} beforeActions={<ExplorationSelfCheck key={selected.id} task={selected} answer={answers[selected.id] ?? selected.answer ?? ""} busy={taskBusy} onRun={() => exploration.runSelfCheck(selected, answers[selected.id] ?? selected.answer ?? "")} />} onAction={command => act(selected, command)} /> : <ExplorationLearningActions key={`${selected.id}:${selectedMode}`} task={selected} busy={taskBusy} actionsContainer={actionsContainer} hasNext={!!followingTask} onComplete={confirmed => finishLearning(selected, confirmed)} onContinue={() => continueAfter(selected)} />}</section>
+        {selectedMode === "assessment" && (selected.assessmentUrl || !taskFileCount) && (selectedAi
+          ? <div className="ex-assessment-entry"><div><span>培训测试 · AI 评测</span><h3>完成作答，评测达标后自动完成</h3><p>{selectedAssessmentHref ? "测试将在新页面打开。完成后返回这里，填写成果或飞书文档链接，运行 AI 评测。" : "请根据任务要求完成作答，AI 将按本任务的评分维度和参考答案评测。"}</p></div>{selectedAssessmentHref && <a className="module-primary" href={selectedAssessmentHref} target="_blank" rel="noopener noreferrer" onClick={needsExplorationClaim(selected) ? () => { void act(selected, "claim"); } : undefined}>进入测试 ↗</a>}</div>
+          : <ExplorationAssessmentEntry url={selected.assessmentUrl} onStart={needsExplorationClaim(selected) ? () => { void act(selected, "claim"); } : undefined} />)}
+        <section className="ex-detail-section"><h3><span>01</span>{selectedMode === "checkin" ? "签退与入群材料" : "学习材料"} · {selected.materials?.length || 0} 份</h3><p>{selectedMode === "learning" ? "打开每份材料后，完成下方确认即可进入下一板块，无需提交学习心得。" : selectedMode === "checkin" ? "请按任务说明完成签退及入群，二维码图片会直接显示在下方。" : selectedAi ? "先查看学习材料，完成任务作答后运行 AI 评测，达到通过线后自动完成。" : taskFileCount ? "先查看学习材料，再打开下方任务文件完成作答，提交任务成果供审核。" : "查看下列材料，完成测试后提交测试结果。"}</p><ul className="ex-materials">{selected.materials?.map((material, index) => <ExplorationLearningMaterial key={`${selected.id}:${selected.versionId}:${index}:${material.name}`} taskId={selected.id} index={index} material={material} opened={selected.openedMaterials?.includes(index)} onOpened={selectedMode !== "assessment" && selected.status !== "completed" ? () => exploration.readMaterial(selected, index) : undefined} />)}{!selected.materials?.length && <li><p>{selectedMode === "checkin" ? "本任务暂未配置二维码，请根据任务说明完成签退及入群；管理员补充图片后会在这里显示。" : "本板块暂未配置附件，请阅读下方任务说明。"}</p></li>}</ul></section>
+        {taskFileCount > 0 && <section className="ex-detail-section ex-task-files-section"><h3><span>02</span>任务文件 · {taskFileCount} 份</h3><p>这里是管理员发布的题目或作答要求。打开或下载文件，完成后在下方填写任务成果或结果文档链接，{selectedAi ? "运行 AI 评测。" : "提交审核。"}</p>{needsExplorationClaim(selected) ? <div className="ex-claim-section"><button type="button" className="module-primary" disabled={taskBusy} onClick={() => void act(selected, "claim")}>{taskBusy ? "正在准备…" : "开始任务，查看任务文件 →"}</button></div> : <ul className="ex-materials">{selected.taskFiles?.map((material, index) => <ExplorationLearningMaterial key={`${selected.id}:${selected.versionId}:task:${index}:${material.name}`} taskId={selected.id} index={index} material={material} group="task" />)}</ul>}</section>}
+        <section className="ex-detail-section"><h3><span>{taskFileCount ? "03" : "02"}</span>任务要求</h3><ol>{selected.requirements?.length ? selected.requirements.map((item, index) => <li key={index}>{item}</li>) : <li>{selectedMode === "learning" ? "阅读本板块材料与说明，完成学习后确认并进入下一板块。" : selectedMode === "checkin" ? "完成签退并进入项目培训群后，勾选确认。" : selectedAi ? "完成任务作答，填写成果或飞书文档链接。AI 按本任务标准评分，达到通过线后自动完成。" : taskFileCount ? "完成任务文件中的题目，并提交任务成果或结果文档链接供审核。" : "完成测试，并提交测试结果或结果文档链接供审核。"}</li>}</ol>{selected.criteria?.length > 0 && <div className="ex-criteria"><strong>完成标准</strong>{selected.criteria.map((item, index) => <p key={index}>✓ {item}</p>)}</div>}</section>
+        {selected.feedback && <section ref={feedback} className="ex-review-feedback" tabIndex={-1} aria-label={selectedFeedbackAi ? "AI 评测反馈" : "人工审核反馈"} data-decision={selected.feedback.decision}><strong>{["PASS", "APPROVE"].includes(selected.feedback.decision) ? selectedFeedbackAi ? "AI 评测通过 · 这一步完成了" : "审核通过 · 这一步完成了" : selectedFeedbackAi ? "AI 评测反馈 · 修改后可重新评测" : "审核反馈 · 期待你的进一步完善"}</strong><p>{selected.feedback.text}</p><time>{new Date(selected.feedback.at).toLocaleString("zh-CN")}</time></section>}
+        <section className="ex-detail-section ex-submit-section"><h3><span>{taskFileCount ? "04" : "03"}</span>{selectedMode === "learning" ? "完成本板块学习" : selectedMode === "checkin" ? "确认签退与入群" : selectedAi ? "任务成果与 AI 评测" : taskFileCount ? selected.status === "completed" ? "你的任务成果" : "提交任务成果" : selected.status === "completed" ? "你的测试结果" : "提交测试结果"}</h3>{selectedMode === "assessment" ? selectedAi
+          ? <ExplorationAiAssessmentActions key={selected.id} task={selected} answer={answers[selected.id] ?? selected.answer ?? ""} busy={taskBusy} selfCheckPending={selectedSelfCheck?.pending} selfCheckRecords={selectedSelfCheck?.items} savedMessage={savedTaskId === selected.id ? "草稿保存成功" : ""} actionsContainer={actionsContainer} hasNext={!!followingTask} onContinue={() => continueAfter(selected)} onAnswer={answer => { setAnswers(previous => ({ ...previous, [selected.id]: answer })); setSavedTaskId(null); }} onRun={() => exploration.runSelfCheck(selected, answers[selected.id] ?? selected.answer ?? "")} onAction={command => act(selected, command)} />
+          : <ExplorationAssessmentActions key={`${selected.id}:${selected.status}`} task={selected} answer={answers[selected.id] ?? selected.answer ?? ""} busy={taskBusy} savedMessage={savedTaskId === selected.id ? "草稿保存成功" : ""} actionsContainer={actionsContainer} hasNext={!!followingTask} onContinue={() => continueAfter(selected)} onAnswer={answer => { setAnswers(previous => ({ ...previous, [selected.id]: answer })); setSavedTaskId(null); }} beforeActions={null} onAction={command => act(selected, command)} />
+          : <ExplorationLearningActions key={`${selected.id}:${selectedMode}`} task={selected} busy={taskBusy} actionsContainer={actionsContainer} hasNext={!!followingTask} onComplete={confirmed => finishLearning(selected, confirmed)} onContinue={() => continueAfter(selected)} />}</section>
       </>}</div>
       <footer className="ex-detail-footer"><div ref={setActionsContainer} className="ex-detail-actions" />{notice && notice !== "草稿保存成功" && <p className="ex-detail-notice" role="status">{notice}</p>}{exploration.error && <p className="ex-detail-error" role="alert">{exploration.error}</p>}</footer>
       </JourneyDialogSurface></div>

@@ -72,11 +72,12 @@ export function ExplorationAssessmentActions({ task, answer, busy, savedMessage,
 }) {
   const minimumLength = task.minimumAnswerLength ?? (task.assessmentUrl ? 1 : 40);
   const hasTaskFiles = !!task.taskFiles?.length;
-  const resultLabel = hasTaskFiles ? "任务成果或结果文档链接" : "测试结果或结果文档链接";
+  const aiHint = task.reviewMode === "AI" ? "可先进行 AI 评测。" : "完成后提交审核。";
+  const resultLabel = hasTaskFiles ? "任务成果或飞书文档链接" : "测试结果或飞书文档链接";
   const renderAction = (action: ReactNode) => actionsContainer ? createPortal(action, actionsContainer) : action;
   if (needsExplorationClaim(task)) return <div className="ex-claim-section"><p>{hasTaskFiles ? "先开始任务并查看任务文件，完成作答后可以提交成果，也可以先保存草稿。" : "完成测试后，可以填写结果并提交审核，也可以先保存草稿。"}</p>{renderAction(<button type="button" className="module-primary" disabled={busy} onClick={() => void onAction("claim")}>{busy ? "正在准备…" : hasTaskFiles ? "开始任务 →" : "填写测试结果 →"}</button>)}</div>;
   return <>
-    <VillageTaskForm task={task} answer={answer} busy={busy} savedMessage={savedMessage} beforeActions={beforeActions} minLength={minimumLength} inputLabel={resultLabel} placeholder={hasTaskFiles ? minimumLength <= 1 ? "填写你的任务成果、作答说明或结果文档链接…" : `填写你的任务成果或结果文档链接（至少 ${minimumLength} 字）…` : minimumLength <= 1 ? "填写你的测试结果、简短说明或结果文档链接…" : `填写你的测试结果或结果文档链接（至少 ${minimumLength} 字）…`} actionsContainer={actionsContainer} onAnswer={onAnswer} onAction={onAction} />
+    <VillageTaskForm task={task} answer={answer} busy={busy} savedMessage={savedMessage} beforeActions={beforeActions} minLength={minimumLength} inputLabel={resultLabel} placeholder={`直接填写${hasTaskFiles ? "任务成果或作答说明" : "测试结果或简短说明"}，或粘贴飞书文档链接；链接旁可补充说明。${minimumLength > 1 ? `提交审核至少 ${minimumLength} 字。${task.reviewMode === "AI" ? aiHint : ""}` : aiHint}`} actionsContainer={actionsContainer} allowCancel={false} onAnswer={onAnswer} onAction={onAction} />
     {["pending", "completed"].includes(task.status) && <div className="ex-assessment-continue"><p>{task.status === "pending" ? "测试结果已提交，审核期间可以继续下一板块。毕业码需全部任务完成后解锁。" : "测试审核已通过，可以继续探索下一板块。"}</p>{renderAction(<button type="button" className="module-secondary" disabled={busy} onClick={onContinue}>{hasNext ? "进入下一板块 →" : "返回任务目录，查看毕业码 →"}</button>)}</div>}
   </>;
 }

@@ -1012,6 +1012,61 @@
         }
       }
     },
+    "/api/v1/me/assignments/{assignment_id}/destination": {
+      "get": {
+        "summary": "Assignment Destination",
+        "description": "Resolve old and new task links without trusting a client-supplied module.\n\nNotifications keep their stable assignment URL. The mapping is scoped to the\nsame learner and organization as the assignment before exposing a task ID.",
+        "operationId": "assignment_destination_api_v1_me_assignments__assignment_id__destination_get",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/attachments/presign": {
       "post": {
         "summary": "Presign Attachment",
@@ -3147,6 +3202,60 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-admin/rubric-documents/import": {
+      "post": {
+        "summary": "Import Rubric Document Route",
+        "operationId": "import_rubric_document_route_api_v1_review_admin_rubric_documents_import_post",
+        "parameters": [
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRubricDocument"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -12011,32 +12120,32 @@
           "domain": {
             "type": "string",
             "title": "Domain",
-            "default": "产品开发"
+            "default": "\u4ea7\u54c1\u5f00\u53d1"
           },
           "department": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "IT部",
-                  "人才开发部",
-                  "人才发展部",
-                  "客户增长与战略解决方案部",
-                  "人事运营与薪酬部",
-                  "财务法务合规部",
-                  "HRBP与组织发展部",
-                  "智能产品方案部",
-                  "PMO经营治理办公室",
-                  "行政与职场运营部",
-                  "总经办",
-                  "开发部",
-                  "多语种数据交付线",
-                  "Agent交付与行为轨迹交付线",
-                  "代码推理交付线",
-                  "高质量数据构建交付线",
-                  "多模态数据交付线",
-                  "通用模型测评交付线",
-                  "方言语音交付线"
+                  "IT\u90e8",
+                  "\u4eba\u624d\u5f00\u53d1\u90e8",
+                  "\u4eba\u624d\u53d1\u5c55\u90e8",
+                  "\u5ba2\u6237\u589e\u957f\u4e0e\u6218\u7565\u89e3\u51b3\u65b9\u6848\u90e8",
+                  "\u4eba\u4e8b\u8fd0\u8425\u4e0e\u85aa\u916c\u90e8",
+                  "\u8d22\u52a1\u6cd5\u52a1\u5408\u89c4\u90e8",
+                  "HRBP\u4e0e\u7ec4\u7ec7\u53d1\u5c55\u90e8",
+                  "\u667a\u80fd\u4ea7\u54c1\u65b9\u6848\u90e8",
+                  "PMO\u7ecf\u8425\u6cbb\u7406\u529e\u516c\u5ba4",
+                  "\u884c\u653f\u4e0e\u804c\u573a\u8fd0\u8425\u90e8",
+                  "\u603b\u7ecf\u529e",
+                  "\u5f00\u53d1\u90e8",
+                  "\u591a\u8bed\u79cd\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "Agent\u4ea4\u4ed8\u4e0e\u884c\u4e3a\u8f68\u8ff9\u4ea4\u4ed8\u7ebf",
+                  "\u4ee3\u7801\u63a8\u7406\u4ea4\u4ed8\u7ebf",
+                  "\u9ad8\u8d28\u91cf\u6570\u636e\u6784\u5efa\u4ea4\u4ed8\u7ebf",
+                  "\u591a\u6a21\u6001\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "\u901a\u7528\u6a21\u578b\u6d4b\u8bc4\u4ea4\u4ed8\u7ebf",
+                  "\u65b9\u8a00\u8bed\u97f3\u4ea4\u4ed8\u7ebf"
                 ]
               },
               {
@@ -12048,9 +12157,9 @@
           "level": {
             "type": "string",
             "enum": [
-              "初级",
-              "中级",
-              "高级"
+              "\u521d\u7ea7",
+              "\u4e2d\u7ea7",
+              "\u9ad8\u7ea7"
             ],
             "title": "Level"
           }
@@ -14284,9 +14393,9 @@
           "level": {
             "type": "string",
             "enum": [
-              "初级",
-              "中级",
-              "高级"
+              "\u521d\u7ea7",
+              "\u4e2d\u7ea7",
+              "\u9ad8\u7ea7"
             ],
             "title": "Level"
           }
@@ -14590,6 +14699,174 @@
           "created_at"
         ],
         "title": "EvaluationOut"
+      },
+      "ExplorationAiEvaluationOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "EXPLORATION_AI",
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "const": "AI",
+            "title": "Source"
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attemptid"
+          },
+          "requestHash": {
+            "type": "string",
+            "title": "Requesthash"
+          },
+          "taskVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Taskversionid"
+          },
+          "assignmentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignmentid"
+          },
+          "originalInput": {
+            "type": "string",
+            "title": "Originalinput"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completedat"
+          },
+          "validated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Validated"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "maxScore": {
+            "type": "integer",
+            "const": 100,
+            "title": "Maxscore"
+          },
+          "passed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Passed"
+          },
+          "dimensions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Dimensions"
+          },
+          "feedback": {
+            "type": "string",
+            "title": "Feedback"
+          },
+          "rubricHash": {
+            "type": "string",
+            "title": "Rubrichash"
+          },
+          "evidenceHash": {
+            "type": "string",
+            "title": "Evidencehash"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "promptVersion": {
+            "type": "string",
+            "title": "Promptversion"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "source",
+          "attemptId",
+          "requestHash",
+          "taskVersionId",
+          "assignmentId",
+          "originalInput",
+          "completedAt",
+          "validated",
+          "score",
+          "maxScore",
+          "passed",
+          "dimensions",
+          "feedback",
+          "rubricHash",
+          "evidenceHash",
+          "model",
+          "promptVersion"
+        ],
+        "title": "ExplorationAiEvaluationOut",
+        "description": "Read-only server evaluation; never accepted as a learner disclosure."
+      },
+      "ExplorationAiUseOut": {
+        "properties": {
+          "used": {
+            "type": "boolean",
+            "const": true,
+            "title": "Used"
+          },
+          "purpose": {
+            "type": "string",
+            "const": "DYNAMIC_EXPLORATION_AI_ASSESSMENT",
+            "title": "Purpose"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "output_is_advisory_only": {
+            "type": "boolean",
+            "const": false,
+            "title": "Output Is Advisory Only"
+          },
+          "exploration_ai_evaluation": {
+            "$ref": "#/components/schemas/ExplorationAiEvaluationOut"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "used",
+          "purpose",
+          "model_version",
+          "prompt_version",
+          "output_is_advisory_only",
+          "exploration_ai_evaluation"
+        ],
+        "title": "ExplorationAiUseOut"
       },
       "ExplorationCommand": {
         "properties": {
@@ -14963,32 +15240,32 @@
           "domain": {
             "type": "string",
             "title": "Domain",
-            "default": "产品开发"
+            "default": "\u4ea7\u54c1\u5f00\u53d1"
           },
           "department": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "IT部",
-                  "人才开发部",
-                  "人才发展部",
-                  "客户增长与战略解决方案部",
-                  "人事运营与薪酬部",
-                  "财务法务合规部",
-                  "HRBP与组织发展部",
-                  "智能产品方案部",
-                  "PMO经营治理办公室",
-                  "行政与职场运营部",
-                  "总经办",
-                  "开发部",
-                  "多语种数据交付线",
-                  "Agent交付与行为轨迹交付线",
-                  "代码推理交付线",
-                  "高质量数据构建交付线",
-                  "多模态数据交付线",
-                  "通用模型测评交付线",
-                  "方言语音交付线"
+                  "IT\u90e8",
+                  "\u4eba\u624d\u5f00\u53d1\u90e8",
+                  "\u4eba\u624d\u53d1\u5c55\u90e8",
+                  "\u5ba2\u6237\u589e\u957f\u4e0e\u6218\u7565\u89e3\u51b3\u65b9\u6848\u90e8",
+                  "\u4eba\u4e8b\u8fd0\u8425\u4e0e\u85aa\u916c\u90e8",
+                  "\u8d22\u52a1\u6cd5\u52a1\u5408\u89c4\u90e8",
+                  "HRBP\u4e0e\u7ec4\u7ec7\u53d1\u5c55\u90e8",
+                  "\u667a\u80fd\u4ea7\u54c1\u65b9\u6848\u90e8",
+                  "PMO\u7ecf\u8425\u6cbb\u7406\u529e\u516c\u5ba4",
+                  "\u884c\u653f\u4e0e\u804c\u573a\u8fd0\u8425\u90e8",
+                  "\u603b\u7ecf\u529e",
+                  "\u5f00\u53d1\u90e8",
+                  "\u591a\u8bed\u79cd\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "Agent\u4ea4\u4ed8\u4e0e\u884c\u4e3a\u8f68\u8ff9\u4ea4\u4ed8\u7ebf",
+                  "\u4ee3\u7801\u63a8\u7406\u4ea4\u4ed8\u7ebf",
+                  "\u9ad8\u8d28\u91cf\u6570\u636e\u6784\u5efa\u4ea4\u4ed8\u7ebf",
+                  "\u591a\u6a21\u6001\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "\u901a\u7528\u6a21\u578b\u6d4b\u8bc4\u4ea4\u4ed8\u7ebf",
+                  "\u65b9\u8a00\u8bed\u97f3\u4ea4\u4ed8\u7ebf"
                 ]
               },
               {
@@ -15000,12 +15277,12 @@
           "level": {
             "type": "string",
             "enum": [
-              "初级",
-              "中级",
-              "高级"
+              "\u521d\u7ea7",
+              "\u4e2d\u7ea7",
+              "\u9ad8\u7ea7"
             ],
             "title": "Level",
-            "default": "初级"
+            "default": "\u521d\u7ea7"
           },
           "access_role": {
             "type": "string",
@@ -16024,6 +16301,42 @@
           "request_id"
         ],
         "title": "IdentityLinkResponse"
+      },
+      "ImportRubricDocument": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "camp": {
+            "type": "string",
+            "enum": [
+              "exploration",
+              "novice"
+            ],
+            "title": "Camp"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "\u5165\u95e8",
+              "\u8fdb\u9636",
+              "\u6311\u6218",
+              ""
+            ],
+            "title": "Difficulty",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "camp"
+        ],
+        "title": "ImportRubricDocument"
       },
       "IncentiveLedgerEntryOut": {
         "properties": {
@@ -17298,25 +17611,25 @@
           "department": {
             "type": "string",
             "enum": [
-              "IT部",
-              "人才开发部",
-              "人才发展部",
-              "客户增长与战略解决方案部",
-              "人事运营与薪酬部",
-              "财务法务合规部",
-              "HRBP与组织发展部",
-              "智能产品方案部",
-              "PMO经营治理办公室",
-              "行政与职场运营部",
-              "总经办",
-              "开发部",
-              "多语种数据交付线",
-              "Agent交付与行为轨迹交付线",
-              "代码推理交付线",
-              "高质量数据构建交付线",
-              "多模态数据交付线",
-              "通用模型测评交付线",
-              "方言语音交付线"
+              "IT\u90e8",
+              "\u4eba\u624d\u5f00\u53d1\u90e8",
+              "\u4eba\u624d\u53d1\u5c55\u90e8",
+              "\u5ba2\u6237\u589e\u957f\u4e0e\u6218\u7565\u89e3\u51b3\u65b9\u6848\u90e8",
+              "\u4eba\u4e8b\u8fd0\u8425\u4e0e\u85aa\u916c\u90e8",
+              "\u8d22\u52a1\u6cd5\u52a1\u5408\u89c4\u90e8",
+              "HRBP\u4e0e\u7ec4\u7ec7\u53d1\u5c55\u90e8",
+              "\u667a\u80fd\u4ea7\u54c1\u65b9\u6848\u90e8",
+              "PMO\u7ecf\u8425\u6cbb\u7406\u529e\u516c\u5ba4",
+              "\u884c\u653f\u4e0e\u804c\u573a\u8fd0\u8425\u90e8",
+              "\u603b\u7ecf\u529e",
+              "\u5f00\u53d1\u90e8",
+              "\u591a\u8bed\u79cd\u6570\u636e\u4ea4\u4ed8\u7ebf",
+              "Agent\u4ea4\u4ed8\u4e0e\u884c\u4e3a\u8f68\u8ff9\u4ea4\u4ed8\u7ebf",
+              "\u4ee3\u7801\u63a8\u7406\u4ea4\u4ed8\u7ebf",
+              "\u9ad8\u8d28\u91cf\u6570\u636e\u6784\u5efa\u4ea4\u4ed8\u7ebf",
+              "\u591a\u6a21\u6001\u6570\u636e\u4ea4\u4ed8\u7ebf",
+              "\u901a\u7528\u6a21\u578b\u6d4b\u8bc4\u4ea4\u4ed8\u7ebf",
+              "\u65b9\u8a00\u8bed\u97f3\u4ea4\u4ed8\u7ebf"
             ],
             "title": "Department"
           }
@@ -19337,9 +19650,9 @@
           },
           "display_name": {
             "type": "string",
-            "const": "下一训练阶段决定",
+            "const": "\u4e0b\u4e00\u8bad\u7ec3\u9636\u6bb5\u51b3\u5b9a",
             "title": "Display Name",
-            "default": "下一训练阶段决定"
+            "default": "\u4e0b\u4e00\u8bad\u7ec3\u9636\u6bb5\u51b3\u5b9a"
           },
           "status": {
             "type": "string",
@@ -19783,11 +20096,11 @@
             "items": {
               "type": "string",
               "enum": [
-                "提交材料不完整",
-                "答案错误",
-                "未达到任务要求",
-                "依据或论证不足",
-                "其他"
+                "\u63d0\u4ea4\u6750\u6599\u4e0d\u5b8c\u6574",
+                "\u7b54\u6848\u9519\u8bef",
+                "\u672a\u8fbe\u5230\u4efb\u52a1\u8981\u6c42",
+                "\u4f9d\u636e\u6216\u8bba\u8bc1\u4e0d\u8db3",
+                "\u5176\u4ed6"
               ]
             },
             "type": "array",
@@ -21325,6 +21638,83 @@
         ],
         "title": "RubricEvaluationOut"
       },
+      "RubricMaterial": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "link",
+              "file",
+              "image",
+              "text"
+            ],
+            "title": "Type"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2800000,
+            "title": "Url",
+            "default": ""
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Text",
+            "default": ""
+          },
+          "mime": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Mime",
+            "default": ""
+          },
+          "size": {
+            "type": "integer",
+            "maximum": 104857600.0,
+            "minimum": 0.0,
+            "title": "Size",
+            "default": 0
+          },
+          "sourceUrl": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Sourceurl",
+            "default": ""
+          },
+          "sourceRevision": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Sourcerevision",
+            "default": ""
+          },
+          "sourceTitle": {
+            "type": "string",
+            "maxLength": 240,
+            "title": "Sourcetitle",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type"
+        ],
+        "title": "RubricMaterial"
+      },
       "RubricVersionInput": {
         "properties": {
           "version": {
@@ -21369,17 +21759,17 @@
           "domain": {
             "type": "string",
             "title": "Domain",
-            "default": "产品开发"
+            "default": "\u4ea7\u54c1\u5f00\u53d1"
           },
           "level": {
             "type": "string",
             "enum": [
-              "初级",
-              "中级",
-              "高级"
+              "\u521d\u7ea7",
+              "\u4e2d\u7ea7",
+              "\u9ad8\u7ea7"
             ],
             "title": "Level",
-            "default": "初级"
+            "default": "\u521d\u7ea7"
           }
         },
         "additionalProperties": false,
@@ -22116,7 +22506,15 @@
             "title": "Body"
           },
           "ai_use": {
-            "$ref": "#/components/schemas/AiUseDisclosure"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiUseDisclosure"
+              },
+              {
+                "$ref": "#/components/schemas/ExplorationAiUseOut"
+              }
+            ],
+            "title": "Ai Use"
           },
           "created_at": {
             "type": "string",
@@ -22297,32 +22695,32 @@
           "domain": {
             "type": "string",
             "title": "Domain",
-            "default": "产品开发"
+            "default": "\u4ea7\u54c1\u5f00\u53d1"
           },
           "publishingDepartment": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "IT部",
-                  "人才开发部",
-                  "人才发展部",
-                  "客户增长与战略解决方案部",
-                  "人事运营与薪酬部",
-                  "财务法务合规部",
-                  "HRBP与组织发展部",
-                  "智能产品方案部",
-                  "PMO经营治理办公室",
-                  "行政与职场运营部",
-                  "总经办",
-                  "开发部",
-                  "多语种数据交付线",
-                  "Agent交付与行为轨迹交付线",
-                  "代码推理交付线",
-                  "高质量数据构建交付线",
-                  "多模态数据交付线",
-                  "通用模型测评交付线",
-                  "方言语音交付线"
+                  "IT\u90e8",
+                  "\u4eba\u624d\u5f00\u53d1\u90e8",
+                  "\u4eba\u624d\u53d1\u5c55\u90e8",
+                  "\u5ba2\u6237\u589e\u957f\u4e0e\u6218\u7565\u89e3\u51b3\u65b9\u6848\u90e8",
+                  "\u4eba\u4e8b\u8fd0\u8425\u4e0e\u85aa\u916c\u90e8",
+                  "\u8d22\u52a1\u6cd5\u52a1\u5408\u89c4\u90e8",
+                  "HRBP\u4e0e\u7ec4\u7ec7\u53d1\u5c55\u90e8",
+                  "\u667a\u80fd\u4ea7\u54c1\u65b9\u6848\u90e8",
+                  "PMO\u7ecf\u8425\u6cbb\u7406\u529e\u516c\u5ba4",
+                  "\u884c\u653f\u4e0e\u804c\u573a\u8fd0\u8425\u90e8",
+                  "\u603b\u7ecf\u529e",
+                  "\u5f00\u53d1\u90e8",
+                  "\u591a\u8bed\u79cd\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "Agent\u4ea4\u4ed8\u4e0e\u884c\u4e3a\u8f68\u8ff9\u4ea4\u4ed8\u7ebf",
+                  "\u4ee3\u7801\u63a8\u7406\u4ea4\u4ed8\u7ebf",
+                  "\u9ad8\u8d28\u91cf\u6570\u636e\u6784\u5efa\u4ea4\u4ed8\u7ebf",
+                  "\u591a\u6a21\u6001\u6570\u636e\u4ea4\u4ed8\u7ebf",
+                  "\u901a\u7528\u6a21\u578b\u6d4b\u8bc4\u4ea4\u4ed8\u7ebf",
+                  "\u65b9\u8a00\u8bed\u97f3\u4ea4\u4ed8\u7ebf"
                 ]
               },
               {
@@ -22336,13 +22734,13 @@
           "difficulty": {
             "type": "string",
             "enum": [
-              "入门",
-              "进阶",
-              "挑战",
+              "\u5165\u95e8",
+              "\u8fdb\u9636",
+              "\u6311\u6218",
               ""
             ],
             "title": "Difficulty",
-            "default": "入门"
+            "default": "\u5165\u95e8"
           },
           "order": {
             "anyOf": [
@@ -22454,7 +22852,7 @@
           },
           "rubricAttachments": {
             "items": {
-              "$ref": "#/components/schemas/Material"
+              "$ref": "#/components/schemas/RubricMaterial"
             },
             "type": "array",
             "maxItems": 4,

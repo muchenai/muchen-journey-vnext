@@ -217,6 +217,11 @@ export function createJourneyService({ store }) {
     },
     evaluations: { run: async (task, answer) => {
       const result = await request({ command: 'sandbox', task: taskWrite(task), payload: { answer } });
+      if (result.validated === true && typeof result.score === 'number') {
+        return {advisory: false, score: result.score, passed: result.passed,
+          dimensions: (result.dimensions || []).map(item => ({name: item.name, score: item.score, max: item.maxScore, comment: item.feedback || ''})),
+          comment: result.feedback, source: result.model};
+      }
       return { advisory: true, score: null, dimensions: [], comment: result.result, source: result.model };
     } },
   };

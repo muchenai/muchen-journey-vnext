@@ -90,11 +90,205 @@ def test_exhausted_time_budget_does_not_start_another_request(monkeypatch):
     assert len(calls) == 1 and sleeps == []
 
 
-def test_incomplete_generation_is_not_automatically_repeated(monkeypatch):
-    calls, sleeps, _ = install_transport(monkeypatch, [{"choices": [{"finish_reason": "length"}]}])
-    with pytest.raises(ApiError, match="完整评价"):
+def capture_requests(monkeypatch):
+    requests = []
+    original = clients.request_json
+
+    def capture(*args, **kwargs):
+        requests.append({"body": json.loads(json.dumps(kwargs["body"])), "timeout": kwargs["timeout"]})
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(clients, "request_json", capture)
+    return requests
+
+
+LENGTH = {"choices": [{"finish_reason": "length", "message": {"content": '{"partial":'}}]}
+
+
+@pytest.mark.parametrize("truncated", [LENGTH, {"choices": [{"finish_reason": "length"}]}])
+def test_length_recovers_once_with_larger_bounded_output_and_compact_json_prompt(monkeypatch, truncated):
+    calls, sleeps, _ = install_transport(monkeypatch, [truncated, SUCCESS])
+    requests = capture_requests(monkeypatch)
+    ai = reviewer()
+    assert ai.review("Original rubric, strict JSON and no scores.", {"body": "same evidence"}) == "valid feedback"
+    assert len(calls) == 2 and sleeps == []
+    assert [request["body"]["max_tokens"] for request in requests] == [3500, 8000]
+    original, retry = [request["body"] for request in requests]
+    assert retry["messages"][1] == original["messages"][1]
+    assert retry["messages"][0]["content"].startswith(original["messages"][0]["content"])
+    assert "严格JSON" in retry["messages"][0]["content"]
+    assert "全部评价规则" in retry["messages"][0]["content"]
+    assert "findings数组则最多8项" in retry["messages"][0]["content"]
+    assert "必须完整覆盖所有配置维度" in retry["messages"][0]["content"]
+    assert set(retry) == {"model", "stream", "max_tokens", "messages"}
+    assert ai.last_model == retry["model"]
+
+
+@pytest.mark.parametrize("model", sorted(clients.LOW_REASONING_MODELS))
+def test_truncated_allowlisted_model_uses_low_reasoning_only_on_recovery(monkeypatch, model):
+    install_transport(monkeypatch, [LENGTH, SUCCESS])
+    requests = capture_requests(monkeypatch)
+    ai = clients.AIReviewer(Settings(ai_self_check_enabled=False, ai_model=model,
+        ai_base_url="https://provider.example/v1", ai_api_key="private-key"))
+    assert ai.review("publisher standards", {}) == "valid feedback"
+    assert "reasoning_effort" not in requests[0]["body"]
+    assert requests[1]["body"]["reasoning_effort"] == "low"
+    assert requests[1]["body"]["max_tokens"] == 8000
+
+
+def test_recovery_does_not_forward_unsupported_reasoning_control_to_fallback(monkeypatch):
+    install_transport(monkeypatch, [LENGTH, URLError("offline"), SUCCESS])
+    requests = capture_requests(monkeypatch)
+    ai = clients.AIReviewer(Settings(ai_self_check_enabled=False, ai_model="deepseek-v4.1-flash",
+        ai_fallback_model="unrelated-provider-model", ai_base_url="https://provider.example/v1",
+        ai_api_key="private-key"))
+    assert ai.review("publisher standards", {}) == "valid feedback"
+    assert requests[1]["body"]["reasoning_effort"] == "low"
+    assert requests[2]["body"]["model"] == "unrelated-provider-model"
+    assert "reasoning_effort" not in requests[2]["body"]
+
+
+def test_second_length_stops_without_accepting_partial_content(monkeypatch, caplog):
+    calls, sleeps, _ = install_transport(monkeypatch, [LENGTH])
+    ai = reviewer()
+    with pytest.raises(ApiError, match="长度上限") as exc:
+        ai.review("prompt", {})
+    assert exc.value.code == "AI_INCOMPLETE_RESULT"
+    assert len(calls) == 2 and sleeps == [] and ai.last_model is None
+    logs = [json.loads(record.message) for record in caplog.records]
+    assert [record["will_retry"] for record in logs] == [True, False]
+    assert all(record["finish_reason"] == "length" for record in logs)
+
+
+@pytest.mark.parametrize("outcomes", [
+    [URLError("offline"), LENGTH, SUCCESS],
+    [LENGTH, URLError("offline"), SUCCESS],
+])
+def test_length_and_network_retries_share_three_attempt_limit_and_model_order(monkeypatch, outcomes):
+    calls, _, _ = install_transport(monkeypatch, outcomes)
+    requests = capture_requests(monkeypatch)
+    ai = clients.AIReviewer(Settings(ai_self_check_enabled=False, ai_model="primary", ai_fallback_model="backup",
+        ai_base_url="https://provider.example/v1", ai_api_key="private-key"))
+    assert ai.review("rubric", {}) == "valid feedback"
+    assert len(calls) == 3 and ai.last_model == "backup"
+    assert [request["body"]["model"] for request in requests] == ["primary", "primary", "backup"]
+    assert all(request["timeout"] <= 60 for request in requests)
+    assert requests[-1]["body"]["max_tokens"] == 8000
+
+
+def test_length_on_last_attempt_does_not_start_fourth_request(monkeypatch):
+    calls, sleeps, _ = install_transport(monkeypatch, [URLError("offline"), URLError("offline"), LENGTH, SUCCESS])
+    ai = reviewer()
+    with pytest.raises(ApiError, match="长度上限"):
+        ai.review("prompt", {})
+    assert len(calls) == 3 and sleeps == [1, 2] and ai.last_model is None
+
+
+def test_content_filter_is_not_retried_or_accepted(monkeypatch):
+    filtered = {"choices": [{"finish_reason": "content_filter", "message": {"content": "partial feedback"}}]}
+    calls, sleeps, _ = install_transport(monkeypatch, [filtered, SUCCESS])
+    ai = reviewer()
+    with pytest.raises(ApiError, match="内容安全规则拦截") as exc:
+        ai.review("prompt", {})
+    assert exc.value.code == "AI_CONTENT_FILTERED"
+    assert len(calls) == 1 and sleeps == [] and ai.last_model is None
+
+
+@pytest.mark.parametrize("response,code,message", [
+    ({}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"error": {"message": "private upstream detail"}}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": None}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": {}}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": "private malformed choice"}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": []}, "AI_EMPTY_RESULT", "未返回评价结果"),
+    ({"choices": [None]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop"}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": []}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": []}}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": {}}}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": False}}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": 123}}]}, "AI_INVALID_RESPONSE", "数据结构异常"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": None}}]}, "AI_EMPTY_CONTENT", "评价正文为空"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}, "AI_EMPTY_CONTENT", "评价正文为空"),
+    ({"choices": [{"finish_reason": "stop", "message": {"content": " \n\t "}}]}, "AI_EMPTY_CONTENT", "评价正文为空"),
+    ({"choices": [{"finish_reason": "stop", "message": {"reasoning_content": "private reasoning"}}]}, "AI_EMPTY_CONTENT", "评价正文为空"),
+    ({"choices": [{"message": {"content": "answer without finish marker"}}]}, "AI_INCOMPLETE_RESULT", "未返回完整评价"),
+    ({"choices": [{"finish_reason": "tool_calls", "message": {"content": "partial feedback"}}]}, "AI_INCOMPLETE_RESULT", "未返回完整评价"),
+    ({"choices": [{"finish_reason": {"private": "detail"}, "message": {"content": "partial feedback"}}]}, "AI_INCOMPLETE_RESULT", "未返回完整评价"),
+])
+def test_empty_or_malformed_generation_has_specific_error_and_never_retries(monkeypatch, response, code, message):
+    calls, sleeps, _ = install_transport(monkeypatch, [response, SUCCESS])
+    ai = reviewer()
+    with pytest.raises(ApiError, match=message) as exc:
+        ai.review("prompt", {})
+    assert exc.value.code == code
+    assert len(calls) == 1 and sleeps == [] and ai.last_model is None
+
+
+def test_generation_logs_only_allowlisted_metadata(monkeypatch, caplog):
+    secret = "private-provider-and-learner-data"
+    partial = {"choices": [{"finish_reason": "length", "message": {
+        "content": secret, "reasoning_content": secret + secret}}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 3500, "total_tokens": 3600,
+                  "completion_tokens_details": {"reasoning_tokens": 3000, "private": secret}, "private": secret},
+        "error": {"message": secret}}
+    unknown_reason = {"choices": [{"finish_reason": secret, "message": {
+        "content": secret, "reasoning_content": secret}}],
+        "usage": {"prompt_tokens": secret, "completion_tokens": True, "total_tokens": -1,
+                  "completion_tokens_details": {"reasoning_tokens": secret}, "private": secret}}
+    install_transport(monkeypatch, [partial, unknown_reason])
+    with pytest.raises(ApiError):
+        reviewer().review("private prompt", {"body": "private evidence"})
+    assert "private" not in caplog.text and secret not in caplog.text
+    logs = [json.loads(record.message) for record in caplog.records]
+    assert logs[0]["usage"] == {"prompt_tokens": 100, "completion_tokens": 3500,
+                                "total_tokens": 3600, "reasoning_tokens": 3000}
+    assert logs[0]["choices_count"] == 1 and logs[0]["content_type"] == "str"
+    assert logs[0]["content_length"] == len(secret) and logs[0]["reasoning_length"] == 2 * len(secret)
+    assert logs[1]["finish_reason"] == "other" and logs[1]["usage"] == {}
+
+
+def test_length_does_not_retry_when_time_budget_is_exhausted(monkeypatch):
+    calls, sleeps, clock = install_transport(monkeypatch, [LENGTH, SUCCESS])
+    original = clients.request_json
+
+    def slow(*args, **kwargs):
+        response = original(*args, **kwargs)
+        clock[0] = 180
+        return response
+
+    monkeypatch.setattr(clients, "request_json", slow)
+    with pytest.raises(ApiError, match="长度上限"):
         reviewer().review("prompt", {})
     assert len(calls) == 1 and sleeps == []
+
+
+def test_length_retry_uses_remaining_total_time_budget(monkeypatch):
+    calls, sleeps, clock = install_transport(monkeypatch, [LENGTH, SUCCESS])
+    original = clients.request_json
+
+    def slow_first(*args, **kwargs):
+        response = original(*args, **kwargs)
+        if len(calls) == 1:
+            clock[0] = 170
+        return response
+
+    monkeypatch.setattr(clients, "request_json", slow_first)
+    assert reviewer().review("prompt", {}) == "valid feedback"
+    assert calls == [180, 10] and sleeps == []
+
+
+def test_scheduler_delay_after_network_retry_cannot_exceed_total_budget(monkeypatch):
+    calls, sleeps, clock = install_transport(monkeypatch, [URLError("offline"), SUCCESS])
+
+    def oversleep(delay):
+        sleeps.append(delay)
+        clock[0] = 180
+
+    monkeypatch.setattr(clients.time, "sleep", oversleep)
+    with pytest.raises(ApiError):
+        reviewer().review("prompt", {})
+    assert len(calls) == 1 and sleeps == [1]
 
 
 def test_feishu_transport_never_retries_a_comment(monkeypatch):

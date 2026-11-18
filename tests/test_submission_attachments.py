@@ -9,7 +9,7 @@ from sqlalchemy.exc import DBAPIError
 from journey_api.db import SessionLocal
 from journey_api.config import get_settings
 from journey_api.errors import ApiError
-from journey_api.fixtures import REVIEWER_ID, TASK_VERSION_V2_ID
+from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_VERSION_V2_ID
 from journey_api.main import app
 from journey_api.models import (
     Attachment,
@@ -20,6 +20,9 @@ from journey_api.models import (
     SubmissionDraft,
     SubmissionVersion,
     SubmissionVersionAttachment,
+    TaskDefinition,
+    TaskDefinitionStatus,
+    TaskVersion,
 )
 
 
@@ -38,6 +41,35 @@ def assert_ok(response):
 
 
 def new_attachment_learner(label: str):
+    # Attachment review uses a task owned by this reviewer; never rewrite the
+    # shared seed task's author or bypass the production review visibility rules.
+    task_version_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        source = session.get(TaskVersion, TASK_VERSION_V2_ID)
+        task_id = uuid.uuid4()
+        session.add(
+            TaskDefinition(
+                id=task_id,
+                organization_id=ORGANIZATION_ID,
+                stable_key="ATTACHMENT-TEST-" + task_id.hex,
+                status=TaskDefinitionStatus.PUBLISHED,
+                revision=1,
+                created_by=REVIEWER_ID,
+            )
+        )
+        session.flush()
+        values = {
+            column.name: getattr(source, column.name)
+            for column in TaskVersion.__table__.columns
+            if column.name not in {"id", "task_definition_id", "published_at"}
+        }
+        values.update(
+            id=task_version_id,
+            task_definition_id=task_id,
+            published_by=REVIEWER_ID,
+            reviewed_by=REVIEWER_ID,
+        )
+        session.add(TaskVersion(**values))
     created = assert_ok(
         client_for(f"operator-{label}").post(
             "/api/v1/ops/invites",
@@ -50,7 +82,7 @@ def new_attachment_learner(label: str):
                 "expires_in_hours": 24,
                 "role": "LEARNER",
                 "reviewer_id": str(REVIEWER_ID),
-                "task_version_id": str(TASK_VERSION_V2_ID),
+                "task_version_id": str(task_version_id),
                 "target_user_id": None,
             },
         )
@@ -434,7 +466,7 @@ def test_disabled_attachment_runtime_is_fail_closed(monkeypatch):
         get_settings.cache_clear()
 
 
-def test_draft_first_submit_revision_history_and_database_immutability(system_task_reviewer):
+def test_draft_first_submit_revision_history_and_database_immutability():
     learner, csrf_token, assignment_id, started = new_attachment_learner("history")
     attachment = upload_attachment(
         learner,

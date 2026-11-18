@@ -24,8 +24,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0057_dynamic_exploration",
-        "revision_count": 59,
+        "head": "0060_migrated_ai_ownership",
+        "revision_count": 62,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -95,15 +95,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0057_dynamic_exploration",
-        "revision_count": 59,
+        "head": "0060_migrated_ai_ownership",
+        "revision_count": 62,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_form_one_connected_migration_graph():
-    assert migration()["head"] == "0057_dynamic_exploration"
+    assert migration()["head"] == "0060_migrated_ai_ownership"
     assert config_schema() == 3
 
 

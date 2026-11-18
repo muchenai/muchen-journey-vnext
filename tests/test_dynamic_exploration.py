@@ -218,13 +218,17 @@ def test_treasures_unique_once_and_short_catalog_can_graduate(count):
 
 
 def test_real_ai_failure_is_saved_without_completing_task(exploration, monkeypatch):
+    from journey_api.config import get_settings
     from journey_api.errors import ApiError
     class FailedReviewer:
         def review(self, *_):
             raise ApiError(503, 'AI_UNAVAILABLE', '模型服务暂时不可用。')
     monkeypatch.setattr('journey_api.ai_self_check_clients.get_reviewer', lambda: FailedReviewer())
+    settings = get_settings().model_copy(update={"ai_self_check_enabled": True})
+    monkeypatch.setattr('journey_api.exploration_ai_self_check.get_settings', lambda: settings)
     _, learner, _ = exploration
-    task_id, _, _ = publish(exploration, 'assessment')
+    task_id, _, _ = publish(exploration, 'assessment', reviewMode='ai', rubric=[
+        dict(id='result', name='结果说明', points=100, description='核对测试结果与任务要求。')])
     task = assert_ok(command(learner, read(learner, task_id), 'claim'))
     checked = assert_ok(command(learner, task, 'selfCheck', answer='测试结果已经完成，等待审核确认。'))
     assert checked['record']['status'] == 'FAILED' and checked['record']['mode'] == 'AI'
@@ -316,7 +320,7 @@ def test_reference_requirements_and_criteria_are_exact_without_rewriting_snapsho
         finish_for_unlock(learner, task_id)
     task_id, _, _ = publish(exploration, 'assessment', reviewMode='ai', rubric=[dict(
         id='result', name='结果说明', points=100, description='核对测试结果与任务要求。')])
-    assert read(learner, task_id)['criteria'] == ['结果说明：核对测试结果与任务要求。']
+    assert read(learner, task_id)['criteria'] == ['结果说明']
 
 
 def test_editing_legacy_seed_preserves_same_mode_and_resets_changed_mode_requirements(exploration):
