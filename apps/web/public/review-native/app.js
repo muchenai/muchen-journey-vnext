@@ -10,16 +10,19 @@ import {createMedalsController} from './medals.js?v=20261103-badge-layout-fix';
 import { renderPublishMaterials } from './publish-materials.js';
 import { uploadExplorationMaterial, localMaterialUrl, materialSizeLabel, materialImagePreviewUrl } from './exploration-material-files.js';
 import { hasTransferredFiles, transferredFiles, normalizeLearningMaterialFile, isMaterialPasteTarget } from './material-upload-input.js';
+import { normalizeRubricFile } from './rubric-materials.js?v=20261118-document-rubric';
+import {ANSWER_DOCUMENT_DIMENSION, usesAnswerDocumentRubric, rubricScoreTotal, rubricDimensionErrors} from './rubric-policy.js?v=20261118-document-rubric';
+import {createRubricLinkEditor, renderRubricAttachments} from './rubric-link-editor.js?v=20261118-answer-link';
 import { nextExplorationOrder, isPinnedExplorationTask, explorationDisplayOrder } from './exploration-order.js';
 import { EXPLORATION_COMPLETION_MODES, explorationCompletionMode, requiresTaskAssessment, taskCompletionLabel, explorationTaskFiles, explorationTaskResourceErrors, taskResourceLinks } from './exploration-completion.js';
-import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261030-member-action-spacing';
-import { ApiStore, newDraft, createJourneyService } from './native-api.js?v=20261030-member-action-spacing';
-import { createSandboxController } from './sandbox.js?v=20261021-brand-npc';
+import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateTask } from './core.js?v=20261118-document-rubric';
+import { ApiStore, newDraft, createJourneyService, request } from './native-api.js?v=20261118-publisher-ai-scoring';
+import { createSandboxController } from './sandbox.js?v=20261118-document-rubric';
 import { renderReview, bindReview, openSubmission } from './review.js?v=20261026-passed-tab';
-import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261030-member-action-spacing';
+import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261118-document-rubric';
 import { openCertification } from './member-access.js?v=20261030-member-action-spacing';
-import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261030-member-action-spacing';
-import { createAcademyStore } from './native-api.js?v=20261030-member-action-spacing';
+import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261118-publisher-ai-scoring';
+import { createAcademyStore } from './native-api.js?v=20261118-publisher-ai-scoring';
 import { createAcademyController } from './academy.js?v=20261105-sources';
 
 import {departmentOptions, departmentLabel, isPublishingDepartment} from './publishing-departments.js';
@@ -31,6 +34,7 @@ import { TASK_FIELD_LIMITS, taskFieldLength, validateTaskFieldLimits } from './t
 const store = await ApiStore.create().catch(error => { document.querySelector('#app').innerHTML = `<div class="card empty-state"><strong>${e(error.message)}</strong><a href="/review/login">重新登录</a></div>`; throw error; });
 const service = createJourneyService({ store, getCurrentUser: getCurrentInviteUser });
 const editMaterial = createMaterialEditor({store,openModal,closeModal,saveDraft,refresh:render,toast});
+const editRubricLink = createRubricLinkEditor({store,request,openModal,closeModal,saveDraft,refresh:render,toast});
 let materialUploadsPending = false;
 const readingCompletionModes = new WeakMap();
 let page = location.hash.startsWith('#medals') ? 'medals' : ['publish','review','publications','library','knowledge','guild','academy'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'publish';
@@ -192,7 +196,7 @@ function render() {
   $('#theme-toggle').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
   $('#notification-btn').onclick = () => { const submission=store.data.submissions.find(s=>!s.supersededBy&&getSubmissionStatus(s,store.getTask(s.taskId)||{})==='pending'); if(submission)reviewCamp=getReviewCamp(submission,store.getTask(submission.taskId)||{}); navigate('review'); };
   $('#logout-btn').onclick = async () => { try { await clearInviteSession(); academy.reset(); } catch (error) { toast(error.message,'error'); } };
-  $('#guide-btn').onclick = () => openModal(`<div class="modal-heading"><h2>使用指南</h2></div><div class="guide-list">${[['填写基础信息','填写任务标题与简述，选择难度及 1～2 个徽章。'],['添加学习材料','添加文档链接、图片或文件。'],['选择审核方式与评分标准','有固定答案选择 AI 自测并填写评分标准；无固定答案选择人工审核。'],['查看右侧预览','AI 自测任务可选用沙盒试测，超级管理员确认后发布；普通管理员提交发布审核。']].map(([title,description])=>`<div><section><strong>${title}</strong><p>${description}</p></section></div>`).join('')}</div><div class="notice">任务、提交和审核记录来自本地服务。编辑中的草稿保存在当前账号的浏览器中；AI 自查仅供参考，最终由审核人确认。</div>`);
+  $('#guide-btn').onclick = () => openModal(`<div class="modal-heading"><h2>使用指南</h2></div><div class="guide-list">${[['填写基础信息','填写任务标题与简述，选择难度及 1～2 个徽章。'],['添加学习材料','添加文档链接、图片或文件。'],['选择审核方式与评分标准','有固定答案选择 AI 自测并填写评分标准；无固定答案选择人工审核。'],['查看右侧预览','AI 自测任务可选用沙盒试测，探索营仅限超级管理员发布；新手村沿用原有发布流程。']].map(([title,description])=>`<div><section><strong>${title}</strong><p>${description}</p></section></div>`).join('')}</div><div class="notice">任务、提交和审核记录来自本地服务。编辑中的草稿保存在当前账号的浏览器中。探索营 AI 自测达到配置的通过分数后自动完成；人工审核任务由审核人确认，新手村沿用原有任务流程。</div>`);
   if (page === 'publish') {if(canConfigureTask(store.data.draft,ui.isSuperAdmin))bindEditor();else $('#new-task').onclick=()=>taskWorkflow.start();if(canConfigureTask(store.data.draft,ui.isSuperAdmin)&&draftPublication()?.status==='pending'){$('.main-content').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=true);$('#new-task').disabled=false;$('#publish-task').textContent='待审核';}}
   else if(page==='knowledge')knowledge.bind($('.main-content'));
   else if(page==='guild'){if(guildLoaded&&!guildLoading&&!guildError)guild.bind($('.main-content'));else if(!guildLoading&&!guildError)void loadGuild();}
@@ -255,16 +259,17 @@ function renderTaskFiles() {
 }
 function renderScoring() {
   if(!requiresTaskAssessment(store.data.draft))return '';
-  const d=store.data.draft; const total=d.rubric.reduce((sum,r)=>sum+Number(r.points||0),0);
+  const d=store.data.draft; const total=rubricScoreTotal(d);
+  const documentScoring=usesAnswerDocumentRubric(d);
   const ai=d.reviewMode==='ai';
   return `<section class="card" id="task-review" tabindex="-1" aria-label="审核方式">${cardHeader('审核方式')}<div class="card-body"><div class="review-options">${[['ai','sparkles','AI 自测','有固定答案，按评分标准自动判定。'],['manual','user','人工审核','无固定答案，由 NPC 或导师直接审核。']].map(([value,ic,title,desc])=>`<label class="review-option ${d.reviewMode===value?'selected':''}"><input type="radio" name="review-mode" value="${value}" ${d.reviewMode===value?'checked':''}><div class="review-option-icon">${icon(ic,20)}</div><div><strong>${title}</strong><p>${desc}</p></div><span class="radio-circle"></span></label>`).join('')}</div>${ai?`<label class="form-field pass-score-field"><span class="field-label">通过分数</span><div class="input-suffix"><input data-field="passScore" type="number" min="0" max="100" value="${d.passScore}"><span>/ 100</span></div><span class="field-hint">${getReviewCamp({},d)==='exploration'?'达到通过分数后完成任务。':'通过后全额发放奖励，每位学员每个任务仅领取一次。'}</span></label>`:''}</div></section>
-  ${ai?`<section class="card" id="task-rubric" tabindex="-1" aria-label="AI 评分标准">${cardHeader('AI 评分标准',`<span id="rubric-total" class="tag ${total===100?'tag-green':'tag-red'}">合计 ${total}/100</span>`)}<div class="card-body rubric-list">${d.rubric.map((r,i)=>`<div class="rubric-row"><div class="rubric-index">${String(i+1).padStart(2,'0')}</div><div class="rubric-fields"><div class="rubric-top"><label class="form-field"><span class="field-label">评分维度</span><input data-rubric="${i}" data-key="name" value="${e(r.name)}" placeholder="例如：分析完整性"></label><label class="form-field rubric-score"><span class="field-label">分值</span><div class="input-suffix"><input type="number" min="1" max="100" data-rubric="${i}" data-key="points" value="${r.points}"><span>分</span></div></label><button class="icon-btn" data-remove-rubric="${i}" aria-label="删除评分维度">${icon('trash',17)}</button></div><textarea rows="2" data-rubric="${i}" data-key="description" placeholder="描述获得该分数需要满足的条件">${e(r.description)}</textarea></div></div>`).join('')}<div class="rubric-actions"><button class="btn btn-secondary" id="add-rubric">${icon('plus',16)} 添加维度</button><label class="btn btn-plain upload-label">${icon('upload',16)} 附加评分文档<input id="rubric-upload" type="file" accept=".pdf,.doc,.docx,.txt,.md" hidden></label></div>${(d.rubricAttachments||[]).map((a,i)=>`<div class="attachment-line">${icon('file',16)} ${e(a.name)} <button class="text-btn" data-remove-rubric-file="${i}">移除</button></div>`).join('')}</div></section>`:''}`;
+  ${ai?`<section class="card" id="task-rubric" tabindex="-1" aria-label="AI 评分标准">${cardHeader('AI 评分标准',`<span id="rubric-total" class="tag ${total===100?'tag-green':'tag-red'}">合计 ${total}/100</span>`)}<div class="card-body rubric-list">${documentScoring?`<div class="notice" role="status"><strong>已按标准答案文档评分，满分 100 分</strong><p>${e(ANSWER_DOCUMENT_DIMENSION.description)}</p><p>如需自定义评分规则，仍可添加维度并配置合计 100 分。</p></div>`:''}${d.rubric.map((r,i)=>`<div class="rubric-row"><div class="rubric-index">${String(i+1).padStart(2,'0')}</div><div class="rubric-fields"><div class="rubric-top"><label class="form-field"><span class="field-label">评分维度</span><input data-rubric="${i}" data-key="name" value="${e(r.name)}" placeholder="例如：分析完整性"></label><label class="form-field rubric-score"><span class="field-label">分值</span><div class="input-suffix"><input type="number" min="1" max="100" data-rubric="${i}" data-key="points" value="${r.points}"><span>分</span></div></label><button class="icon-btn" data-remove-rubric="${i}" aria-label="删除评分维度">${icon('trash',17)}</button></div><textarea rows="2" data-rubric="${i}" data-key="description" placeholder="填写得分条件、标准答案或参考要点（仅供评测使用）">${e(r.description)}</textarea></div></div>`).join('')}<div class="rubric-actions"><button class="btn btn-secondary" id="add-rubric">${icon('plus',16)} 添加维度</button><label class="btn btn-plain upload-label">${icon('upload',16)} 附加评分文档<input id="rubric-upload" type="file" accept=".pdf,.docx,.txt,.md" hidden></label><button type="button" class="btn btn-secondary" id="add-rubric-link">${icon('link',16)} 添加答案链接</button></div><p class="field-hint">最多 4 份，每份不超过 2 MB；支持 TXT、MD、DOCX 和含文字的 PDF。保存或发布时解析正文，无法读取的文档会提示更换。评分描述与文档仅供评测和管理人员查看。答案链接读取后保留导入版本，源文档更新时需重新读取。</p><p class="field-hint">${d.camp==='exploration'?'未添加手动维度时，可直接使用标准答案文档评分，满分 100 分；仍需设置通过分数。手动添加维度后，须完善全部维度并配置合计 100 分。':'纯选择题也需要配置评分维度和通过分数，可设置“答案正确性”100 分，并填写标准答案或添加答案链接。'}</p>${renderRubricAttachments(d.rubricAttachments||[],{editable:true})}</div></section>`:''}`;
 }
 function getReadiness() {
   const d=store.data.draft;
   const assessment=requiresTaskAssessment(d);
   const filled=value=>typeof value==='string'&&!!value.trim();
-  const badges=d.badges||[], materials=d.materials||[], rubric=d.rubric||[], taskFiles=explorationTaskFiles(d);
+  const badges=d.badges||[], materials=d.materials||[];
   const validMaterial=m=>{
     if(!filled(m.name)||m.name.trim().length>(d.camp==='exploration'&&m.type!=='link'?240:160)||!['link','file','image'].includes(m.type))return false;
     if(m.type!=='link')return true;
@@ -277,7 +282,7 @@ function getReadiness() {
     {id:'task-materials',title:assessment?'学习材料':'学习材料（选填）',ready:(!assessment||materials.length>0)&&materials.every(validMaterial)},
     ...(getReviewCamp({},d)==='exploration'&&assessment?[{id:'task-files',title:'任务文件',ready:explorationTaskResourceErrors(d).length===0}]:[]),
     ...(assessment?[{id:'task-review',title:'审核方式',ready:['manual','ai'].includes(d.reviewMode)&&(d.reviewMode!=='ai'||(d.passScore!==null&&d.passScore!==undefined&&String(d.passScore).trim()!==''&&Number.isFinite(Number(d.passScore))&&Number(d.passScore)>=0&&Number(d.passScore)<=100))}]:[]),
-    ...(assessment&&d.reviewMode==='ai'?[{id:'task-rubric',title:'评分标准',ready:rubric.length>0&&rubric.every(r=>filled(r.name)&&filled(r.description)&&Number.isFinite(Number(r.points))&&Number(r.points)>0)&&Math.abs(rubric.reduce((sum,r)=>sum+Number(r.points),0)-100)<0.000001}]:[]),
+    ...(assessment&&d.reviewMode==='ai'?[{id:'task-rubric',title:'评分标准',ready:rubricDimensionErrors(d).length===0}]:[]),
   ];
 }
 function focusSection(id) {
@@ -298,6 +303,7 @@ function renderAside() {
       <div class="overview-time">${exploration?`${icon('file',14)} ${d.materials.length} 份学习材料${requiresTaskAssessment(d)?` · ${explorationTaskFiles(d).length} 份任务文件`:''}`:`${icon('clock',14)} 预计 ${d.minutes||0} 分钟`} <span>${e(taskCompletionLabel(d))}</span></div>
       ${exploration?'':`<div class="overview-rewards"><div><span class="metric-symbol">XP</span><strong>${format(reward.xp)}</strong><small>经验值</small></div><div>${icon('award',18)}<strong>${format(reward.totalPoints)}</strong><small>徽章点</small></div></div>`}
       <div class="preview-task-access"><span>领取方式</span><strong>直接领取</strong></div>
+      ${requiresTaskAssessment(d)&&d.reviewMode==='ai'?`<div class="preview-task-access"><span>评分标准</span><strong>${rubricDimensionErrors(d).length?'待完善':usesAnswerDocumentRubric(d)?'标准答案文档 · 100 分':`评分维度 · ${format(rubricScoreTotal(d))} 分`}</strong></div>`:''}
       ${exploration?'':`<div class="aside-distribution"><h4>徽章点分配</h4><div class="distribution-track">${d.badges.map((b,i)=>`<span class="bg-${i}" data-weight="${b.weight}"></span>`).join('')}</div>${reward.allocations.map((b,i)=>`<div class="distribution-row"><i class="color-dot color-${i}"></i><span>${e(badgeName(b.id))}</span><strong>${format(b.points)}<small> 点</small></strong></div>`).join('')}</div>`}
     </div></section><section class="card checklist-card"><div class="checklist-heading"><h3>发布准备</h3><span>${checks.filter(x=>x.ready).length}/${checks.length}</span></div>${checks.map(({id,title,ready})=>`<button type="button" class="checklist-row ${ready?'complete':'incomplete'}" data-jump-section="${id}" aria-label="定位到${title}，${ready?'已完成':'待完成'}">${icon(ready?'checkCircle':'alert',16)}<span>${title}</span><small>${ready?'已完成':'待完成'}</small>${icon('chevronRight',13)}</button>`).join('')}</section>`;
 }
@@ -366,9 +372,12 @@ function bindEditor() {
   document.querySelectorAll('[data-view-material]').forEach(b=>b.onclick=()=>viewMaterial(d[b.dataset.materialCollection||'materials'][Number(b.dataset.viewMaterial)]));
   document.querySelectorAll('[data-edit-material]').forEach(b=>b.onclick=()=>editMaterial(Number(b.dataset.editMaterial),{collection:b.dataset.materialCollection||'materials'}));
   document.querySelectorAll('[data-remove-material]').forEach(b=>b.onclick=()=>{d[b.dataset.materialCollection||'materials'].splice(Number(b.dataset.removeMaterial),1);saveDraft();render();});
-  $('#add-rubric')?.addEventListener('click',()=>{d.rubric.push({id:crypto.randomUUID(),name:'',points:0,description:''});saveDraft();render();});
-  document.querySelectorAll('[data-rubric]').forEach(el=>el.addEventListener('input',()=>{d.rubric[Number(el.dataset.rubric)][el.dataset.key]=el.type==='number'?Number(el.value):el.value;saveDraft();if(el.dataset.key==='points'){const total=d.rubric.reduce((s,r)=>s+Number(r.points||0),0);const tag=$('#rubric-total');if(tag){tag.textContent=`合计 ${total}/100`;tag.className=`tag ${total===100?'tag-green':'tag-red'}`;}}}));
+  $('#add-rubric')?.addEventListener('click',()=>{if(d.rubric.length>=12){toast('最多配置 12 个评分维度','error');return;}d.rubric.push({id:crypto.randomUUID(),name:'',points:0,description:''});saveDraft();render();});
+  document.querySelectorAll('[data-rubric]').forEach(el=>el.addEventListener('input',()=>{d.rubric[Number(el.dataset.rubric)][el.dataset.key]=el.type==='number'?Number(el.value):el.value;saveDraft();if(el.dataset.key==='points'){const total=rubricScoreTotal(d);const tag=$('#rubric-total');if(tag){tag.textContent=`合计 ${total}/100`;tag.className=`tag ${total===100?'tag-green':'tag-red'}`;}}}));
   document.querySelectorAll('[data-remove-rubric]').forEach(b=>b.onclick=()=>{d.rubric.splice(Number(b.dataset.removeRubric),1);saveDraft();render();});
+  $('#add-rubric-link')?.addEventListener('click',()=>editRubricLink());
+  document.querySelectorAll('[data-edit-rubric-link]').forEach(b=>b.onclick=()=>editRubricLink(Number(b.dataset.editRubricLink)));
+  document.querySelectorAll('[data-reread-rubric-link]').forEach(b=>b.onclick=()=>editRubricLink(Number(b.dataset.rereadRubricLink),{reread:true}));
   document.querySelectorAll('[data-remove-rubric-file]').forEach(b=>b.onclick=()=>{d.rubricAttachments.splice(Number(b.dataset.removeRubricFile),1);saveDraft();render();});
   document.querySelectorAll('[name="review-mode"]').forEach(el=>el.onchange=()=>{d.reviewMode=el.value;saveDraft();render();});
 
@@ -398,7 +407,7 @@ async function uploadFiles(files,target,{source='select',errors=[]}={}) {
     for(const [index,original] of selected.entries()){
       if(exploration&&d[target].length>=20){const message=`每个任务最多添加 20 份${label}，剩余 ${selected.length-index} 份文件未上传。`;failures.push(message);toast(message,'error');break;}
       try {
-        const file=['materials','taskFiles'].includes(target)?normalizeLearningMaterialFile(original,{source,names}):original;
+        const file=target==='rubricAttachments'?normalizeRubricFile(original,d[target].length):['materials','taskFiles'].includes(target)?normalizeLearningMaterialFile(original,{source,names}):original;
         const status=$(statusId);
         if(status)status.textContent=`正在上传 ${file.name}（${index+1}/${selected.length}），请稍候…`;
         if(exploration){

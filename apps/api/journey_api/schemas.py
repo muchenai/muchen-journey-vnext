@@ -1311,11 +1311,43 @@ class AttachmentResponse(StrictModel):
     request_id: str
 
 
+class ExplorationAiEvaluationOut(StrictModel):
+    """Read-only server evaluation; never accepted as a learner disclosure."""
+    kind: Literal["EXPLORATION_AI"]
+    source: Literal["AI"]
+    attemptId: UUID
+    requestHash: str
+    taskVersionId: UUID
+    assignmentId: UUID
+    originalInput: str
+    completedAt: datetime
+    validated: Literal[True]
+    score: float = Field(ge=0, le=100)
+    maxScore: Literal[100]
+    passed: Literal[True]
+    dimensions: list[dict[str, object]]
+    feedback: str
+    rubricHash: str
+    evidenceHash: str
+    model: str
+    promptVersion: str
+    document: dict[str, object] | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+class ExplorationAiUseOut(StrictModel):
+    used: Literal[True]
+    purpose: Literal["DYNAMIC_EXPLORATION_AI_ASSESSMENT"]
+    model_version: str
+    prompt_version: str
+    output_is_advisory_only: Literal[False]
+    exploration_ai_evaluation: ExplorationAiEvaluationOut
+
+
 class SubmissionVersionOut(StrictModel):
     id: UUID
     version_no: int
     body: str
-    ai_use: AiUseDisclosure
+    ai_use: AiUseDisclosure | ExplorationAiUseOut
     created_at: datetime
     attachments: list[AttachmentOut]
     review_id: UUID | None

@@ -68,9 +68,12 @@ export async function POST(request: Request) {
     if (!body || Array.isArray(body)) return Response.json({ error: "任务操作参数无效。" }, { status: 400, headers });
     const key = body.key ?? body.idempotencyKey;
     if (!uuid(key)) return Response.json({ error: "请求标识无效，请重新操作。" }, { status: 400, headers });
+    if (body.command === "cancel") {
+      return Response.json({ error: "探索营任务接取后不能取消。" }, { status: 409, headers });
+    }
     const globalCommand = body.command === "unlockGraduation" || body.command === "ackTreasure";
     if (body.command === "ackTreasure" && !uuid(body.id)) return Response.json({ error: "宝藏标识无效。" }, { status: 400, headers });
-    if (!globalCommand && (!uuid(body.taskId) || !["claim", "draft", "submit", "cancel", "selfCheck", "readMaterial", "completeLearning"].includes(body.command))) {
+    if (!globalCommand && (!uuid(body.taskId) || !["claim", "draft", "submit", "selfCheck", "readMaterial", "completeLearning"].includes(body.command))) {
       return Response.json({ error: "任务操作参数无效。" }, { status: 400, headers });
     }
     const command: Record<string, unknown> = { command: body.command, key };

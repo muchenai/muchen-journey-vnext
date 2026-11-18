@@ -1,12 +1,13 @@
 """Sequential exploration gates use durable server-side learning milestones."""
+import copy
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 import pytest
 from sqlalchemy import func, select
 from journey_api.db import SessionLocal
-from journey_api.exploration_models import ExplorationWork
-from journey_api.models import Assignment, Review
+from journey_api.exploration_models import ExplorationProgress, ExplorationWork
+from journey_api.models import Assignment, Enrollment, IdempotencyRecord, Review, SubmissionDraft
 from test_dynamic_exploration import command, exploration, finish_for_unlock, post, publish, read
 from test_wp09_feishu_identity import assert_ok
 
@@ -55,9 +56,12 @@ def test_locked_projection_and_all_direct_entry_points_are_protected(exploration
     for action in ('learnerTask', 'selfCheckHistory', 'material'):
         denied = learner[0].get('/api/v1/me/exploration', params={'command': action, 'taskId': second, 'index': 0})
         assert denied.status_code == 409 and denied.json()['error']['code'] == 'JOURNEY_STAGE_LOCKED'
-    for action in ('claim', 'readMaterial', 'completeLearning', 'draft', 'submit', 'selfCheck', 'cancel'):
+    for action in ('claim', 'readMaterial', 'completeLearning', 'draft', 'submit', 'selfCheck'):
         denied = command(learner, locked, action, answer='尝试直接提交锁定课程。', index=0, checkinConfirmed=True)
         assert denied.status_code == 409 and denied.json()['error']['code'] == 'JOURNEY_STAGE_LOCKED'
+    cancelled = command(learner, locked, 'cancel')
+    assert cancelled.status_code == 409
+    assert cancelled.json()['error']['code'] == 'EXPLORATION_CANCEL_NOT_ALLOWED'
     path = '/api/v1/me/exploration/materials/' + file['id']
     assert learner[0].get(path).status_code == learner[0].head(path).status_code == 404
     with SessionLocal() as session:
@@ -72,10 +76,11 @@ def test_learning_completion_and_test_submission_unlock_next_without_waiting_for
     third, _, _ = publish(exploration, 'checkin')
     task = assert_ok(command(learner, read(learner, first), 'readMaterial', index=0))
     assert statuses(learner)[second] == 'locked'
-    cancelled = assert_ok(command(learner, task, 'cancel'))
-    assert cancelled['status'] == 'active' and not cancelled['claimed']
+    cancelled = command(learner, task, 'cancel')
+    assert cancelled.status_code == 409
+    assert cancelled.json()['error']['message'] == '探索营任务接取后不能取消。'
+    assert read(learner, first)['claimed'] is True
     assert statuses(learner)[second] == 'locked'
-    task = assert_ok(command(learner, cancelled, 'claim'))
     assert_ok(command(learner, task, 'completeLearning'))
     assert statuses(learner) == {first: 'completed', second: 'active', third: 'locked'}
     task = assert_ok(command(learner, read(learner, second), 'claim'))
@@ -96,6 +101,98 @@ def test_learning_completion_and_test_submission_unlock_next_without_waiting_for
     assert_ok(command(learner, task, 'draft', answer='修改中的新草稿，保留已经提交的版本。'))
     assert statuses(learner)[third] == 'active'
     assert finish_for_unlock(learner, third)['status'] == 'completed'
+
+
+def cancellation_state(task):
+    """Observe retained evidence and progress independently of the response."""
+    with SessionLocal() as session:
+        assignment = session.get(Assignment, uuid.UUID(task['assignmentId']))
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        work = session.scalar(select(ExplorationWork).where(
+            ExplorationWork.assignment_id == assignment.id))
+        draft = session.scalar(select(SubmissionDraft).where(
+            SubmissionDraft.assignment_id == assignment.id))
+        progress = session.get(ExplorationProgress, (enrollment.organization_id, enrollment.learner_id))
+        return copy.deepcopy(dict(assignment=(assignment.status, assignment.revision),
+            enrollment=(enrollment.status, enrollment.revision),
+            work=(work.assignment_id, work.opened_materials, work.checkin_confirmed, work.completed_at),
+            draft=(draft.body, draft.revision, draft.updated_at) if draft else None,
+            progress=(progress.treasures, progress.unlocked_at) if progress else None))
+
+
+@pytest.mark.parametrize('mode', ['learning', 'assessment', 'checkin'])
+def test_cancel_cannot_change_claim_materials_draft_or_sequence(exploration, mode):
+    _, learner, _ = exploration
+    first, _, _ = publish(exploration, mode)
+    second, _, _ = publish(exploration)
+    task = assert_ok(command(learner, read(learner, first), 'claim'))
+    if mode == 'assessment':
+        task = assert_ok(command(learner, task, 'draft', answer='取消请求不得丢失这份已保存的测试草稿。'))
+    elif mode == 'learning':
+        task = assert_ok(command(learner, task, 'readMaterial', index=0))
+    before = cancellation_state(task)
+    for revision in (task['revision'], task['revision'] - 1):
+        rejected = command(learner, {**task, 'revision': revision}, 'cancel')
+        assert rejected.status_code == 409
+        assert rejected.json()['error']['code'] == 'EXPLORATION_CANCEL_NOT_ALLOWED'
+        assert rejected.json()['error']['message'] == '探索营任务接取后不能取消。'
+        assert cancellation_state(task) == before
+    current = read(learner, first)
+    assert current['claimed'] is True and current['assignmentId'] == task['assignmentId']
+    assert current['revision'] == task['revision'] and statuses(learner)[second] == 'locked'
+    if mode == 'assessment':
+        assert current['answer'] == '取消请求不得丢失这份已保存的测试草稿。'
+
+
+def test_cancel_rejects_historical_successful_idempotency_replay(exploration):
+    from journey_api.exploration_routes import ExplorationCommand
+    from journey_api.idempotency import store_result
+
+    _, learner, _ = exploration
+    task_id, _, _ = publish(exploration, 'assessment')
+    task = assert_ok(command(learner, read(learner, task_id), 'claim'))
+    task = assert_ok(command(learner, task, 'draft', answer='旧取消结果重放时也必须保留本次已领取的任务和草稿。'))
+    key = str(uuid.uuid4())
+    body = dict(command='cancel', taskId=task_id, versionId=task['versionId'], revision=task['revision'])
+    payload = ExplorationCommand.model_validate(body).model_dump(mode='json', exclude={'key', 'idempotencyKey'})
+    with SessionLocal.begin() as session:
+        assignment = session.get(Assignment, uuid.UUID(task['assignmentId']))
+        enrollment = session.get(Enrollment, assignment.enrollment_id)
+        store_result(session, actor_id=enrollment.learner_id, command='exploration.cancel',
+            key=key, payload=payload, response={**task, 'claimed': False, 'status': 'active'})
+    before = cancellation_state(task)
+    for value in (body, {**body, 'revision': task['revision'] + 1}):
+        rejected = post(learner, 'me/exploration', value, key=key)
+        assert rejected.status_code == 409
+        assert rejected.json()['error']['code'] == 'EXPLORATION_CANCEL_NOT_ALLOWED'
+        assert cancellation_state(task) == before
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count()).select_from(IdempotencyRecord).where(
+            IdempotencyRecord.command == 'exploration.cancel', IdempotencyRecord.key == key)) == 1
+
+
+@pytest.mark.parametrize('historical_replay', [False, True])
+def test_novice_cancel_endpoint_cannot_cancel_exploration_claim(exploration, historical_replay):
+    from journey_api.idempotency import store_result
+
+    _, learner, _ = exploration
+    task_id, _, _ = publish(exploration, 'assessment')
+    task = assert_ok(command(learner, read(learner, task_id), 'claim'))
+    task = assert_ok(command(learner, task, 'draft', answer='新手村取消接口不能取消探索营任务，也不能覆盖这份草稿。'))
+    key = str(uuid.uuid4())
+    body = dict(expected_revision=task['revision'])
+    if historical_replay:
+        with SessionLocal.begin() as session:
+            assignment = session.get(Assignment, uuid.UUID(task['assignmentId']))
+            enrollment = session.get(Enrollment, assignment.enrollment_id)
+            store_result(session, actor_id=enrollment.learner_id, command='novice.cancel', key=key,
+                payload={**body, 'task_id': task_id}, response={**task, 'claimed': False, 'status': 'available'})
+    before = cancellation_state(task)
+    rejected = post(learner, f'me/novice/tasks/{task_id}/cancel', body, key=key)
+    assert rejected.status_code == 409
+    assert rejected.json()['error']['code'] == 'EXPLORATION_CANCEL_NOT_ALLOWED'
+    assert rejected.json()['error']['message'] == '探索营任务接取后不能取消。'
+    assert cancellation_state(task) == before
 
 
 @pytest.mark.parametrize('mode', ['learning', 'checkin'])

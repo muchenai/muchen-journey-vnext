@@ -15,6 +15,7 @@ export type JourneyContextValue = {
   configurableExploration?: boolean;
   explorationVariant?: "cards" | "list" | "path";
   explorationTaskId?: string;
+  explorationOpenFeedback?: boolean;
   explorationScope?: "all" | "mine";
 };
 

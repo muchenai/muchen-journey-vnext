@@ -47,6 +47,7 @@
 .ex-self-check-record>summary>strong{flex:1;font-weight:500}
 :is(.module-hub,.restored-exploration-dialog-root) .exploration-task-dialog .ex-self-check-record-mode{margin:10px 0 0;font-size:10px;color:#83b0c6}
 .ex-self-check-snapshot{margin-top:10px;border-top:1px solid #2e4d6666;padding-top:9px;color:#81bdd2;font-size:11px}
+.ex-self-check-comment-status>a{display:inline-block;margin-top:8px;font-size:11px;color:#8cc6da;text-underline-offset:3px}
 .ex-self-check-snapshot>summary{cursor:pointer}
 :is(.module-hub,.restored-exploration-dialog-root) .exploration-task-dialog .ex-self-check-snapshot>p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:#92adc4;font-size:11px;line-height:1.8}
 .ex-self-check summary:focus-visible{outline:2px solid #85e8f1;outline-offset:3px;border-radius:2px}

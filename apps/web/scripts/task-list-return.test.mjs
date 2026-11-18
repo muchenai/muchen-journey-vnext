@@ -13,9 +13,10 @@ function find(node, predicate) {
   return predicate(node) ? node : find(node.props?.children, predicate);
 }
 
-function createFlow(initialScreen = 'dashboard', { configurableExploration = true, originalTasks = [] } = {}) {
+function createFlow(initialScreen = 'dashboard', { configurableExploration = true, originalTasks = [], exploration: explorationOverrides = {} } = {}) {
   const slots = [];
   let cursor = 0;
+  let changed = false;
   let href = `http://localhost:3000/app?view=${initialScreen}`;
   const calls = { assign: [], reload: 0, refresh: 0, push: 0, replace: [] };
   const historyState = { framework: 'retained' };
@@ -31,7 +32,11 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
     useState(initial) {
       const index = cursor++;
       if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
-      return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
+      return [slots[index], value => {
+        const next = typeof value === 'function' ? value(slots[index]) : value;
+        changed ||= !Object.is(next, slots[index]);
+        slots[index] = next;
+      }];
     },
     useRef(initial) { return slots[cursor++] ??= { current: initial }; },
     useCallback(callback) { return callback; },
@@ -39,10 +44,18 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
   };
   const ModuleHub = () => null;
   const ExplorationTaskList = () => null;
+  const ExplorationTaskHall = () => null;
+  const ExplorationTreasureExperience = () => null;
   const component = () => null;
   const experience = { assignmentId: 'current-assignment', currentAssignmentId: 'current-assignment',
     stagePosition: 1, taskVersion: 1, revision: 1, status: 'AVAILABLE', materials: [],
     allowedCommands: [], journeyTasks: originalTasks, reviewFeedback: [] };
+  const exploration = { tasks: [], treasures: { total: 4, count: 0, items: [], pendingDrops: [] }, busy: false, ...explorationOverrides };
+  const treasurePresentationModule = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/app/project29/useExplorationTreasurePresentation.ts', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, { module: treasurePresentationModule, exports: treasurePresentationModule.exports,
+    require: name => name === 'react' ? react : nativeRequire(name) });
   const dependencies = {
     react,
     'next/navigation': { useRouter: () => ({ refresh() { calls.refresh += 1; }, push() { calls.push += 1; } }) },
@@ -53,12 +66,11 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
       executionTasks: [{ id: 'first', label: '探索启航' }] },
     './UpdatedDashboard': { UpdatedDashboard: component },
     './ModuleHub': { ModuleHub },
-    './ExplorationTaskHall': { ExplorationTaskHall: component, useExplorationTasks: () => ({
-      tasks: [], treasures: [], loading: false, error: null, busy: false, refresh() {},
-    }) },
+    './ExplorationTaskHall': { ExplorationTaskHall, useExplorationTasks: () => exploration },
     './ExplorationTaskList': { ExplorationTaskList },
-    './explorationTaskState': { canOpenExplorationTask: () => true },
-    './ExplorationTreasureExperience': { ExplorationTreasureExperience: component },
+    './explorationTaskState': { canOpenExplorationTask: task => !['locked', 'unavailable'].includes(task.status) },
+    './ExplorationTreasureExperience': { ExplorationTreasureExperience },
+    './useExplorationTreasurePresentation': treasurePresentationModule.exports,
     './useCanvasScale': { useCanvasScale: () => 0.8 },
     './SelfCheckHistory': { SelfCheckHistory: component },
     './TaskFeedbackDialog': { TaskFeedbackDialog: component },
@@ -78,8 +90,12 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
   vm.runInNewContext(source, { module: compiledModule, exports: compiledModule.exports, window, URL,
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : nativeRequire(name) });
   const { ExperienceScreen, Tasks, ClickBurst } = compiledModule.exports.returnProbe;
-  return { calls, ModuleHub, ExplorationTaskList, ClickBurst, experience, get href() { return href; },
-    render() { cursor = 0; return ExperienceScreen(); },
+  const renderOnce = () => { cursor = 0; changed = false; return ExperienceScreen(); };
+  return { calls, ModuleHub, ExplorationTaskList, ExplorationTaskHall, ExplorationTreasureExperience, ClickBurst, experience, exploration, renderOnce, get href() { return href; },
+    render() {
+      for (let pass = 0; pass < 10; pass++) { const tree = renderOnce(); if (!changed) return tree; }
+      assert.fail('App presentation state did not settle');
+    },
     returnButton() {
       const button = find(Tasks(), node => node.type === 'button' && node.props['data-node-id'] === '2006:454');
       assert.ok(button, 'the actual task list must expose its return button');
@@ -531,4 +547,64 @@ test('guild certification opens the real ability map without preview mode', () =
   assert.equal(page.props.view, 'certification');
   assert.equal(page.props.identity, '真实学员');
   assert.equal(find(tree, node => node.type === ModuleSidebar).props.activeMenu, 'certification');
+});
+
+test('task completion hands a newly dropped treasure priority before continuation and retains it through acknowledgment', () => {
+  const first = { id: 'first-course', versionId: 'version-one', status: 'active', completionMode: 'learning' };
+  const discovery = { id: 'first-discovery', taskId: first.id, taskTitle: '写给Muchener的信',
+    treasureId: 'crystal', discoveredAt: '2026-11-18T08:10:00Z', acknowledgedAt: null };
+  const flow = createFlow('tasks', { configurableExploration: true, exploration: { tasks: [first] } });
+  let tree = flow.render();
+  find(tree, node => node.type === flow.ExplorationTaskList).props.onOpenTask(first.id);
+  tree = flow.render();
+  let hall = find(tree, node => node.type === flow.ExplorationTaskHall);
+  assert.equal(hall.props.initialTaskId, first.id);
+  assert.equal(hall.props.suspended, false);
+  assert.equal(hall.props.continuationReady, true);
+
+  hall.props.onTransitionBusyChange(true);
+  flow.exploration.treasures = { total: 4, count: 1, items: [discovery], pendingDrops: [discovery] };
+  tree = flow.render();
+  hall = find(tree, node => node.type === flow.ExplorationTaskHall);
+  let chest = find(tree, node => node.type === flow.ExplorationTreasureExperience);
+  assert.equal(hall.props.suspended, false, 'The task finishes saving and refreshing before its dialog is suspended');
+  assert.equal(hall.props.continuationReady, false, 'The absence of a visible chest must not allow an early continuation');
+  assert.equal(chest.props.presentedDrop, null);
+  assert.equal(chest.props.busy, true);
+
+  hall.props.onTransitionBusyChange(false);
+  tree = flow.renderOnce();
+  hall = find(tree, node => node.type === flow.ExplorationTaskHall);
+  chest = find(tree, node => node.type === flow.ExplorationTreasureExperience);
+  assert.equal(hall.props.suspended, true, 'The first eligible render already pauses the task, before modal effects run');
+  assert.equal(hall.props.continuationReady, true);
+  assert.equal(hall.props.initialTaskId, first.id, 'Suspension retains the original task and its draft');
+  assert.equal(chest.props.presentedDrop.id, discovery.id);
+  tree = flow.render();
+
+  flow.exploration.busy = true;
+  flow.exploration.treasures = {
+    total: 4, count: 1,
+    items: [{ ...discovery, acknowledgedAt: '2026-11-18T08:10:15Z' }], pendingDrops: [],
+  };
+  tree = flow.render();
+  hall = find(tree, node => node.type === flow.ExplorationTaskHall);
+  chest = find(tree, node => node.type === flow.ExplorationTreasureExperience);
+  assert.equal(hall.props.suspended, true, 'Server acknowledgment cannot reopen the task before the chest settles');
+  assert.equal(chest.props.presentedDrop.id, discovery.id);
+  assert.equal(chest.props.busy, true);
+  chest.props.onDropSettled(discovery.id);
+  tree = flow.render();
+  assert.equal(find(tree, node => node.type === flow.ExplorationTaskHall).props.suspended, false);
+  assert.equal(find(tree, node => node.type === flow.ExplorationTreasureExperience).props.presentedDrop, null);
+
+  flow.exploration.busy = false;
+  flow.exploration.treasures = { total: 4, count: 1, items: [discovery], pendingDrops: [discovery] };
+  tree = flow.render();
+  hall = find(tree, node => node.type === flow.ExplorationTaskHall);
+  assert.equal(hall.props.suspended, false, 'An older catalog response cannot interrupt the task with the same chest again');
+  assert.equal(hall.props.initialTaskId, first.id);
+  assert.deepEqual(flow.calls.assign, []);
+  assert.equal(flow.calls.reload, 0);
+  assert.equal(flow.calls.push, 0);
 });

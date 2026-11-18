@@ -3,6 +3,7 @@ export type LearnerNotification = {
   assignmentId: string;
   taskTitle: string;
   decision: "PASS" | "REVISION_REQUIRED";
+  source?: "AI" | "HUMAN";
   reviewedAt: string;
   readAt: string | null;
 };

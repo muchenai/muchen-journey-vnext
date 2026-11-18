@@ -134,7 +134,7 @@ export function ReviewNotificationPanel({ panelId, unread, busy, loading, loaded
             {!item.readAt && <span className="review-notification-dot" aria-label="未读" />}
             <strong>{item.taskTitle}</strong>
             <span className="review-notification-result" data-decision={item.decision}>
-              {item.decision === "PASS" ? "审核已通过" : "已退回，请修改"}</span>
+              {item.decision === "PASS" ? item.source === "AI" ? "AI 评测已通过" : "审核已通过" : "已退回，请修改"}</span>
             <time dateTime={item.reviewedAt}>{new Date(item.reviewedAt).toLocaleString("zh-CN", { hour12: false })}</time>
           </button>
           {!item.readAt && <button className="review-notification-read" type="button" disabled={busy}

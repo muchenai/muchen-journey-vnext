@@ -66,7 +66,7 @@ export function ExplorationTaskList({ tasks, identity, loading = false, error = 
     <aside className="eotl-next" aria-label="当前学习进度">
       <p className="eotl-greeting">你好，{identity || "新同学"} · 你的成长航线</p>
       <h1><span>{allComplete ? "这一程" : "下一站"}</span><strong>{loading && !ordered.length ? "准备中" : allComplete ? "已完成" : current ? `任务 ${numberLabel(current.order)}` : "等待启程"}</strong></h1>
-      <p className="eotl-description">{allComplete ? "你已经完成当前全部探索任务。集齐四件宝藏后，即可在最后一张卡片解锁毕业码。" : "打开材料开始学习，学完后进入下一板块。测试任务提交审核，培训签退后确认进入项目群，完成这一程探索。"}</p>
+      <p className="eotl-description">{allComplete ? "你已经完成当前全部探索任务。集齐四件宝藏后，即可在最后一张卡片解锁毕业码。" : "打开材料开始学习，学完后进入下一板块。测试任务按配置完成 AI 评测或人工审核，培训签退后确认进入项目群，完成这一程探索。"}</p>
       <button type="button" className="eotl-continue" disabled={!current || loading} onClick={openCurrent}>
         {allComplete ? "回看学习成果" : current?.task.status === "pending" ? "查看当前提交" : current && needsExplorationClaim(current.task) ? "开始当前任务" : "继续当前任务"}<span aria-hidden="true">→</span>
       </button>

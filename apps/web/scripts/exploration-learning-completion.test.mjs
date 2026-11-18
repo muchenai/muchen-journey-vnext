@@ -11,11 +11,11 @@ function load(file, dependencies = {}) {
   const compiled = ts.transpileModule(readFileSync(new URL(`../src/app/project29/${file}`, import.meta.url), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  const compiledModule = { exports: {} };
-  vm.runInNewContext(compiled, { module: compiledModule, exports: compiledModule.exports, URL,
+  const loadedModule = { exports: {} };
+  vm.runInNewContext(compiled, { module: loadedModule, exports: loadedModule.exports, URL,
     require: name => name === './explorationTaskState' ? load('explorationTaskState.ts') : ({ react: React, 'react/jsx-runtime': jsxRuntime, ...dependencies })[name] ?? {},
   });
-  return compiledModule.exports;
+  return loadedModule.exports;
 }
 
 function find(node, predicate) {
@@ -62,9 +62,10 @@ test('assessment results use the configured minimum and preserve the real draft 
   });
   const form = find(tree, node => node.type === Form);
   assert.equal(form.props.minLength, 1);
-  assert.equal(form.props.inputLabel, '测试结果或结果文档链接');
+  assert.equal(form.props.inputLabel, '测试结果或飞书文档链接');
   assert.equal(form.props.savedMessage, '草稿保存成功');
   assert.equal(form.props.beforeActions, 'AI反馈区');
+  assert.doesNotMatch(form.props.placeholder, /AI 自测|AI 评测/);
 });
 
 test('an unlocked unclaimed assessment keeps the claim step while its visible status is active', () => {
@@ -168,7 +169,7 @@ test('question document results retain the configured answer limit and real subm
   });
   const form = find(tree, node => node.type === Form);
   assert.equal(form.props.minLength, 1);
-  assert.equal(form.props.inputLabel, '任务成果或结果文档链接');
+  assert.equal(form.props.inputLabel, '任务成果或飞书文档链接');
   assert.equal(form.props.beforeActions, '自测反馈');
   assert.match(form.props.placeholder, /任务成果/);
 });

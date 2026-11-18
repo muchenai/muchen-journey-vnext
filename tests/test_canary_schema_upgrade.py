@@ -136,7 +136,7 @@ def test_package_workflow_pins_restore_image_and_migration_range():
 
 def test_migration_head_parser_handles_merge_revision():
     assert migration_heads(Path("migrations/versions")) == [
-        "0057_dynamic_exploration"
+        "0060_migrated_ai_ownership"
     ]
 
 

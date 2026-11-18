@@ -58,7 +58,7 @@ function TreasureChest({ stage }: { stage: Reveal["stage"] }) {
   </div>;
 }
 
-export function ExplorationTreasureExperience({ treasures, collectionOpen, onCollectionClose, canReveal = true, busy = false, onAcknowledge, onUnlockGraduation }: {
+export function ExplorationTreasureExperience({ treasures, collectionOpen, onCollectionClose, canReveal = true, busy = false, onAcknowledge, onUnlockGraduation, presentedDrop, onDropSettled }: {
   treasures: ExplorationTreasures;
   collectionOpen: boolean;
   onCollectionClose: () => void;
@@ -66,12 +66,15 @@ export function ExplorationTreasureExperience({ treasures, collectionOpen, onCol
   busy?: boolean;
   onAcknowledge: (id: string) => Promise<boolean>;
   onUnlockGraduation?: () => Promise<boolean>;
+  presentedDrop?: ExplorationTreasureDrop | null;
+  onDropSettled?: (id: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const focusBeforeOpen = useRef<HTMLElement | null>(null);
   const acknowledged = useRef(new Set<string>());
   const deferredDrops = useRef(new Set<string>());
   const acknowledging = useRef(false);
+  const mounted = useRef(true);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [selectedId, setSelectedId] = useState<TreasureId | null>(null);
   const [saving, setSaving] = useState(false);
@@ -94,9 +97,14 @@ export function ExplorationTreasureExperience({ treasures, collectionOpen, onCol
 
   useEffect(() => {
     if (!canReveal || busy || collectionOpen || reveal) return;
-    const next = treasures.pendingDrops.find(drop => !acknowledged.current.has(drop.id) && !deferredDrops.current.has(drop.id));
+    const candidates = presentedDrop === undefined ? treasures.pendingDrops : presentedDrop ? [presentedDrop] : [];
+    const next = candidates.find(drop => !acknowledged.current.has(drop.id) && !deferredDrops.current.has(drop.id));
     if (next) { setError(""); setReveal({ drop: next, preview: false, stage: "sealed" }); }
-  }, [treasures.pendingDrops, collectionOpen, canReveal, busy, reveal]);
+  }, [treasures.pendingDrops, collectionOpen, canReveal, busy, reveal, presentedDrop]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   useEffect(() => {
     const element = dialog.current;
     if (mode && element && !element.open) {
@@ -122,13 +130,18 @@ export function ExplorationTreasureExperience({ treasures, collectionOpen, onCol
     if (!reveal) { onCollectionClose(); return; }
     if (reveal.preview) { setReveal(null); setError(""); return; }
     if (!reveal.drop) return;
+    const id = reveal.drop.id;
+    if (acknowledged.current.has(id) || deferredDrops.current.has(id)) return;
     acknowledging.current = true; setSaving(true); setError("");
     try {
-      if (!await onAcknowledge(reveal.drop.id)) { setError("宝藏已保留，暂未确认领取结果。请重试收下宝藏。"); return; }
-      acknowledged.current.add(reveal.drop.id);
+      const saved = await onAcknowledge(id);
+      if (!mounted.current) return;
+      if (!saved) { setError("宝藏已保留，暂未确认领取结果。请重试收下宝藏。"); return; }
+      acknowledged.current.add(id);
       setReveal(null);
-    } catch { setError("宝藏已保留，暂时无法保存查看状态，请重试。"); }
-    finally { acknowledging.current = false; setSaving(false); }
+      onDropSettled?.(id);
+    } catch { if (mounted.current) setError("宝藏已保留，暂时无法保存查看状态，请重试。"); }
+    finally { acknowledging.current = false; if (mounted.current) setSaving(false); }
   }
   async function unlockGraduation() {
     if (!canUnlockGraduation || !onUnlockGraduation || busy || unlockingRef.current) return;
@@ -170,8 +183,10 @@ export function ExplorationTreasureExperience({ treasures, collectionOpen, onCol
         {error && <p className="treasure-error" role="alert">{error}</p>}
         {error && reveal.stage !== "revealed" && <button type="button" className="treasure-text-button" disabled={saving || busy} onClick={() => void close()}>重试保存查看状态</button>}
         {error && <button type="button" className="treasure-text-button" disabled={saving || busy} onClick={() => {
-          if (reveal.drop) deferredDrops.current.add(reveal.drop.id);
+          if (!reveal.drop || acknowledging.current || deferredDrops.current.has(reveal.drop.id)) return;
+          deferredDrops.current.add(reveal.drop.id);
           setError(""); setReveal(null);
+          onDropSettled?.(reveal.drop.id);
         }}>稍后查看</button>}
         <p className="treasure-discovery-footnote">{reveal.preview ? "仅预览开启效果，不会获得宝藏或改变任务进度。" : "宝藏已为你保留，关闭窗口也不会丢失。"}</p>
       </section> : <section className="treasure-collection">

@@ -75,7 +75,7 @@ def test_two_successful_release_receipts_bind_current_web_and_older_api():
     assert app.old_images == {'api': API_IMAGE, 'web': WEB_IMAGE}
     assert app.base.name == release.WEB_BASE + '-learner-usability'
     assert app.new.name == 'a' * 40 + '-dynamic-exploration'
-    assert (release.SOURCE_SCHEMA, release.TARGET_SCHEMA) == ('0056_guild_halls', '0057_dynamic_exploration')
+    assert (release.SOURCE_SCHEMA, release.TARGET_SCHEMA) == ('0056_guild_halls', '0060_migrated_ai_ownership')
     assert len(release.NEW_TABLES) == 5
 
 

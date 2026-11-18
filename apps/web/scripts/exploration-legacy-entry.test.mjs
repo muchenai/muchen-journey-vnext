@@ -14,7 +14,7 @@ function page(file,experience){
   }).outputText;
   const dependencies={
     'next/navigation':{redirect:target=>{throw Error('REDIRECT '+target)}},
-    '@/lib/server/api':{},
+    '@/lib/server/api':{learnerPageRequest:async()=>({module:'legacy',taskId:null})},
     '@/lib/server/local-preview':{localVillagePreviewEnabled:()=>false},
     '@/app/project29/App':{default:()=>null},
     '@/app/project-ui/experience-data':{loadProjectExperience:async (...args)=>{

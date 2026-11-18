@@ -1,4 +1,5 @@
 import { escapeHtml as e, icon } from './core.js?v=20261030-member-action-spacing';
+import {effectiveRubric, rubricDimensionErrors} from './rubric-policy.js?v=20261118-document-rubric';
 
 const MAX_ANSWER_LENGTH = 20000;
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -36,9 +37,9 @@ function configuration(task = {}) {
     name: item.name, type: item.type, url: item.url, size: item.size, mime: item.mime,
   }));
   return digest({
-    title: task.title, summary: task.summary, domain: task.domain, difficulty: task.difficulty,
+    title: task.title, summary: task.summary, domain: task.domain, difficulty: task.difficulty, camp: task.camp,
     materials: files(task.materials),
-    rubric: (task.rubric || []).map(item => ({ name: item.name, points: Number(item.points), description: item.description })),
+    rubric: effectiveRubric(task).map(item => ({ name: item?.name, points: Number(item?.points), description: item?.description })),
     rubricAttachments: files(task.rubricAttachments),
     reviewMode: task.reviewMode, passScore: Number(task.passScore),
   });
@@ -47,11 +48,8 @@ function configuration(task = {}) {
 function evaluationIssues(task) {
   if (!text(task.title) || !text(task.summary)) return ['请先填写任务标题和任务简述。'];
   if (!task.materials?.length) return ['请先添加学习材料。'];
-  const rubric = task.rubric || [];
-  if (!rubric.length || rubric.some(item => !text(item.name) || !text(item.description) || !Number.isFinite(Number(item.points)) || Number(item.points) <= 0)) {
-    return ['请先完善 AI 评分标准。'];
-  }
-  if (Math.abs(rubric.reduce((sum, item) => sum + Number(item.points), 0) - 100) > 0.000001) return ['AI 评分标准的总分需为 100 分。'];
+  const rubricIssues = rubricDimensionErrors(task);
+  if (rubricIssues.length) return rubricIssues;
   if (task.passScore == null || !text(task.passScore) || !Number.isFinite(Number(task.passScore)) || Number(task.passScore) < 0 || Number(task.passScore) > 100) return ['请先设置有效的通过分数。'];
   return [];
 }

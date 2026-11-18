@@ -8,10 +8,11 @@ export const BADGES = [
 ];
 export const PRESETS: Record<string, [number, number, number]> = { "入门": [30, 50, 5], "进阶": [60, 100, 10], "挑战": [90, 200, 20] };
 export type Material = { id: string; name: string; type: "link" | "file" | "image" | "text"; url: string; text?: string; mime?: string; size?: number };
+export type RubricMaterial = Material & { sourceUrl?: string; sourceRevision?: string; sourceTitle?: string };
 export type AdminTask = {
  id: string; title: string; summary: string; camp: "exploration" | "novice"; domain: string; order?: number; publishedOrder?: number; completionMode?: "learning" | "assessment" | "checkin"; assessmentUrl?: string; publishingDepartment?: string; difficulty: string;
  badges: { id: string; weight: number }[]; materials: Material[]; reviewMode: "manual" | "ai"; passScore: number;
- rubric: { id: string; name: string; points: number; description: string }[]; rubricAttachments: Material[];
+ rubric: { id: string; name: string; points: number; description: string }[]; rubricAttachments: RubricMaterial[];
  revision: number; status: string; author?: string; authorId?: string; stableKey?: string;
  participants?: number; completions?: number; version?: number;
 };

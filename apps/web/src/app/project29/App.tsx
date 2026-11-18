@@ -16,6 +16,7 @@ import { ExplorationTaskHall, useExplorationTasks } from "./ExplorationTaskHall"
 import { ExplorationTaskList } from "./ExplorationTaskList";
 import { canOpenExplorationTask } from "./explorationTaskState";
 import { ExplorationTreasureExperience } from "./ExplorationTreasureExperience";
+import { useExplorationTreasurePresentation } from "./useExplorationTreasurePresentation";
 import { SelfCheckHistory } from "./SelfCheckHistory";
 import { TaskFeedbackDialog } from "./TaskFeedbackDialog";
 import { useWorkspaceRecovery } from "./useWorkspaceRecovery";
@@ -33,24 +34,35 @@ export default function App(props: Partial<JourneyContextValue>) {
 function ExperienceScreen() {
  const router = useRouter();
  const { learnerName, experience, initialScreen, initialNotice, joinPhase, joinError, localVillagePreview = false,
-   configurableExploration = true, explorationVariant, explorationTaskId, explorationScope } = useJourney();
+   configurableExploration = true, explorationVariant, explorationTaskId, explorationScope, explorationOpenFeedback = false } = useJourney();
  const taskStatus = useTaskStatus();
  const identity = learnerName;
  const [screen, setScreen] = useState<Screen>(initialScreen);
  const exploration = useExplorationTasks(configurableExploration && screen !== "login");
  const [publishedTaskId, setPublishedTaskId] = useState<string | null>(explorationTaskId ?? null);
+ const [publishedFeedbackOpen, setPublishedFeedbackOpen] = useState(explorationOpenFeedback);
  const [treasureCollectionOpen, setTreasureCollectionOpen] = useState(false);
+ const [taskTransitionBusy, setTaskTransitionBusy] = useState(false);
+ const treasureBusy = exploration.busy || taskTransitionBusy;
+ const treasurePresentation = useExplorationTreasurePresentation({
+   treasures: exploration.treasures,
+   enabled: configurableExploration && ["dashboard", "tasks"].includes(screen),
+   busy: treasureBusy,
+   collectionOpen: treasureCollectionOpen,
+ });
  useEffect(() => { if (!configurableExploration || new URL(window.location.href).searchParams.get("treasures") !== "1") return; const timer = window.setTimeout(() => setTreasureCollectionOpen(true), 0); return () => window.clearTimeout(timer); }, [configurableExploration]);
- useEffect(() => { if (!explorationTaskId) return; const timer = window.setTimeout(() => setPublishedTaskId(explorationTaskId), 0); return () => window.clearTimeout(timer); }, [explorationTaskId]);
+ useEffect(() => { if (!explorationTaskId) return; const timer = window.setTimeout(() => { setPublishedTaskId(explorationTaskId); setPublishedFeedbackOpen(explorationOpenFeedback); }, 0); return () => window.clearTimeout(timer); }, [explorationTaskId, explorationOpenFeedback]);
  const openPublishedTask = (id: string) => {
    const selected = exploration.tasks.find(task => task.id === id);
    if (!selected) return;
    if (!canOpenExplorationTask(selected)) { setNotice("需要提交上一任务"); return; }
+   setPublishedFeedbackOpen(false);
    setPublishedTaskId(id);
  };
  const closePublishedTask = () => {
    setPublishedTaskId(null);
-   const url = new URL(window.location.href); url.searchParams.delete("task"); window.history.replaceState(window.history.state, "", url);
+   setPublishedFeedbackOpen(false);
+   const url = new URL(window.location.href); url.searchParams.delete("task"); url.searchParams.delete("feedback"); window.history.replaceState(window.history.state, "", url);
  };
  const [lastModule, setLastModule] = useState<"dashboard" | "village" | "academy" | "guild">("dashboard");
  const isModuleScreen = ["dashboard", "village", "academy", "guild"].includes(screen);
@@ -358,7 +370,7 @@ function ExperienceScreen() {
    </div>{selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position-1]?.title ?? selectedFeedback.title} onClose={()=>setFeedbackAssignmentId(null)} />}
    {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={()=>setBurst(null)} />}{notice && <div className="module-toast" role="status">{notice}</div>}</>}
  /></div>;
- return <>{moduleContent}{configurableExploration && <div className="restored-exploration-dialog-root"><ExplorationTaskHall detailOnly sharedExploration={exploration} initialTaskId={publishedTaskId ?? undefined} onTaskClose={closePublishedTask} onTaskBlocked={()=>setNotice("需要提交上一任务")} /><ExplorationTreasureExperience treasures={exploration.treasures} collectionOpen={treasureCollectionOpen} onCollectionClose={()=>setTreasureCollectionOpen(false)} canReveal={["dashboard", "tasks"].includes(screen) && !publishedTaskId && !exploration.busy} busy={exploration.busy} onAcknowledge={exploration.acknowledgeTreasure} onUnlockGraduation={exploration.unlockGraduation} /></div>}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
+ return <>{moduleContent}{configurableExploration && <div className="restored-exploration-dialog-root"><ExplorationTaskHall detailOnly sharedExploration={exploration} initialTaskId={publishedTaskId ?? undefined} openFeedback={publishedFeedbackOpen && publishedTaskId === explorationTaskId} suspended={treasurePresentation.blocking} continuationReady={!taskTransitionBusy} onTransitionBusyChange={setTaskTransitionBusy} onTaskClose={closePublishedTask} onTaskBlocked={()=>setNotice("需要提交上一任务")} /><ExplorationTreasureExperience treasures={exploration.treasures} collectionOpen={treasureCollectionOpen} onCollectionClose={()=>setTreasureCollectionOpen(false)} presentedDrop={treasurePresentation.drop} onDropSettled={treasurePresentation.dismiss} busy={treasureBusy} onAcknowledge={exploration.acknowledgeTreasure} onUnlockGraduation={exploration.unlockGraduation} /></div>}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
    energizePanels(event.currentTarget, event.clientX, event.clientY);
    if (screen === "dashboard" && event.pointerType === "mouse") magnetizeControl(event.currentTarget, event.target, event.clientX, event.clientY);
  }} onPointerLeave={event => {

@@ -7,3 +7,38 @@
 #material-form .material-field-error[hidden] { display: none; }
 #material-form input[aria-invalid="true"] { border-color: #d73745; }
 .material-row .material-edit-btn { flex-shrink: 0; white-space: nowrap; padding: 7px 10px; }
+
+#task-rubric .rubric-actions { flex-wrap: wrap; }
+.rubric-attachment {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border, #e6e8ee);
+  border-radius: 8px;
+}
+.rubric-attachment > .rubric-attachment-name {
+  display: block;
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.rubric-attachment-name > svg { vertical-align: middle; margin-right: 5px; }
+.rubric-attachment-name > small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.rubric-attachment > .text-btn {
+  flex: 0 0 auto;
+  max-width: 100%;
+  margin-left: 0;
+  white-space: nowrap;
+}

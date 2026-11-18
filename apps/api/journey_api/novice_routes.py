@@ -101,7 +101,8 @@ def task_view(session, actor, task_id):
         minutes=minutes, experience=xp, points=points, mentor=author.display_name if author else "任务发布者",
         badges=[[BADGES[b["id"]], b["weight"]] for b in content.get("badges", []) if b.get("id") in BADGES],
         requirements=version.instructions, criteria=version.completion_criteria, materials=materials,
-        rubric=content.get("rubric", []) if content.get("reviewMode") == "ai" else [],
+        rubric=[{key: item.get(key) for key in ("id", "name", "points")} | {"description": ""}
+            for item in content.get("rubric", [])] if content.get("reviewMode") == "ai" else [],
         passScore=content.get("passScore", 60), review="AI 自测" if content.get("reviewMode") == "ai" else "人工审核", reviewMode=content.get("reviewMode", "manual"),
         publishedAt=version.published_at.isoformat(), versionId=str(version.id),
         status="available", claimed=False, assignmentId=None, revision=None, answer="", feedback=None,
@@ -180,6 +181,17 @@ def cancel_claim(task_id: uuid.UUID, command: CancelClaimCommand, request: Reque
     # Serializes this learner's claim commands without blocking FK KEY SHARE
     # locks taken by a concurrent draft/submission that already owns Enrollment.
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update(key_share=True))
+    exploration_assignment = session.scalar(select(Assignment.id).join(Enrollment,
+        Enrollment.id == Assignment.enrollment_id).join(PublishedTaskContent,
+        PublishedTaskContent.task_version_id == Assignment.task_version_id).where(
+        Enrollment.organization_id == actor.organization_id, Enrollment.learner_id == actor.id,
+        Enrollment.novice_task_id == task_id, Assignment.organization_id == actor.organization_id,
+        Assignment.task_definition_id == task_id, PublishedTaskContent.organization_id == actor.organization_id,
+        PublishedTaskContent.content["camp"].as_string() == "exploration").limit(1))
+    if exploration_assignment is not None:
+        # Exploration also uses novice_task_id for its durable enrollment. Its
+        # no-cancel rule must apply before any historical novice.cancel replay.
+        raise ApiError(409, "EXPLORATION_CANCEL_NOT_ALLOWED", "探索营任务接取后不能取消。")
     payload = {**command.model_dump(mode="json"), "task_id": str(task_id)}
     replay = find_replay(session, actor_id=actor.id, command="novice.cancel", key=idempotency_key, payload=payload)
     if replay is not None:

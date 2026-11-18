@@ -36,6 +36,19 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== "object") return reply({ ok: false, error: "请求格式不正确。" }, 400);
     const { command, task, id, key, payload } = body;
     switch (command) {
+      case "importRubricDocument":
+        if (!payload || typeof payload.url !== "string" || payload.url.length > 2000
+          || !["exploration", "novice"].includes(payload.camp)
+          || (payload.difficulty !== undefined && !["", "入门", "进阶", "挑战"].includes(payload.difficulty))) break;
+        try {
+          const data = await apiRequest("/api/v1/review-admin/rubric-documents/import", "REVIEWER", {
+            method: "POST", body: JSON.stringify(payload),
+          });
+          return reply({ ok: true, data });
+        } catch (error) {
+          if (error instanceof ApiRequestError) return reply({ ok: false, error: error.message, status: error.status }, error.status);
+          throw error;
+        }
       case "knowledge":
       case "guild":
         if (!payload || typeof payload.action !== "string") break;

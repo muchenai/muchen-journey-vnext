@@ -29,7 +29,7 @@ from journey_api.review_admin_access import permissions, require_super
 from journey_api.review_admin_models import PublishedTaskContent, ReviewAdminTask
 from journey_api.review_admin_routes import TaskContent, task_content_for_publish
 
-TARGET_SCHEMA = "0057_dynamic_exploration"
+TARGET_SCHEMA = "0060_migrated_ai_ownership"
 SEED_ROOT = Path(journey_api.__file__).resolve().parent
 STABLE_KEYS = tuple(f"EXPLORATION-DYNAMIC-20261117-{index:02}" for index in range(1, 9))
 NEW_TABLES = frozenset({"exploration_catalog_tasks", "exploration_work", "exploration_progress",

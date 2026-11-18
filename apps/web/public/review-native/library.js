@@ -1,3 +1,5 @@
+import {effectiveRubric, usesAnswerDocumentRubric} from './rubric-policy.js?v=20261118-document-rubric';
+import {renderRubricAttachments} from './rubric-link-editor.js?v=20261118-answer-link';
 import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from './task-publication-access.js';
 import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown, getReviewCamp } from './core.js?v=20261030-member-action-spacing';
 import { localMaterialUrl } from './exploration-material-files.js';
@@ -160,6 +162,8 @@ export function openTask(task, store, ui) {
   if (!task) { ui.toast('任务不存在', 'error'); return; }
   const exploration = getReviewCamp({},task)==='exploration';
   const assessment=requiresTaskAssessment(task);
+  const scoringRubric=effectiveRubric(task);
+  const documentScoring=usesAnswerDocumentRubric(task);
   const completion=exploration?EXPLORATION_COMPLETION_MODES.find(mode=>mode.id===explorationCompletionMode(task)):null;
   const assessmentUrl=exploration&&assessment&&validAssessmentUrl(task.assessmentUrl)?safeUrl(task.assessmentUrl):'';
   let rewards;
@@ -177,7 +181,7 @@ export function openTask(task, store, ui) {
     <section class="detail-section"><h3>学习材料 <span class="count-pill">${(task.materials || []).length}</span></h3>${materialHtml(task.materials||[]) || '<p class="muted">尚未添加学习材料</p>'}</section>
     ${exploration&&assessment?`<section class="detail-section"><h3>任务文件 <span class="count-pill">${explorationTaskFiles(task).length}</span></h3>${materialHtml(explorationTaskFiles(task),'task-file')||'<p class="muted">使用已有培训测试链接完成任务</p>'}</section>`:''}
     ${assessment?`<section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || (task.requirements||[]).map(item=>`<p>${e(item)}</p>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>`:''}
-    ${assessment&&task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt((task.rubric || []).reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${(task.rubric || []).map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${(task.rubricAttachments || []).map((attachment, index) => `<div class="detail-material"><span>${icon('file')} ${e(attachment.name)}</span>${/^data:[^,]*;base64,/i.test(attachment.url || '') ? `<button class="text-btn" data-rubric-download="${index}">下载评分文档</button>` : '<span class="muted">附加评分文档</span>'}</div>`).join('')}</section>` : ''}
+    ${assessment&&task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt(scoringRubric.reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${documentScoring?'<p class="notice">已按标准答案文档评分，满分 100 分。</p>':''}${scoringRubric.map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${renderRubricAttachments(task.rubricAttachments || [])}</section>` : ''}
     <section class="detail-section"><h3>参与情况</h3><p class="muted">${fmt(task.participants)} 人次参与，${fmt(task.completions)} 人次完成，${fmt(taskSubmissions.length)} 份答案已提交。</p>${taskSubmissions.length ? '<button class="btn btn-secondary" data-task-review>前往审核任务</button>' : ''}</section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button>${canConfigureTask(task,ui.isSuperAdmin)?'<button class="btn btn-primary" data-detail-edit>编辑任务</button>':''}</div>`, modal => {
     const root = modalRoot(modal);
     root.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', ui.closeModal));

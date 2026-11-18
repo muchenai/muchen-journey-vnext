@@ -980,6 +980,18 @@ def submit_assignment(
         raise ApiError(409, "INVALID_STATE_TRANSITION", "任务缺少固定内容版本。")
     from journey_api.exploration_service import ensure_assessment_submission
     ensure_assessment_submission(session, assignment)
+    # Dynamic exploration AI scores complete their own immutable submission.
+    # The generic endpoint must not create an alternate human review for them.
+    from journey_api.exploration_models import ExplorationWork
+    from journey_api.review_admin_models import PublishedTaskContent
+    exploration_work = session.scalar(select(ExplorationWork.assignment_id).where(
+        ExplorationWork.assignment_id == assignment.id,
+        ExplorationWork.organization_id == actor.organization_id,
+        ExplorationWork.user_id == actor.id))
+    pinned = session.get(PublishedTaskContent, assignment.task_version_id) if exploration_work else None
+    if pinned and pinned.content.get("camp") == "exploration" and pinned.content.get("reviewMode") == "ai":
+        raise ApiError(409, "AI_ASSESSMENT_REQUIRED",
+            "本任务按 AI 评分标准自动评测，请完成 AI 自测，达到通过分数后直接完成任务。")
     attachments = lock_ready_attachments(
         session,
         actor=actor,

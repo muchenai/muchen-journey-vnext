@@ -2,6 +2,7 @@ import {isMaterialLink} from './material-validation.js';
 import {validateTaskFieldLimits as fieldLimits} from './task-field-limits.js';
 import {isPublishingDepartment} from './publishing-departments.js';
 import { EXPLORATION_COMPLETION_MODES, requiresTaskAssessment, explorationTaskResourceErrors } from './exploration-completion.js';
+import {rubricDimensionErrors} from './rubric-policy.js?v=20261118-document-rubric';
 /** JOURNEY prototype domain model. All persistence stays in this browser. */
 export const BADGES = Object.freeze([
   { id: 'data', name: '数据交付徽章', category: '数据交付', color: '#648b83' },
@@ -190,15 +191,9 @@ export function validateTask(task = {}) {
   errors.push(...explorationTaskResourceErrors(task));
   if (assessment&&!['manual', 'ai'].includes(task.reviewMode)) errors.push('请选择人工审核或 AI 自测');
   if (assessment&&task.reviewMode === 'ai') {
-    const rubric = Array.isArray(task.rubric) ? task.rubric : [];
-    if (!rubric.length) errors.push('请至少配置一个评分维度');
-    rubric.forEach((dimension, index) => {
-      if (!text(dimension.name)) errors.push(`请填写评分维度 ${index + 1} 的名称`);
-      if (!Number.isFinite(Number(dimension.points)) || Number(dimension.points) <= 0) errors.push(`评分维度 ${index + 1} 的分值需大于 0`);
-      if (!text(dimension.description)) errors.push(`请填写评分维度 ${index + 1} 的评分描述`);
-    });
-    if (Math.abs(rubric.reduce((sum, dimension) => sum + number(dimension.points), 0) - 100) > 0.000001) errors.push('评分维度总分需为 100 分');
+    errors.push(...rubricDimensionErrors(task));
     if (!isNumeric(task.passScore) || Number(task.passScore) < 0 || Number(task.passScore) > 100) errors.push('通过分数需在 0～100 分之间');
+    else if (Math.abs(Number(task.passScore) * 100 - Math.round(Number(task.passScore) * 100)) > 0.0000001) errors.push('通过分数最多保留两位小数');
   }
   return errors;
 }

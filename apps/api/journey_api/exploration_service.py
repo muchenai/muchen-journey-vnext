@@ -1,4 +1,4 @@
-"""Dynamic exploration uses canonical task versions, assignments and human reviews."""
+"""Dynamic exploration uses pinned tasks and explicit human or AI provenance."""
 import copy
 import secrets
 import uuid
@@ -33,10 +33,27 @@ SEED_REQUIREMENTS = {
     "assessment": ["阅读福利与实用信息学习材料。", "打开培训测试文档，按文档要求完成测试。",
         "提交测试结果、结果截图链接或简短说明，等待审核。"],
 }
+AI_ASSESSMENT_REQUIREMENTS = [
+    "打开测试文档，按文档要求完成测试。",
+    "按发布人员配置的评分标准进行 AI 评测，达到通过分数后自动完成任务。",
+]
 
 
 def default_requirements(mode, *, seed=False):
     return list((SEED_REQUIREMENTS if seed else DEFAULT_REQUIREMENTS)[mode])
+
+
+def assessment_requirements(content, supplied):
+    """Update generated instructions without replacing publisher-authored ones."""
+    if ((content.get("completionMode") or "assessment") == "assessment"
+            and content.get("reviewMode") == "ai"
+            and supplied in (DEFAULT_REQUIREMENTS["assessment"], SEED_REQUIREMENTS["assessment"],
+                AI_ASSESSMENT_REQUIREMENTS)):
+        return list(AI_ASSESSMENT_REQUIREMENTS)
+    if ((content.get("completionMode") or "assessment") == "assessment"
+            and content.get("reviewMode") != "ai" and supplied == AI_ASSESSMENT_REQUIREMENTS):
+        return default_requirements("assessment")
+    return list(supplied)
 
 
 def requirements_for_save(content, previous, *, seed=False):
@@ -46,10 +63,10 @@ def requirements_for_save(content, previous, *, seed=False):
     inherited = previous.get("requirements") or default_requirements(previous_mode, seed=seed)
     supplied = content.get("requirements") or []
     if previous and mode == previous_mode:
-        return supplied or inherited
+        return assessment_requirements(content, supplied or inherited)
     if supplied and supplied != inherited:
-        return supplied
-    return default_requirements(mode)
+        return assessment_requirements(content, supplied)
+    return assessment_requirements(content, default_requirements(mode))
 
 
 class ExplorationPublicationCommand(PublishTaskVersionCommand):
@@ -299,35 +316,61 @@ def task_view(session, actor, task_id, *, allow_locked=False, unlocked_ids=None,
     if assignment and assignment.status == AssignmentStatus.CANCELLED and profile.status != "published":
         status = "unavailable"
     history = []
+    ai_feedback_records = []
     for row in versions:
         decision = decisions_by_version.get(row.id)
-        history.append({"id": str(decision.review_id) if decision else str(row.id), "body": row.body,
-            "submittedAt": row.created_at.isoformat(), "status": "COMPLETED" if decision and decision.decision == Decision.PASS
-            else "NEEDS_REVISION" if decision else "SUBMITTED", "version": row.version_no})
+        proof = (row.ai_use or {}).get("exploration_ai_evaluation") or {}
+        ai_completed = (proof.get("source") == "AI" and proof.get("kind") == "EXPLORATION_AI"
+            and proof.get("validated") is True and proof.get("passed") is True
+            and proof.get("assignmentId") == str(assignment.id)
+            and proof.get("taskVersionId") == str(version.id))
+        history.append({"id": str(decision.review_id) if decision else str(row.id),
+            "body": proof.get("originalInput", row.body) if ai_completed else row.body,
+            "submittedAt": row.created_at.isoformat(),
+            "status": "COMPLETED" if ai_completed or decision and decision.decision == Decision.PASS
+            else "NEEDS_REVISION" if decision else "SUBMITTED", "version": row.version_no,
+            **({"source": "AI"} if ai_completed else {})})
+        if ai_completed:
+            ai_feedback_records.append({"id": str(row.id), "text": proof["feedback"], "source": "AI",
+                "decision": "PASS", "reviewedAt": row.created_at.isoformat(),
+                "score": proof["score"], "maxScore": proof["maxScore"],
+                "dimensions": [{key: item[key] for key in ("id", "name", "score", "maxScore", "evidence", "feedback")}
+                    for item in proof["dimensions"]]})
     feedback_records = [{"id": str(decision.review_id), "text": decision.feedback or "审核已通过，继续探索吧。",
         "decision": decision.decision.value, "reviewedAt": decision.created_at.isoformat()} for decision in decisions]
+    feedback_records.extend(ai_feedback_records)
+    feedback_records.sort(key=lambda item: item["reviewedAt"])
+    latest_feedback = feedback_records[-1] if feedback_records else None
     if work and work.completed_at and mode != "assessment":
         history.append({"id": str(assignment.id) + ":learning-completed", "body": "已完成培训签退并确认进入项目培训群。" if mode == "checkin" else "已完成学习。",
             "submittedAt": work.completed_at.isoformat(), "status": "CHECKIN_COMPLETED" if mode == "checkin" else "LEARNING_COMPLETED"})
     definition = session.get(TaskDefinition, task_id)
     owner = session.get(User, definition.created_by)
-    requirements = content.get("requirements") or default_requirements(mode,
-        seed=definition.stable_key.startswith("EXPLORATION-DYNAMIC-20261117-"))
+    requirements = assessment_requirements(content, content.get("requirements") or default_requirements(mode,
+        seed=definition.stable_key.startswith("EXPLORATION-DYNAMIC-20261117-")))
+    rubric = content.get("rubric") or []
+    if mode == "assessment" and content.get("reviewMode") == "ai" and not rubric:
+        # The publisher can use a private answer document without manual rows.
+        # Only its server-generated dimension labels/points enter this view.
+        rubric = (content.get("aiRubricSnapshot") or {}).get("dimensions") or []
     criteria = requirements
     if mode == "assessment":
-        criteria = [row["name"] + "：" + row["description"] for row in content.get("rubric", [])] if content.get("reviewMode") == "ai" and content.get("rubric") else ["完成测试并提交结果，由审核人确认。"]
+        criteria = ([row["name"] for row in rubric]
+            or ["按本任务配置的标准完成 AI 评测，达标后自动完成。"]
+            if content.get("reviewMode") == "ai" else ["完成测试并提交结果，由审核人确认。"])
     result = dict(id=str(task_id), title=content["title"], description=content["summary"], category="", level="", minutes=0,
         review="材料学习" if mode == "learning" else "培训签退" if mode == "checkin" else "AI 自测" if content.get("reviewMode") == "ai" else "人工审核",
         experience=0, points=0, mentor=owner.display_name if owner else "", badges=[], requirements=requirements,
         status=status, versionId=str(version.id), assignmentId=str(assignment.id) if assignment else None,
         revision=assignment.revision if assignment else None, claimed=bool(assignment and assignment.status != AssignmentStatus.CANCELLED),
-        answer=draft.body if draft else versions[-1].body if versions else "", publishedAt=version.published_at.isoformat(),
+        answer=draft.body if draft else history[-1]["body"] if versions else "", publishedAt=version.published_at.isoformat(),
         criteria=criteria, reviewMode="NONE" if mode != "assessment" else "AI" if content.get("reviewMode") == "ai" else "HUMAN",
         passScore=content.get("passScore", 60), unlockTaskPoints=0, publishingDepartment="", rewardAllocations=[],
         materials=[learner_material(material) for material in content.get("materials", [])],
         taskFiles=[learner_material(material) for material in content.get("taskFiles", [])] if mode == "assessment" else [],
-        rubric=content.get("rubric", []),
-        feedback={"text": evaluation.feedback, "at": evaluation.created_at.isoformat(), "decision": evaluation.decision.value} if evaluation else None,
+        rubric=[{key: item.get(key) for key in ("id", "name", "points")} | {"description": ""}
+            for item in rubric] if content.get("reviewMode") == "ai" else [],
+        feedback={**latest_feedback, "at": latest_feedback["reviewedAt"]} if latest_feedback else None,
         order=(catalog_positions if catalog_positions is not None else effective_catalog_positions(session, actor.organization_id, user_id=actor.id)).get(task_id, entry.position),
         pinnedLast=definition.stable_key == TRAINING_CHECKOUT_TASK_KEY,
         completionMode=mode, assessmentUrl=content.get("assessmentUrl") if mode == "assessment" else None,

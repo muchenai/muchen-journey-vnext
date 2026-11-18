@@ -5,7 +5,7 @@
   "database": "journey_next_canary_20260901_c72fea5",
   "migrations": {
     "from": "0056_guild_halls",
-    "to": "0057_dynamic_exploration"
+    "to": "0060_migrated_ai_ownership"
   },
   "images": {
     "dbrestore": "ghcr.io/muchenai/muchen-journey-vnext-dbrestore@sha256:1517ffbd8fdf7c4946535604bfa8df5299456b7749e5396c0edcbb345fe76d6a"

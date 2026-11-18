@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Fail closed on Web dependency advisories with bounded, expiring dev-only exceptions."""
+"""Fail closed on advisories, verifying one upstream withdrawal against GitHub."""
 
 from __future__ import annotations
 
 import json
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,10 @@ WEB_ROOT = ROOT / "apps" / "web"
 LOCK_FILE = WEB_ROOT / "package-lock.json"
 BRACE_EXPANSION_DOS = "https://github.com/advisories/GHSA-mh99-v99m-4gvg"
 BRACES_PARSE_DOS = "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+PICOMATCH_WITHDRAWN_ID = "GHSA-fc5q-39xc-vjpf"
+PICOMATCH_WITHDRAWN_URL = f"https://github.com/advisories/{PICOMATCH_WITHDRAWN_ID}"
+PICOMATCH_WITHDRAWAL_API = f"https://api.github.com/advisories/{PICOMATCH_WITHDRAWN_ID}"
+PICOMATCH_WITHDRAWN_AT = "2026-11-18T15:38:56Z"
 # Owner renewed only the braces dev-only exception on 2026-10-20 through
 # 2026-10-27 for this release; runtime reachability remains forbidden.
 # Only trusted repository patterns reach this ESLint development dependency.
@@ -27,6 +32,63 @@ WAIVERS = {
 
 class AuditError(RuntimeError):
     pass
+
+
+class NoAdvisoryRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def validate_withdrawal(proof: object) -> None:
+    """Accept only the exact published withdrawal, never an inferred exception."""
+    if not isinstance(proof, dict) or any(
+        proof.get(key) != expected
+        for key, expected in {
+            "ghsa_id": PICOMATCH_WITHDRAWN_ID,
+            "cve_id": "CVE-2026-112366",
+            "url": PICOMATCH_WITHDRAWAL_API,
+            "html_url": PICOMATCH_WITHDRAWN_URL,
+            "withdrawn_at": PICOMATCH_WITHDRAWN_AT,
+        }.items()
+    ):
+        raise AuditError("official picomatch withdrawal identity or timestamp mismatch")
+    try:
+        updated = datetime.fromisoformat(proof["updated_at"].replace("Z", "+00:00"))
+        withdrawn = datetime.fromisoformat(PICOMATCH_WITHDRAWN_AT.replace("Z", "+00:00"))
+        if updated.tzinfo is None or updated < withdrawn:
+            raise ValueError("withdrawal update timestamp")
+    except (KeyError, AttributeError, TypeError, ValueError) as error:
+        raise AuditError("official picomatch withdrawal has invalid update timestamp") from error
+    vulnerabilities = proof.get("vulnerabilities")
+    if not isinstance(vulnerabilities, list) or len(vulnerabilities) != 1:
+        raise AuditError("official picomatch withdrawal package mismatch")
+    item = vulnerabilities[0]
+    if not isinstance(item, dict) or item.get("package") != {
+        "ecosystem": "npm", "name": "picomatch"
+    } or item.get("vulnerable_version_range") != "<= 4.0.7":
+        raise AuditError("official picomatch withdrawal package mismatch")
+
+
+def read_official_withdrawal() -> dict[str, object]:
+    # npm's audit feed may lag an official GitHub withdrawal. Revalidate the
+    # exact advisory live on every audit; no cached/offline success or redirects.
+    request = urllib.request.Request(
+        PICOMATCH_WITHDRAWAL_API,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "Journey-dependency-audit"},
+    )
+    try:
+        opener = urllib.request.build_opener(NoAdvisoryRedirect())
+        with opener.open(request, timeout=20) as response:
+            if response.status != 200 or response.geturl() != PICOMATCH_WITHDRAWAL_API:
+                raise AuditError("official picomatch withdrawal response mismatch")
+            raw = response.read(1024 * 1024 + 1)
+            if len(raw) > 1024 * 1024:
+                raise AuditError("official picomatch withdrawal response too large")
+            proof = json.loads(raw)
+        validate_withdrawal(proof)
+        return proof
+    except (OSError, ValueError) as error:
+        raise AuditError("official picomatch withdrawal could not be verified") from error
 
 
 def advisory_urls(
@@ -60,6 +122,7 @@ def validate_report(
     lock: dict[str, object],
     *,
     today: date,
+    withdrawal_proof: object = None,
 ) -> tuple[int, set[str]]:
     if report.get("error"):
         raise AuditError("npm audit returned an error response")
@@ -69,6 +132,8 @@ def validate_report(
     packages = lock.get("packages")
     if not isinstance(packages, dict):
         raise AuditError("package-lock is missing package metadata")
+    if withdrawal_proof is not None:
+        validate_withdrawal(withdrawal_proof)
 
     waived: set[str] = set()
     for name, raw_item in vulnerabilities.items():
@@ -78,6 +143,8 @@ def validate_report(
         if not urls:
             raise AuditError(f"vulnerability has no advisory identity: {name}")
         for url in urls:
+            if url == PICOMATCH_WITHDRAWN_URL and withdrawal_proof is not None:
+                continue
             expiry = WAIVERS.get(url)
             if expiry is None:
                 raise AuditError(f"unwaived npm advisory: {url}")
@@ -91,7 +158,7 @@ def validate_report(
         for node in nodes:
             package = packages.get(node) if isinstance(node, str) else None
             if not isinstance(package, dict) or package.get("dev") is not True:
-                raise AuditError(f"waived advisory reaches a non-dev package: {name}")
+                raise AuditError(f"npm advisory reaches a non-dev package: {name}")
     return len(vulnerabilities), waived
 
 
@@ -109,7 +176,15 @@ def main() -> None:
         if result.returncode not in {0, 1}:
             raise AuditError(f"npm audit failed with exit code {result.returncode}")
         report = json.loads(result.stdout)
-        count, waived = validate_report(report, lock, today=date.today())
+        vulnerabilities = report.get("vulnerabilities")
+        proof = None
+        if isinstance(vulnerabilities, dict) and any(
+            isinstance(name, str)
+            and PICOMATCH_WITHDRAWN_URL in advisory_urls(name, vulnerabilities)
+            for name in vulnerabilities
+        ):
+            proof = read_official_withdrawal()
+        count, waived = validate_report(report, lock, today=date.today(), withdrawal_proof=proof)
     except (
         AuditError,
         json.JSONDecodeError,
@@ -119,15 +194,27 @@ def main() -> None:
         print(f"WEB_DEPENDENCY_AUDIT_ERROR: {error}", file=sys.stderr)
         raise SystemExit(1) from error
 
+    if proof is not None:
+        print(
+            "NPM_ADVISORY_WITHDRAWAL_CONFIRMED"
+            f" ghsa={PICOMATCH_WITHDRAWN_ID} withdrawn_at={PICOMATCH_WITHDRAWN_AT}"
+            f" source={PICOMATCH_WITHDRAWAL_API}"
+            f" npm_report_vulnerability_packages={count} scope=dev-only"
+        )
     if waived:
         expiry = min(WAIVERS[url] for url in waived)
         print(
             "WEB_DEPENDENCY_AUDIT=PASS"
             f" vulnerability_packages={count} waived_advisories={len(waived)}"
+            f" withdrawn_advisories={int(proof is not None)}"
             f" scope=dev-only waiver_expires={expiry.isoformat()}"
         )
     else:
-        print("WEB_DEPENDENCY_AUDIT=PASS vulnerability_packages=0 waived_advisories=0")
+        print(
+            "WEB_DEPENDENCY_AUDIT=PASS"
+            f" vulnerability_packages={count} waived_advisories=0"
+            f" withdrawn_advisories={int(proof is not None)}"
+        )
 
 
 if __name__ == "__main__":

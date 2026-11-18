@@ -1,4 +1,4 @@
-"""Disposable 0056 -> 0057 rehearsal with old formal work and new curriculum.
+"""Disposable 0056 -> 0057 -> 0060 rehearsal with preserved formal and AI work.
 
 Never point this at an application database. CI creates and removes the exact
 named isolated database; production rehearsal instead uses the verified backup.
@@ -85,17 +85,49 @@ with SessionLocal.begin() as session:
     baseline = existing_business_rows(session)
 
 run("alembic", "upgrade", "0057_dynamic_exploration")
+legacy_check_id = uuid.uuid5(drill_learner_id, "pre-0058-exploration-ai-history")
 with SessionLocal.begin() as session:
     assert existing_business_rows(session) == baseline, "MIGRATION_CHANGED_EXISTING_FACTS"
     for table in NEW_TABLES:
         assert session.execute(text(f'SELECT count(*) FROM "{table}"')).scalar_one() == 0
+    # Model 0057's real stored shape with SQL: the candidate's ORM already knows
+    # about details, which must not be queried until 0058 has added that column.
+    # The synthetic history is confined to this explicitly disposable database.
+    session.execute(text("""
+        INSERT INTO exploration_self_checks
+            (id, organization_id, user_id, assignment_id, task_version_id,
+             answer, result, status, created_at)
+        VALUES (:id, :organization, :learner, :assignment, :version,
+            'Pre-upgrade learner evidence.', 'Pre-upgrade feedback is retained.',
+            'COMPLETED', CURRENT_TIMESTAMP)
+    """), {"id": legacy_check_id, "organization": ORGANIZATION_ID,
+        "learner": drill_learner_id, "assignment": assignments[1].id,
+        "version": assignments[1].task_version_id})
+    legacy_check = session.execute(text(
+        "SELECT to_jsonb(t) FROM exploration_self_checks t WHERE id=:id"),
+        {"id": legacy_check_id}).scalar_one()
+
+# This intermediate populated 0057 schema also exercises installations that
+# already adopted the earlier dynamic-exploration release.
+run("alembic", "upgrade", "0060_migrated_ai_ownership")
+with SessionLocal.begin() as session:
+    assert existing_business_rows(session) == baseline, "MIGRATION_CHANGED_EXISTING_FACTS"
+    for table in NEW_TABLES - {"exploration_self_checks"}:
+        assert session.execute(text(f'SELECT count(*) FROM "{table}"')).scalar_one() == 0
+    upgraded_check = session.execute(text(
+        "SELECT to_jsonb(t) FROM exploration_self_checks t WHERE id=:id"),
+        {"id": legacy_check_id}).scalar_one()
+    assert upgraded_check.pop("details") == {}, "LEGACY_AI_DETAILS_DEFAULT"
+    assert upgraded_check == legacy_check, "LEGACY_AI_HISTORY_CHANGED"
+    assert session.execute(text("SELECT count(*) FROM exploration_self_checks")).scalar_one() == 1
     plan = upgrade_catalog(session, ORGANIZATION_ID, REVIEWER_ID, "isolated-migration-rehearsal")
     assert len(plan["missing"]) == 8 and plan["inserted"] == []
     first = upgrade_catalog(session, ORGANIZATION_ID, REVIEWER_ID, "isolated-migration-rehearsal", apply=True)
     assert len(first["inserted"]) == 8 and first["business_records_preserved"]
     verify_preserved(baseline, existing_business_rows(session))
-    for table in ("exploration_work", "exploration_progress", "exploration_self_checks"):
+    for table in ("exploration_work", "exploration_progress"):
         assert session.execute(text(f'SELECT count(*) FROM "{table}"')).scalar_one() == 0, "FAKE_LEARNER_PROGRESS"
+    assert session.execute(text("SELECT count(*) FROM exploration_self_checks")).scalar_one() == 1
     assert session.execute(text("SELECT count(*) FROM exploration_catalog_tasks")).scalar_one() == 8
     assert session.execute(text("SELECT count(*) FROM exploration_materials")).scalar_one() == 1
     checkout = session.execute(text("SELECT d.stable_key FROM exploration_catalog_tasks c JOIN task_definitions d ON d.id=c.task_id ORDER BY c.position DESC LIMIT 1")).scalar_one()
@@ -123,4 +155,14 @@ with engine.connect() as connection:
     finally:
         transaction.rollback()
 
-print("0056 -> 0057: old formal assignments, submission versions, pending review, draft and AI feedback preserved; eight reference courses and QR initialized atomically; replay and five table grants verified", flush=True)
+# Exercise the actual PostgreSQL provenance trigger after this exact upgrade,
+# including the consumed phone-to-Feishu mapping and revocation boundaries.
+# These tests own isolated organizations and never contact Feishu or a model.
+run("python", "-m", "pytest", "-q", "-o", "cache_dir=/tmp/pytest-cache",
+    "tests/test_exploration_ai_completion.py::test_threshold_completes_with_immutable_ai_provenance_and_one_settlement",
+    "tests/test_exploration_ai_completion.py::test_database_rejects_forged_ai_submission_proof",
+    "tests/test_exploration_ai_completion.py::test_database_keeps_legacy_advisory_shape_and_evaluation_gate",
+    "tests/test_exploration_ai_migrated_learner.py::test_migrated_feishu_document_comments_and_completes_for_retired_phone_record",
+    "tests/test_exploration_ai_migration_guard.py")
+
+print("0056 -> populated 0057 -> 0060: old formal assignments, submission versions, pending review, draft and AI feedback preserved; legacy self-check details initialized without rewriting history; eight reference courses and QR initialized atomically; replay, five table grants, immutable AI completion and migrated ownership guards verified", flush=True)
