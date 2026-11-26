@@ -1,0 +1,73 @@
+/* Module buttons normally inherit the small shell font. Keep this navigation
+   control legible on both the desktop canvas and the independent reader. */
+.journey-scaled-canvas .learner-back-control {
+  --learner-back-scale: var(--module-narrow-scale, var(--journey-canvas-scale, 1));
+}
+
+html :is(body, .module-hub) :is(a, button).learner-back-control {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55em;
+  width: fit-content;
+  max-width: 100%;
+  min-height: max(52px, calc(44px / var(--learner-back-scale, 1)));
+  padding: .45em .9em;
+  border: 1px solid #5798ba;
+  border-radius: 8px;
+  background: #14334b;
+  color: #e5f8ff;
+  font: 600 18px/1.4 "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: max(18px, calc(15px / var(--learner-back-scale, 1)));
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.learner-back-control::before {
+  content: "";
+  flex: none;
+  width: .5em;
+  height: .5em;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: rotate(45deg);
+}
+
+/* In course headers the return action sits inline with the breadcrumb. */
+html :is(.study-breadcrumb, .academy-course-state) :is(a, button).learner-back-control {
+  position: relative;
+  min-height: max(40px, calc(34px / var(--learner-back-scale, 1)));
+  padding: .3em .7em;
+  gap: .45em;
+  border-color: rgb(108 174 202 / 44%);
+  border-radius: 6px;
+  background: rgb(12 38 56 / 76%);
+  color: #c4e6f1;
+  font-size: max(16px, calc(13.5px / var(--learner-back-scale, 1)));
+  font-weight: 500;
+}
+
+/* Keep the area above and below the smaller outline clickable. */
+:is(.study-breadcrumb, .academy-course-state) .learner-back-control::after {
+  content: "";
+  position: absolute;
+  inset: calc(-6px / var(--learner-back-scale, 1)) 0;
+}
+
+html :is(body, .module-hub) :is(a, button).learner-back-control:hover:not(:disabled) {
+  background: #1c4562;
+  border-color: #85d7f0;
+  color: white;
+  text-decoration: none;
+}
+
+html button.learner-back-control:disabled {
+  cursor: not-allowed;
+}
+
+html :is(body, .module-hub) :is(a, button).learner-back-control:focus-visible {
+  outline: 3px solid #7edfff;
+  outline-offset: 3px;
+}

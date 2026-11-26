@@ -69,6 +69,12 @@ const tableColumns = {
   passed: ['学员', '任务', '评分', '提交时间', '实际审核人', '审核时间', '操作'],
   failed: ['学员', '任务', '提交时间', '未通过原因', '实际审核人', '审核时间', '操作'],
 };
+function learnerIdentityLabel(submission) {
+  if (submission.studentAccountDisabled) return '原账号已停用，手机号不可用';
+  if (submission.studentIsFeishu) return submission.studentEmployeeNo ? `工号：${submission.studentEmployeeNo}` : '工号未填写';
+  return submission.studentPhone ? `手机号：${submission.studentPhone}` : '手机号未补充';
+}
+
 function renderRows(store) {
   const rows = filteredSubmissions(store);
   if (!rows.length) return `<tr><td colspan="${tableColumns[state.tab].length}"><div class="empty-state review-empty"><div class="empty-icon">${iconFor('inbox')}</div><strong>${campLabel(currentCamp)}${state.query ? '没有匹配的提交' : state.tab === 'pending' ? '暂无待审核答案' : '暂无相关记录'}</strong><p>学员提交后，记录将在这里展示。</p></div></td></tr>`;
@@ -78,7 +84,7 @@ function renderRows(store) {
     const status = statusOf(store, submission);
     const action = submission.claim ? (submission.claim.mine ? '继续审核' : '他人审核中') : status === 'pending' && state.tab !== 'ai' ? '去审核' : '查看详情';
     const cells = {
-      '学员': `<div class="student-cell"><span class="avatar avatar-small">${e((submission.studentName || '学员').slice(-2))}</span><div><strong>${e(submission.studentName || '未命名学员')}</strong><span class="cell-subtext">${e(submission.studentIsFeishu ? (submission.studentEmployeeNo ? `工号：${submission.studentEmployeeNo}` : '工号未填写') : (submission.studentPhone ? `手机号：${submission.studentPhone}` : '手机号未补充'))}</span></div></div>`,
+      '学员': `<div class="student-cell"><span class="avatar avatar-small">${e((submission.studentName || '学员').slice(-2))}</span><div><strong>${e(submission.studentName || '未命名学员')}</strong><span class="cell-subtext">${e(learnerIdentityLabel(submission))}</span></div></div>`,
       '任务': `<span class="table-task-title">${e(task.title)}</span><span class="cell-subtext">${e(task.domain || '综合能力')} · ${aiMode ? 'AI 自测' : '人工审核'}</span>${num(submission.attempt) > 1 ? `<span class="review-attempt">第 ${fmt(submission.attempt)} 次提交</span>` : ''}`,
       '评分': hasScore(submission.finalScore) ? `${fmt(submission.finalScore)} / 100` : '—',
       '提交时间': e(dateLabel(submission.submittedAt)),

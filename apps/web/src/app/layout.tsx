@@ -5,6 +5,7 @@ import { canvasScaleBootstrap } from "./project29/canvas-scale";
 
 import "./globals.css";
 import "./project29/canvasScale.css";
+import "./project29/learnerBack.css";
 
 
 export const metadata: Metadata = {

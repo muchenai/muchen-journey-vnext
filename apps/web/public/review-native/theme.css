@@ -127,6 +127,20 @@ button:focus-visible, a:focus-visible { outline-color: var(--primary); }
 .field-label { color: var(--text); }
 .field-hint, .optional, .required-note, .subtle-label, .muted, .form-help { color: var(--muted); }
 .field-label i, .required-note i, .required, .inline-error, .field-error { color: var(--red); }
+.field-feedback-message {
+  display: block;
+  flex-basis: 100%;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+[data-field-feedback-invalid][aria-invalid="true"] {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+}
 .btn-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); box-shadow: 0 3px 6px var(--focus-ring); }
 .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); color: var(--on-primary); }
 .btn-secondary { background: var(--surface); border-color: var(--border); color: var(--text); }

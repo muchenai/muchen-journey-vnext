@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateTask} from '../public/review-native/core.js';
+import {taskIssue} from '../public/review-native/task-field-limits.js';
 import {taskView,taskWrite,detailView} from '../public/review-native/native-model.js';
 import {ApiStore,createJourneyService} from '../public/review-native/native-api.js';
 import {copyAsNewTask,hasUnsavedChanges} from '../public/review-native/task-workflow.js';
@@ -18,6 +19,16 @@ const link=(name,url='https://example.com/learning')=>({id:crypto.randomUUID(),t
 const file=(name='培训题目.pdf',size=100)=>({id,name,type:'file',url:`exploration-material:${id}`,mime:'application/pdf',size});
 const task=(extra={})=>({id,camp:'exploration',completionMode:'assessment',assessmentUrl:'',taskFiles:[file()],materials:[link('学习材料')],
   title:'测试探索营任务',summary:'阅读学习材料并完成任务文档中的题目。',order:1,reviewMode:'manual',badges:[],rubric:[],...extra});
+
+test('publish issues identify the field and row without parsing the displayed message',()=>{
+  const draft=task({title:'',summary:'',reviewMode:'ai',passScore:105,
+    taskFiles:[link('', 'http://example.com')],rubric:[{id:'d',name:'',points:0,description:''}]});
+  const issues=validateTask(draft,taskIssue);
+  assert.deepEqual(issues.map(problem=>problem.message),validateTask(draft));
+  for(const field of ['title','summary','passScore'])assert.ok(issues.some(problem=>problem.field===field));
+  for(const field of ['taskFiles','rubric.name','rubric.points','rubric.description'])
+    assert.ok(issues.some(problem=>problem.field===field && problem.index===0));
+});
 
 test('No modes keep learning materials and serialize no inactive task resources without mutating local edits',()=>{
   for(const completionMode of ['learning','checkin']){

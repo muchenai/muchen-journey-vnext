@@ -50,6 +50,50 @@ def test_returning_password_user_keeps_identity_and_journey(password_provider):
     assert second.get("/api/v1/reviews").status_code == 403
 
 
+COMPANY_LEARNER_VIEWS = (
+    "/novice/tasks", "/novice/medals", "/course-workspace/village-summary",
+    "/course-workspace?camp=village", "/course-workspace?camp=academy", "/academy", "/guild",
+)
+
+
+def test_phone_identity_only_accesses_exploration_and_its_shared_personal_views(password_provider):
+    from journey_api.fixtures import ORGANIZATION_ID, REVIEWER_ID, TASK_DEFINITION_ID, TASK_VERSION_ID
+    from journey_api.models import EnrollmentStatus
+
+    client, _ = register("phone-module-views")
+    me = "/api/v1/me"
+    assert assert_ok(client.get(me + "/learner-profile"))["exploration_only"] is True
+    asset = uuid.uuid4()
+    paths = (*COMPANY_LEARNER_VIEWS, f"/academy/courses/{asset}/video", f"/academy/courses/{asset}/cover",
+             f"/course-assets/{asset}", f"/novice/tasks/{asset}/materials/0")
+    for path in paths:
+        response = client.get(me + path)
+        assert (response.status_code, response.json()["error"]["code"]) == (403, "COMPANY_ACCOUNT_REQUIRED"), path
+        assert response.json()["error"]["message"] == "请用公司认证的飞书账号进行登录和使用", path
+    for path in ("/novice/growth", "/novice/wallet", "/current-action"):
+        assert_ok(client.get(me + path))
+
+    # A legacy phone user could have claimed a village task before this restriction existed.
+    owner = uuid.UUID(assert_ok(client.get("/api/v1/session"))["user_id"])
+    assignment_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        enrollment = Enrollment(id=uuid.uuid4(), organization_id=ORGANIZATION_ID, learner_id=owner,
+            reviewer_id=REVIEWER_ID, novice_task_id=TASK_DEFINITION_ID, status=EnrollmentStatus.ACTIVE)
+        session.add(enrollment)
+        session.flush()
+        session.add(Assignment(id=assignment_id, organization_id=ORGANIZATION_ID, enrollment_id=enrollment.id,
+            task_definition_id=TASK_DEFINITION_ID, task_version_id=TASK_VERSION_ID,
+            position=1, status=AssignmentStatus.IN_PROGRESS))
+    path = f"{me}/assignments/{assignment_id}"
+    assert assert_ok(client.get(f"{me}/novice/assignments/{assignment_id}")) == {"taskId": None}
+    assert client.get(path).status_code == 403
+    assert client.get(path + "/ai-self-checks").status_code == 403
+    headers = {"X-CSRF-Token": client.cookies["journey_next_csrf"], "Idempotency-Key": str(uuid.uuid4())}
+    body = {"expected_revision": 1, "body": "existing assignment response"}
+    assert client.put(path + "/draft", json=body, headers=headers).status_code == 403
+    assert client.post(path + "/submissions", json=body, headers=headers).status_code == 403
+
+
 @pytest.mark.parametrize("staff_role", [None, Role.REVIEWER, Role.OPERATOR])
 def test_completion_code_preserves_corporate_account_and_retires_phone_login(password_provider, staff_role, monkeypatch):
     source, credentials = register("password-graduate")
@@ -57,6 +101,9 @@ def test_completion_code_preserves_corporate_account_and_retires_phone_login(pas
     assignment_id = assert_ok(source.get("/api/v1/me/current-action"))["resource_id"]
     detail_path = f"/api/v1/me/assignments/{assignment_id}"
     detail = assert_ok(source.get(detail_path))
+    assert_ok(source.get("/api/v1/me/knowledge/dashboard"))
+    for module in ("village", "academy", "guild"):
+        assert source.get(f"/api/v1/me/knowledge/{module}").status_code == 403
     material = detail["learning_materials"][0]
     completed = assert_ok(source.post(f"{detail_path}/materials/{material['key']}/complete",
         json={"task_version": detail["task_version"]}, headers={
@@ -74,6 +121,8 @@ def test_completion_code_preserves_corporate_account_and_retires_phone_login(pas
     subject = "ou_graduate_" + uuid.uuid4().hex
     target, response = login(password_provider, "graduate-feishu" + uuid.uuid4().hex, subject)
     assert_ok(response)
+    assert assert_ok(target.get("/api/v1/me/learner-profile"))["exploration_only"] is False
+    assert_ok(target.get("/api/v1/me/course-workspace"))
     target_id = uuid.UUID(assert_ok(target.get("/api/v1/session"))["user_id"])
     with SessionLocal.begin() as session:
         from journey_api.fixtures import ORGANIZATION_ID
@@ -121,10 +170,15 @@ def test_completion_code_preserves_corporate_account_and_retires_phone_login(pas
     inherited = assert_ok(target.get("/api/v1/me/current-action"))
     assert {n["assignment_id"] for n in inherited["journey"]["nodes"]} == assignment_ids
     assert assert_ok(target.get(detail_path))["learning_materials"][0]["completed_at"] == completed["completed_at"]
+    for module in ("village", "academy", "guild"):
+        assert_ok(target.get(f"/api/v1/me/knowledge/{module}"))
     assert target.get("/api/v1/me/timeline").status_code == 200
     returning, result = login(password_provider, "graduate-return" + uuid.uuid4().hex, subject)
     assert_ok(result)
     assert assert_ok(returning.get("/api/v1/session"))["user_id"] == str(target_id)
+    assert assert_ok(returning.get("/api/v1/me/learner-profile"))["exploration_only"] is False
+    for path in COMPANY_LEARNER_VIEWS:
+        assert_ok(returning.get("/api/v1/me" + path))
     assert {n["assignment_id"] for n in assert_ok(returning.get("/api/v1/me/current-action"))["journey"]["nodes"]} == assignment_ids
     outsider, _ = register("unrelated-phone")
     assert outsider.get(detail_path).status_code == 404

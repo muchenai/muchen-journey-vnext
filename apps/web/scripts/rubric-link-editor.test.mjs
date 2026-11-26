@@ -271,5 +271,6 @@ test('authoring and library wire the answer link module and cache refresh withou
   assert.match(app, /id="add-rubric-link"/); assert.match(app, /纯选择题也需要配置评分维度和通过分数/);
   assert.match(app, /renderRubricAttachments\(d.rubricAttachments/);
   assert.match(source('library.js'), /renderRubricAttachments\(task.rubricAttachments/);
-  assert.match(source('index.html'), /app.js\?v=20261118-document-rubric/);
+  const appVersion = source('index.html').match(/src="\.\/app\.js\?v=(\d{8})-/)?.[1];
+  assert.ok(Number(appVersion) >= 20261126);
 });

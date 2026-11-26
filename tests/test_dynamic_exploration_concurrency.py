@@ -132,6 +132,7 @@ def test_waiting_first_claim_cannot_overtake_archive_or_delete(exploration, monk
 
 
 @pytest.mark.parametrize('original_camp', ['exploration', 'novice'])
+@pytest.mark.parametrize('exploration', ['FEISHU'], indirect=True)
 def test_published_camp_stays_fixed_after_saving_an_editable_draft(exploration, original_camp):
     staff, learner, _ = exploration
     configuration = {}

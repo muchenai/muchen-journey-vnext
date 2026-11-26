@@ -1,0 +1,36 @@
+.page {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 1.25rem;
+  background: #02091c;
+  color: #e8f4ff;
+}
+
+.card {
+  width: min(100%, 28rem);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  border: 1px solid #284460;
+  border-radius: 1rem;
+  background: #0e1d32;
+}
+
+.card h1 {
+  max-width: none;
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  letter-spacing: normal;
+}
+
+.card a {
+  display: inline-block;
+  margin-top: 1.25rem;
+  padding: .55rem 1.25rem;
+  border-radius: .4rem;
+  background: #40d6ef;
+  color: #081a30;
+  font-weight: 600;
+  text-decoration: none;
+}

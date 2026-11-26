@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {departmentOptions,departmentLabel,PUBLISHING_DEPARTMENTS} from '../public/review-native/publishing-departments.js';
+import {departmentOptions,departmentLabel,taskCategoryOptions,PUBLISHING_DEPARTMENTS} from '../public/review-native/publishing-departments.js';
 import {editableContent,copyAsNewTask,hasUnsavedChanges} from '../public/review-native/task-workflow.js';
-import {validateTask} from '../public/review-native/core.js';
+import {validateTask,applyDifficultyPreset,rewardBreakdown} from '../public/review-native/core.js';
 import {memberRows,editMemberDepartment} from '../public/review-native/member-access.js';
 
 test('departments are grouped and a legacy domain is not silently selected',()=>{
@@ -43,4 +43,15 @@ test('member list keeps real identity and actions while showing configured depar
  assert.match(html,/部门：飞书组织/);
  assert.match(html,/工号：MCE01/);
  assert.match(html,/data-member-edit="one"/);
+});
+
+test('ordinary tasks can publish without files, retain custom XP on copy and use general knowledge outside the staff directory',()=>{
+ const task=applyDifficultyPreset({camp:'novice',difficulty:'入门',xp:73,rewardRulesVersion:4,publishingDepartment:'公司通用常识',title:'部门实践任务',summary:'依照任务说明完成实践并提交工作成果。',badges:[{id:'product',weight:100}],materials:[],reviewMode:'manual'});
+ assert.deepEqual(validateTask(task),[]);
+ assert.equal(task.difficulty,'进阶');
+ assert.equal(rewardBreakdown(task).totalPoints,7);
+ assert.equal(copyAsNewTask(task,{id:'new'}).xp,73);
+ assert.equal(applyDifficultyPreset({...task,xp:0}).xp,0);
+ assert.match(taskCategoryOptions('公司通用常识'),/value="公司通用常识" selected/);
+ assert.doesNotMatch(departmentOptions(),/公司通用常识/);
 });

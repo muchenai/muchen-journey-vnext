@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from uuid import UUID
 
@@ -13,8 +14,11 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, STAFF_SESSION_COOKIE, STAFF_CSRF_COOKIE, credential_hash
 from journey_api.reviewer_access import effective_roles
+from journey_api.review_admin_models import PublishedTaskContent
 from journey_api.models import (
+    Assignment,
     CompletionCode,
+    Enrollment,
     ExternalIdentity,
     IdentitySession,
     Role,
@@ -23,6 +27,7 @@ from journey_api.models import (
     UserStatus,
 )
 
+TEMPORARY_IDENTITY_PROVIDERS = ("PHONE", "PHONE_PASSWORD")
 
 @dataclass(frozen=True)
 class Actor:
@@ -34,6 +39,7 @@ class Actor:
     entry_role: Role | None = None
     external_identity_verified: bool = False
     inherited_learner_id: UUID | None = None
+    exploration_only: bool = False
 
     @property
     def learner_record_id(self) -> UUID:
@@ -82,6 +88,20 @@ def enforce_canary_invite_target(target_user_id: UUID | None) -> None:
         )
 
 
+def inherited_learner_ids(session: Session, organization_id: UUID, user_ids: Sequence[UUID]) -> dict[UUID, UUID]:
+    """Map current accounts to the owners of their inherited learning records."""
+    if not user_ids:
+        return {}
+    return dict(session.execute(
+        select(CompletionCode.migrated_to_user_id, CompletionCode.user_id).where(
+            CompletionCode.organization_id == organization_id,
+            CompletionCode.migrated_to_user_id.in_(user_ids),
+            CompletionCode.used_at.is_not(None),
+            CompletionCode.user_id != CompletionCode.migrated_to_user_id,
+        )
+    ).all())
+
+
 def get_actor(
     request: Request,
     x_fixture_role: str | None = Header(default=None, alias="X-Fixture-Role"),
@@ -101,7 +121,7 @@ def get_actor(
     if session_token:
         token_hash = credential_hash(settings.session_secret, "session", session_token)
         row = session.execute(
-            select(IdentitySession, User)
+            select(IdentitySession, User, ExternalIdentity.provider)
             .join(User, User.id == IdentitySession.user_id)
             .outerjoin(
                 ExternalIdentity,
@@ -128,7 +148,7 @@ def get_actor(
         ).first()
         if row is None:
             raise ApiError(401, "UNAUTHENTICATED", "vNext 会话无效或已过期。")
-        identity_session, user = row
+        identity_session, user, provider = row
         # A cookie or caller-controlled scope must never turn one entry into the other.
         if (staff and identity_session.role == Role.LEARNER) or ((scope == "learner" or learner_path) and identity_session.role != Role.LEARNER):
             raise ApiError(401, "UNAUTHENTICATED", "当前入口的登录已失效，请重新登录。")
@@ -164,6 +184,12 @@ def get_actor(
                 or not compare_digest(identity_session.csrf_token_hash, expected_hash)
             ):
                 raise ApiError(403, "FORBIDDEN", "安全校验失败，请刷新后重试。")
+        exploration_only = False
+        if identity_session.role == Role.LEARNER and provider in (*TEMPORARY_IDENTITY_PROVIDERS, "NICKNAME_PHONE"):
+            exploration_only = session.scalar(select(ExternalIdentity.id).where(
+                ExternalIdentity.user_id == user.id, ExternalIdentity.organization_id == user.organization_id,
+                ExternalIdentity.provider == "FEISHU", ExternalIdentity.revoked_at.is_(None),
+            ).limit(1)) is None
         actor = enforce_canary_learner_scope(
             Actor(
                 user.id,
@@ -173,18 +199,12 @@ def get_actor(
                 identity_session.id,
                 identity_session.role if identity_session.role in roles else None,
                 identity_session.external_identity_id is not None,
+                exploration_only=exploration_only,
             )
         )
         # Authenticate and enforce the corporate account's scope before resolving
         # access to inherited history. Never transfer identity or staff roles.
-        inherited_learner_id = session.scalar(
-            select(CompletionCode.user_id).where(
-                CompletionCode.migrated_to_user_id == user.id,
-                CompletionCode.organization_id == user.organization_id,
-                CompletionCode.used_at.is_not(None),
-                CompletionCode.user_id != user.id,
-            )
-        )
+        inherited_learner_id = inherited_learner_ids(session, user.organization_id, [user.id]).get(user.id)
         return replace(actor, inherited_learner_id=inherited_learner_id)
     if not settings.allow_fixture_identity or settings.app_env not in {"local", "test"}:
         raise ApiError(401, "UNAUTHENTICATED", "需要有效的 vNext 会话。")
@@ -228,3 +248,41 @@ def get_learner_actor(actor: Actor = Depends(get_actor)) -> Actor:
         return actor
     return replace(actor, id=actor.inherited_learner_id,
                    roles=frozenset({Role.LEARNER}), entry_role=Role.LEARNER)
+
+
+def require_company_learner(actor: Actor) -> None:
+    if actor.exploration_only:
+        raise ApiError(403, "COMPANY_ACCOUNT_REQUIRED", "请用公司认证的飞书账号进行登录和使用")
+
+
+def get_company_learner_actor(actor: Actor = Depends(get_learner_actor)) -> Actor:
+    require_company_learner(actor)
+    return actor
+
+
+def require_assignment_camp(session: Session, actor: Actor, assignment_id: UUID) -> None:
+    if not actor.exploration_only:
+        return
+    # Both dynamic exploration and village tasks populate novice_task_id.
+    # The immutable publication identifies the camp for this assignment.
+    claimed_task = session.execute(
+        select(PublishedTaskContent.content["camp"].as_string())
+        .select_from(Assignment)
+        .join(Enrollment, Enrollment.id == Assignment.enrollment_id)
+        .outerjoin(PublishedTaskContent, and_(
+            PublishedTaskContent.task_version_id == Assignment.task_version_id,
+            PublishedTaskContent.organization_id == Assignment.organization_id,
+        ))
+        .where(Assignment.id == assignment_id, Assignment.organization_id == actor.organization_id,
+               Enrollment.organization_id == actor.organization_id, Enrollment.learner_id == actor.id,
+               Enrollment.novice_task_id.is_not(None))
+    ).first()
+    if claimed_task is not None and claimed_task[0] != "exploration":
+        require_company_learner(actor)
+
+
+def get_assignment_learner_actor(
+    assignment_id: UUID, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)
+) -> Actor:
+    require_assignment_camp(session, actor, assignment_id)
+    return actor

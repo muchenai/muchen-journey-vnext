@@ -1,5 +1,6 @@
 import { escapeHtml as e, icon } from './core.js?v=20261030-member-action-spacing';
 import {effectiveRubric, rubricDimensionErrors} from './rubric-policy.js?v=20261118-document-rubric';
+import {taskIssue} from './task-field-limits.js';
 
 const MAX_ANSWER_LENGTH = 20000;
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -46,16 +47,17 @@ function configuration(task = {}) {
 }
 
 function evaluationIssues(task) {
-  if (!text(task.title) || !text(task.summary)) return ['请先填写任务标题和任务简述。'];
-  if (!task.materials?.length) return ['请先添加学习材料。'];
-  const rubricIssues = rubricDimensionErrors(task);
+  if (!text(task.title)) return [taskIssue('title','请先填写任务标题。')];
+  if (!text(task.summary)) return [taskIssue('summary','请先填写任务简述。')];
+  if (!task.materials?.length) return [taskIssue('materials','请先添加学习材料。')];
+  const rubricIssues = rubricDimensionErrors(task,taskIssue);
   if (rubricIssues.length) return rubricIssues;
-  if (task.passScore == null || !text(task.passScore) || !Number.isFinite(Number(task.passScore)) || Number(task.passScore) < 0 || Number(task.passScore) > 100) return ['请先设置有效的通过分数。'];
+  if (task.passScore == null || !text(task.passScore) || !Number.isFinite(Number(task.passScore)) || Number(task.passScore) < 0 || Number(task.passScore) > 100) return [taskIssue('passScore','请先设置有效的通过分数。')];
   return [];
 }
 
 /** Optional author-only test state. Never attached to a task or learner data. */
-export function createSandboxController({ store, service, openModal, toast, onChange = () => {} }) {
+export function createSandboxController({ store, service, openModal, toast, onChange = () => {}, onConfigurationError }) {
   const STORAGE_KEY = `${store.storageKey}:sandbox`;
   let records = Object.create(null);
   let aliases = Object.create(null);
@@ -185,7 +187,11 @@ export function createSandboxController({ store, service, openModal, toast, onCh
         const record = entryFor(key);
         if (!text(record.answer)) { error = '请先填写示例答案。'; render(); return; }
         const issues = evaluationIssues(task);
-        if (issues.length) { error = issues[0]; render(); return; }
+        if (issues.length) {
+          if (onConfigurationError) onConfigurationError(issues);
+          else { error = issues[0].message; render(); }
+          return;
+        }
         const answer = record.answer;
         const fingerprint = configuration(task);
         running.add(key);

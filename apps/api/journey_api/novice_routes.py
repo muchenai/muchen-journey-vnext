@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session, aliased
-from journey_api.auth import Actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_company_learner_actor, get_learner_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.models import (Assignment, AssignmentStatus, Enrollment, EnrollmentStatus,
@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/v1/me/novice")
 def assignment_task(assignment_id: uuid.UUID, request: Request,
                     actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
+    if actor.exploration_only:
+        return envelope(request, {"taskId": None})
     task_id = session.scalar(select(Enrollment.novice_task_id).join(Assignment,
         Assignment.enrollment_id == Enrollment.id).where(Assignment.id == assignment_id,
             Enrollment.learner_id == actor.id, Enrollment.organization_id == actor.organization_id,
@@ -94,6 +96,7 @@ def task_view(session, actor, task_id):
     for index, material in enumerate(content.get("materials", [])):
         materials.append({"name": material.get("name", "学习材料"), "type": material["type"],
             "text": material.get("text", ""), "url": material.get("url", "") if material["type"] == "link"
+            else f"/api/learner/village?task={task_id}&material={index}&stream=1" if material.get("url", "").startswith("exploration-material:")
             else f"/api/learner/village?task={task_id}&material={index}" if material["type"] in {"file", "image"} else ""})
     result = dict(id=str(task_id), title=version.title, description=version.purpose,
         category=content.get("domain", "产品开发"), level=content.get("difficulty", "入门"),
@@ -136,7 +139,7 @@ def task_view(session, actor, task_id):
 
 
 @router.get("/tasks")
-def list_tasks(request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def list_tasks(request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     visible = select(PublishedTaskContent.task_version_id).where(
         PublishedTaskContent.organization_id == actor.organization_id,
@@ -158,7 +161,7 @@ def list_tasks(request: Request, actor: Actor = Depends(get_learner_actor), sess
 
 
 @router.get("/tasks/{task_id}")
-def detail(task_id: uuid.UUID, request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def detail(task_id: uuid.UUID, request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     return envelope(request, task_view(session, actor, task_id))
 
@@ -176,7 +179,7 @@ class CancelClaimCommand(BaseModel):
 @router.post("/tasks/{task_id}/cancel")
 def cancel_claim(task_id: uuid.UUID, command: CancelClaimCommand, request: Request,
                  idempotency_key: str = Header(alias="Idempotency-Key"),
-                 actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+                 actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     # Serializes this learner's claim commands without blocking FK KEY SHARE
     # locks taken by a concurrent draft/submission that already owns Enrollment.
@@ -222,7 +225,7 @@ def cancel_claim(task_id: uuid.UUID, command: CancelClaimCommand, request: Reque
 
 @router.post("/tasks/{task_id}/claim")
 def claim(task_id: uuid.UUID, command: ClaimCommand, request: Request,
-          actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+          actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     # Serialize claims per learner; the unique owner/task constraint is the final guard.
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update(key_share=True))
@@ -261,6 +264,8 @@ def claim(task_id: uuid.UUID, command: ClaimCommand, request: Request,
                 RoleAssignment.organization_id == actor.organization_id))
         if reviewer is None:
             raise ApiError(409, "REVIEWER_UNAVAILABLE", "任务发布者暂不可审核，请联系管理员。")
+        from journey_api.course_learning import assert_village_unlocked
+        assert_village_unlocked(session, actor)
         cost = unlock_cost(snapshot.content)
         if cost and wallet(session, actor)["taskPoints"] < cost:
             raise ApiError(409, "INSUFFICIENT_POINTS", f"任务点不足，解锁此任务需要 {cost} 任务点。")
@@ -281,8 +286,9 @@ def claim(task_id: uuid.UUID, command: ClaimCommand, request: Request,
 
 
 @router.get("/tasks/{task_id}/materials/{index}")
+@router.head("/tasks/{task_id}/materials/{index}")
 def material(task_id: uuid.UUID, index: int, request: Request,
-             actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+             actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
     _, snapshot, _ = context(session, actor, task_id)
     materials = snapshot.content.get("materials", [])
@@ -290,4 +296,11 @@ def material(task_id: uuid.UUID, index: int, request: Request,
         raise ApiError(404, "NOT_FOUND", "没有找到学习文件。")
     from journey_api.review_admin_routes import Material
     data = Material.model_validate(materials[index])
+    if data.url.startswith("exploration-material:"):
+        from journey_api.exploration_models import ExplorationMaterial
+        from journey_api.content_assets import material_response
+        row = session.get(ExplorationMaterial, uuid.UUID(data.url.split(":", 1)[1]))
+        if not row or not row.complete or row.purpose != "novice" or row.organization_id != actor.organization_id:
+            raise ApiError(404, "NOT_FOUND", "没有找到学习文件。")
+        return material_response(request, session, row, inline=request.query_params.get("inline") == "1")
     return envelope(request, {"name":data.name, "mime":data.mime, "data":data.url.split(",",1)[1]})

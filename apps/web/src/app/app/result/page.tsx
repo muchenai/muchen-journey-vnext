@@ -5,6 +5,7 @@ import {
   requestNextTrainingStageReview,
 } from "@/app/actions";
 import { FactLabel } from "@/app/human-experience";
+import { LearnerBack } from "@/app/project29/LearnerBack";
 import {
   CurrentAction,
   HandoffDetail,
@@ -142,9 +143,9 @@ export default async function ResultPage({
           <p>
             当前结果基于上一次完整完成记录；本次自证重测不会改写正式评测结论。
           </p>
-          <Link href={`/app/tasks/${result.active_evidence_retest.assignment_id}`}>
-            返回正在重测的站点 →
-          </Link>
+          <LearnerBack href={`/app/tasks/${result.active_evidence_retest.assignment_id}`}>
+            返回正在重测的站点
+          </LearnerBack>
         </section>
       ) : null}
 

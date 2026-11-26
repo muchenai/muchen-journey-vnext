@@ -116,9 +116,70 @@
 .module-search kbd { flex-shrink: 0; white-space: nowrap; border: 1px solid var(--m-border); border-radius: 2px; font-size: 10px; color: var(--m-dim); padding: 0 3px; }
 .module-page-content {
   flex: 1; min-height: 0; width: 100%; padding: 12px 60px 28px;
-  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none;
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
 }
-.module-page-content::-webkit-scrollbar { display: none; }
+.module-hub:is([data-module="village"], [data-module="academy"]) .module-page-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--m-border) transparent;
+}
+.module-hub:not([data-module="village"], [data-module="academy"]) .module-page-content { scrollbar-width: none; }
+.module-hub:not([data-module="village"], [data-module="academy"]) .module-page-content::-webkit-scrollbar { display: none; }
+.module-content-frame { display: contents; }
+
+/* A narrow window or a large native zoom uses the same frame in all four
+   modules. Wide task boards can pan inside the shared navigation. */
+@media (max-width: 1100px) {
+  .module-viewport > .module-hub {
+    --module-narrow-scale: max(.75, var(--journey-canvas-scale, 1));
+    zoom: var(--module-narrow-scale);
+    width: calc(100dvw / var(--module-narrow-scale));
+    height: calc(100dvh / var(--module-narrow-scale));
+  }
+  .module-viewport .module-shared-sidebar {
+    height: 100%;
+    overflow: hidden auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--m-border) transparent;
+  }
+  .module-hub:not([data-module="academy"]):not([data-world-map]) .module-content-frame,
+  .module-content-frame:has(> .module-page-content > .personal-profile) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+  }
+  .module-hub .module-dashboard-content {
+    position: relative;
+    inset: auto;
+    flex: none;
+    margin: -74px 0 0 -246px;
+  }
+  .module-hub:not([data-module="academy"], [data-module="village"]) .module-page-content {
+    min-width: 1080px;
+    min-height: 700px;
+  }
+  /* Pan wide boards within the focusable pane so its vertical thumb
+     stays at the visible right edge, including at high browser zoom. */
+  .module-hub[data-module="village"] .module-page-content:not([data-world-map]),
+  .module-hub[data-module="academy"] .module-page-content:has(> .personal-profile) {
+    display: grid;
+    grid-template-columns: minmax(960px, 1fr); /* 1080px board less 60px padding on each side */
+    align-content: start;
+    overflow-x: auto;
+  }
+}
+@media (max-width: 650px) {
+  .module-viewport .module-shared-sidebar {
+    zoom: .62;
+    height: calc(100dvh / var(--module-narrow-scale) / .62);
+  }
+  .module-viewport .module-main { left: 153px; }
+  .module-viewport .module-header { padding-inline: 12px; gap: 4px; flex-wrap: wrap; height: auto; min-height: 76px; }
+  .module-viewport .module-header-tools { gap: 4px; flex-wrap: wrap; }
+  .module-viewport .module-search { width: 120px; }
+}
+
 .module-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 3px 0 25px; }
 .module-page-heading p { font-size: 13.351px; line-height: 22.028px; color: var(--m-muted); padding-top: 4px; }
 .module-actions { display: flex; gap: 11px; flex-wrap: wrap; }
@@ -396,3 +457,22 @@
 .village-world-map iframe { display: block; width: 100%; height: 820px; border: 0; }
 .village-world-map iframe[data-ready="false"] { visibility: hidden; }
 .village-world-map > .module-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; }
+
+.village-required-learning { margin-top: 32px; }
+.village-required-learning h2, .village-task-list-heading h2 { margin: 0; font-size: 22px; }
+.village-required-list { list-style: none; padding: 0; margin: 14px 0 0; border: 1px solid var(--m-border); border-radius: 8px; overflow: hidden; background: var(--m-surface); }
+.village-required-list:empty { display: none; }
+.village-required-empty { margin: 14px 0 0; padding: 16px 20px; border: 1px solid var(--m-border); border-radius: 8px; color: var(--m-muted); }
+.village-required-list li { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 16px 20px; }
+.village-required-list li + li { border-top: 1px solid var(--m-border); }
+.village-required-list h3 { margin: 6px 0 3px; color: var(--m-text); font-size: 17px; line-height: 1.45; overflow-wrap: anywhere; }
+.village-required-list p { margin: 0; color: var(--m-muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.village-required-action { display: grid; flex-shrink: 0; justify-items: end; gap: 7px; }
+.village-required-action small, .village-task-list-heading span { font-size: 12px; color: var(--m-muted); }
+.village-required-action a { text-decoration: none; }
+.village-task-list-heading { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.module-task-card .module-card-footer button:disabled { cursor: default; color: var(--m-muted); }
+@media (max-width: 640px) {
+  .village-required-list li { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .village-required-action { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+}

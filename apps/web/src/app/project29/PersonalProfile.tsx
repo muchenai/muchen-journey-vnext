@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModuleIcon, ModulePanel } from "./ModuleShell";
+import { LearnerBack } from "./LearnerBack";
 import { AcademyFavoritesPreview } from "./AcademyLearning";
 import { pointNames } from "./VillageTaskCard";
 import { GrowthHistoryDialog } from "./GrowthHistoryDialog";
@@ -10,6 +11,18 @@ import type { Badge } from "./badgeEconomy";
 import "./personalProfile.css";
 
 export type { ProfileWallet } from "./profileGrowth";
+export function ExplorationProfile({ name, onBack }: { name: string; onBack: () => void }) {
+  return <div className="personal-profile">
+    <div className="module-page-heading"><h1>个人主页</h1><LearnerBack onClick={onBack}>返回上一页</LearnerBack></div>
+    <ModulePanel className="profile-overview">
+      <div className="profile-identity">
+        <div className="profile-avatar" aria-hidden="true">{Array.from(name)[0]}</div>
+        <div className="profile-name"><h2>{name}</h2><p>当前学习阶段：探索营。毕业后，请使用公司飞书账号和毕业码迁移学习记录。</p></div>
+      </div>
+    </ModulePanel>
+  </div>;
+}
+
 export function PersonalProfile({name,onBack,onAcademy,onAcademyFavorites,onBadgeShop,onBadgeCatalog,onBadgeOwned}:{name:string;onBack:()=>void;onAcademy:()=>void;onAcademyFavorites:()=>void;onBadgeShop:()=>void;onBadgeCatalog:()=>void;onBadgeOwned:()=>void}){
   const [collection,setCollection]=useState<ProfileCollection|null>(null);
   const [error,setError]=useState("");
@@ -45,7 +58,7 @@ export function PersonalProfileView({name,wallet,badges,error,onRetry,onBack,onA
   const growth=profileGrowthLevel(wallet?.xp);
   const levelLabel=growth?`Lv.${growth.level} · ${growth.title}`:"成长等级 · —";
   return <div className="personal-profile">
-    <div className="module-page-heading"><div><h1>个人主页</h1><p>记录每一次探索，珍藏每一份成长。</p></div><button data-page-navigation className="module-secondary" onClick={onBack}>返回上一页 →</button></div>
+    <div className="module-page-heading"><div><h1>个人主页</h1><p>记录每一次探索，珍藏每一份成长。</p></div><LearnerBack onClick={onBack}>返回上一页</LearnerBack></div>
     {error?<p role="alert">{error}{wallet&&" 当前显示上次读取的数据。"} <button className="module-secondary" onClick={onRetry}>重新加载</button></p>:!wallet&&<p role="status">正在读取成长数据…</p>}
     <ModulePanel className="profile-overview">
       <div className="profile-identity"><div className="profile-avatar" aria-hidden="true">{Array.from(name||"学员")[0]}</div><div className="profile-name"><span className="badge-eyebrow">MY GROWTH SPACE</span><h2>{name||"学员"}</h2><div className="profile-identity-tags"><span className="module-tag">{levelLabel}</span></div><p>让每一份努力，成为看得见的成长印记。</p></div></div>

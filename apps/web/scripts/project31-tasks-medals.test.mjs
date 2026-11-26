@@ -19,7 +19,8 @@ test('delivery aggregate includes exactly the seven publishing departments, neve
   const tasks=filters.taskDepartments.map(d=>task(d.name));
   tasks.push(task('',{category:'数据交付',rewardAllocations:[{id:'data',points:10}]}));
   assert.equal(filters.filterDepartmentTasks(tasks,'delivery').length,7);
-  assert.equal(filters.filterDepartmentTasks(tasks,'all').length,20);
+  assert.equal(filters.filterDepartmentTasks(tasks,'all').length,tasks.length);
+  assert.equal(filters.filterDepartmentTasks(tasks,'company-common').length,1);
   for(const d of delivery) assert.equal(filters.filterDepartmentTasks(tasks,d.id).length,1);
   assert.equal(filters.belongsToDepartment(task('总经办',{category:'数据交付'}),'delivery'),false);
 });

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, require_role
+from journey_api.auth import Actor, TEMPORARY_IDENTITY_PROVIDERS, get_actor, require_role
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -50,7 +50,6 @@ from journey_api.sms import SmsDeliveryError, VolcengineSmsClient
 router = APIRouter(prefix="/api/v1")
 PHONE_PATTERN = re.compile(r"^1[3-9]\d{9}$")
 LOCAL_CODE = "123456"
-TEMPORARY_IDENTITY_PROVIDERS = ("PHONE", "PHONE_PASSWORD")
 
 
 class StrictModel(BaseModel):
@@ -88,19 +87,6 @@ class LearnerNickname(StrictModel):
     display_name: str
 
 
-def phone_profile_allowed(session: Session, actor: Actor) -> bool:
-    identity_session = session.get(IdentitySession, actor.session_id) if actor.session_id else None
-    identity = session.get(ExternalIdentity, identity_session.external_identity_id) if identity_session else None
-    corporate = session.scalar(select(ExternalIdentity.id).where(
-        ExternalIdentity.user_id == actor.id,
-        ExternalIdentity.organization_id == actor.organization_id,
-        ExternalIdentity.provider == "FEISHU", ExternalIdentity.revoked_at.is_(None),
-    ))
-    return bool(identity and identity.user_id == actor.id
-                and identity.provider in (*TEMPORARY_IDENTITY_PROVIDERS, "NICKNAME_PHONE")
-                and corporate is None)
-
-
 def nickname_needed(session: Session, user: User) -> bool:
     if user.display_name != "探索者":
         return False
@@ -117,14 +103,14 @@ def learner_profile(request: Request, actor: Actor = Depends(get_actor), session
     require_role(actor, Role.LEARNER)
     user = session.get(User, actor.id)
     return envelope(request, {"display_name": user.display_name,
-        "needs_nickname": phone_profile_allowed(session, actor) and nickname_needed(session, user)})
+        "needs_nickname": actor.exploration_only and nickname_needed(session, user), "exploration_only": actor.exploration_only})
 
 
 @router.put("/me/learner-profile")
 def save_learner_nickname(payload: LearnerNickname, request: Request,
                           actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     require_role(actor, Role.LEARNER)
-    if not phone_profile_allowed(session, actor):
+    if not actor.exploration_only:
         raise ApiError(403, "PHONE_ACCOUNT_REQUIRED", "仅手机号账号可设置昵称。")
     name = payload.display_name.strip()
     if not 1 <= len(name) <= 120 or any(ord(char) < 32 for char in name):

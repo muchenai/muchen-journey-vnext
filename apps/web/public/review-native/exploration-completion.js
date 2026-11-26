@@ -1,4 +1,5 @@
 import {isMaterialLink} from './material-validation.js';
+import {issueMessage} from './task-field-limits.js';
 
 export const EXPLORATION_COMPLETION_MODES = [
   {id:'learning',label:'阅读学习',description:'学员打开学习材料后即可完成，继续下一板块，无需填写作文或提交审核。'},
@@ -26,19 +27,19 @@ export function explorationTaskFiles(task = {}) {
 export function hasExplorationTaskResource(task = {}) {
   return explorationTaskFiles(task).length > 0 || (!!String(task.assessmentUrl || '').trim() && validAssessmentUrl(task.assessmentUrl));
 }
-export function explorationTaskResourceErrors(task = {}) {
+export function explorationTaskResourceErrors(task = {}, issue = issueMessage) {
   if(task.camp !== 'exploration' || !requiresTaskAssessment(task))return [];
   const errors=[], files=explorationTaskFiles(task);
-  if(!hasExplorationTaskResource(task))errors.push('请上传任务文件，或填写已有的测试链接');
-  if(!validAssessmentUrl(task.assessmentUrl))errors.push('培训测试链接需为有效的 HTTPS 地址');
-  if(files.length>20)errors.push('每个任务最多添加 20 份任务文件');
+  if(!hasExplorationTaskResource(task))errors.push(issue('taskFiles', '请上传任务文件，或填写已有的测试链接'));
+  if(!validAssessmentUrl(task.assessmentUrl))errors.push(issue('assessmentUrl', '培训测试链接需为有效的 HTTPS 地址'));
+  if(files.length>20)errors.push(issue('taskFiles', '每个任务最多添加 20 份任务文件'));
   files.forEach((file,index)=>{
     const name=String(file.name||'').trim(), nameLimit=file.type==='link'?160:240;
-    if(!name)errors.push(`请填写任务文件 ${index+1} 的名称`);
-    if(name.length>nameLimit)errors.push(`任务文件 ${index+1} 的名称不能超过 ${nameLimit} 字`);
-    if(!['link','file','image','text'].includes(file.type))errors.push(`任务文件 ${index+1} 的类型无效`);
-    if(file.type==='link'&&!isMaterialLink(file.url))errors.push(`任务文件 ${index+1} 需填写有效的 HTTPS 链接，不能包含账号或密码`);
-    if(['file','image'].includes(file.type)&&(!Number.isSafeInteger(file.size)||file.size<1||file.size>100*1024*1024))errors.push(`任务文件 ${index+1} 需为非空且不超过 100 MB 的文件`);
+    if(!name)errors.push(issue('taskFiles', `请填写任务文件 ${index+1} 的名称`, index));
+    if(name.length>nameLimit)errors.push(issue('taskFiles', `任务文件 ${index+1} 的名称不能超过 ${nameLimit} 字`, index));
+    if(!['link','file','image','text'].includes(file.type))errors.push(issue('taskFiles', `任务文件 ${index+1} 的类型无效`, index));
+    if(file.type==='link'&&!isMaterialLink(file.url))errors.push(issue('taskFiles', `任务文件 ${index+1} 需填写有效的 HTTPS 链接，不能包含账号或密码`, index));
+    if(['file','image'].includes(file.type)&&(!Number.isSafeInteger(file.size)||file.size<1||file.size>(file.url?.startsWith('exploration-material:') && file.mime?.startsWith('video/') ? 2*1024**3 : 100*1024**2)))errors.push(issue('taskFiles', `任务文件 ${index+1} 需为非空文件，视频上限 2 GB，其他文件上限 100 MB`, index));
   });
   return errors;
 }

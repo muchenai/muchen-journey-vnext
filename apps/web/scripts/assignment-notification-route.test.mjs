@@ -6,6 +6,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const nativeRequire = createRequire(import.meta.url);
+const CompanyLoginNotice = () => null;
 function compile(file, overrides) {
   const source = ts.transpileModule(readFileSync(new URL(`../src/app/${file}`, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
@@ -13,23 +14,24 @@ function compile(file, overrides) {
   const compiled = { exports: {} };
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(
     name => name in overrides ? overrides[name] : nativeRequire(name), compiled, compiled.exports);
-  return compiled.exports.default;
+  return compiled.exports.default ?? compiled.exports;
 }
 
-function taskRoute(destination, { village = true, fail } = {}) {
+function taskRoute(destination, { village = true, fail, explorationOnly = false } = {}) {
   let experienceLoads = 0;
   const page = compile("app/tasks/[assignmentId]/page.tsx", {
     "next/navigation": { redirect: path => { throw Error(`REDIRECT ${path}`); } },
     "@/lib/server/local-preview": { localVillagePreviewEnabled: () => village },
+    "@/app/project-ui/CompanyLoginNotice": { default: CompanyLoginNotice },
     "@/lib/server/api": { learnerPageRequest: async path => {
       assert.equal(path, "/api/v1/me/assignments/assignment-id/destination");
       if (fail) throw fail;
       return destination;
     } },
-    "@/app/project-ui/experience-data": { loadProjectExperience: async id => {
+    "@/app/project-ui/experience-data": { loadLearnerProfile: async () => ({ needs_nickname: false, exploration_only: explorationOnly }), loadProjectExperience: async id => {
       experienceLoads++;
       assert.equal(id, "assignment-id");
-      return { learnerName: "学员", experience: { assignmentId: id } };
+      return { learnerName: "学员", experience: { assignmentId: id }, explorationOnly };
     } },
     "@/app/project29/App": { default: () => null },
   });
@@ -52,11 +54,20 @@ test("novice notifications retain the village task destination", async () => {
   assert.equal(route.loads(), 0);
 });
 
+test("phone learners opening an old village assignment link see the company login prompt at that link", async () => {
+  for (const village of [false, true]) {
+    const route = taskRoute({ module: "village", taskId: "novice-task" }, { explorationOnly: true, village });
+    assert.equal((await route.open("review")).type, CompanyLoginNotice);
+    assert.equal(route.loads(), 0);
+  }
+});
+
 test("old exploration links still use the existing journey and review view", async () => {
-  const route = taskRoute({ module: "legacy", taskId: null });
+  const route = taskRoute({ module: "legacy", taskId: null }, { explorationOnly: true });
   const reviewed = await route.open("review");
   assert.equal(reviewed.props.initialScreen, "view");
   assert.equal(reviewed.props.experience.assignmentId, "assignment-id");
+  assert.equal(reviewed.props.explorationOnly, true);
   const detail = await route.open(undefined);
   assert.equal(detail.props.initialScreen, "detail");
   assert.equal(route.loads(), 2);
@@ -72,8 +83,13 @@ test("an expired or inaccessible destination cannot silently open a different ta
 
 test("the home route passes the selected task and feedback intent into the new experience", async () => {
   const home = compile("app/page.tsx", {
+    "@/lib/learner-module-access": compile("../lib/learner-module-access.ts", {}),
     "@/lib/server/local-preview": { localVillagePreviewEnabled: () => true },
-    "@/app/project-ui/experience-data": { loadProjectExperience: async () => ({ learnerName: "学员", experience: null, needsNickname: false }) },
+    "@/app/project-ui/CompanyLoginNotice": { default: CompanyLoginNotice },
+    "@/app/project-ui/experience-data": {
+      loadLearnerProfile: async () => ({ needs_nickname: false, exploration_only: false }),
+      loadProjectExperience: async () => ({ learnerName: "学员", experience: null, needsNickname: false }),
+    },
     "@/app/project29/App": { default: () => null },
   });
   const task = await home({ searchParams: Promise.resolve({ view: "tasks", task: "new-task", feedback: "1" }) });

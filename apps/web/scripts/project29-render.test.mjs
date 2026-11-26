@@ -233,6 +233,14 @@ test('learners with original exploration assignments can find their retained tas
   assert.doesNotMatch(render({initialScreen:'tasks',configurableExploration:false}),/restored-exploration-dialog-root/);
 });
 
+test('company-only initial screens show the phone login prompt instead of mounting the dashboard',()=>{
+  for(const initialScreen of ['village','academy','guild']){
+    const html=render({initialScreen,explorationOnly:true});
+    assert.match(html,/<h1\b[^>]*>请用公司认证的飞书账号进行登录和使用<\/h1>/);
+    assert.doesNotMatch(html,/updated-dashboard|dashboard-exploration-progress/);
+  }
+});
+
 test('exploration progress uses the same real count as its label on the first server render',()=>{
   for(const completedStages of [0,1,4,8]) {
     const html=render({experience:{...data,completedStages}});

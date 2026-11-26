@@ -5,10 +5,9 @@ import uuid
 from datetime import UTC, datetime
 from tempfile import SpooledTemporaryFile
 from typing import Literal
-from urllib.parse import quote
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
 from journey_api.db import get_db
@@ -326,7 +325,7 @@ def download_material(material_id: uuid.UUID, request: Request, inline: str | No
     if request.url.path.startswith("/api/v1/review-admin/") and (actor.entry_role == Role.LEARNER or not staff_roles):
         raise ApiError(403, "FORBIDDEN", "需要审核或管理权限。")
     row = session.get(ExplorationMaterial, material_id)
-    if not row or row.organization_id != actor.organization_id:
+    if not row or not row.complete or row.purpose not in {"novice", "exploration"} or row.organization_id != actor.organization_id:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的学习文件。")
     allowed = False
     if staff_roles and actor.entry_role != Role.LEARNER:
@@ -352,25 +351,5 @@ def download_material(material_id: uuid.UUID, request: Request, inline: str | No
                 break
     if not allowed:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的学习文件。")
-    media = row.mime in {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "video/mp4", "video/webm", "video/ogg"}
-    disposition = "inline" if inline and media and not re.search(r"\.(?:svgz?|html?|xhtml)$", row.name, re.I) else "attachment"
-    headers = {"Content-Disposition": disposition + "; filename*=UTF-8''" + quote(row.name), "Accept-Ranges": "bytes",
-        "ETag": '"' + row.sha256 + '"', "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
-    start, end, status = 0, row.size - 1, 200
-    range_header = request.headers.get("range")
-    if range_header:
-        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header)
-        if not match or not any(match.groups()):
-            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{row.size}"})
-        left, right = match.groups()
-        start = int(left) if left else max(0, row.size - int(right))
-        end = min(row.size - 1, int(right)) if left and right else row.size - 1
-        if start >= row.size or end < start:
-            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{row.size}"})
-        status = 206
-        headers["Content-Range"] = f"bytes {start}-{end}/{row.size}"
-    headers["Content-Length"] = str(end - start + 1)
-    data = b"" if request.method == "HEAD" else session.scalar(select(func.substr(ExplorationMaterial.content, start + 1, end - start + 1))
-        .where(ExplorationMaterial.id == row.id))
-    return Response(content=data, status_code=status,
-        media_type=row.mime if disposition == "inline" else "application/octet-stream", headers=headers)
+    from journey_api.content_assets import material_response
+    return material_response(request, session, row, inline=inline == "1")

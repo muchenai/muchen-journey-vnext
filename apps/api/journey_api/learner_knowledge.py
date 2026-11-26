@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-from journey_api.auth import Actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_learner_actor, require_company_learner, require_role
 from journey_api.models import Role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -21,6 +21,8 @@ Module = Literal['dashboard', 'village', 'academy', 'guild']
 
 def visible_items(session, actor, module):
     require_role(actor, Role.LEARNER)
+    if module != 'dashboard':
+        require_company_learner(actor)
     row = session.get(CommunityState, (actor.organization_id, 'knowledge'))
     data = row.content if row else initial('knowledge')
     items = [item for item in data.get('items', []) if item.get('status') == 'published'
@@ -79,3 +81,13 @@ def chunk(module: Module, item_id: uuid.UUID, position: int, request: Request,
     if part is None:
         raise ApiError(404, 'KNOWLEDGE_NOT_FOUND', '文件分段不存在。')
     return envelope(request, dict(data=base64.b64encode(part.data).decode()))
+
+@router.get('/{module}/files/{item_id}/content')
+@router.head('/{module}/files/{item_id}/content')
+def download(module: Module, item_id: uuid.UUID, request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+    from journey_api.content_assets import knowledge_response
+    item = visible_item(session, actor, module, item_id)
+    file = session.get(KnowledgeFile, item_id)
+    if item.get("kind") != "file" or not file or not file.complete or file.organization_id != actor.organization_id:
+        raise ApiError(404, "KNOWLEDGE_NOT_FOUND", "文件不存在。")
+    return knowledge_response(request, session, file)

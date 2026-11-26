@@ -74,7 +74,7 @@ def test_directory_selects_stable_account_and_requires_super(admin_setup):
     admin,response=login_admin(provider,d.people[1]['open_id']);token=assert_ok(response)['csrf_token']
     assert assert_ok(admin.get('/api/v1/session'))['user_id']==member['id']
     rights=assert_ok(admin.get('/api/v1/review-admin/capabilities'))
-    assert rights=={'isSuperAdmin':False,'canGrantSuperAdmins':False,'canPublish':True,'level':'初级','allowedDifficulties':['入门']}
+    assert rights=={'canConfigureExperience':False,'canGrantExperience':False,'isSuperAdmin':False,'canGrantSuperAdmins':False,'canPublish':True,'level':'初级','allowedDifficulties':['入门']}
     for path in ['/members','/directory?q=同名','/directory/status']:
         assert admin.get('/api/v1/review-admin'+path).status_code==403
     assert admin.post('/api/v1/review-admin/directory/refresh',headers={'X-CSRF-Token':token}).status_code==403
@@ -286,3 +286,38 @@ def test_directory_refresh_requires_csrf_and_super_admin(admin_setup,monkeypatch
     assert not calls
     assert assert_ok(c.post('/api/v1/review-admin/directory/refresh',headers=h))['syncing']
     assert calls==['refresh']
+
+def test_issuer_search_uses_company_directory_and_name_or_employee_number(admin_setup, monkeypatch):
+    client, headers, directory, _, super_id = admin_setup
+    endpoint = "/api/v1/ops/experience/permissions"
+    assert client.get(endpoint).status_code == 403
+    assert client.get(endpoint + "/search",params={"q":"同名"}).status_code == 403
+    assert client.get("/api/v1/ops/experience").status_code == 403
+    with SessionLocal.begin() as session:
+        session.get(ReviewAdminAccess, super_id).can_grant_super_admin = True
+    for index, member in enumerate(directory.people):
+        member["employee_no"] = f"MC{index:04d}"
+        member["department_paths"] = [f"技术中心 / {member['departments'][0]}"]
+    directory.people[0].update(job_title="应用工程师", avatar="https://example.com/avatar.png")
+    monkeypatch.setattr(directory, "search", lambda term: {"items":[p for p in directory.people
+        if term in p["name"] or term in p["employee_no"]], "has_more":False})
+    member = grant(admin_setup)
+    before = assert_ok(client.get(endpoint + "/search",params={"q":"同名"}))["items"]
+    assert before[0]["id"] == member["id"] and before[0]["hasManagementAccess"]
+    assert before[1]["id"] is None and not before[1]["hasManagementAccess"]
+    assert [p["employeeNo"] for p in before] == ["MC0000", "MC0001"]
+    certification = assert_ok(client.get("/api/v1/review-admin/directory", params={"q":"同名"}))["items"]
+    for candidate, profile in zip(before, certification, strict=True):
+        assert candidate["name"] == profile["name"]
+        assert candidate["avatar"] == profile["avatar"]
+        assert candidate["jobTitle"] == profile.get("job_title", "")
+        assert candidate["employeeNo"] == profile["employee_no"]
+        assert candidate["departmentPaths"] == profile["department_paths"]
+    assert assert_ok(client.get(endpoint + "/search",params={"q":"0001"}))["items"] == [before[1]]
+    rights = assert_ok(client.get("/api/v1/review-admin/capabilities"))
+    assert rights["canConfigureExperience"] and not rights["canGrantExperience"]
+    # A failed assignment cannot replace an existing issuer; no privilege is conferred on selection.
+    before_config = assert_ok(client.get(endpoint))
+    invalid = client.post(endpoint,headers=headers,json={"action":"configure","issuers":[member["id"],str(uuid.uuid4())],"revision":before_config["revision"]})
+    assert invalid.status_code == 422
+    assert assert_ok(client.get(endpoint)) == before_config

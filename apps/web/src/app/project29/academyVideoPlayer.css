@@ -1,0 +1,167 @@
+.academy-tracked-video {
+  container: academy-player / inline-size;
+  width: 100%;
+  margin: 12px 0;
+  border: 1px solid;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+  color: #e3edf7;
+  border-color: #34526d;
+  background: #0b1929;
+}
+.academy-tracked-video .tracked-video-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+  isolation: isolate;
+  background: #030b14;
+}
+.academy-tracked-video .tracked-video-stage video {
+  display: block;
+  width: 100%;
+  background: #030b14;
+  object-fit: contain;
+}
+.academy-tracked-video .tracked-video-error {
+  display: flex; align-items: center; justify-content: space-between; gap: 13px;
+  margin: 0 12px 12px; padding: 10px 12px; border: 1px solid #98545766;
+  border-radius: 5px; background: #662d3733; color: #e9b5b8; font-size: 11px;
+}
+.academy-tracked-video .tracked-video-error > button {
+  flex: none; padding: 4px 7px; border: 1px solid #a5697066; border-radius: 4px;
+  background: #57333d66; color: #edc1c5; font-size: 10px; cursor: pointer;
+}
+.academy-tracked-video .tracked-video-note { margin: 0; padding: 0 13px 12px; color: #789fb6; font-size: 10px; }
+.academy-tracked-video:fullscreen {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 15px; box-sizing: border-box; border: 0; border-radius: 0; background: #030b14;
+}
+.academy-tracked-video:fullscreen .tracked-video-stage { flex: 1; min-height: 0; }
+@media (max-width: 550px) {
+  .academy-tracked-video .tracked-video-stage { min-height: 150px; }
+  .academy-tracked-video .tracked-video-error { align-items: flex-start; flex-direction: column; }
+}
+.academy-video-learning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 9px 15px;
+  border-bottom: 1px solid #2e475e;
+  color: #c7dce9;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.academy-video-metric { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.academy-video-metric strong { color: #8ee9f4; font-size: 17px; }
+.academy-video-metric small { color: #a7bfd0; font-size: 13px; white-space: nowrap; }
+.academy-video-time-label { font-family: sans-serif; }
+.academy-tracked-video .tracked-video-stage video { max-height: min(62vh, 600px); }
+.module-hub .academy-tracked-video .academy-video-surface-action {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+}
+.academy-video-overlay-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid #a3e8f5b3;
+  border-radius: 50%;
+  background: #051724d9;
+  box-shadow: 0 3px 16px #0006;
+}
+.academy-video-overlay-icon svg { width: 25px; height: 25px; }
+.academy-video-surface-action[data-playing="true"] .academy-video-overlay-icon { opacity: 0; }
+@media (hover: hover) {
+  .academy-video-surface-action[data-playing="true"]:hover .academy-video-overlay-icon { opacity: 1; }
+}
+.academy-video-surface-action[data-playing="true"]:focus-visible .academy-video-overlay-icon { opacity: 1; }
+.module-hub .academy-tracked-video .academy-video-surface-action:focus-visible { outline-offset: -3px; }
+.academy-video-loading {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #d5e8f7;
+  background: #071420e0;
+  font-size: 12px;
+  pointer-events: none;
+}
+.academy-video-transport { padding: 12px 16px 10px; }
+.academy-playback-progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: #294158;
+  color: #4cd8eb;
+  cursor: default;
+}
+.academy-playback-progress::-webkit-progress-bar { border-radius: inherit; background: #294158; }
+.academy-playback-progress::-webkit-progress-value { border-radius: inherit; background: #4cd8eb; }
+.academy-playback-progress::-moz-progress-bar { border-radius: inherit; background: #4cd8eb; }
+.academy-video-controls, .academy-video-tools { display: flex; align-items: center; gap: 8px; }
+.academy-video-controls { flex-wrap: wrap; margin-top: 9px; }
+.academy-video-tools { margin-left: auto; gap: 4px; }
+.module-hub .academy-tracked-video .academy-video-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #c0d4e4;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.module-hub .academy-tracked-video .academy-video-button:hover:not(:disabled) { background: #1c344b; color: #fff; }
+.module-hub .academy-tracked-video .academy-playback-toggle {
+  min-width: 88px;
+  padding-inline: 12px;
+  border-color: #47778d;
+  color: #b9f3fb;
+  background: #143347;
+}
+.module-hub .academy-tracked-video .academy-playback-toggle:hover:not(:disabled) { background: #21495c; }
+.academy-video-time {
+  margin-left: 5px;
+  color: #9db5c8;
+  font: 13px/1.5 ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.academy-video-time strong { color: #e7f5fc; font-weight: 600; }
+.academy-tracked-video .academy-video-complete { margin: 5px 0 0; color: #8cdfbe; font-size: 13px; }
+.academy-tracked-video:fullscreen .tracked-video-stage video { height: 100%; max-height: 100%; }
+@container academy-player (max-width: 440px) {
+  .academy-video-transport { padding: 10px 9px 7px; }
+  .academy-video-controls, .academy-video-tools { gap: 2px; }
+  .module-hub .academy-tracked-video .academy-video-button { min-width: 34px; padding-inline: 6px; }
+  .module-hub .academy-tracked-video .academy-playback-toggle { padding-inline: 8px; }
+  .academy-video-tools .academy-video-button span { display: none; }
+  .academy-video-time { margin-left: 4px; font-size: 12px; }
+}

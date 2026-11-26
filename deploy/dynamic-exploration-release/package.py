@@ -22,10 +22,11 @@ def sha(path):
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
-def package(build, output):
+def package(build, output, *, course_workspace=False):
     source = ROOT / "deploy/dynamic-exploration-release"
+    profile = ROOT / "deploy/course-workspace-release" if course_workspace else source
     shared = ROOT / "deploy/academy-release"
-    manifest = json.loads((source / "baseline.json").read_text(encoding="utf-8"))
+    manifest = json.loads((profile / "baseline.json").read_text(encoding="utf-8"))
     manifest["candidate"] = os.environ["CANDIDATE"]
     manifest["package_run_id"] = os.environ["PACKAGE_RUN"]
     for line in (build / "SHA256SUMS").read_text().splitlines():
@@ -63,16 +64,18 @@ def package(build, output):
     files = {
         "restore_backup.py": shared / "restore_backup.py",
         "diagnose_backup.py": ROOT / "deploy/admin-reviewed/diagnose_backup.py",
-        "activate.py": source / "activate.py", "prepare.py": ROOT / "deploy/exploration-release/prepare.py",
-        "facts_guard.py": source / "facts_guard.py",
+        "activate.py": profile / "activate.py", "prepare.py": ROOT / "deploy/exploration-release/prepare.py",
+        "facts_guard.py": profile / "facts_guard.py",
         "canary_schema_upgrade.py": ROOT / "scripts/canary_schema_upgrade.py",
         "wp31_database_snapshot.py": ROOT / "scripts/wp31_database_snapshot.py",
         "db_facts.py": ROOT / "deploy/production/db_facts.py",
         "db_facts_control.py": ROOT / "deploy/production/db_facts.py",
-        "grant_runtime.py": source / "grant_runtime.py",
+        "grant_runtime.py": profile / "grant_runtime.py",
         "catalog_actor.py": source / "catalog_actor.py",
         "disk_space.py": shared / "disk_space.py", "image_transport.py": shared / "image_transport.py",
     }
+    if course_workspace:
+        files["dynamic_release.py"] = source / "activate.py"
     for name, path in files.items():
         shutil.copyfile(path, output / name)
     manifest["disk_budget"] = disk_budget(sum(path.stat().st_size for path in output.iterdir()) + 1024**2,
@@ -85,4 +88,5 @@ def package(build, output):
 
 
 if __name__ == "__main__":
-    package(Path(os.environ["BUILD_DIR"]), Path(os.environ["PACKAGE_DIR"]))
+    package(Path(os.environ["BUILD_DIR"]), Path(os.environ["PACKAGE_DIR"]),
+            course_workspace=os.environ.get("RELEASE_PROFILE") == "course-workspace")

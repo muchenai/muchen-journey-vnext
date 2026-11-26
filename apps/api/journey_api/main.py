@@ -170,3 +170,9 @@ app.include_router(academy_admin_router)
 app.include_router(academy_learner_router)
 from journey_api.guild_routes import router as guild_router
 app.include_router(guild_router)
+from journey_api.management_access_routes import router as management_access_router
+from journey_api.course_workspace_routes import router as course_workspace_router
+from journey_api.content_assets import router as content_assets_router
+app.include_router(management_access_router)
+app.include_router(course_workspace_router)
+app.include_router(content_assets_router)

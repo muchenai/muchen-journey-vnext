@@ -13,13 +13,16 @@ export function proxy(request: NextRequest) {
   const isLocal = process.env.APP_ENV === "local";
   const developmentEval = isDevelopment ? " 'unsafe-eval'" : "";
   const stylePolicy = isLocal ? "style-src 'self'" : `style-src 'self' 'nonce-${nonce}'`;
-  const reviewAvatars = request.nextUrl.pathname === "/review" || request.nextUrl.pathname.startsWith("/review/")
+  const pathname = request.nextUrl.pathname;
+  const isReviewRoute = pathname === "/review" || pathname.startsWith("/review/");
+  const reviewAvatars = isReviewRoute
     ? " https://*.feishucdn.com https://*.larksuitecdn.com https://*.byteimg.com" : "";
   const policy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentEval}`,
     stylePolicy,
     `img-src 'self' data: blob:${reviewAvatars}`,
+    ...(pathname === "/review" ? ["media-src 'self' blob:", "worker-src 'self'"] : []),
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",
@@ -37,13 +40,11 @@ export function proxy(request: NextRequest) {
   // instructs the browser and leaves those generated scripts un-nonced.
   requestHeaders.set("Content-Security-Policy", policy);
 
-  const pathname = request.nextUrl.pathname;
   const hasSession = Boolean(request.cookies.get(STAFF_SESSION_COOKIE)?.value);
   const fixtureIdentityAllowed =
     process.env.APP_ENV === "local" &&
     process.env.ALLOW_FIXTURE_IDENTITY === "true";
   const isReviewLogin = pathname === "/review/login";
-  const isReviewRoute = pathname === "/review" || pathname.startsWith("/review/");
   if (isReviewRoute && !isReviewLogin && !hasSession && !fixtureIdentityAllowed) {
     const response = NextResponse.redirect(new URL("/review/login", request.url), 303);
     response.headers.set("Cache-Control", "no-store");

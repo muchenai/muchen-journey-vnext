@@ -17,7 +17,7 @@ from journey_api.attachments import (
     safe_original_filename,
     validate_content,
 )
-from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_actor, get_assignment_learner_actor, get_learner_actor, require_assignment_camp, require_role
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -212,6 +212,7 @@ def lock_owned_attachment(
     )
     if attachment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
+    require_assignment_camp(session, actor, attachment.assignment_id)
     return attachment
 
 
@@ -240,6 +241,7 @@ def presign_attachment(
 ) -> dict[str, object]:
     require_attachments_enabled()
     require_role(actor, Role.LEARNER)
+    require_assignment_camp(session, actor, command.assignment_id)
     payload = command.model_dump(mode="json")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     replay = find_replay(
@@ -357,7 +359,7 @@ def presign_attachment(
 async def upload_attachment_content(
     attachment_id: uuid.UUID,
     request: Request,
-    actor: Actor = Depends(get_actor),
+    actor: Actor = Depends(get_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_attachments_enabled()
@@ -421,6 +423,7 @@ def complete_attachment(
         attachment = session.get(Attachment, attachment_id)
         if attachment is None or attachment.owner_id != actor.id:
             raise ApiError(409, "VERSION_CONFLICT", "幂等附件引用已不可用。")
+        require_assignment_camp(session, actor, attachment.assignment_id)
         return envelope(request, attachment_out(attachment))
     attachment = lock_owned_attachment(session, actor, attachment_id)
     if (
@@ -558,6 +561,8 @@ def download_attachment(
     if attachment is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的附件。")
     allowed = actor.has_role(Role.LEARNER) and attachment.owner_id == actor.learner_record_id
+    if allowed:
+        require_assignment_camp(session, actor, attachment.assignment_id)
     if not allowed and actor.has_role(Role.REVIEWER):
         from journey_api.review_routes import scoped_context_query
 
@@ -610,7 +615,7 @@ def save_submission_draft(
     command: SaveSubmissionDraftCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_learner_actor),
+    actor: Actor = Depends(get_assignment_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -699,7 +704,7 @@ def start_evidence_revision(
     command: RevisionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_learner_actor),
+    actor: Actor = Depends(get_assignment_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -833,7 +838,7 @@ def cancel_evidence_revision(
     command: RevisionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_learner_actor),
+    actor: Actor = Depends(get_assignment_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -941,7 +946,7 @@ def submit_assignment(
     command: SubmissionCommand,
     request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"),
-    actor: Actor = Depends(get_learner_actor),
+    actor: Actor = Depends(get_assignment_learner_actor),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_role(actor, Role.LEARNER)
@@ -1141,6 +1146,7 @@ def submission_history(
     )
     if submission is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可访问的提交历史。")
+    require_assignment_camp(session, actor, submission.assignment_id)
     return envelope(request, submission_out(session, submission))
 
 

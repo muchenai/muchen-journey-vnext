@@ -4,7 +4,8 @@ import { nextExplorationOrder } from './exploration-order.js';
 const fields = ['title','summary','camp','domain','publishingDepartment','difficulty','unlockTaskPoints','badges','materials','reviewMode','passScore','rubric','rubricAttachments'];
 export function editableContent(task) {
   const editable = task.camp === 'exploration' ? [...fields, 'order','completionMode','assessmentUrl','taskFiles'] : fields;
-  return Object.fromEntries(editable.map(key => [key, task[key] ?? (key==='completionMode'?'assessment':key==='unlockTaskPoints' ? 0 : ['badges','materials','rubric','rubricAttachments','taskFiles'].includes(key) ? [] : '')]));
+  const rewardFields = task.camp !== "exploration" && task.rewardRulesVersion === 4 ? [...editable, "xp", "rewardRulesVersion"] : editable;
+  return Object.fromEntries(rewardFields.map(key => [key, task[key] ?? (key==='completionMode'?'assessment':key==='unlockTaskPoints' ? 0 : ['badges','materials','rubric','rubricAttachments','taskFiles'].includes(key) ? [] : '')]));
 }
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -34,32 +35,33 @@ export function copyAsNewTask(task, empty) {
 }
 export function createTaskWorkflow({store,newDraft,openModal,closeModal,showEditor,toast}) {
   let transitionPending = false;
-  function freshDraft() {
-    const empty=unpublishedDraft(newDraft());
+  function freshDraft(camp) {
+    const empty=unpublishedDraft(newDraft(camp));
     if (!empty.id || empty.id===store.data.draft?.id || store.getTask(empty.id)?.id===empty.id) empty.id=crypto.randomUUID();
     return empty;
   }
-  async function replace(next, ready) {
+  async function replace(next, ready, isCopy) {
     const before = store.data.draft;
     store.data.draft = next;
     try { const pending=store.save(); if(pending?.then)await pending; }
     catch (error) { if(store.data.draft===next)store.data.draft=before; throw error; }
     ready?.();
-    closeModal(); showEditor();
+    closeModal(); showEditor(isCopy);
   }
-  async function start(copy) {
+  async function start(copy, camp) {
     if (transitionPending) return;
     if (!canConfigureTask(copy, store.capabilities?.isSuperAdmin)) { toast(EXPLORATION_CONFIGURATION_NOTICE, 'error'); return; }
     const draft=store.data.draft;
-    const empty=freshDraft();
+    const empty=freshDraft(camp);
     const next=copy ? copyAsNewTask(copy,copy.camp==='exploration'?{...empty,order:nextExplorationOrder(store.data.tasks)}:empty) : empty;
     const proceed=async modal=>{
       if(transitionPending)return;
       transitionPending=true;
-      try { await replace(next,()=>{if(modal)modal.dataset.operationPending='false';});toast(copy ? '已复制为新任务，请编辑后发布' : '已打开新任务表单'); }
+      try { await replace(next,()=>{if(modal)modal.dataset.operationPending='false';},!!copy);toast(copy ? '已复制为新任务，请编辑后发布' : '已打开新任务表单'); }
       finally { transitionPending=false; }
     };
-    if (!canConfigureTask(draft, store.capabilities?.isSuperAdmin) || !hasUnsavedChanges(draft,store.getTask(draft.id),empty)) {
+    const currentCampDefaults = draft.camp === empty.camp ? empty : newDraft(draft.camp);
+    if (!canConfigureTask(draft, store.capabilities?.isSuperAdmin) || !hasUnsavedChanges(draft,store.getTask(draft.id),currentCampDefaults)) {
       try {await proceed();} catch(error) {toast(error.message,'error');}
       return;
     }

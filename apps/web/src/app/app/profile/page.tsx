@@ -8,6 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function LearnerProfilePage() {
   const profile = await learnerPageRequest<{ needs_nickname: boolean }>("/api/v1/me/learner-profile");
   if (!profile.needs_nickname) redirect("/app");
-  const { learnerName, experience } = await loadProjectExperience(undefined, true);
-  return <ProjectExperience initialScreen="welcome" joinPhase="nickname" joinError="" learnerName={learnerName} experience={experience} />;
+  const { learnerName, experience, explorationOnly } = await loadProjectExperience(undefined, true);
+  return <ProjectExperience initialScreen="welcome" joinPhase="nickname" joinError="" learnerName={learnerName} experience={experience} explorationOnly={explorationOnly} />;
 }

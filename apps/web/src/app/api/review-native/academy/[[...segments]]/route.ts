@@ -40,7 +40,7 @@ function allowed(parts: string[], method: string) {
     || (parts[0] === "shares" && parts[2] === "review" && method === "POST")
     || (parts[0] === "uploads" && parts[2] === "complete" && method === "POST")
     || (parts[0] === "courses" && ["video", "cover"].includes(parts[2]) && ["GET", "HEAD"].includes(method));
-  return parts.length === 4 && parts[0] === "uploads" && parts[2] === "chunks" && /^\d{1,4}$/.test(parts[3]) && Number(parts[3]) < 1000 && method === "PUT";
+  return parts.length === 4 && parts[0] === "uploads" && parts[2] === "chunks" && /^\d{1,4}$/.test(parts[3]) && Number(parts[3]) < 4096 && method === "PUT";
 }
 
 async function handle(request: NextRequest, context: Context) {

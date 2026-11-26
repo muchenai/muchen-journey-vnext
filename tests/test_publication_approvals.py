@@ -87,7 +87,7 @@ def test_return_reason_resubmit_and_existing_live_version_stays_visible():
     assert_ok(decision(boss,request_for(boss,task_id),'rejected','请完善任务要求'))
     assert assert_ok(learner[0].get('/api/v1/me/novice/tasks/'+task_id))['versionId']==original['versionId']
 
-def test_challenge_new_rules_have_no_cost_and_twenty_percent_weights():
+def test_challenge_has_no_cost_and_keeps_two_type_rewards():
     owner,boss,task_id,data,saved=setup_flow()
     boss_id=str(assert_ok(boss[0].get('/api/v1/review-admin/reviews'))['actor']['id'])
     another=str(uuid.uuid4())
@@ -100,7 +100,7 @@ def test_challenge_new_rules_have_no_cost_and_twenty_percent_weights():
     learner=flow['learner'],flow['csrf']
     assert_ok(post(learner,f'me/novice/tasks/{another}/claim',{'version_id':published['versionId']}))
     invalid=boss[0].put('/api/v1/review-admin/tasks/'+another,headers={'X-CSRF-Token':boss[1]},
-        json={'id':another,'expected_revision':saved['revision'],'content':{**challenge,'badges':[{'id':'product','weight':50},{'id':'data','weight':50}]}})
+        json={'id':another,'expected_revision':saved['revision'],'content':{**challenge,'badges':[{'id':'product','weight':50.5},{'id':'data','weight':49.5}]}})
     assert invalid.status_code==422
 
 def test_generic_publish_cannot_bypass_approval_and_revoked_author_stays_unpublished():

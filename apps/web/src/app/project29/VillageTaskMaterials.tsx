@@ -62,7 +62,12 @@ function MaterialDownload({ taskId, index, name }: { taskId: string; index: numb
 export function VillageTaskMaterials({ task }: { task: VillageTask }) {
   return <ul className="village-task-materials">{task.materials.map((material, index) => <li key={`${task.id}:${task.versionId}:${index}`}>
     {material.type === "file" || material.type === "image"
-      ? <MaterialDownload taskId={task.id} index={index} name={material.name} />
+      ? material.url.endsWith("&stream=1")
+        ? <div className="village-material-download">
+            <video controls playsInline preload="none" style={{maxWidth:"100%"}} src={material.url + "&inline=1"} aria-label={material.name} />
+            <a className="module-cyan" href={material.url} download={material.name}>{material.name} ↓</a>
+          </div>
+        : <MaterialDownload taskId={task.id} index={index} name={material.name} />
       : material.url ? <a className="module-cyan" href={material.url} target="_blank" rel="noopener noreferrer">{material.name} ↗</a> : <strong>{material.name}</strong>}
     {material.text && <p style={{ whiteSpace: "pre-wrap" }}>{material.text}</p>}
   </li>)}</ul>;

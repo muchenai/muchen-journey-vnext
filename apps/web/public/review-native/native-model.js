@@ -20,6 +20,7 @@ export function taskWrite(task) {
 }
 export function reviewView(item, task) {
   return { id: item.id, taskId: item.task_id, taskStableKey: task?.stableKey, studentId: item.learner_id, studentName: item.learner_name,
+    studentAccountDisabled: item.learner_account_disabled === true,
     studentIsFeishu: item.learner_is_feishu === true, studentEmployeeNo: item.learner_employee_no || '', studentPhone: item.learner_phone || '',
     camp: item.camp, reviewMode: 'manual', status: item.decision === 'PASS' ? 'passed' : item.decision === 'REVISION_REQUIRED' ? 'returned' : 'pending',
     finalScore: item.score, reviewComment: item.feedback, failureReasons: (item.reasons || []).map(name => Object.keys(reasonNames).find(key => reasonNames[key] === name) || name),

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from journey_api.db import SessionLocal
 from journey_api.fixtures import ORGANIZATION_ID
 from journey_api.learner_phone import read_verified_phone, remember_verified_phone
-from journey_api.models import ExternalIdentity
+from journey_api.models import ExternalIdentity, User, UserStatus
 from journey_api.phone_auth_routes import phone_subject
 from test_phone_password_flow import password_provider, register, learner_provider, oauth_provider
 from test_reviewer_workbench import create_submission, client_for, assert_ok, REVIEWER_HEADERS
@@ -21,6 +21,7 @@ def test_review_phone_is_scoped_and_feishu_takes_precedence():
         return next(item for item in data['items'] if item['id'] == str(flow['review_id']))
 
     initial = row()
+    assert initial['learner_account_disabled'] is False
     assert initial['learner_phone'] == ''
     learner_id = uuid.UUID(initial['learner_id'])
     phone = '13900000042'
@@ -40,6 +41,34 @@ def test_review_phone_is_scoped_and_feishu_takes_precedence():
             user_id=learner_id, provider='FEISHU', subject='test-feishu-' + uuid.uuid4().hex, revision=1))
     assert row()['learner_phone'] == ''
     assert row()['learner_is_feishu'] is True
+
+
+def test_queue_marks_disabled_account_and_withholds_any_remaining_phone():
+    flow = create_submission('retired-phone-' + uuid.uuid4().hex[:8])
+    reviewer = client_for('retired-phone-reviewer')
+
+    def row():
+        data = assert_ok(reviewer.get('/api/v1/review-admin/reviews', headers=REVIEWER_HEADERS))
+        return next(item for item in data['items'] if item['id'] == str(flow['review_id']))
+
+    learner_id = uuid.UUID(row()['learner_id'])
+    phone = '13900000044'
+    identity_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        identity = ExternalIdentity(id=identity_id, organization_id=ORGANIZATION_ID,
+            user_id=learner_id, provider='PHONE_PASSWORD', subject=phone_subject(phone), revision=1)
+        remember_verified_phone(identity, phone)
+        session.add(identity)
+        session.get(User, learner_id).status = UserStatus.DISABLED
+    disabled = row()
+    assert disabled['learner_account_disabled'] is True
+    assert disabled['learner_phone'] == ''
+
+    with SessionLocal.begin() as session:
+        session.get(ExternalIdentity, identity_id).revoked_at = datetime.now(UTC)
+    revoked = row()
+    assert revoked['learner_account_disabled'] is True
+    assert revoked['learner_phone'] == ''
 
 
 def test_phone_ciphertext_cannot_be_rebound_or_read_after_revocation():

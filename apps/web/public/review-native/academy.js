@@ -1,5 +1,6 @@
 import { validateExternalUrl } from './academy-store.js?v=20261021-academy-management';
 import { ACADEMY_TAGS } from './academy-api.js?v=20261105-sources';
+import {bindFieldFeedback, clearFieldErrors, showFieldError} from './field-feedback.js';
 
 const e = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const date = value => { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('zh-CN'); };
@@ -8,7 +9,7 @@ const fresh = (type = 'link') => ({ id: crypto.randomUUID(), type, title: '', su
 const sourceLabel = type => ({ link: '外部链接', video: '内部视频', share: '员工分享' })[type] || '外部链接';
 
 export function createAcademyController({ academy, ui }) {
-  const state = { tab: 'courses', view: 'list', query: '', tag: 'all', reviewStatus: 'pending', editId: null, draft: fresh(), busy: false, error: '', progress: 0 };
+  const state = { tab: 'courses', view: 'list', query: '', tag: 'all', reviewStatus: 'pending', editId: null, draft: fresh(), busy: false, progress: 0 };
   const ic = (name, size = 16) => ui.icon(name, size);
   const admin = () => academy.isAdmin();
   const guard = () => { if (admin()) return true; ui.toast('仅管理员可管理学院内容', 'error'); return false; };
@@ -24,7 +25,7 @@ export function createAcademyController({ academy, ui }) {
     if (!guard() || state.busy) return;
     state.editId = course?.id || null;
     state.draft = course ? { type: course.type, title: course.title, summary: course.summary, url: course.url || '', minutes: course.minutes, tags: [...(course.tags || [])], expected_revision: course.revision, file: null, videoName: course.videoName } : fresh(type);
-    state.error = ''; state.view = 'form'; ui.refresh();
+    state.view = 'form'; ui.refresh();
   }
 
   function search() {
@@ -53,8 +54,8 @@ export function createAcademyController({ academy, ui }) {
   function renderForm() {
     const d=state.draft;
     const sourceField = `<label class="ac-field"><span>课程来源</span>${state.editId ? `<input value="${sourceLabel(d.type)}" readonly aria-label="课程来源">` : `<select name="type" data-ac-source aria-label="课程来源"><option value="link" ${d.type==='link'?'selected':''}>外部链接</option><option value="video" ${d.type==='video'?'selected':''}>内部视频</option></select>`}</label>`;
-    const fileField=d.type==='video'?`<div class="ac-field"><span>视频文件 ${state.editId?'':'*'}</span><label class="ac-upload">${ic('upload',26)}<strong class="ac-upload-name">${e(d.file?.name||d.videoName||'选择本地视频')}</strong><span>${d.file?(d.file.size/1024/1024).toFixed(1)+' MB':state.editId?'重新选择可替换视频':'上传 MP4、WebM 等视频文件'}</span><input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.m4v,.webm,.ogv,.ogg,.mov" data-ac-file aria-label="选择课程视频"></label><small>支持最大 500 MB 的视频，发布后学员可在站内观看。</small></div>`:`<label class="ac-field"><span>课程链接 *</span><input name="url" type="url" value="${e(d.url)}" placeholder="https://" required><small>支持飞书文档、网页及外部视频链接。</small></label>`;
-    return `<header class="ac-heading"><h1>${state.editId?'编辑课程':'新增课程'}</h1><button type="button" class="ac-btn ac-btn-secondary" data-ac-cancel ${state.busy?'disabled':''}>返回课程管理</button></header><section class="ac-form-card"><form class="ac-form" data-ac-form novalidate><fieldset class="ac-form-fields" ${state.busy?'disabled':''}>${sourceField}<label class="ac-field"><span>课程名称 *</span><input name="title" maxlength="100" value="${e(d.title)}" placeholder="填写课程名称" required></label><label class="ac-field"><span>课程简介 *</span><textarea name="summary" rows="4" maxlength="1200" placeholder="填写课程内容与适用场景" required>${e(d.summary)}</textarea></label>${fileField}<fieldset class="ac-field ac-tag-options"><legend>课程标签（可多选）</legend><div>${tags().map(tag=>`<label><input type="checkbox" name="tags" value="${e(tag)}" ${d.tags.includes(tag)?'checked':''}><span>${e(tag)}</span></label>`).join('')}</div></fieldset><label class="ac-field"><span>预计时长（分钟）</span><input name="minutes" type="number" min="1" max="1440" value="${e(d.minutes)}"></label></fieldset><p class="ac-inline-error" role="alert">${e(state.error)}</p>${state.busy?`<div class="ac-upload-progress" role="status" aria-live="polite"><progress max="100" value="${state.progress}" data-ac-progress></progress><span data-ac-progress-label>${d.type==='video'&&d.file?'正在上传视频 '+state.progress+'%':'正在保存课程…'}</span></div>`:''}<div class="ac-form-footer"><button type="button" class="ac-btn ac-btn-secondary" data-ac-cancel ${state.busy?'disabled':''}>取消</button><button type="submit" class="ac-btn ac-btn-primary" ${state.busy?'disabled':''}>${state.busy?'保存中…':state.editId?'保存修改':'发布课程'}</button></div></form></section>`;
+    const fileField=d.type==='video'?`<div class="ac-field"><span>视频文件 ${state.editId?'':'*'}</span><label class="ac-upload">${ic('upload',26)}<strong class="ac-upload-name">${e(d.file?.name||d.videoName||'选择本地视频')}</strong><span>${d.file?(d.file.size/1024/1024).toFixed(1)+' MB':state.editId?'重新选择可替换视频':'上传 MP4、WebM 等视频文件'}</span><input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.m4v,.webm,.ogv,.ogg,.mov" data-ac-file aria-label="选择课程视频"></label><small>支持最大 2 GB 的视频，发布后学员可在站内观看。</small></div>`:`<label class="ac-field"><span>课程链接 *</span><input name="url" type="url" value="${e(d.url)}" placeholder="https://" required><small>支持飞书文档、网页及外部视频链接。</small></label>`;
+    return `<header class="ac-heading"><h1>${state.editId?'编辑课程':'新增课程'}</h1><button type="button" class="ac-btn ac-btn-secondary" data-ac-cancel ${state.busy?'disabled':''}>返回课程管理</button></header><section class="ac-form-card"><form class="ac-form" data-ac-form novalidate><fieldset class="ac-form-fields" ${state.busy?'disabled':''}>${sourceField}<label class="ac-field"><span>课程名称 *</span><input name="title" maxlength="100" value="${e(d.title)}" placeholder="填写课程名称" required></label><label class="ac-field"><span>课程简介 *</span><textarea name="summary" rows="4" maxlength="1200" placeholder="填写课程内容与适用场景" required>${e(d.summary)}</textarea></label>${fileField}<fieldset class="ac-field ac-tag-options"><legend>课程标签（可多选）</legend><div>${tags().map(tag=>`<label><input type="checkbox" name="tags" value="${e(tag)}" ${d.tags.includes(tag)?'checked':''}><span>${e(tag)}</span></label>`).join('')}</div></fieldset><label class="ac-field"><span>预计时长（分钟）</span><input name="minutes" type="number" min="1" max="1440" value="${e(d.minutes)}"></label></fieldset>${state.busy?`<div class="ac-upload-progress" role="status" aria-live="polite"><progress max="100" value="${state.progress}" data-ac-progress></progress><span data-ac-progress-label>${d.type==='video'&&d.file?'正在上传视频 '+state.progress+'%':'正在保存课程…'}</span></div>`:''}<div class="ac-form-footer"><button type="button" class="ac-btn ac-btn-secondary" data-ac-cancel ${state.busy?'disabled':''}>取消</button><button type="submit" class="ac-btn ac-btn-primary" ${state.busy?'disabled':''}>${state.busy?'保存中…':state.editId?'保存修改':'发布课程'}</button></div></form></section>`;
   }
 
   function render() {
@@ -139,25 +140,39 @@ export function createAcademyController({ academy, ui }) {
     bindRows(page);
     const form=page.querySelector('[data-ac-form]');
     if(!form)return;
+    bindFieldFeedback(form);
     form.addEventListener('input',()=>capture(form));
     form.querySelector('[data-ac-source]')?.addEventListener('change',event=>{
       if(state.busy||state.editId)return;
       capture(form);
       state.draft.type=event.target.value==='video'?'video':'link';
-      state.error='';
       ui.refresh();
     });
     form.querySelector('[data-ac-file]')?.addEventListener('change',event=>{capture(form);state.draft.file=event.target.files?.[0]||state.draft.file;ui.refresh();});
     form.onsubmit=async event=>{
       event.preventDefault();if(state.busy||!guard())return;capture(form);
       const d=state.draft;
-      state.error='';
-      if(!d.title.trim()||!d.summary.trim())state.error='请填写课程名称和简介';
-      else if(!Number.isFinite(Number(d.minutes))||Number(d.minutes)<1||Number(d.minutes)>1440)state.error='预计时长需为 1～1440 分钟';
-      else if(d.type!=='video'&&!validateExternalUrl(d.url).valid)state.error=validateExternalUrl(d.url).message;
-      else if(d.type==='video'&&!state.editId&&!d.file)state.error='请选择视频文件';
-      else if(d.type==='video'&&d.file?.size>524288000)state.error='视频不能超过 500 MB';
-      if(state.error){ui.refresh();return;}
+      clearFieldErrors(form);
+      const errors = [];
+      if (!d.title.trim()) errors.push(['title', '请填写课程名称。']);
+      if (!d.summary.trim()) errors.push(['summary', '请填写课程简介。']);
+      if (d.type === 'video') {
+        if (!state.editId && !d.file) errors.push(['file', '请选择视频文件。']);
+        else if (d.file?.size > 2147483648) errors.push(['file', '视频不能超过 2 GB。']);
+      } else {
+        const link = validateExternalUrl(d.url);
+        if (!link.valid) errors.push(['url', link.message]);
+      }
+      if (!Number.isFinite(Number(d.minutes)) || Number(d.minutes) < 1 || Number(d.minutes) > 1440) {
+        errors.push(['minutes', '预计时长需为 1～1440 分钟。']);
+      }
+      if (errors.length) {
+        errors.forEach(([field, message], index) => {
+          const target = field === 'file' ? form.querySelector('[data-ac-file]') : form.elements.namedItem(field);
+          showFieldError(target, message, {focus:index === 0});
+        });
+        return;
+      }
       state.busy=true;state.progress=0;ui.refresh();
       try{
         const payload={...d,file:d.type==='video'?d.file:null,minutes:Number(d.minutes),onProgress(value){
@@ -168,11 +183,17 @@ export function createAcademyController({ academy, ui }) {
         }};
         if(state.editId)await academy.updateCourse(state.editId,payload);else await academy.addCourse(payload);
         const edited=Boolean(state.editId);state.busy=false;state.draft=fresh();state.editId=null;state.tag='all';changeTab('courses');ui.toast(edited?'课程已更新':'课程已发布，学员可在 AI 学院查看');
-      }catch(error){state.busy=false;state.error=errorText(error);ui.refresh();}
+      } catch (error) {
+        state.busy = false;
+        ui.refresh();
+        const currentForm = form.ownerDocument.querySelector('[data-ac-form]');
+        const target = currentForm?.querySelector(error.field === 'file' ? '[data-ac-file]' : '[type="submit"]');
+        if (target) showFieldError(target, errorText(error));
+      }
     };
   }
 
-  function reset() { if(state.busy)return;state.tab='courses';state.view='list';state.query='';state.tag='all';state.reviewStatus='pending';state.editId=null;state.draft=fresh();state.error=''; }
+  function reset() { if(state.busy)return;state.tab='courses';state.view='list';state.query='';state.tag='all';state.reviewStatus='pending';state.editId=null;state.draft=fresh(); }
   async function activate() { if(!admin()||academy.loading)return;try{await academy.refresh();}catch{}if(state.view==='list')ui.refresh(); }
   function canRefresh() { return state.view==='list'&&!state.busy; }
   function deactivate() { document.querySelectorAll('.ac-media-preview video').forEach(video=>video.pause()); }

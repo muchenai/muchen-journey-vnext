@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiRequest, ApiRequestError } from "@/lib/server/api";
 
+import { proxyContentFile } from "@/lib/server/exploration-material-proxy";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
 const modules = new Set(["dashboard", "village", "academy", "guild"]);
@@ -13,9 +14,14 @@ export async function GET(request: NextRequest) {
   const moduleId = p.get("module") || "";
   if (!modules.has(moduleId)) return NextResponse.json({ error: "知识库模块无效。" }, { status: 400, headers });
   let path = `/api/v1/me/knowledge/${moduleId}`;
+  if (p.has("file")) {
+    const id = p.get("file");
+    if (!uuid(id)) return NextResponse.json({ error:"文件参数无效。" }, {status:400, headers});
+    return proxyContentFile(request, `${path}/files/${id}/content`, "LEARNER");
+  }
   if (p.has("id") || p.has("position")) {
     const id = p.get("id"), position = p.get("position") || "";
-    if (!uuid(id) || !/^\d{1,3}$/.test(position) || Number(position) >= 200)
+    if (!uuid(id) || !/^\d{1,4}$/.test(position) || Number(position) >= 4096)
       return NextResponse.json({ error: "文件参数无效。" }, { status: 400, headers });
     path += `/files/${id}/chunks/${Number(position)}`;
   }
@@ -23,6 +29,7 @@ export async function GET(request: NextRequest) {
   catch (error) { return fail(error); }
 }
 
+export const HEAD = GET;
 export async function POST(request: NextRequest) {
   let sameOrigin = false;
   try { const origin = new URL(request.headers.get("origin") || ""); sameOrigin = origin.host === request.headers.get("host") && ["http:", "https:"].includes(origin.protocol); } catch {}

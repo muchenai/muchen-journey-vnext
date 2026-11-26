@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_actor, get_company_learner_actor, get_learner_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.models import User, Role
@@ -153,7 +153,7 @@ def read_growth_history(request: Request, offset: int=Query(default=0, ge=0, le=
 
 
 @router.get("/me/novice/medals")
-def learner_catalog(request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+def learner_catalog(request: Request, actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     medals = session.scalars(select(MedalDefinition).where(
         MedalDefinition.organization_id == actor.organization_id,
@@ -174,7 +174,7 @@ class RedeemMedal(BaseModel):
 
 @router.post("/me/novice/medals/{medal_id}/redeem")
 def redeem(medal_id: uuid.UUID, command: RedeemMedal, request: Request,
-           actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+           actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     previous = session.scalar(select(MedalRedemption).where(MedalRedemption.user_id == actor.id,

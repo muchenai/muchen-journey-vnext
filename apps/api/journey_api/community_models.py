@@ -1,7 +1,7 @@
 """Organization-scoped knowledge and delivery guild records."""
 import uuid
 from datetime import datetime
-from sqlalchemy import JSON, DateTime, ForeignKey, LargeBinary, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, JSON, DateTime, ForeignKey, LargeBinary, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from journey_api.db import Base
 
@@ -19,7 +19,7 @@ class KnowledgeFile(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('organizations.id'), index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'))
-    size: Mapped[int] = mapped_column()
+    size: Mapped[int] = mapped_column(BigInteger)
     complete: Mapped[bool] = mapped_column(default=False)
     metadata_json: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

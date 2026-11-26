@@ -100,7 +100,9 @@ def validate_material_references(session, organization_id, content):
         if not url.startswith("exploration-material:"):
             continue
         stored = session.get(ExplorationMaterial, uuid.UUID(url.split(":", 1)[1]))
-        if not stored or stored.organization_id != organization_id:
+        if (not stored or not stored.complete or stored.organization_id != organization_id
+                or stored.purpose != content.get("camp", "exploration")
+                or stored.purpose == "novice" and not stored.mime.startswith("video/")):
             raise ApiError(422, "INVALID_MATERIAL", "学习材料或任务文件不存在，或无权使用。")
         material.update(name=material["name"].strip(), mime=stored.mime, size=stored.size)
 

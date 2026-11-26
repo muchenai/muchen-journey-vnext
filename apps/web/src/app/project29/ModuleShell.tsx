@@ -101,6 +101,7 @@ export function ModuleHeader({
   identity,
   query,
   onQuery,
+  onSearchSubmit,
   onHome,
   onProfile,
   legacyTasksAvailable = false,
@@ -111,6 +112,7 @@ export function ModuleHeader({
   identity: string
   query: string
   onQuery: (value: string) => void
+  onSearchSubmit?: () => void
   onHome: () => void
   onProfile: () => void
   legacyTasksAvailable?: boolean
@@ -150,7 +152,7 @@ export function ModuleHeader({
   }
   const page =
     ({ mine: "我的任务", tasks: "我的任务", saved: "我的收藏", badges: "我的徽章", profile: "个人主页", map: "世界地图", knowledge: "知识库", lab: "模拟实验室", certification: "能力地图", "capability-map": "能力地图", arena: "认证竞技场" } as Record<string, string>)[menu] ||
-    hall[module]
+    (menu === "course" ? "课程学习" : hall[module])
   return (
     <header className="module-header">
       <div className="module-breadcrumb">
@@ -166,13 +168,19 @@ export function ModuleHeader({
           <ModuleIcon file="095be" size={17} />
           <input
             ref={searchInput}
-            aria-label="搜索当前板块"
+            aria-label={onSearchSubmit ? "搜索学院课程，按回车查看结果" : "搜索当前板块"}
             aria-keyshortcuts={macPlatform ? "Meta+K" : "Control+K"}
-            placeholder="搜索内容"
+            placeholder={onSearchSubmit ? "搜索学院课程" : "搜索内容"}
             value={query}
             onChange={(e) => onQuery(e.target.value)}
+            onKeyDown={event => {
+              if (onSearchSubmit && event.key === "Enter" && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                onSearchSubmit()
+              }
+            }}
           />
-          <kbd>{macPlatform ? "⌘ K" : "Ctrl + K"}</kbd>
+          <kbd>{onSearchSubmit ? "↵" : macPlatform ? "⌘ K" : "Ctrl + K"}</kbd>
         </label>
         <ReviewNotificationBell>
           <ModuleIcon file="99dd2" size={20} />

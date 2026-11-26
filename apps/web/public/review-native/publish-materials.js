@@ -1,6 +1,20 @@
 import { escapeHtml as e, icon } from './core.js?v=20261030-member-action-spacing';
-import { localMaterialUrl, materialSizeLabel } from './exploration-material-files.js';
+import { localMaterialUrl, materialSizeLabel, materialVideoPreviewUrl } from './exploration-material-files.js';
 import { EXPLORATION_COMPLETION_MODES, explorationCompletionMode, validAssessmentUrl, explorationTaskFiles, taskResourceLinks } from './exploration-completion.js';
+import { showFieldError } from './field-feedback.js';
+
+export function confirmPublicationFields(modal, reviewer) {
+  if (reviewer && !reviewer.value) {
+    showFieldError(reviewer, '请选择内容复核人。');
+    return false;
+  }
+  const missing = modal.querySelector('[data-verified-link]:not(:checked)');
+  if (missing) {
+    showFieldError(missing, '请打开并确认这份材料可供学员访问。');
+    return false;
+  }
+  return true;
+}
 
 // Keep file previews inside the confirmation so opening one never loses its selections.
 export function renderPublishMaterials(materials = [], task) {
@@ -21,7 +35,7 @@ export function renderPublishMaterials(materials = [], task) {
       const downloadUrl = local || m.url;
       const downloadable = Boolean(local) || /^data:[^;,]+;base64,/i.test(m.url || '');
       const preview = m.type === 'image' && /^data:image\/(png|jpeg|webp);base64,/i.test(m.url || '');
-      return `<div class="material-row"><div class="file-icon">${icon(m.type === 'image' ? 'image' : 'file',20)}</div>${header}<span>${kind} · ${e(m.mime || '')} · ${e(size)}</span>${preview ? `<details><summary>查看图片</summary><img class="material-image" src="${e(m.url)}" alt="${e(m.name)}"></details>` : ''}${downloadable ? `<a href="${e(downloadUrl)}" download="${e(m.name)}">下载文件</a>` : '<span>文件内容不可用</span>'}</div></div>`;
+      return `<div class="material-row"><div class="file-icon">${icon(m.type === 'image' ? 'image' : 'file',20)}</div>${header}<span>${kind} · ${e(m.mime || '')} · ${e(size)}</span>${preview ? `<details><summary>查看图片</summary><img class="material-image" src="${e(m.url)}" alt="${e(m.name)}"></details>` : ''}${materialVideoPreviewUrl(m) ? `<details><summary>预览视频</summary><video controls preload="none" playsinline style="max-width:100%" src="${e(materialVideoPreviewUrl(m))}"></video></details>` : ''}${downloadable ? `<a href="${e(downloadUrl)}" download="${e(m.name)}">下载文件</a>` : '<span>文件内容不可用</span>'}</div></div>`;
     }
     return `<div class="material-row">${header}<span>文本材料</span><details><summary>查看内容</summary><p>${e(m.url || '')}</p></details></div></div>`;
   }).join('');

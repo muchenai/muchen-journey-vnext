@@ -6,12 +6,12 @@ import type { VillageTask } from "./useVillageTasks";
 type LearningMaterial = VillageTask["materials"][number];
 const rasterMimes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-ms-bmp"]);
 const rasterFilename = /\.(?:png|jpe?g|gif|webp|avif|bmp)$/i;
-const videoMimes = new Set(["video/mp4", "video/webm", "video/ogg"]);
+const videoMimes = new Set(["video/mp4", "video/quicktime", "video/webm", "video/ogg"]);
 
 function isInlineVideo(material: LearningMaterial) {
   if (!["file", "video"].includes(material.type)) return false;
   const mime = material.mime?.split(";")[0].trim().toLowerCase() || "";
-  return videoMimes.has(mime) || ((!mime || mime === "application/octet-stream") && /\.(?:mp4|webm|ogv|ogg)$/i.test(material.name.trim()));
+  return videoMimes.has(mime) || ((!mime || mime === "application/octet-stream") && /\.(?:mp4|m4v|mov|webm|ogv|ogg)$/i.test(material.name.trim()));
 }
 
 function isInlineImage(material: LearningMaterial) {

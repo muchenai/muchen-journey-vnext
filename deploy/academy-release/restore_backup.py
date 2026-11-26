@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -61,8 +62,27 @@ def cleanup_restore_resources(restore_name, network, *, container_created, netwo
     return not failures
 
 
+def stable_file_digest(path, require):
+    require(path.resolve() == path and path.is_file() and not path.is_symlink(), 'UNSAFE_DIGEST_FILE')
+    before = path.stat()
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0)
+    hasher = hashlib.sha256()
+    length = 0
+    with os.fdopen(os.open(path, flags), 'rb') as stream:
+        opened = os.fstat(stream.fileno())
+        require(os.path.samestat(before, opened) and stat.S_ISREG(opened.st_mode) and opened.st_size > 0, 'UNSAFE_DIGEST_FILE')
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            length += len(chunk)
+            hasher.update(chunk)
+        after = os.fstat(stream.fileno())
+        require(length == opened.st_size == after.st_size and opened.st_mtime_ns == after.st_mtime_ns
+                and os.path.samestat(after, path.lstat()), 'FILE_CHANGED_DURING_HASH')
+    return hasher.hexdigest()
+
+
 def restore_verified_backup(self, before, dump, encrypted, verify, backup_key, module):
-    run,require,read_file,write_new,changed_env,digest,UpgradeError = (module.run,module.require,module.read_file,module.write_new,module.changed_env,module.digest,module.UpgradeError)
+    run,require,read_file,write_new,changed_env = (module.run,module.require,module.read_file,module.write_new,module.changed_env)
+    dump_sha = stable_file_digest(dump, require)
     phase('RESTORE_CONTAINER_SETUP')
     restore_name = "journey-schema-restore-" + str(self.manifest["candidate"])[:12]
     restore_password = hashlib.sha256((backup_key + str(self.manifest["candidate"])).encode()).hexdigest()
@@ -117,20 +137,23 @@ def restore_verified_backup(self, before, dump, encrypted, verify, backup_key, m
             restore_env.unlink()
         require(cleaned, 'RESTORE_TEMP_CLEANUP_FAILED')
     phase('BACKUP_ENCRYPT_AND_VERIFY')
+    require(all(path.parent.resolve() == path.parent and not path.exists() and not path.is_symlink()
+                for path in (encrypted, verify)), 'BACKUP_OUTPUT_EXISTS')
     encryption_env = os.environ.copy()
     encryption_env["CANARY_SCHEMA_BACKUP_KEY"] = backup_key
     run([
         "openssl", "enc", "-aes-256-cbc", "-pbkdf2", "-iter", "600000", "-salt",
         "-in", str(dump), "-out", str(encrypted), "-pass", "env:CANARY_SCHEMA_BACKUP_KEY",
     ], timeout=900, env=encryption_env)
+    encrypted_sha = stable_file_digest(encrypted, require)
     run([
         "openssl", "enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "600000",
         "-in", str(encrypted), "-out", str(verify), "-pass", "env:CANARY_SCHEMA_BACKUP_KEY",
     ], timeout=900, env=encryption_env)
-    require(digest(read_file(verify, maximum=2_000_000_000)) == digest(read_file(dump, maximum=2_000_000_000)), "BACKUP_DECRYPT_VERIFY")
+    require(stable_file_digest(verify, require) == dump_sha, "BACKUP_DECRYPT_VERIFY")
     receipt = {
         "candidate": self.manifest["candidate"], "migration": before["migration"],
-        "backup_sha256": digest(read_file(encrypted, maximum=2_000_000_000)),
+        "backup_sha256": encrypted_sha,
         "restore": "PASS", "production_migration_applied": False,
     }
     write_new(self.backup / "backup-receipt.json", json.dumps(receipt, sort_keys=True).encode())
