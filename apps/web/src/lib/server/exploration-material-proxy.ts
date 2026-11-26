@@ -5,8 +5,13 @@ const privateHeaders = { "Cache-Control": "private, no-store", "X-Content-Type-O
 
 /** Streams authorized files, including byte-range video requests, through this origin. */
 export async function explorationMaterialResponse(request: Request, id: string, role: Role): Promise<Response> {
+  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return Response.json({ error:"材料标识无效。" }, {status:400, headers:privateHeaders});
+  const scope = role === "LEARNER" ? "me" : "review-admin";
+  return proxyContentFile(request, `/api/v1/${scope}/exploration/materials/${id}`, role);
+}
+
+export async function proxyContentFile(request: Request, path: string, role: Role): Promise<Response> {
   const fail = (error: string, status: number) => Response.json({ error }, { status, headers: privateHeaders });
-  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return fail("材料标识无效。", 400);
   const range = request.headers.get("range");
   if (range && !/^bytes=(?:\d+-\d*|-\d+)$/.test(range)) return fail("材料分段参数无效。", 416);
   const headers = new Headers();
@@ -14,8 +19,7 @@ export async function explorationMaterialResponse(request: Request, id: string, 
   const query = new URLSearchParams();
   if (new URL(request.url).searchParams.get("inline") === "1") query.set("inline", "1");
   try {
-    const scope = role === "LEARNER" ? "me" : "review-admin";
-    const response = await apiResponse(`/api/v1/${scope}/exploration/materials/${id}?${query}`, role, {
+    const response = await apiResponse(`${path}?${query}`, role, {
       method: request.method === "HEAD" ? "HEAD" : "GET", headers, redirect: "error", signal: request.signal,
     });
     const outgoing = new Headers(privateHeaders);

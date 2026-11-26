@@ -1,6 +1,6 @@
 import {isMaterialLink} from './material-validation.js';
-import {validateTaskFieldLimits as fieldLimits} from './task-field-limits.js';
-import {isPublishingDepartment} from './publishing-departments.js';
+import {validateTaskFieldLimits as fieldLimits, issueMessage} from './task-field-limits.js';
+import {isTaskCategory as isPublishingDepartment} from './publishing-departments.js';
 import { EXPLORATION_COMPLETION_MODES, requiresTaskAssessment, explorationTaskResourceErrors } from './exploration-completion.js';
 import {rubricDimensionErrors} from './rubric-policy.js?v=20261118-document-rubric';
 /** JOURNEY prototype domain model. All persistence stays in this browser. */
@@ -63,10 +63,15 @@ export function getCertificationLevel(value) {
 
 const RULES_VERSION = 'difficulty-v2';
 
-/** Difficulty is the only configurable source of time and reward values. */
+/** Earlier publications use difficulty presets. New custom rewards determine their difficulty. */
 export function applyDifficultyPreset(task = {}) {
   if (getReviewCamp({}, task) === 'exploration') {
     return { ...task, publishingDepartment: undefined, difficulty: '', badges: [], minutes: 0, xp: 0, taskPoints: 0, unlockTaskPoints: 0 };
+  }
+  if (task.rewardRulesVersion === 4) {
+    if (!Number.isInteger(task.xp) || task.xp < 0 || task.xp > 1000000) return { ...task };
+    const level = DIFFICULTY_PRESETS.find(item => task.xp <= item.xp) ?? DIFFICULTY_PRESETS.at(-1);
+    return { ...task, difficulty:level.name, minutes:level.minutes, taskPoints:0, unlockTaskPoints:0 };
   }
   const preset = DIFFICULTY_PRESETS.find(item => item.name === task.difficulty);
   return preset
@@ -137,18 +142,22 @@ export function rewardBreakdown(task = {}) {
       allocations: clone(task.allocations),
     };
   }
-  const totalPoints = round(xp / 10);
-  const raw = (task.badges || []).map(item => totalPoints * number(item.weight) / 100);
-  const amounts = raw.map(Math.floor);
-  if ((task.badges || []).reduce((sum,b)=>sum+number(b.weight),0) === 100) {
-    const order = raw.map((_,i)=>i).sort((a,b)=>(raw[b]-amounts[b])-(raw[a]-amounts[a]) || a-b);
-    for (const i of order.slice(0,totalPoints-amounts.reduce((sum,n)=>sum+n,0))) amounts[i]++;
+  const totalPoints = task.rewardRulesVersion === 4 ? Math.floor(xp / 10) : round(xp / 10);
+  const badges = task.badges || [];
+  const hundredths = badges.map(item => totalPoints * number(item.weight));
+  const amounts = hundredths.map(value => Math.floor(value / 100));
+  if (badges.reduce((sum, badge) => sum + number(badge.weight), 0) === 100) {
+    // Compare whole hundredths so equally ranked categories follow the publisher's order.
+    const order = hundredths.map((_, index) => index)
+      .sort((a, b) => (hundredths[b] % 100) - (hundredths[a] % 100) || a - b);
+    const remaining = totalPoints - amounts.reduce((sum, points) => sum + points, 0);
+    for (const index of order.slice(0, remaining)) amounts[index]++;
   }
   return {
     xp,
     taskPoints: Math.max(0, number(effective.taskPoints)),
     totalPoints,
-    allocations: (task.badges || []).map((item, index) => ({
+    allocations: badges.map((item, index) => ({
       id: item.id,
       name: BADGES.find(badge => badge.id === item.id)?.name || item.id,
       weight: number(item.weight),
@@ -157,43 +166,54 @@ export function rewardBreakdown(task = {}) {
   };
 }
 
-export function validateTask(task = {}) {
-  const errors = fieldLimits(task);
-  if (text(task.title).length < 3) errors.push('任务标题至少需要 3 个字');
-  if (text(task.summary).length < 10) errors.push(`任务简述至少需要 10 个字，当前 ${text(task.summary).length} 个字`);
+export function validateBadgeWeights(badges, issue = issueMessage) {
+  if (!badges.length) return [issue('badges', '请选择至少一类奖励点数')];
+  const errors = [];
+  if (new Set(badges.map(badge => badge.id)).size !== badges.length) errors.push(issue('badges', '不能重复选择同一徽章'));
+  if (badges.some(badge => !BADGES.some(option => option.id === badge.id))) errors.push(issue('badges', '请选择系统已有的徽章'));
+  badges.forEach((badge, index) => {
+    if (!Number.isInteger(badge.weight) || badge.weight < 1 || badge.weight > 100) {
+      errors.push(issue('weights', '请填写 1 至 100 之间的整数百分比', index));
+    }
+  });
+  if (!errors.length && badges.reduce((sum, badge) => sum + badge.weight, 0) !== 100) {
+    errors.push(issue('weights', '徽章占比合计需为 100%'));
+  }
+  return errors;
+}
+
+export function validateTask(task = {}, issue = issueMessage) {
+  const errors = fieldLimits(task, issue);
+  if (text(task.title).length < 3) errors.push(issue('title', '任务标题至少需要 3 个字'));
+  if (text(task.summary).length < 10) errors.push(issue('summary', `任务简述至少需要 10 个字，当前 ${text(task.summary).length} 个字`));
   const exploration = getReviewCamp({}, task) === 'exploration';
   const assessment = requiresTaskAssessment(task);
-  if(exploration&&task.completionMode!=null&&!EXPLORATION_COMPLETION_MODES.some(mode=>mode.id===task.completionMode))errors.push('请选择有效的任务完成方式');
-  if (exploration && task.order != null && (!Number.isInteger(task.order) || task.order < 1 || task.order > 9999)) errors.push('任务排序需为 1～9999 的整数');
-  if (!exploration && !isPublishingDepartment(task.publishingDepartment)) errors.push('请选择发布部门');
-  if (!exploration && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push('请选择入门、进阶或挑战难度');
+  if(exploration&&task.completionMode!=null&&!EXPLORATION_COMPLETION_MODES.some(mode=>mode.id===task.completionMode))errors.push(issue('completionMode', '请选择有效的任务完成方式'));
+  if (exploration && task.order != null && (!Number.isInteger(task.order) || task.order < 1 || task.order > 9999)) errors.push(issue('order', '任务排序需为 1～9999 的整数'));
+  if (!exploration && task.rewardRulesVersion === 4 && (!Number.isInteger(task.xp) || task.xp < 0 || task.xp > 1000000)) errors.push(issue('xp', '任务奖励经验值应为 0 至 1,000,000 的整数'));
+  if (!exploration && !isPublishingDepartment(task.publishingDepartment)) errors.push(issue('publishingDepartment', '请选择发布部门'));
+  if (!exploration && !DIFFICULTY_PRESETS.some(item => item.name === task.difficulty)) errors.push(issue('difficulty', '请选择入门、进阶或挑战难度'));
 
   if (!exploration) {
-  const badges = Array.isArray(task.badges) ? task.badges : [];
-  if (badges.length < 1 || badges.length > 2) errors.push('每个任务需选择 1～2 个徽章');
-  if (new Set(badges.map(badge => badge.id)).size !== badges.length) errors.push('不能重复选择同一徽章');
-  if (badges.some(badge => !Number.isInteger(badge.weight) || badge.weight % 20 !== 0)) errors.push('徽章占比请按 20% 设置');
-  if (badges.some(badge => !BADGES.some(option => option.id === badge.id))) errors.push('请选择系统已有的徽章');
-  if (badges.some(badge => !Number.isFinite(Number(badge.weight)) || Number(badge.weight) <= 0 || Number(badge.weight) > 100)) errors.push('每个徽章的占比需大于 0% 且不超过 100%');
-  if (Math.abs(badges.reduce((sum, badge) => sum + number(badge.weight), 0) - 100) > 0.000001) errors.push('徽章占比合计需为 100%');
+    errors.push(...validateBadgeWeights(Array.isArray(task.badges) ? task.badges : [], issue));
   }
 
   const materials = Array.isArray(task.materials) ? task.materials : [];
-  if (exploration && materials.length > 20) errors.push('每个任务最多添加 20 份材料');
-  if (assessment&&!materials.length) errors.push('请至少添加一份学习材料');
+  if (exploration && materials.length > 20) errors.push(issue('materials', '每个任务最多添加 20 份材料'));
+  if (exploration&&assessment&&!materials.length) errors.push(issue('materials', '请至少添加一份学习材料'));
   materials.forEach((material, index) => {
-    if (!text(material.name)) errors.push(`请填写材料 ${index + 1} 的名称`);
+    if (!text(material.name)) errors.push(issue('materials', `请填写材料 ${index + 1} 的名称`, index));
     const nameLimit = exploration && material.type !== 'link' ? 240 : 160;
-    if (text(material.name).length > nameLimit) errors.push(`材料 ${index + 1} 的名称不能超过 ${nameLimit} 字`);
-    if (!['link', 'file', 'image'].includes(material.type)) errors.push(`材料 ${index + 1} 的类型无效`);
-    if (material.type === 'link' && !isMaterialLink(material.url)) errors.push(`材料 ${index + 1} 需填写有效的 HTTPS 链接，不能包含账号或密码`);
+    if (text(material.name).length > nameLimit) errors.push(issue('materials', `材料 ${index + 1} 的名称不能超过 ${nameLimit} 字`, index));
+    if (!['link', 'file', 'image'].includes(material.type)) errors.push(issue('materials', `材料 ${index + 1} 的类型无效`, index));
+    if (material.type === 'link' && !isMaterialLink(material.url)) errors.push(issue('materials', `材料 ${index + 1} 需填写有效的 HTTPS 链接，不能包含账号或密码`, index));
   });
-  errors.push(...explorationTaskResourceErrors(task));
-  if (assessment&&!['manual', 'ai'].includes(task.reviewMode)) errors.push('请选择人工审核或 AI 自测');
+  errors.push(...explorationTaskResourceErrors(task, issue));
+  if (assessment&&!['manual', 'ai'].includes(task.reviewMode)) errors.push(issue('reviewMode', '请选择人工审核或 AI 自测'));
   if (assessment&&task.reviewMode === 'ai') {
-    errors.push(...rubricDimensionErrors(task));
-    if (!isNumeric(task.passScore) || Number(task.passScore) < 0 || Number(task.passScore) > 100) errors.push('通过分数需在 0～100 分之间');
-    else if (Math.abs(Number(task.passScore) * 100 - Math.round(Number(task.passScore) * 100)) > 0.0000001) errors.push('通过分数最多保留两位小数');
+    errors.push(...rubricDimensionErrors(task, issue));
+    if (!isNumeric(task.passScore) || Number(task.passScore) < 0 || Number(task.passScore) > 100) errors.push(issue('passScore', '通过分数需在 0～100 分之间'));
+    else if (Math.abs(Number(task.passScore) * 100 - Math.round(Number(task.passScore) * 100)) > 0.0000001) errors.push(issue('passScore', '通过分数最多保留两位小数'));
   }
   return errors;
 }
@@ -648,8 +668,7 @@ export function icon(name, size = 20) {
 export function normalizeBadgeWeights(task) {
   if (getReviewCamp({}, task) === 'exploration') return applyDifficultyPreset(structuredClone(task));
   const result=structuredClone(task);
-  result.unlockTaskPoints=0;result.rewardRulesVersion=3;result.taskPoints=0;
+  result.unlockTaskPoints=0;result.rewardRulesVersion=result.rewardRulesVersion===4?4:3;result.taskPoints=0;
   if(result.badges?.length===1)result.badges[0].weight=100;
-  if(result.badges?.length===2){const weight=Math.max(20,Math.min(80,Math.round(Number(result.badges[0].weight||60)/20)*20));result.badges[0].weight=weight;result.badges[1].weight=100-weight;}
   return result;
 }

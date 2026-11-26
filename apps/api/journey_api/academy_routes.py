@@ -14,9 +14,10 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from journey_api.video_limits import MAX_VIDEO_SIZE, VIDEO_TYPES, media_signature
 from journey_api.academy_models import AcademyCourse, AcademyLearningRecord, AcademyVideo, AcademyVideoChunk
 from journey_api.academy_covers import cached_course_cover, course_cover_processing, ensure_course_cover, source_fingerprint
-from journey_api.auth import Actor, get_actor, get_learner_actor
+from journey_api.auth import Actor, get_actor, get_company_learner_actor
 from journey_api.db import SessionLocal, get_db
 from journey_api.errors import ApiError
 from journey_api.identity import add_audit
@@ -33,15 +34,13 @@ def require_staff_entry(request: Request, actor: Actor = Depends(get_actor)):
 admin_router = APIRouter(prefix='/api/v1/ops/academy', dependencies=[Depends(require_staff_entry)])
 learner_router = APIRouter(prefix='/api/v1/me/academy')
 CHUNK_SIZE = 512 * 1024
-MAX_VIDEO_SIZE = 500 * 1024 * 1024
 TAGS = (
     'AI 入门', 'AI 工具推荐', '怎么问 AI', 'AI 使用避坑', 'AIGC 创意玩法',
     'AI 写文案', 'AI 做图片', 'AI 做视频', 'AI 配音与音乐', 'AI 做 PPT',
     'AI 做表格', 'AI 写邮件', 'AI 整理会议纪要', 'AI 写周报与总结', 'AI 查资料',
     'AI 读文档', 'AI 翻译', 'AI 做计划', 'AI 辅助学习', 'AI 日常妙用',
 )
-VIDEO_TYPES = {'mp4': 'video/mp4', 'm4v': 'video/mp4', 'mov': 'video/quicktime',
-               'webm': 'video/webm', 'ogv': 'video/ogg', 'ogg': 'video/ogg'}
+
 
 
 def fail(message, status=422):
@@ -347,7 +346,7 @@ def review_share(course_id: uuid.UUID, command: Review, request: Request, backgr
 
 
 @learner_router.get('')
-def learner_listing(request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def learner_listing(request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     rows = list(session.scalars(select(AcademyCourse).where(AcademyCourse.organization_id == actor.organization_id,
         *public_conditions()).order_by(AcademyCourse.created_at.desc(), AcademyCourse.id)))
     records = {r.course_id: r for r in session.scalars(select(AcademyLearningRecord).where(
@@ -356,20 +355,25 @@ def learner_listing(request: Request, actor: Actor = Depends(get_learner_actor),
     shares = [course_view(row, share=True) for row in session.scalars(select(AcademyCourse).where(
         AcademyCourse.organization_id == actor.organization_id, AcademyCourse.kind == 'share',
         AcademyCourse.author_id == actor.id).order_by(AcademyCourse.created_at.desc()))]
-    return envelope(request, dict(courses=courses, shares=shares, tags=list(TAGS),
+    from journey_api.course_workspace_routes import learner_catalog
+    workspace = learner_catalog(session, actor, "academy")
+    courses = workspace["courses"] + courses
+    tags = list(dict.fromkeys([*workspace["tags"], *TAGS]))
+    return envelope(request, dict(learner=workspace["learner"], academyXp=workspace["academyXp"],
+        courses=courses, shares=shares, tags=tags,
         stats=dict(total=len(courses), completed=sum(c['completed'] for c in courses),
                    favorites=sum(c['favorite'] for c in courses), pending=sum(s['status'] == 'pending' for s in shares))))
 
 
 @learner_router.get('/courses/{course_id}')
-def learner_course(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def learner_course(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     row = course_row(session, actor, course_id, public=True)
     record = session.get(AcademyLearningRecord, (actor.organization_id, actor.id, row.id))
     return envelope(request, course_view(row, record))
 
 
 @learner_router.post('/shares')
-def submit_share(command: ShareCreate, request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def submit_share(command: ShareCreate, request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     # Serialize a learner's repeated submit request so its stable ID is idempotent.
     session.scalar(select(User.id).where(User.id == actor.id, User.organization_id == actor.organization_id).with_for_update())
     data = metadata(command.model_dump())
@@ -392,7 +396,7 @@ def submit_share(command: ShareCreate, request: Request, actor: Actor = Depends(
 
 @learner_router.patch('/shares/{course_id}')
 def resubmit_share(course_id: uuid.UUID, command: CourseUpdate, request: Request,
-                   actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+                   actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     row = course_row(session, actor, course_id, lock=True)
     if row.kind != 'share' or row.author_id != actor.id:
         fail('分享不存在。', 404)
@@ -425,7 +429,7 @@ def record_row(session, actor, course_id):
 
 @learner_router.post('/courses/{course_id}/favorite')
 def favorite(course_id: uuid.UUID, command: Favorite, request: Request,
-             actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+             actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     course_row(session, actor, course_id, public=True, lock=True)
     record = record_row(session, actor, course_id)
     record.favorite = command.saved
@@ -436,7 +440,7 @@ def favorite(course_id: uuid.UUID, command: Favorite, request: Request,
 
 @learner_router.post('/courses/{course_id}/progress')
 def progress(course_id: uuid.UUID, command: Progress, request: Request,
-             actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+             actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     row = course_row(session, actor, course_id, public=True, lock=True)
     if command.expected_revision is not None:
         check_revision(row, command.expected_revision)
@@ -522,16 +526,6 @@ async def upload_chunk(upload_id: uuid.UUID, position: int, request: Request,
         session.add(AcademyVideoChunk(video_id=row.id, position=position, data=bytes(payload)))
     session.commit()
     return envelope(request, dict(id=str(row.id), position=position, received=expected))
-
-
-def media_signature(data, mime):
-    if mime in ('video/mp4', 'video/quicktime'):
-        return len(data) >= 12 and data[4:8] == b'ftyp'
-    if mime == 'video/webm':
-        return data.startswith(b'\x1a\x45\xdf\xa3') and b'webm' in data[:4096].lower()
-    if mime == 'video/ogg':
-        return data.startswith(b'OggS') and b'theora' in data[:65536]
-    return False
 
 
 @admin_router.post('/uploads/{upload_id}/complete')
@@ -633,7 +627,7 @@ def admin_video(course_id: uuid.UUID, request: Request, actor: Actor = Depends(g
 
 @learner_router.get('/courses/{course_id}/video')
 @learner_router.head('/courses/{course_id}/video')
-def learner_video(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def learner_video(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     return video_response(session, actor, course_id, request, public=True)
 
 
@@ -677,5 +671,5 @@ def admin_cover(course_id: uuid.UUID, request: Request, actor: Actor = Depends(g
 
 @learner_router.get('/courses/{course_id}/cover')
 @learner_router.head('/courses/{course_id}/cover')
-def learner_cover(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db)):
+def learner_cover(course_id: uuid.UUID, request: Request, actor: Actor = Depends(get_company_learner_actor), session: Session = Depends(get_db)):
     return cover_response(session, actor, course_id, request, public=True)

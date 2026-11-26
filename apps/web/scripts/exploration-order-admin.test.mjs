@@ -38,7 +38,7 @@ const appSource=await readFile(new URL('../public/review-native/app.js',import.m
 function basics(draft){
   const context=vm.createContext({store:{data:{draft}},ui:{isSuperAdmin:true},getReviewCamp,isPinnedExplorationTask,cardHeader:()=>'',icon:()=>'',e:escapeHtml,
     REVIEW_CAMPS,canConfigureTask,TASK_FIELD_LIMITS,taskFieldLength,EXPLORATION_COMPLETION_MODES,explorationCompletionMode,requiresTaskAssessment});
-  vm.runInContext(appSource.slice(appSource.indexOf('function renderBasics()'),appSource.indexOf('function renderRatio()')),context);
+  vm.runInContext(appSource.slice(appSource.indexOf('function renderCampField('),appSource.indexOf('function renderRatio()')),context);
   return vm.runInContext('renderBasics()',context);
 }
 

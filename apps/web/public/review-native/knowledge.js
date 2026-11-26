@@ -1,3 +1,4 @@
+import {fileUploadLimit, isUploadVideo} from './course-asset-upload.js';
 import { validateKnowledgeUrl, knowledgeFileType } from './knowledge-store.js?v=20261103-module-publication';
 
 const e = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -115,7 +116,7 @@ export function createKnowledgeController({ knowledge, ui }) {
   }
   function uploadForm() {
     let files = [];
-    modal('上传文件', `<form class="kb-form" data-kb-upload-form><div class="kb-dropzone" data-kb-drop>${ic('upload',30)}<strong>拖动文件到这里</strong><span>PPT、Word、PDF、表格、图片等文件</span><button type="button" class="kb-btn kb-btn-secondary" data-kb-choose>选择文件</button><input type="file" multiple data-kb-file hidden><small>单文件最多 100 MB，每次最多 20 个</small></div><div class="kb-upload-list" data-kb-file-list aria-live="polite"></div><label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(defaultCategory())}</select></label>${publicationFields()}<label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" rows="3" maxlength="1000" placeholder="介绍这批资料的内容或使用场景"></textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">保存资料</button></footer></form>`, node => {
+    modal('上传文件', `<form class="kb-form" data-kb-upload-form><div class="kb-dropzone" data-kb-drop>${ic('upload',30)}<strong>拖动文件到这里</strong><span>视频、PPT、Word、PDF、表格、图片等文件</span><button type="button" class="kb-btn kb-btn-secondary" data-kb-choose>选择文件</button><input type="file" multiple data-kb-file hidden><small>视频单个最多 2 GB，其他文件最多 100 MB，每次最多 20 个</small></div><div class="kb-upload-list" data-kb-file-list aria-live="polite"></div><label class="kb-field"><span>资料分类</span><select name="categoryId">${categoryOptions(defaultCategory())}</select></label>${publicationFields()}<label class="kb-field"><span>资料说明 <small>选填</small></span><textarea name="description" rows="3" maxlength="1000" placeholder="介绍这批资料的内容或使用场景"></textarea></label><p class="kb-error" data-kb-error role="alert"></p><footer class="kb-form-actions"><button type="button" class="kb-btn kb-btn-secondary" data-kb-cancel>取消</button><button type="submit" class="kb-btn kb-btn-primary">保存资料</button></footer></form>`, node => {
       bindPublication(node);
       const fileInput = node.querySelector('[data-kb-file]'), list = node.querySelector('[data-kb-file-list]'), drop = node.querySelector('[data-kb-drop]');
       const paint = () => { list.innerHTML = files.map((file,index)=>`<div><span>${ic('file')}<strong>${e(file.name)}</strong><small>${bytes(file.size)}</small></span><button type="button" class="kb-icon-button" data-kb-remove-file="${index}" aria-label="移除 ${e(file.name)}">${ic('close')}</button></div>`).join(''); };
@@ -123,8 +124,8 @@ export function createKnowledgeController({ knowledge, ui }) {
         const next = [...files];
         for (const file of incoming) if (!next.some(other => other.name === file.name && other.size === file.size && other.lastModified === file.lastModified)) next.push(file);
         if (next.length > 20) { formError(node,'每次最多上传 20 个文件，请分批添加'); return; }
-        const tooLarge = next.find(file=>file.size > 100*1024*1024);
-        if (tooLarge) { formError(node,`「${tooLarge.name}」超过 100 MB，请缩小文件后重试`); return; }
+        const tooLarge = next.find(file=>file.size > fileUploadLimit(file,100*1024**2));
+        if (tooLarge) { formError(node,`「${tooLarge.name}」超过 ${isUploadVideo(tooLarge) ? "2 GB" : "100 MB"}，请缩小文件后重试`); return; }
         files = next; formError(node,''); paint();
       };
       node.querySelector('[data-kb-choose]').onclick = () => fileInput.click();
@@ -186,10 +187,11 @@ export function createKnowledgeController({ knowledge, ui }) {
     if (!guard() || button?.disabled) return;
     if(button)button.disabled=true;
     try {
-      const blob=await knowledge.getFile(item.id);
-      const url=URL.createObjectURL(blob), link=document.createElement('a');
+      const video = item.mimeType?.startsWith('video/');
+      const url = video ? '/api/review-native/content-assets/knowledge/'+encodeURIComponent(item.id) : URL.createObjectURL(await knowledge.getFile(item.id));
+      const link=document.createElement('a');
       link.href=url; link.download=item.fileName || item.title; link.style.display='none'; document.body.append(link); link.click(); link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),30000);
+      if(!video)setTimeout(()=>URL.revokeObjectURL(url),30000);
     } catch(error) { ui.toast(errorText(error),'error'); }
     finally { if(button)button.disabled=false; }
   }
@@ -200,6 +202,11 @@ export function createKnowledgeController({ knowledge, ui }) {
       if(item.kind==='link')return;
       node.querySelector('[data-kb-download]').onclick=event=>download(item,event.currentTarget);
       const target=node.querySelector('[data-kb-preview-content]');
+      if(item.mimeType?.startsWith('video/')) {
+        const video=document.createElement('video'); video.controls=true; video.preload='metadata'; video.style.maxWidth='100%';
+        video.src='/api/review-native/content-assets/knowledge/'+encodeURIComponent(item.id)+'?inline=1';
+        target.replaceChildren(video); return;
+      }
       knowledge.getFile(item.id).then(async blob=>{
         if(!node.isConnected)return;
         const name=(item.fileName||'').toLowerCase();

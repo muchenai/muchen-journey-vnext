@@ -10,7 +10,7 @@ const BASE = '/api/review-native/academy';
 const clone = value => structuredClone(value);
 const text = value => String(value ?? '').trim();
 const CHUNK_SIZE = 524288;
-const MAX_VIDEO_SIZE = 524288000;
+const MAX_VIDEO_SIZE = 2147483648;
 
 export function createAcademyApi({ getCurrentUser, fetcher = (...args) => fetch(...args) } = {}) {
   let data = { courses: [], shares: [], stats: { total: 0, published: 0, unpublished: 0, pending: 0 }, tags: [...ACADEMY_TAGS] };
@@ -64,7 +64,7 @@ export function createAcademyApi({ getCurrentUser, fetcher = (...args) => fetch(
   }
   async function uploadVideo(file, onProgress) {
     if (!(file instanceof Blob) || !file.size) throw new Error('请选择非空的视频文件');
-    if (file.size > MAX_VIDEO_SIZE) throw new Error('视频不能超过 500 MB');
+    if (file.size > MAX_VIDEO_SIZE) throw new Error('视频不能超过 2 GB');
     if (!/\.(mp4|webm|ogv|ogg|mov|m4v)$/i.test(file.name || '')) throw new Error('请选择 MP4、WebM、MOV 或 Ogg 视频文件');
     const cached = uploads.get(file);
     if (cached) { onProgress?.(100); return cached; }
@@ -86,7 +86,13 @@ export function createAcademyApi({ getCurrentUser, fetcher = (...args) => fetch(
   async function writeCourse(id, payload) {
     guard();
     const body = { title: text(payload.title), summary: text(payload.summary), minutes: Number(payload.minutes), tags: payload.tags || [], url: text(payload.url) };
-    if (payload.file) body.uploadId = await uploadVideo(payload.file, payload.onProgress);
+    if (payload.file) {
+      try {
+        body.uploadId = await uploadVideo(payload.file, payload.onProgress);
+      } catch (error) {
+        throw Object.assign(new Error(error.message, {cause:error}), {field:'file'});
+      }
+    }
     if (id) body.expected_revision = payload.expected_revision ?? data.courses.find(item => item.id === id)?.revision;
     else { body.type = payload.type; if (payload.id) body.id = payload.id; }
     const course = await request(id ? `/courses/${encodeURIComponent(id)}` : '/courses', id ? 'PATCH' : 'POST', body);

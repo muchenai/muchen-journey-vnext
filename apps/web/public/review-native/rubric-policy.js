@@ -1,4 +1,5 @@
 import {rubricAttachmentErrors, normalizeImportedRubricMaterial} from './rubric-materials.js?v=20261118-document-rubric';
+import {issueMessage} from './task-field-limits.js';
 
 export const ANSWER_DOCUMENT_DIMENSION = Object.freeze({
   id: 'answer-document',
@@ -55,23 +56,23 @@ export function rubricScoreTotal(task = {}) {
 }
 
 /** Shared by publication, readiness and the optional author sandbox. */
-export function rubricDimensionErrors(task = {}) {
+export function rubricDimensionErrors(task = {}, issue = issueMessage) {
   const errors = [];
   const rubric = effectiveRubric(task);
   const text = value => String(value ?? '').trim();
-  if (!rubric.length) errors.push(task.camp === 'exploration' ? '请添加有效的标准答案文档，或至少配置一个评分维度' : '请至少配置一个评分维度');
-  if (rubric.length > 12) errors.push('最多配置 12 个评分维度');
+  if (!rubric.length) errors.push(issue('rubric', task.camp === 'exploration' ? '请添加有效的标准答案文档，或至少配置一个评分维度' : '请至少配置一个评分维度'));
+  if (rubric.length > 12) errors.push(issue('rubric', '最多配置 12 个评分维度'));
   const ids = rubric.map((dimension, index) => dimension?.id || `dimension-${index + 1}`);
-  if (new Set(ids).size !== ids.length) errors.push('评分维度不能重复');
+  if (new Set(ids).size !== ids.length) errors.push(issue('rubric', '评分维度不能重复'));
   rubric.forEach((dimension, index) => {
-    if (!text(dimension?.name)) errors.push(`请填写评分维度 ${index + 1} 的名称`);
-    if (text(dimension?.name).length > 120) errors.push(`评分维度 ${index + 1} 的名称不能超过 120 字`);
-    if (!Number.isFinite(Number(dimension?.points)) || Number(dimension?.points) <= 0 || Number(dimension?.points) > 100) errors.push(`评分维度 ${index + 1} 的分值需大于 0 且不超过 100`);
-    else if (Math.abs(Number(dimension.points) * 100 - Math.round(Number(dimension.points) * 100)) > 0.0000001) errors.push(`评分维度 ${index + 1} 的分值最多保留两位小数`);
-    if (!text(dimension?.description)) errors.push(`请填写评分维度 ${index + 1} 的评分描述`);
-    if (text(dimension?.description).length > 2000) errors.push(`评分维度 ${index + 1} 的评分描述不能超过 2,000 字`);
+    if (!text(dimension?.name)) errors.push(issue('rubric.name', `请填写评分维度 ${index + 1} 的名称`, index));
+    if (text(dimension?.name).length > 120) errors.push(issue('rubric.name', `评分维度 ${index + 1} 的名称不能超过 120 字`, index));
+    if (!Number.isFinite(Number(dimension?.points)) || Number(dimension?.points) <= 0 || Number(dimension?.points) > 100) errors.push(issue('rubric.points', `评分维度 ${index + 1} 的分值需大于 0 且不超过 100`, index));
+    else if (Math.abs(Number(dimension.points) * 100 - Math.round(Number(dimension.points) * 100)) > 0.0000001) errors.push(issue('rubric.points', `评分维度 ${index + 1} 的分值最多保留两位小数`, index));
+    if (!text(dimension?.description)) errors.push(issue('rubric.description', `请填写评分维度 ${index + 1} 的评分描述`, index));
+    if (text(dimension?.description).length > 2000) errors.push(issue('rubric.description', `评分维度 ${index + 1} 的评分描述不能超过 2,000 字`, index));
   });
-  errors.push(...rubricAttachmentErrors(task.rubricAttachments || []));
-  if (Math.abs(rubric.reduce((sum, dimension) => sum + (Number(dimension?.points) || 0), 0) - 100) > 0.000001) errors.push('评分维度总分需为 100 分');
+  errors.push(...rubricAttachmentErrors(task.rubricAttachments || []).map(message => issue('rubricAttachments', message)));
+  if (Math.abs(rubric.reduce((sum, dimension) => sum + (Number(dimension?.points) || 0), 0) - 100) > 0.000001) errors.push(issue('rubric.total', '评分维度总分需为 100 分'));
   return errors;
 }

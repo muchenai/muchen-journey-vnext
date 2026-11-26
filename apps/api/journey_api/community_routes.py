@@ -18,6 +18,7 @@ from journey_api.errors import ApiError
 from journey_api.models import User, UserStatus, Role, RoleAssignment, TaskVersion, Assignment, Enrollment, Evaluation, Decision
 from journey_api.review_admin_models import ReviewAdminTask
 from journey_api.review_admin_access import require_publisher
+from journey_api.video_limits import MAX_VIDEO_SIZE, VIDEO_TYPES, media_signature
 from journey_api.community_models import CommunityState, KnowledgeFile, KnowledgeChunk, KnowledgeFavorite, GuildContribution
 
 router = APIRouter(prefix='/api/v1/review-admin/community')
@@ -140,11 +141,15 @@ def file_command(session, actor, action, p):
     if action=='beginUpload':
         name=text(p.get('fileName'), '文件名',255,True)
         size=p.get('size')
-        if type(size) is not int or size<0 or size>MAX_FILE_SIZE:fail('单个文件不能超过 100 MB。')
+        ext = name.rsplit('.',1)[-1].lower()
+        video_mime = VIDEO_TYPES.get(ext)
+        limit = MAX_VIDEO_SIZE if video_mime else MAX_FILE_SIZE
+        if type(size) is not int or size < 0 or size > limit:
+            fail('单个视频不能超过 2 GB。' if video_mime else '单个文件不能超过 100 MB。')
         # Discard abandoned uploads only; published files are never expired.
         session.execute(delete(KnowledgeFile).where(KnowledgeFile.organization_id==actor.organization_id, KnowledgeFile.created_by==actor.id,KnowledgeFile.complete==False,KnowledgeFile.created_at<datetime.now(UTC)-timedelta(days=1)))
         if session.scalar(select(func.count()).select_from(KnowledgeFile).where(KnowledgeFile.created_by==actor.id,KnowledgeFile.complete==False))>=20:fail('未完成的上传过多，请重试或稍后上传。')
-        mime={'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','gif':'image/gif','webp':'image/webp','avif':'image/avif','bmp':'image/bmp','pdf':'application/pdf'}.get(name.rsplit('.',1)[-1].lower(),'application/octet-stream')
+        mime=video_mime or {'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','gif':'image/gif','webp':'image/webp','avif':'image/avif','bmp':'image/bmp','pdf':'application/pdf'}.get(name.rsplit('.',1)[-1].lower(),'application/octet-stream')
         row=KnowledgeFile(id=uuid.uuid4(),organization_id=actor.organization_id,created_by=actor.id,size=size,complete=False,metadata_json=dict(fileName=name,size=size,mimeType=mime,fileType=file_type(name)))
         session.add(row);session.flush()
         return dict(id=str(row.id),chunkSize=CHUNK_SIZE)
@@ -192,6 +197,11 @@ def knowledge_change(session,actor,data,action,p):
         file=get_file(session,actor,p.get('id'),writing=True)
         chunks=session.execute(select(KnowledgeChunk.position,func.length(KnowledgeChunk.data)).where(KnowledgeChunk.file_id==file.id).order_by(KnowledgeChunk.position)).all()
         if len(chunks)!=math.ceil(file.size/CHUNK_SIZE) or sum(c[1] for c in chunks)!=file.size:fail('文件未完整上传，请重试。')
+        video_mime = file.metadata_json.get('mimeType')
+        if video_mime in VIDEO_TYPES.values():
+            first = session.get(KnowledgeChunk, (file.id, 0))
+            if not first or not media_signature(first.data, video_mime):
+                fail('文件内容与视频格式不匹配。')
         row=dict(id=str(file.id),kind='file',title=file.metadata_json['fileName'][:120],**file.metadata_json,categoryId=category(data,p.get('categoryId')),description=text(p.get('description',''),'资料说明'),createdAt=timestamp(),updatedAt=timestamp(),createdBy=editor)
         row.update(knowledge_publication(p))
         file.complete=True;data['items'].insert(0,row);return row

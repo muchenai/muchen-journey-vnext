@@ -31,7 +31,9 @@ export function KnowledgeLibrary({ module, query, onClearSearch }: {
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [saving, setSaving] = useState("");
   const [selected, setSelected] = useState<Resource | null>(null);
-  const [fileUrl, setFileUrl] = useState(""), [fileError, setFileError] = useState("");
+  const [blobUrl, setBlobUrl] = useState(""), [fileError, setFileError] = useState("");
+  const streamVideo = selected?.kind === "file" && selected.mimeType?.startsWith("video/");
+  const fileUrl = streamVideo ? `/api/learner/knowledge?module=${module}&file=${selected.id}` : blobUrl;
   const [fileProgress, setFileProgress] = useState(0);
   const modal = useRef<HTMLDialogElement>(null);
   const request = useRef<AbortController | null>(null);
@@ -58,7 +60,7 @@ export function KnowledgeLibrary({ module, query, onClearSearch }: {
     return () => element?.close();
   }, [selected]);
   useEffect(() => {
-    if (!selected || selected.kind !== "file") return;
+    if (!selected || selected.kind !== "file" || streamVideo) return;
     const controller = new AbortController(); let objectUrl = "";
     const item = selected;
     void (async () => {
@@ -74,13 +76,13 @@ export function KnowledgeLibrary({ module, query, onClearSearch }: {
         if (controller.signal.aborted) return;
         const blob = new Blob(chunks, { type: item.mimeType || "application/octet-stream" });
         if (blob.size !== item.size) throw new Error("文件未完整读取，请关闭后重新打开。");
-        objectUrl = URL.createObjectURL(blob); setFileUrl(objectUrl); setFileProgress(100);
+        objectUrl = URL.createObjectURL(blob); setBlobUrl(objectUrl); setFileProgress(100);
       } catch (e) { if (!controller.signal.aborted) setFileError(e instanceof Error ? e.message : "文件读取失败。"); }
     })();
     return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [selected, module]);
+  }, [selected, module, streamVideo]);
   function openResource(item: Resource) {
-    setFileUrl(""); setFileError(""); setFileProgress(0); setSelected(item);
+    setBlobUrl(""); setFileError(""); setFileProgress(0); setSelected(item);
   }
   async function toggle(item: Resource) {
     if (saving) return;
@@ -111,6 +113,6 @@ export function KnowledgeLibrary({ module, query, onClearSearch }: {
         </ModulePanel>
       </section>
     </div>
-    <dialog ref={modal} className="module-dialog knowledge-preview-dialog journey-dialog" aria-labelledby="knowledge-resource-title" onCancel={() => setSelected(null)}><JourneyDialogSurface><div className="module-dialog-heading"><span className="badge-eyebrow">RESOURCE PREVIEW</span><button onClick={() => setSelected(null)} aria-label="关闭资料">关闭</button></div>{selected && <><span className="knowledge-file-icon" data-format={formatLabel(selected)}>{formatLabel(selected)}</span><h2 id="knowledge-resource-title">{selected.title}</h2><span className="module-tag">{categoryName(selected.categoryId)}</span><p>{selected.description}</p><div className="knowledge-preview-meta"><span>发布方：{selected.publisher}</span><span>格式：{formatLabel(selected)} · {sizeLabel(selected)}</span><span>更新日期：{date(selected.updatedAt)}</span></div>{selected.kind === "link" ? <a className="module-primary knowledge-open-link" href={safeUrl(selected.url) || undefined} target="_blank" rel="noopener noreferrer">打开在线文档 ↗</a> : <div className="knowledge-file-preview">{fileError ? <p role="alert">{fileError}</p> : !fileUrl ? <p role="status">正在读取文件… {fileProgress}%</p> : <>{/^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(selected.mimeType || "") && <img src={fileUrl} alt={selected.title} />}{selected.mimeType === "application/pdf" && <a className="module-secondary" href={fileUrl} target="_blank" rel="noopener noreferrer">打开 PDF 预览 ↗</a>}<a className="module-primary" href={fileUrl} download={selected.fileName || selected.title}>下载文件 ↓</a></>}</div>}</>}</JourneyDialogSurface></dialog>
+    <dialog ref={modal} className="module-dialog knowledge-preview-dialog journey-dialog" aria-labelledby="knowledge-resource-title" onCancel={() => setSelected(null)}><JourneyDialogSurface><div className="module-dialog-heading"><span className="badge-eyebrow">RESOURCE PREVIEW</span><button onClick={() => setSelected(null)} aria-label="关闭资料">关闭</button></div>{selected && <><span className="knowledge-file-icon" data-format={formatLabel(selected)}>{formatLabel(selected)}</span><h2 id="knowledge-resource-title">{selected.title}</h2><span className="module-tag">{categoryName(selected.categoryId)}</span><p>{selected.description}</p><div className="knowledge-preview-meta"><span>发布方：{selected.publisher}</span><span>格式：{formatLabel(selected)} · {sizeLabel(selected)}</span><span>更新日期：{date(selected.updatedAt)}</span></div>{selected.kind === "link" ? <a className="module-primary knowledge-open-link" href={safeUrl(selected.url) || undefined} target="_blank" rel="noopener noreferrer">打开在线文档 ↗</a> : <div className="knowledge-file-preview">{fileError ? <p role="alert">{fileError}</p> : !fileUrl ? <p role="status">正在读取文件… {fileProgress}%</p> : <>{selected.mimeType?.startsWith("video/") && <video controls preload="metadata" src={fileUrl + "&inline=1"} style={{ maxWidth:"100%" }} />}{/^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(selected.mimeType || "") && <img src={fileUrl} alt={selected.title} />}{selected.mimeType === "application/pdf" && <a className="module-secondary" href={fileUrl} target="_blank" rel="noopener noreferrer">打开 PDF 预览 ↗</a>}<a className="module-primary" href={fileUrl} download={selected.fileName || selected.title}>下载文件 ↓</a></>}</div>}</>}</JourneyDialogSurface></dialog>
   </div>;
 }

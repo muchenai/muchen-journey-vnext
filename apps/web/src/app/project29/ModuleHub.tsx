@@ -34,10 +34,13 @@ import {
 import { VillageTaskCard, VillageTaskRewards } from "./VillageTaskCard"
 import { JourneyDialogSurface } from "./JourneyDialogSurface"
 import { AccountSwitchDialog } from "./AccountSwitchDialog"
-import { PersonalProfile } from "./PersonalProfile"
+import { ExplorationProfile, PersonalProfile } from "./PersonalProfile"
 import { WorldMap } from "./WorldMap"
 import { KnowledgeLibrary } from "./KnowledgeLibrary"
+import { AcademyCourseEntry } from "./AcademyCourseEntry"
+import { VillageCourseCatalog, VillageOrdinaryCourses } from "./VillageCourseCatalog"
 import { AcademyLearning } from "./AcademyLearning"
+import type { JourneyContextValue } from "./journey-context"
 import { DeliveryLab } from "./DeliveryLab"
 import { createDeliveryLabSession } from "./deliveryLabModel"
 import { GuildGrowthPage } from "./GuildGrowthPage"
@@ -58,6 +61,9 @@ type DialogState = { type: "task"; task: VillageTask } | {
 
 export function ModuleHub({
   active = true,
+  explorationOnly = false,
+  navigationNotice = "",
+  academyEntry,
   module,
   identity,
   onNavigate,
@@ -73,6 +79,9 @@ export function ModuleHub({
   legacyTasksAvailable = false,
 }: {
   active?: boolean
+  explorationOnly?: boolean
+  navigationNotice?: string
+  academyEntry?: JourneyContextValue["academyEntry"]
   module: ModuleDestination
   identity: PreviewIdentity
   onNavigate: (destination: ModuleDestination) => void
@@ -90,11 +99,17 @@ export function ModuleHub({
   explorationScope?: "all" | "mine"
   legacyTasksAvailable?: boolean
 }) {
+  const studyCourseId = module === "academy" ? academyEntry?.courseId : undefined
+  const villageCourseId = module === "village" ? academyEntry?.courseId : undefined
+  const activeCourseId = studyCourseId || villageCourseId
+  const allowedSections = module === "village" ? ["mine","badges","map","knowledge","profile"] : ["saved","map","knowledge","profile"]
+  const academySection = (module === "academy" || module === "village") && academyEntry?.section && allowedSections.includes(academyEntry.section) ? academyEntry.section : "hall"
+  const initialQuery = module === "academy" || module === "village" ? academyEntry?.query ?? "" : ""
   const villageEnabled = module === "village"
   const modulePagesEnabled = ["academy", "guild"].includes(module)
   const village = useVillageTasks(villageEnabled)
   const practiceTasks = village.tasks
-  const [menu, setMenu] = useState(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : "hall")
+  const [menu, setMenu] = useState(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : academySection)
   const [profileReturn, setProfileReturn] = useState("hall")
   const [badgeEntryTab, setBadgeEntryTab] = useState<BadgeTab>("shop")
   const [badgeEntryVersion, setBadgeEntryVersion] = useState(0)
@@ -107,7 +122,7 @@ export function ModuleHub({
   const [taskStatusFilter, setTaskStatusFilter] = useState<VillageTaskStatusFilter>("all")
   const resetTaskFilters = () => {setTaskDepartment("all"); setTaskLevel("全部"); setTaskReview("全部"); setTaskBadgeType("全部"); setTaskStatusFilter("all"); setQuery("")}
   const [filter, setFilter] = useState("全部")
-  const [search, setSearch] = useState({ module, value: "" })
+  const [search, setSearch] = useState({ module, value: initialQuery })
   const query = search.module === module ? search.value : ""
   const setQuery = useCallback((value: string) => setSearch({ module, value }), [module])
   const [sort, setSort] = useState("recommended")
@@ -159,7 +174,7 @@ export function ModuleHub({
     const initial = window.setTimeout(() => {
       const mapDepartment = module === "village" ? pendingMapTaskDepartment.current : null
       pendingMapTaskDepartment.current = null
-      setMenu(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : module === "village" && pendingVillageMenu.current ? pendingVillageMenu.current : module === "academy" && pendingAcademyFavorites.current ? "saved" : "hall")
+      setMenu(module === "dashboard" && configurableExploration && explorationScope === "mine" ? "tasks" : module === "village" && pendingVillageMenu.current ? pendingVillageMenu.current : module === "academy" && pendingAcademyFavorites.current ? "saved" : academySection)
       if (!(module === "village" && pendingVillageMenu.current === "badges")) setBadgeEntryTab("shop")
       pendingVillageMenu.current = null
       pendingAcademyFavorites.current = false
@@ -167,7 +182,7 @@ export function ModuleHub({
       if (mapDepartment) setTaskDepartment(mapDepartment)
       pendingMapTaskScroll.current = mapDepartment !== null
       setFilter("全部")
-      setQuery("")
+      setQuery(initialQuery)
       setSort("recommended")
       setDialog(null)
       setNotice("")
@@ -184,11 +199,7 @@ export function ModuleHub({
     const timeout = window.setTimeout(() => setNotice(""), 4500)
     return () => window.clearTimeout(timeout)
   }, [notice])
-  const taskStatus = (id: string): ModuleStatusName =>
-    practiceTasks.find(task => task.id === id)?.status || "available"
   const accepted = practiceTasks.filter(isVillageTaskClaimed)
-  const pending = accepted.filter((t) => taskStatus(t.id) === "pending")
-  const completed = accepted.filter((t) => taskStatus(t.id) === "completed")
   const info = (title: string, body: string) => {
     if (module === "guild" || villageEnabled || modulePagesEnabled) setDialog({ type: "info", title, body })
     else setNotice("暂未开放")
@@ -220,6 +231,12 @@ export function ModuleHub({
     onNavigate("village")
   }
   function navigateMenu(next: string) {
+    if (activeCourseId && (next==="hall" || allowedSections.includes(next))) {
+      const query = new URLSearchParams({view:module});
+      if(next!=="hall") query.set("section",next);
+      window.location.assign("/app?"+query)
+      return
+    }
     if (module === "guild" && ["hall", "lab", "certification", "capability-map", "arena"].includes(next)) {
       setMenu(next)
       setQuery("")
@@ -271,6 +288,15 @@ export function ModuleHub({
       )
     }
   }
+  const electivesLocked = village.requiredRemaining > 0
+  const requiredCompleted = village.requiredTotal - village.requiredRemaining
+  const requiredProgressNote = !village.ready ? village.error ? "学习进度读取失败。" : "正在读取学习进度…" : electivesLocked ? `还有 ${village.requiredRemaining} 项必修待完成。全部完成后即可开始普通任务。` : village.requiredTotal ? "必修已全部完成，可以开始普通任务。" : "当前没有已发布的必修，可直接开始普通任务。"
+  const electiveStatus = village.ready ? electivesLocked ? "待解锁" : "已开放" : "—"
+  const requiredCourses = village.requiredCourses.filter(course=>menu!=="mine" || course.progress>0 || course.completed)
+  const ordinaryCourses = village.electiveCourses.filter(course => menu !== "mine" || course.progress > 0 || course.completed)
+  const electiveCourses = ordinaryCourses.filter(course => taskDepartment==="all" && taskLevel==="全部" && taskReview==="全部" && taskBadgeType==="全部"
+    && (menu !== "mine" || taskStatusFilter==="all" || (course.completed ? taskStatusFilter==="completed" : taskStatusFilter==="active"))
+    && (course.title+course.summary).toLowerCase().includes(query.trim().toLowerCase()))
   const taskPool = practiceTasks.filter(t => menu !== "mine" || isVillageTaskClaimed(t))
   const visibleTasks = sortVillageTasks(filterVillageTaskStatus(
     filterDepartmentTasks(taskPool, taskDepartment, taskLevel, taskReview, query, taskBadgeType),
@@ -362,15 +388,19 @@ export function ModuleHub({
               legacyTasksAvailable={configurableExploration && legacyTasksAvailable}
               active={active}
               module={module}
-              menu={menu}
+              menu={activeCourseId ? "course" : menu}
               identity={displayName || identity}
               query={query}
               onQuery={(value) => {
                 setQuery(value)
                 if (menu !== "profile" && menu !== "map" && menu !== "knowledge" && menu !== "badges" && menu !== "hall" && !(module === "dashboard" && configurableExploration) && !(module === "guild" && ["lab", "certification", "capability-map", "arena"].includes(menu)) && !(module === "academy" && menu === "saved")) setMenu("hall")
               }}
+              onSearchSubmit={activeCourseId ? () => {
+                window.location.assign("/app?" + new URLSearchParams({ view: module, q: query.trim() }))
+              } : undefined}
               onHome={() => { setMenu("hall"); setQuery(""); onNavigate("dashboard") }}
               onProfile={() => {
+                if (activeCourseId) { navigateMenu("profile"); return }
                 if(menu!=="profile")setProfileReturn(menu)
                 setMenu("profile");setQuery("");pageContent.current?.scrollTo({top:0})
               }}
@@ -378,7 +408,7 @@ export function ModuleHub({
             <div className="module-map-host" data-active={menu === "map"} aria-hidden={menu !== "map"} inert={menu !== "map"}>
               <WorldMap contextKey={module} active={active && menu === "map"} onViewTasks={module === "village" || module === "academy" || module === "guild" ? openMapDepartmentTasks : undefined} />
             </div>
-            {module === "dashboard" && menu !== "profile" && menu !== "map" && menu !== "knowledge" ? (
+            <div className="module-content-frame">{module === "dashboard" && menu !== "profile" && menu !== "map" && menu !== "knowledge" ? (
               <div className="module-dashboard-content">
                 <DashboardSearchProvider query={query} onClearSearch={() => setQuery("")}>
                   {dashboardContent}
@@ -399,13 +429,15 @@ export function ModuleHub({
                 {module === "guild" && menu === "lab" ? (
                   <DeliveryLab identity={identity} session={deliveryLab} onChange={setDeliveryLab} query={query} onClearSearch={() => setQuery("")} />
                 ) : menu === "profile" ? (
-                  <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>openAcademy("hall")} onAcademyFavorites={()=>openAcademy("saved")} onBadgeShop={()=>openGuildVillage("badges", "shop")} onBadgeCatalog={()=>openGuildVillage("badges", "catalog")} onBadgeOwned={()=>openGuildVillage("badges", "owned")} />
+                  explorationOnly
+                    ? <ExplorationProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} />
+                    : <PersonalProfile name={displayName} onBack={()=>{setMenu(profileReturn);setQuery("")}} onAcademy={()=>openAcademy("hall")} onAcademyFavorites={()=>openAcademy("saved")} onBadgeShop={()=>openGuildVillage("badges", "shop")} onBadgeCatalog={()=>openGuildVillage("badges", "catalog")} onBadgeOwned={()=>openGuildVillage("badges", "owned")} />
                 ) : menu === "map" ? (
                   null
                 ) : menu === "knowledge" ? (
                   <KnowledgeLibrary key={module} module={module} query={query} onClearSearch={() => setQuery("")} />
                 ) : ["academy"].includes(module) ? (
-                  <AcademyLearning active={active} savedOnly={menu === "saved"} query={query} onSaved={saved => { setMenu(saved ? "saved" : "hall"); setQuery("") }} onClearSearch={() => setQuery("")} />
+                  <AcademyLearning courseId={studyCourseId} learnerName={displayName} onOpenAccount={() => { setProfileReturn(menu); setMenu("profile"); pageContent.current?.scrollTo({top:0}) }} active={active} savedOnly={menu === "saved"} query={query} onSaved={saved => { setMenu(saved ? "saved" : "hall"); setQuery("") }} onClearSearch={() => setQuery("")} />
                 ) : module === "academy" && menu === "saved" ? (
                   <div className="favorite-knowledge-page">
                     <FavoriteKnowledge headingLevel="h1" courses={academyCourses} favoriteIds={favorites} query={query}
@@ -413,6 +445,8 @@ export function ModuleHub({
                       onOpen={course => setDialog({type:"course", course})}
                       onBrowse={() => navigateMenu("hall")} onClearSearch={() => setQuery("")} />
                   </div>
+                ) : villageCourseId ? (
+                  <AcademyCourseEntry courseId={villageCourseId} villageCourse />
                 ) : module === "village" && menu === "badges" ? (
                   <BadgeShop key={badgeEntryVersion} initialTab={badgeEntryTab} query={query} onTasks={() => {resetTaskFilters(); navigateMenu("hall")}} />
                 ) : module !== "guild" && module !== "dashboard" ? (
@@ -461,6 +495,8 @@ export function ModuleHub({
                         module={module}
                         onContinue={() => {
                           if (module === "village") {
+                            const mandatory=village.requiredCourses.find(course=>!course.completed)
+                            if(mandatory){window.location.assign("/app?view=village&course="+encodeURIComponent(mandatory.id));return}
                             const first = accepted.find(task => ["active", "returned"].includes(task.status)) || practiceTasks[0]
                             if (first) setDialog({type:"task",task:first})
                             else { setNotice(village.loading ? "任务正在读取，请稍候。" : "暂时没有已发布的任务。"); scrollToListing() }
@@ -482,7 +518,7 @@ export function ModuleHub({
                         }
                         description={
                           module === "village"
-                            ? "在真实问题中练习，把每一次尝试，变成看得见的成长。"
+                            ? "先完成公司文化、制度等全员必修，再选择感兴趣的普通任务。"
                             : "从一个灵感到一次实践，让每一份好奇，都成为成长路上的能量。"
                         }
                       />
@@ -490,7 +526,7 @@ export function ModuleHub({
                         <div className="module-row">
                           <h3>
                             {module === "village"
-                              ? "我的实践进度"
+                              ? "新手村必修进度"
                               : "本周探索任务"}
                           </h3>
                           <ModuleIcon
@@ -500,46 +536,50 @@ export function ModuleHub({
                         </div>
                         <p className="module-weekly-count">
                           <strong>
-                            {villageEnabled ? completed.length : "—"}
+                            {villageEnabled && village.ready ? requiredCompleted : "—"}
                           </strong>
                           <span>
-                            / {villageEnabled ? accepted.length : "—"} {module === "village" ? "个任务" : "门课程"}
+                            / {villageEnabled && village.ready ? village.requiredTotal : "—"} {module === "village" ? "项必修" : "门课程"}
                           </span>
                         </p>
                         <div
                           className="module-progress-track"
                           role="progressbar"
-                          aria-label={module === "village" ? "我的任务完成进度" : "本周进度"}
+                          aria-label={module === "village" ? "新手村必修完成进度" : "本周进度"}
                           aria-valuemin={0}
-                          aria-valuemax={Math.max(accepted.length, 1)}
-                          aria-valuenow={villageEnabled ? completed.length : undefined}
-                          aria-valuetext={villageEnabled ? undefined : "暂未开放"}
+                          aria-valuemax={Math.max(village.requiredTotal, 1)}
+                          aria-valuenow={villageEnabled && village.ready ? requiredCompleted : undefined}
+                          aria-valuetext={village.ready ? `已完成 ${requiredCompleted} 项，共 ${village.requiredTotal} 项` : undefined}
                         >
                           <i
                             style={{
-                              width: `${((module === "village" ? completed.length : learned.length) / Math.max(accepted.length, 1)) * 100}%`,
+                              width: `${(requiredCompleted / Math.max(village.requiredTotal, 1)) * 100}%`,
                             }}
                           />
                         </div>
                         <div className="module-row module-small">
                           <span>
                             {module === "village"
-                              ? "审核通过后完成"
+                              ? "普通任务"
                               : "每完成一门"}
                           </span>
                           <span className="module-cyan">
-                            {villageEnabled ? "点亮能力" : "暂未开放"}
+                            {electiveStatus}
                           </span>
                         </div>
                         <blockquote>
-                          {villageEnabled ? `已接取 ${accepted.length} 项 · 待审核 ${pending.length} 项。提交不等于完成，审核通过后才算完成。` : "暂未开放"}
+                          {requiredProgressNote}
                         </blockquote>
                       </ModulePanel>
                     </div>
+                    {villageEnabled && village.ready && <VillageCourseCatalog requiredCourses={requiredCourses}
+                      tasks={[]} query={query} mine={menu==="mine"} onTask={task=>setDialog({type:"task",task})} />}
                     <div ref={listing} className="module-listing">
+                      {villageEnabled && <div className="village-task-list-heading"><h2>{menu==="mine" ? "我的普通任务" : "普通任务"}</h2>
+                        {electivesLocked && <span>完成全部必修后解锁</span>}</div>}
                       <div className={`module-filterbar ${module === "village" ? "is-task-filter" : ""}`}>
                         {module === "village" ? <TaskClassifications tasks={taskPool} department={taskDepartment} level={taskLevel} review={taskReview} badgeType={taskBadgeType}
-                          status={menu === "mine" ? taskStatusFilter : undefined} onStatus={setTaskStatusFilter} visibleCount={visibleTasks.length}
+                          status={menu === "mine" ? taskStatusFilter : undefined} onStatus={setTaskStatusFilter} ordinaryCourseCount={ordinaryCourses.length} visibleCount={visibleTasks.length+electiveCourses.length}
                           onDepartment={setTaskDepartment} onLevel={setTaskLevel} onReview={setTaskReview} onBadgeType={setTaskBadgeType} onReset={resetTaskFilters} /> :
                           <div className="module-tabs" role="group" aria-label="课程分类">{["全部", "管理员外链", "平台视频", "员工共建"].map(category => <button key={category} className={filter === category ? "is-active" : ""} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category === "全部" ? "全部课程" : category}<span>{academyCourses.filter(c => category === "全部" || c.category === category).length}</span></button>)}</div>}
                         <label className="module-sort">
@@ -562,7 +602,7 @@ export function ModuleHub({
                       <div className="module-list-caption">
                         <span>
                           {module === "village"
-                            ? `${visibleTasks.length} 个任务 · ${
+                            ? `${visibleTasks.length+electiveCourses.length} 个任务 · ${
                                 menu === "mine"
                                   ? "我的任务"
                                   : taskDepartmentName(taskDepartment)
@@ -574,15 +614,16 @@ export function ModuleHub({
                               }`}
                         </span>
                         <span className="module-demo-label">
-                          {villageEnabled ? "所有学员均可领取" : "暂未开放"}
+                          {villageEnabled ? electivesLocked ? "待解锁" : "所有学员均可领取" : "暂未开放"}
                         </span>
                       </div>
                       {villageEnabled && village.loading && <p role="status">正在读取任务…</p>}
                       {villageEnabled && village.error && <p role="alert">{village.error} <button onClick={() => void village.refresh()}>重试</button></p>}
+                      {villageEnabled && <VillageOrdinaryCourses courses={electiveCourses} locked={electivesLocked} />}
                       {module === "village" ? (
                         <div className="module-cards-grid">
                           {visibleTasks.map(task => (
-                            <VillageTaskCard key={task.id} task={task} onOpen={() => setDialog({ type: "task", task })} />
+                            <VillageTaskCard key={task.id} locked={electivesLocked && !isVillageTaskClaimed(task)} task={task} onOpen={() => setDialog({ type: "task", task })} />
                           ))}
                         </div>
                       ) : (
@@ -697,7 +738,7 @@ export function ModuleHub({
                         </div>
                       )}
                       {(module === "village"
-                        ? !visibleTasks.length && !village.loading && !village.error
+                        ? !visibleTasks.length && !electiveCourses.length && !village.loading && !village.error
                         : !visibleCourses.length) && (
                         <ModulePanel className="module-empty">
                           <h3>
@@ -761,11 +802,11 @@ export function ModuleHub({
                   </button>
                 </footer>
               </div>
-            )}
+            )}</div>
           </div>
-          {notice && (
+          {(navigationNotice || notice) && (
             <div className="module-toast" role="status">
-              {notice}
+              {navigationNotice || notice}
             </div>
           )}
           <dialog
@@ -792,7 +833,7 @@ export function ModuleHub({
             </div>
             {openedTask && (
               <>
-                <div className="module-row"><div className="task-department-labels"><span className="module-tag">{openedTask.publishingDepartment || "部门待补充"}</span></div><ModuleStatus status={openedTask.status}/></div>
+                <div className="module-row"><div className="task-department-labels"><span className="module-tag">{openedTask.publishingDepartment || "部门或分类待补充"}</span></div><ModuleStatus status={openedTask.status}/></div>
                 <h2>{openedTask.title}</h2><p>{openedTask.description}</p>
                 <div className="module-meta"><span>{openedTask.level}</span><span>{openedTask.minutes} 分钟</span><span>{openedTask.review}</span></div>
                 <VillageTaskRewards task={openedTask} />
@@ -811,7 +852,7 @@ export function ModuleHub({
                 {openedTask.feedback && <div className="module-demo-note"><strong>{openedTask.feedback.decision === "PASS" ? "审核通过" : "返回修改"}</strong><p style={{whiteSpace:"pre-wrap"}}>{openedTask.feedback.text}</p><time>{new Date(openedTask.feedback.at).toLocaleString("zh-CN")}</time></div>}
                 {notice && notice !== "草稿保存成功" && <p role="status">{notice}</p>}
                 {village.error && <p role="alert">{village.error}</p>}
-                {openedTask.status === "available" ? <button className="module-primary module-claim-action" disabled={village.busy} onClick={()=>void act(openedTask,"claim")}>{village.busy ? "正在领取…" : "接取任务 →"}</button> : (
+                {openedTask.status === "available" ? <button className="module-primary module-claim-action" disabled={village.busy || electivesLocked} onClick={()=>void act(openedTask,"claim")}>{village.busy ? "正在领取…" : "接取任务 →"}</button> : (
                   <VillageTaskForm key={`${openedTask.id}:${openedTask.assignmentId}:${openedTask.revision}:${openedTask.status}`} task={openedTask}
                     busy={village.busy} answer={practice[openedTask.id]?.answer ?? openedTask.answer}
                     savedMessage={savedDraftTaskId === openedTask.id && notice === "草稿保存成功" ? notice : ""}

@@ -16,8 +16,10 @@ function page(file,experience){
     'next/navigation':{redirect:target=>{throw Error('REDIRECT '+target)}},
     '@/lib/server/api':{learnerPageRequest:async()=>({module:'legacy',taskId:null})},
     '@/lib/server/local-preview':{localVillagePreviewEnabled:()=>false},
+    '@/lib/learner-module-access':{isCompanyModule:view=>['village','academy','guild'].includes(view)},
+    '@/app/project-ui/CompanyLoginNotice':{default:()=>null},
     '@/app/project29/App':{default:()=>null},
-    '@/app/project-ui/experience-data':{loadProjectExperience:async (...args)=>{
+    '@/app/project-ui/experience-data':{loadLearnerProfile:async()=>({exploration_only:false}),loadProjectExperience:async (...args)=>{
       calls.push(args);return {learnerName:'原学员',experience,needsNickname:false};
     }},
   };
@@ -35,7 +37,7 @@ test('legacy task listing retains original progress and the original task UI whi
   assert.equal(legacy.props.initialScreen,'tasks');
   assert.equal(legacy.props.configurableExploration,false);
   assert.equal(legacy.props.experience,experience);
-  assert.deepEqual(home.calls[0],[undefined,false]);
+  assert.deepEqual(home.calls[0],[undefined,false,undefined]);
   for(const view of ['tasks','dashboard']){
     const current=await home.render({searchParams:Promise.resolve({view})});
     assert.equal(current.props.configurableExploration,true);

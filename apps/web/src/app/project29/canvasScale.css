@@ -12,7 +12,19 @@ html .design-viewport:not(.module-viewport) {
   justify-content: safe center;
 }
 
+/* Module pages and the exploration task screens share the academy's fit,
+   including on a direct visit before React mounts. */
+.module-viewport,
+.design-viewport:is([data-screen="tasks"], [data-screen="detail"], [data-screen="view"]) {
+  --journey-canvas-scale: var(--journey-module-scale, 1);
+  --journey-canvas-overflow: var(--journey-module-overflow, hidden);
+}
+
 html .module-viewport {
-  overflow-x: var(--journey-canvas-overflow, hidden);
+  overflow: var(--journey-canvas-overflow, hidden);
   justify-content: safe center;
+}
+
+.module-viewport .module-page-content {
+  overscroll-behavior: auto;
 }

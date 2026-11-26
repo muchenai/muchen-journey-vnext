@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, STAFF_SESSION_COOKIE } from "@/lib/auth/cookies";
 
 /** Streams private course media without buffering the video or exposing session credentials. */
-export async function proxyAcademyVideo(request: NextRequest, courseId: string, role: "LEARNER" | "REVIEWER" | "OPERATOR"): Promise<Response> {
+export async function proxyAcademyVideo(request: NextRequest, courseId: string, role: "LEARNER" | "REVIEWER" | "OPERATOR", resource: "academy-video" | "course-asset" = "academy-video"): Promise<Response> {
   const responseHeaders = new Headers({ "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
   const fail = (message: string, status: number) => NextResponse.json({ error: message }, { status, headers: responseHeaders });
   if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(courseId)) return fail("课程参数无效。", 400);
@@ -26,7 +26,8 @@ export async function proxyAcademyVideo(request: NextRequest, courseId: string, 
   if (range) headers.set("Range", range);
   if (ifRange) headers.set("If-Range", ifRange);
   try {
-    const response = await fetch(new URL(`/api/v1/${learner ? "me" : "ops"}/academy/courses/${courseId}/video`, process.env.API_INTERNAL_URL ?? "http://localhost:8000"), {
+    const path = resource === "course-asset" ? `/api/v1/me/course-assets/${courseId}` : `/api/v1/${learner ? "me" : "ops"}/academy/courses/${courseId}/video`;
+    const response = await fetch(new URL(path, process.env.API_INTERNAL_URL ?? "http://localhost:8000"), {
       method: request.method === "HEAD" ? "HEAD" : "GET", headers, cache: "no-store", redirect: "error", signal: request.signal,
     });
     for (const name of ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "Content-Disposition", "ETag", "Last-Modified"]) {

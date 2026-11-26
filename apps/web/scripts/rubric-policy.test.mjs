@@ -45,7 +45,7 @@ function appRender(draft, name) {
     rubricDimensionErrors, ANSWER_DOCUMENT_DIMENSION, getReviewCamp, e: escapeHtml,
     renderRubricAttachments, icon: () => '', cardHeader: (title, suffix = '') => `<h3>${title}${suffix}</h3>`,
     validateTaskFieldLimits, explorationTaskResourceErrors, explorationTaskFiles, EXPLORATION_COMPLETION_MODES,
-    DIFFICULTY_PRESETS, isPublishingDepartment, isMaterialLink, badgeList: () => [],
+    DIFFICULTY_PRESETS, isTaskCategory:isPublishingDepartment, isMaterialLink, badgeList: () => [],
   };
   return vm.runInNewContext(`${body}\n${name}();`, context);
 }
@@ -253,7 +253,8 @@ test('sandbox marks previous results stale after document replacement, removal o
 });
 
 test('entry scripts fetch the updated shared policy rather than old cached validation', () => {
-  assert.match(source('index.html'), /app.js\?v=20261118-document-rubric/);
+  const appVersion = source('index.html').match(/src="\.\/app\.js\?v=(\d{8})-/)?.[1];
+  assert.ok(Number(appVersion) >= 20261126);
   assert.match(source('app.js'), /core.js\?v=20261118-document-rubric/);
   assert.match(source('app.js'), /sandbox.js\?v=20261118-document-rubric/);
   assert.match(source('app.js'), /library.js\?v=20261118-document-rubric/);

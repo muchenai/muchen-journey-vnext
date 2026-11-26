@@ -7,18 +7,26 @@ import type { ProjectExperienceData } from "./types";
 import { collectReviewFeedback } from "./review-feedback";
 import { learnerMaterialDestinations } from "./exploration-links";
 
-export async function loadProjectExperience(assignmentId?: string, allowPendingNickname = false): Promise<{
+type LearnerProfile = { needs_nickname: boolean; exploration_only: boolean };
+
+export function loadLearnerProfile() {
+  return learnerPageRequest<LearnerProfile>("/api/v1/me/learner-profile");
+}
+
+export async function loadProjectExperience(assignmentId?: string, allowPendingNickname = false, knownProfile?: LearnerProfile): Promise<{
   learnerName: string;
   needsNickname: boolean;
+  explorationOnly: boolean;
   experience: ProjectExperienceData | null;
 }> {
-  const profile = await learnerPageRequest<{ needs_nickname: boolean }>("/api/v1/me/learner-profile");
+  const profile = knownProfile ?? await loadLearnerProfile();
   if (profile.needs_nickname && !allowPendingNickname) redirect("/app/profile");
   const [identity, action, completionCode] = await Promise.all([
     learnerPageRequest<{ display_name: string }>("/api/v1/session"),
     learnerPageRequest<CurrentAction>("/api/v1/me/current-action"),
     learnerPageRequest<ProjectExperienceData["completionCode"]>("/api/v1/me/completion-code"),
   ]);
+  const learner = { learnerName: identity.display_name, needsNickname: profile.needs_nickname, explorationOnly: profile.exploration_only !== false };
   // This learner release opens only the exploration journey. A saved link to
   // another module must not render its task in the exploration interface.
   const exploration = action.journey?.stable_key.toLowerCase().replaceAll("_", "-") === "exploration-camp";
@@ -26,14 +34,14 @@ export async function loadProjectExperience(assignmentId?: string, allowPendingN
     redirect("/app?view=dashboard&notice=module-designing");
   }
   if (action.journey && !exploration) {
-    return { learnerName: identity.display_name, needsNickname: profile.needs_nickname, experience: null };
+    return { ...learner, experience: null };
   }
   const resolvedAssignmentId = assignmentId
     ?? (["START_OR_CONTINUE_TASK", "REVISE_SUBMISSION", "WAIT_FOR_REVIEW"].includes(action.action_type)
       ? action.resource_id
       : action.journey?.nodes.find(node => node.status === "CURRENT")?.assignment_id ?? action.journey?.nodes.at(-1)?.assignment_id);
   if (!resolvedAssignmentId) {
-    return { learnerName: identity.display_name, needsNickname: profile.needs_nickname, experience: null };
+    return { ...learner, experience: null };
   }
   const assignment = await learnerPageRequest<Assignment>(
     `/api/v1/me/assignments/${encodeURIComponent(resolvedAssignmentId)}`,
@@ -54,8 +62,7 @@ export async function loadProjectExperience(assignmentId?: string, allowPendingN
       feedback: latest.feedback, feedbackAt: latest.review_finalized_at }];
   });
   return {
-    learnerName: identity.display_name,
-    needsNickname: profile.needs_nickname,
+    ...learner,
     experience: {
       completionCode,
       assignmentId: assignment.id,

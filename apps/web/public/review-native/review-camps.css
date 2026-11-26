@@ -11,3 +11,19 @@
 @media (max-width: 760px) {
   .camp-option { padding: 10px; font-size: 12px; gap: 7px; }
 }
+
+.village-publish-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.village-course-list-link { padding: 0; border: 0; background: transparent; color: var(--primary); font-size: 13px; }
+.village-course-list-link:hover, .village-course-list-link[aria-current="page"] { text-decoration: underline; }
+.village-publish-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.village-publish-option { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; text-align: left; background: var(--surface); color: var(--text); cursor:pointer; }
+.village-publish-option input[type=radio] { accent-color: var(--primary); width: 15px; height: 15px; padding: 0; flex-shrink: 0; }
+.village-publish-option > span { display: grid; gap: 3px; }
+.village-publish-option strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.village-publish-option span { font-size: 12px; line-height: 1.6; }
+.village-publish-option:hover { border-color: var(--primary); }
+.village-publish-option:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.village-publish-option:has(input:checked) strong { color: var(--primary); }
+@media (max-width: 580px) {
+  .village-publish-options { grid-template-columns: 1fr; }
+}

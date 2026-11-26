@@ -28,8 +28,8 @@ export const renderInviteLogin = () => '';
 export const bindInviteLogin = () => {};
 export async function clearInviteSession() { await request({ command: 'logout' }); location.assign('/review/login'); }
 const preferredCamp = () => new URLSearchParams(globalThis.location?.search || '').get('camp') === 'exploration' && activeStore?.capabilities?.isSuperAdmin === true ? 'exploration' : 'novice';
-export function newDraft() {
-  const camp = preferredCamp();
+export function newDraft(requestedCamp) {
+  const camp = requestedCamp === 'novice' || (requestedCamp === 'exploration' && activeStore?.capabilities?.isSuperAdmin) ? requestedCamp : preferredCamp();
   return applyDifficultyPreset({ id: crypto.randomUUID(), revision: 0, title: '', summary: '', camp, ...(camp==='exploration'?{order:nextExplorationOrder(activeStore?.data.tasks),completionMode:'learning',assessmentUrl:'',taskFiles:[]}:{}), domain: '产品开发', publishingDepartment: '', difficulty: '入门', badges: [{ id: 'product', weight: 100 }], materials: [], questions: [], rubric: [], rubricAttachments: [], reviewMode: 'manual', passScore: 60, status: 'draft', author: activeStore?.actor.name || '', participants: 0, completions: 0 });
 }
 export class ApiStore {

@@ -96,6 +96,8 @@ def task_data(session, definition, *, catalog_positions=None):
     minutes, xp, points = PRESETS.get(content.get("difficulty"), PRESETS["入门"])
     if content.get("rewardRulesVersion", 1) >= 3:
         points = 0
+    if content.get("rewardRulesVersion") == 4:
+        xp = content["xp"]
     content.update(id=str(definition.id), stableKey=definition.stable_key, camp=task_camp(definition, profile),
         revision=profile.revision if profile else 0, definitionRevision=definition.revision,
         status=profile.status if profile else ("archived" if definition.status == TaskDefinitionStatus.WITHDRAWN else "published" if version else "draft"),
@@ -167,6 +169,8 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
     learner_ids = {ctx.learner.id for ctx in contexts}
     identity_ids = review_learner_identity_ids(session, actor.organization_id, learner_ids)
     display_ids = set(identity_ids.values())
+    disabled_ids = {ctx.learner.id for ctx in contexts
+                    if ctx.learner.status == UserStatus.DISABLED}
     profiles = cached_directory_profiles(session, actor, display_ids)
     feishu_ids = set(session.scalars(select(ExternalIdentity.user_id).where(
         ExternalIdentity.organization_id == actor.organization_id,
@@ -174,10 +178,11 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
         ExternalIdentity.revoked_at.is_(None)))) if display_ids else set()
     items = []
     phones = {}
-    if display_ids - feishu_ids:
+    phone_ids = display_ids - feishu_ids - disabled_ids
+    if phone_ids:
         identities = session.scalars(select(ExternalIdentity).where(
             ExternalIdentity.organization_id == actor.organization_id,
-            ExternalIdentity.user_id.in_(display_ids - feishu_ids),
+            ExternalIdentity.user_id.in_(phone_ids),
             ExternalIdentity.provider.in_(["PHONE", "PHONE_PASSWORD"]),
             ExternalIdentity.revoked_at.is_(None)).order_by(ExternalIdentity.verified_at.desc(), ExternalIdentity.id))
         for identity in identities:
@@ -195,6 +200,7 @@ def reviews(request: Request, actor: Actor = Depends(get_actor), session: Sessio
         checks = review_document_ai_checks(session, ctx)
         identity_id = identity_ids[ctx.learner.id]
         item.update(learner_id=str(ctx.learner.id), task_id=str(ctx.definition.id),
+            learner_account_disabled=identity_id in disabled_ids,
             learner_is_feishu=identity_id in feishu_ids,
             learner_employee_no=profiles.get(identity_id, {}).get("employee_no") or "",
             learner_phone=phones.get(identity_id, ""),
@@ -249,7 +255,7 @@ class Material(BaseModel):
     url: str = Field(default="", max_length=2_800_000)
     text: str = Field(default="", max_length=20000)
     mime: str = Field(default="", max_length=100)
-    size: int = Field(default=0, ge=0, le=104857600)
+    size: int = Field(default=0, ge=0, le=2 * 1024 ** 3)
 
     @field_validator("name")
     @classmethod
@@ -261,6 +267,8 @@ class Material(BaseModel):
 
     @model_validator(mode="after")
     def safe_url(self):
+        if self.size > 100 * 1024 ** 2 and not (self.type == "file" and self.url.startswith("exploration-material:") and self.mime.startswith("video/")):
+            raise ValueError("单个非视频文件不能超过 100 MB")
         if self.type == "link":
             from urllib.parse import urlparse
             u = urlparse(self.url)
@@ -324,7 +332,14 @@ def import_rubric_document_route(command: ImportRubricDocument, request: Request
 
 class Badge(BaseModel):
     id: str
-    weight: int = Field(ge=20, le=100, multiple_of=20)
+    weight: int = Field(ge=0, le=100)
+
+    @field_validator("weight", mode="before")
+    @classmethod
+    def reject_boolean_weight(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise ValueError("徽章点占比必须是整数")
+        return value
 
 
 class Rubric(BaseModel):
@@ -340,15 +355,16 @@ class _TaskContentFields(BaseModel):
     summary: str = Field(default="", max_length=2000)
     camp: Literal["exploration", "novice"] = "novice"
     domain: str = "产品开发"
-    publishingDepartment: PublishingDepartment | Literal[""] = ""
+    publishingDepartment: PublishingDepartment | Literal["公司通用常识", ""] = ""
     difficulty: Literal["入门", "进阶", "挑战", ""] = "入门"
     order: int | None = Field(default=None, ge=1, le=9999)
     completionMode: Literal["learning", "assessment", "checkin"] | None = None
     assessmentUrl: str = Field(default="", max_length=2048)
     requirements: list[str] = Field(default_factory=list, max_length=20)
     unlockTaskPoints: int = Field(default=0, strict=True, ge=0, le=1000000)
-    rewardRulesVersion: Literal[1, 2, 3] = 3
-    badges: list[Badge] = Field(default_factory=list, max_length=2)
+    xp: int | None = Field(default=None, strict=True, ge=0, le=1000000)
+    rewardRulesVersion: Literal[1, 2, 3, 4] = 3
+    badges: list[Badge] = Field(default_factory=list, max_length=len(BADGES))
     materials: list[Material] = Field(default_factory=list, max_length=20)
     taskFiles: list[Material] = Field(default_factory=list, max_length=20)
     reviewMode: Literal["manual", "ai"] = "manual"
@@ -359,7 +375,13 @@ class _TaskContentFields(BaseModel):
     @model_validator(mode="after")
     def choices(self):
         self.unlockTaskPoints = 0
-        self.rewardRulesVersion = 3
+        if self.camp == "novice" and self.rewardRulesVersion == 4:
+            if self.xp is None:
+                raise ValueError("请填写任务奖励经验值")
+            self.difficulty = next((name for name, (_, maximum, _) in PRESETS.items() if self.xp <= maximum), "挑战")
+        else:
+            self.rewardRulesVersion = 3
+            self.xp = None
         if self.camp == "exploration":
             self.domain, self.difficulty, self.publishingDepartment = "", "", ""
             self.badges = []
@@ -377,7 +399,7 @@ class _TaskContentFields(BaseModel):
         if self.taskFiles:
             raise ValueError("任务文件仅支持探索营任务")
         if self.difficulty not in PRESETS or len(self.materials) > 12 or any(
-            len(m.name) > 160 or m.size > 2097152 or m.url.startswith("exploration-material:") for m in self.materials):
+            len(m.name) > 160 or (m.size > 2097152 and not m.url.startswith("exploration-material:")) for m in self.materials):
             raise ValueError("新手村材料或难度不符合要求")
         if self.domain not in DOMAINS or any(b.id not in BADGES for b in self.badges):
             raise ValueError("未知任务方向或徽章")
@@ -447,10 +469,11 @@ def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
     content = command.content.model_dump(mode="json")
     content = canonicalize_ai_rubric(content, allow_incomplete=True)
     if command.content.camp == "exploration":
-        from journey_api.exploration_service import requirements_for_save, validate_material_references
+        from journey_api.exploration_service import requirements_for_save
         content["requirements"] = requirements_for_save(content, row.content,
             seed=definition.stable_key.startswith("EXPLORATION-DYNAMIC-20261117-"))
-        validate_material_references(session, actor.organization_id, content)
+    from journey_api.exploration_service import validate_material_references
+    validate_material_references(session, actor.organization_id, content)
     row.content = content
     row.revision += 1
     # Saving editable content must not unpublish the immutable live version.
@@ -485,15 +508,18 @@ def task_content_for_publish(content):
         raise ApiError(422, "VALIDATION_FAILED", f"任务标题至少需要 {minimum_title} 个字。")
     if len(d.summary.strip()) < minimum_summary:
         raise ApiError(422, "VALIDATION_FAILED", f"任务简述至少需要 {minimum_summary} 个字，当前 {len(d.summary.strip())} 个字。")
-    if not d.materials and (not exploration or d.completionMode == "assessment"):
+    if not d.materials and exploration and d.completionMode == "assessment":
         raise ApiError(422, "VALIDATION_FAILED", "请至少添加一份学习材料。")
     if exploration and d.completionMode == "assessment" and not d.taskFiles and not d.assessmentUrl:
         raise ApiError(422, "VALIDATION_FAILED", "请上传任务文件，或填写已有的测试链接。")
-    if not exploration and (not d.badges or abs(sum(b.weight for b in d.badges) - 100) > 0.001):
-        raise ApiError(422, "VALIDATION_FAILED", "请选择 1–2 个徽章，且总占比为 100%。")
+    if not exploration:
+        if not d.badges:
+            raise ApiError(422, "VALIDATION_FAILED", "请至少选择一种奖励点数类型。")
+        if any(b.weight == 0 for b in d.badges) or sum(b.weight for b in d.badges) != 100:
+            raise ApiError(422, "VALIDATION_FAILED", "每种徽章点占比须为 1 至 100 的整数，合计须为 100%。")
     if d.reviewMode == "ai":
         prepare_ai_rubric(d.model_dump(mode="json"))
-    criteria = ["按照学习材料完成任务，提交可核验的答案与依据。"]
+    criteria = ["按照学习材料完成任务，提交可核验的答案与依据。" if d.materials else "按照任务说明完成任务，提交可核验的答案与依据。"]
     materials = [{"key": "material-" + str(i), "title": m.name[:160] if len(m.name)>1 else m.name+"材料",
         "kind": "HTTPS_LINK" if m.type == "link" else "TEXT", "source_label": "任务发布者提供",
         "url": m.url if m.type == "link" else None,
@@ -797,7 +823,10 @@ def members(request: Request, actor: Actor=Depends(get_actor), session: Session=
 @router.get("/capabilities")
 def capabilities(request:Request, actor:Actor=Depends(get_actor), session:Session=Depends(get_db)):
     staff(actor)
-    return envelope(request, permissions(session,actor))
+    from journey_api.experience_permissions import can_issue, settings_for
+    rights = permissions(session, actor)
+    return envelope(request, {**rights, "canConfigureExperience": rights["canGrantSuperAdmins"] and Role.REVIEWER in actor.roles,
+                              "canGrantExperience": can_issue(session, actor, settings_for(session, actor))})
 
 
 @router.get("/reviewers")

@@ -1,3 +1,4 @@
+import {fileUploadLimit} from './course-asset-upload.js';
 import {createCommunityApi} from './community-api.js?v=20261028-server';
 const text=value=>String(value??'').trim();
 export function validateKnowledgeUrl(value) {
@@ -32,7 +33,7 @@ export function createKnowledgeStore({getCurrentUser}) {
   removeItem:id=>api.change('removeItem',{id}),setItemStatus:(id,status)=>api.change('setItemStatus',{id,status}),saveCategory:values=>api.change('saveCategory',values),removeCategory:id=>api.change('removeCategory',{id}),
   async uploadFiles(files,values={}) {
    files=Array.from(files||[]);if(!files.length||files.length>20)throw new Error('请选择 1～20 个文件。');
-   if(files.some(f=>f.size>100*1024*1024))throw new Error('单个文件不能超过 100 MB。');
+   if(files.some(f=>f.size>fileUploadLimit(f,100*1024**2)))throw new Error('单个视频最多 2 GB，其他文件最多 100 MB。');
    const created=[];
    for(const file of files){
     let upload;

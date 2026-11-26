@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ExperienceState, FactLabel } from "@/app/human-experience";
+import { LearnerBack } from "@/app/project29/LearnerBack";
 import { getJourneyModule, JOURNEY_MODULES } from "@/lib/journey-program";
 import { LearnerEnrollment, learnerPageRequest } from "@/lib/server/api";
 
@@ -42,7 +43,7 @@ export default async function JourneyModulePage({
 
   return (
     <section className="module-page">
-      <Link className="back-link" href="/app">← 返回四模块首页</Link>
+      <LearnerBack href="/app">返回四模块首页</LearnerBack>
       <header className="module-hero">
         <div>
           <p className="journey-whisper">

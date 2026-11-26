@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 FAILED_RETRY_AFTER = timedelta(hours=1)
 CLAIM_LEASE = timedelta(minutes=3)
 MAX_COVER_SIZE = 1024 * 1024
-MAX_SOURCE_VIDEO_SIZE = 500 * 1024 * 1024
+MAX_SOURCE_VIDEO_SIZE = 2 * 1024 ** 3
 
 
 @dataclass(frozen=True)

@@ -162,7 +162,7 @@ def test_authenticated_learner_session_cannot_bypass_canary_scope(
     )
     class Result:
         def first(self):
-            return identity_session, user
+            return identity_session, user, None
 
     class ScalarResult:
         def all(self):

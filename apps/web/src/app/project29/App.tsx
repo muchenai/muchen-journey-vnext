@@ -6,6 +6,8 @@ import "./retained-controls.css";
 import { FormEvent, MouseEvent, useState, useEffect, useId, useRef, useLayoutEffect, useCallback, CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { effectiveCharacterCount } from "@/lib/text-length";
+import { explorationOnlyMessage, isCompanyModule } from "@/lib/learner-module-access";
+import CompanyLoginNotice from "@/app/project-ui/CompanyLoginNotice";
 import { phonePasswordError, confirmPhonePasswordError } from "@/lib/phone-password-validation";
 import { PhonePasswordField } from "../project-ui/PhonePasswordField";
 import { clientLoginErrorMessage, isFeishuClient, loginInsideFeishu } from "@/lib/feishu-client-login";
@@ -28,16 +30,18 @@ import { logoutSession, recordOpenedLearningMaterial, confirmIdentity, exchangeI
 type PreviewIdentity = string;
 export default function App(props: Partial<JourneyContextValue>) {
  const value: JourneyContextValue = { learnerName: "新同学", experience: null, initialScreen: "login", joinPhase: "invite", joinError: "", ...props };
- return <JourneyProvider value={value}><ExperienceScreen /></JourneyProvider>;
+ if (value.explorationOnly && isCompanyModule(value.initialScreen)) return <CompanyLoginNotice />;
+ return <JourneyProvider value={value}><ExperienceScreen key={value.explorationOnly ? "exploration-only" : "full"} /></JourneyProvider>;
 }
 
 function ExperienceScreen() {
  const router = useRouter();
- const { learnerName, experience, initialScreen, initialNotice, joinPhase, joinError, localVillagePreview = false,
+ const { learnerName, experience, explorationOnly, initialScreen, initialNotice, joinPhase, joinError, localVillagePreview = false, academyEntry,
    configurableExploration = true, explorationVariant, explorationTaskId, explorationScope, explorationOpenFeedback = false } = useJourney();
  const taskStatus = useTaskStatus();
  const identity = learnerName;
  const [screen, setScreen] = useState<Screen>(initialScreen);
+ const [activeAcademyEntry, setActiveAcademyEntry] = useState(academyEntry);
  const exploration = useExplorationTasks(configurableExploration && screen !== "login");
  const [publishedTaskId, setPublishedTaskId] = useState<string | null>(explorationTaskId ?? null);
  const [publishedFeedbackOpen, setPublishedFeedbackOpen] = useState(explorationOpenFeedback);
@@ -127,8 +131,19 @@ function ExperienceScreen() {
    if (!configurableExploration && target === "dashboard") { window.location.assign("/app?view=dashboard"); return; }
    if (["dashboard", "village", "academy", "guild"].includes(target)) setLastModule(target as typeof lastModule);
    setBurst(null);
-   if (["village","academy","guild"].includes(target)) {setScreen(target);setNotice("");return;}
+   if (explorationOnly && isCompanyModule(target)) {
+     setNotice(explorationOnlyMessage);
+     return;
+   }
    const url = new URL(window.location.href);
+   if (target === "academy" || target === "village" || ["academy","village"].includes(url.searchParams.get("view") || "")) {
+     setActiveAcademyEntry(undefined);
+     url.pathname = "/app";
+     url.search = "";
+     url.searchParams.set("view", target);
+     window.history.replaceState(window.history.state, "", url);
+   }
+   if (["village","academy","guild"].includes(target)) {setScreen(target);setNotice("");return;}
    if (target === "dashboard" || target === "tasks" || target === "welcome") {
      url.pathname = "/app";
      if (target === "welcome") url.searchParams.delete("view");
@@ -350,6 +365,9 @@ function ExperienceScreen() {
  const moduleContent = <div hidden={!isModuleScreen}>
  <ModuleHub
    active={isModuleScreen}
+   explorationOnly={explorationOnly}
+   navigationNotice={notice}
+   academyEntry={activeAcademyEntry}
    localVillagePreview={localVillagePreview}
    configurableExploration={configurableExploration}
    explorationVariant={explorationVariant}
@@ -368,7 +386,7 @@ function ExperienceScreen() {
      <UpdatedDashboard identity={identity} decoration={<GradientStroke variant="task" strokeWidth={1} />} activeNavigationDecoration={<GradientStroke variant="active" strokeWidth={1.101} />} idleNavigationDecoration={<GradientStroke variant="idle" strokeWidth={1.101} />}
        publishedTasks={configurableExploration ? exploration.tasks : undefined} treasures={configurableExploration ? exploration.treasures : undefined} onOpenTreasures={configurableExploration ? ()=>setTreasureCollectionOpen(true) : undefined} onOpenTask={configurableExploration ? openPublishedTask : undefined} onOpenFeedback={configurableExploration ? openPublishedTask : undefined} />
    </div>{selectedFeedback && <TaskFeedbackDialog feedback={selectedFeedback} title={executionTasks[selectedFeedback.position-1]?.title ?? selectedFeedback.title} onClose={()=>setFeedbackAssignmentId(null)} />}
-   {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={()=>setBurst(null)} />}{notice && <div className="module-toast" role="status">{notice}</div>}</>}
+   {burst && <ClickBurst key={burst.key} x={burst.x} y={burst.y} onFinish={()=>setBurst(null)} />}</>}
  /></div>;
  return <>{moduleContent}{configurableExploration && <div className="restored-exploration-dialog-root"><ExplorationTaskHall detailOnly sharedExploration={exploration} initialTaskId={publishedTaskId ?? undefined} openFeedback={publishedFeedbackOpen && publishedTaskId === explorationTaskId} suspended={treasurePresentation.blocking} continuationReady={!taskTransitionBusy} onTransitionBusyChange={setTaskTransitionBusy} onTaskClose={closePublishedTask} onTaskBlocked={()=>setNotice("需要提交上一任务")} /><ExplorationTreasureExperience treasures={exploration.treasures} collectionOpen={treasureCollectionOpen} onCollectionClose={()=>setTreasureCollectionOpen(false)} presentedDrop={treasurePresentation.drop} onDropSettled={treasurePresentation.dismiss} busy={treasureBusy} onAcknowledge={exploration.acknowledgeTreasure} onUnlockGraduation={exploration.unlockGraduation} /></div>}{!isModuleScreen && <main ref={viewportRef} className="design-viewport relative min-h-dvh overflow-hidden bg-[#02091c]" data-screen={screen} onClick={click} onPointerMove={event => {
    energizePanels(event.currentTarget, event.clientX, event.clientY);
@@ -653,7 +671,7 @@ export function Login() {
                 <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('register')}>注册账号</button>
                 <span aria-hidden="true">|</span>
                 <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('reset')}>忘记密码？</button>
-              </> : <button disabled={isLaunched || sendingCode} type="button" className="forgot-password-button" onClick={() => switchPhoneMode('login')}>← 返回登录</button>}
+              </> : <button disabled={isLaunched || sendingCode} type="button" className="learner-back-control" onClick={() => switchPhoneMode('login')}>返回登录</button>}
             </div>
             <p className="phone-login-note">{phoneMode === 'register' ? '注册' : phoneMode === 'reset' ? '继续' : '登录'}即代表您已阅读并同意
               <a href="https://zx6w57w0j34.feishu.cn/docx/Oxexd1UMdoHg2YxEOYVcx5fonkd" target="_blank" rel="noreferrer">《用户服务协议》</a>

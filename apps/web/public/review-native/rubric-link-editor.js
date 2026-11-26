@@ -27,9 +27,8 @@ export function createRubricLinkEditor({store, request, openModal, closeModal, s
     const context = {camp: draft.camp, difficulty: draft.difficulty};
     openModal(`<div class="modal-heading"><h2>${reread ? '重新读取标准答案' : editing ? '编辑答案链接' : '添加答案链接'}</h2><p>读取飞书文档正文，保存为本任务的标准答案。AI 评分使用已导入的版本；源文档更新后，请手动重新读取。</p></div>
       <form id="rubric-link-form" novalidate>
-        <label class="form-field"><span class="field-label">标准答案飞书链接</span><input name="url" type="url" maxlength="2000" value="${e(original?.sourceUrl || '')}" placeholder="https://…feishu.cn/docx/…" aria-describedby="rubric-link-error" ${reread ? 'readonly' : ''}><span class="field-hint">支持 Docx 或 Wiki 文档。请确保文档已授权给飞书应用读取。导入不会运行 AI，也不会发送评论。</span></label>
+        <label class="form-field"><span class="field-label">标准答案飞书链接</span><input name="url" type="url" maxlength="2000" value="${e(original?.sourceUrl || '')}" placeholder="https://…feishu.cn/docx/…" aria-describedby="rubric-link-error" ${reread ? 'readonly' : ''}><span class="field-hint">支持 Docx 或 Wiki 文档。请确保文档已授权给飞书应用读取。导入不会运行 AI，也不会发送评论。</span><span id="rubric-link-error" class="material-field-error" role="alert" hidden></span></label>
         ${original ? `<p class="field-hint">当前已导入：${e(original.sourceTitle || original.name)}。读取失败时，保留原来的标准答案。</p>` : ''}
-        <p id="rubric-link-error" class="material-field-error" role="alert" hidden></p>
         <p id="rubric-link-status" class="field-hint" role="status" aria-live="polite"></p>
         <div class="modal-actions"><button type="button" class="btn btn-secondary" data-cancel-rubric-link>取消</button><button type="submit" class="btn btn-primary">${reread ? '确认重新读取' : editing ? '读取并保存修改' : '读取并添加'}</button></div>
       </form>`, modal => {
@@ -97,6 +96,7 @@ export function createRubricLinkEditor({store, request, openModal, closeModal, s
             input.disabled = false;
             submit.textContent = submitLabel;
             status.textContent = '';
+            if (!errorNode.hidden) input.focus();
           }
         }
       };

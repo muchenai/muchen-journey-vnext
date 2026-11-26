@@ -62,6 +62,7 @@ function bootstrapViewport(width, height, options = {}) {
     sessionStorage,
     requestAnimationFrame, cancelAnimationFrame,
     addEventListener(type, callback) { windowEvents[type] = callback; } };
+  window.top = window;
   const document = { body: null, documentElement: {
     style: {
       getPropertyValue(name) { return styles.get(name) ?? ''; },
@@ -121,6 +122,53 @@ test('a cold document has its final canvas scale before body parsing or React hy
     assert.equal(viewport.document.body, null, 'the bootstrap must not need learner DOM to exist');
     assert.equal(viewport.value(), expected, 'the first write must fit the current viewport rather than default to 1');
   }
+});
+
+const moduleScale = '--journey-module-scale';
+const moduleOverflow = '--journey-module-overflow';
+
+function moduleViewport(zoom) {
+  const options = { pixelRatio: 1.5 * zoom, outerWidth: 1936, outerHeight: 964 };
+  options.storage = new Map([['journey.canvas.viewport.v1', JSON.stringify({
+    ratio: options.pixelRatio, outerWidth: options.outerWidth, outerHeight: options.outerHeight, zoom: 1.125,
+  })]]);
+  return bootstrapViewport(1920 / zoom, 864 / zoom, options);
+}
+
+test('module first paint uses the Academy fit despite a stale zoom saved in the tab', () => {
+  for (const zoom of [0.8, 1, 1.25, 4]) {
+    const page = moduleViewport(zoom);
+    assert.equal(page.document.body, null);
+    assert.equal(Number(page.styles.get(moduleScale)), 0.8);
+    assert.equal(page.styles.get(moduleOverflow), zoom > 1 ? 'auto' : 'hidden');
+    assert.ok(Math.abs(page.value() - 0.8 * 1.125 / zoom) < 1e-12,
+      'other screens retain their existing session-based scaling');
+  }
+});
+
+test('native zoom magnifies the module canvas, and resizing the window fits it again', () => {
+  const page = moduleViewport(1);
+  for (const zoom of [0.8, 1, 1.25, 4, 1]) {
+    Object.assign(page.window, {
+      innerWidth: 1920 / zoom, innerHeight: 864 / zoom, devicePixelRatio: 1.5 * zoom,
+    });
+    page.dispatch('resize');
+    const scale = Number(page.styles.get(moduleScale));
+    assert.equal(Math.round(1080 * scale * page.window.devicePixelRatio), Math.round(864 * 1.5 * zoom));
+    assert.equal(page.styles.get(moduleOverflow), zoom > 1 ? 'auto' : 'hidden');
+  }
+  Object.assign(page.window, { outerWidth: 1296, innerWidth: 1280, innerHeight: 800 });
+  page.dispatch('resize');
+  assert.equal(Number(page.styles.get(moduleScale)) * 1920, 1280);
+});
+
+test('hydration restores the module scale and scroll policy in the same mutation checkpoint', () => {
+  const page = moduleViewport(4);
+  page.document.documentElement.removeAttribute('style');
+  page.flushMutations();
+  assert.equal(Number(page.styles.get(moduleScale)), 0.8);
+  assert.equal(page.styles.get(moduleOverflow), 'auto');
+  assert.equal(page.frames.size, 0);
 });
 
 test('the same prepaint scale responds to viewport resize and fullscreen changes', () => {

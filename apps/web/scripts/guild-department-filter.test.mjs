@@ -14,7 +14,8 @@ test("guild functional aggregate uses actual publishing departments and excludes
   assert.equal(taskDepartmentName("functional"), "综合职能公会");
   for (const department of taskDepartments) {
     const task = { publishingDepartment: department.name, category: "数据交付", rewardAllocations: [{id: "data", points: 10}] };
-    assert.equal(belongsToDepartment(task, "functional"), !department.delivery);
+    assert.equal(belongsToDepartment(task, "functional"), !department.delivery && department.id !== "company-common");
+    assert.equal(belongsToDepartment(task, "company-common"), department.id === "company-common");
     assert.equal(belongsToDepartment(task, "delivery"), department.delivery);
   }
   assert.equal(belongsToDepartment({ publishingDepartment: "待补充部门" }, "functional"), false);

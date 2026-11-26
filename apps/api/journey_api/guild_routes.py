@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from journey_api.auth import Actor, get_actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_actor, get_company_learner_actor, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.guild_catalog import HALLS, HALL_BY_ID, TASKS, TASK_VERSIONS
@@ -150,7 +150,7 @@ def admin_snapshot(session, actor):
 
 
 @router.get("/me/guild")
-def learner_guild(request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+def learner_guild(request: Request, actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     return envelope(request, learner_snapshot(session, actor))
 
@@ -193,7 +193,7 @@ def require_entry(session, actor, rows, level):
 
 
 @router.post("/me/guild/join")
-def join(command: GuildJoin, request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+def join(command: GuildJoin, request: Request, actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     if command.guildId not in HALL_BY_ID:
         fail("请选择有效的公会。", 422, "GUILD_INVALID")
@@ -212,7 +212,7 @@ def join(command: GuildJoin, request: Request, actor: Actor=Depends(get_learner_
 
 
 @router.post("/me/guild/tasks")
-def save_task(command: GuildTaskSave, request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+def save_task(command: GuildTaskSave, request: Request, actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     lock_guild(session, actor.organization_id, actor.id)
     require_membership(session, actor, command.guildId)
@@ -244,7 +244,7 @@ def save_task(command: GuildTaskSave, request: Request, actor: Actor=Depends(get
 
 
 @router.post("/me/guild/requests")
-def apply(command: GuildApply, request: Request, actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
+def apply(command: GuildApply, request: Request, actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     lock_guild(session, actor.organization_id, actor.id)
     rows = scoped_rows(request_rows(session, actor.organization_id, actor.id), command.guildId)

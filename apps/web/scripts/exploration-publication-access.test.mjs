@@ -7,6 +7,8 @@ import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from '../public/revi
 import {renderLibrary, openTask} from '../public/review-native/library.js';
 import {createTaskWorkflow} from '../public/review-native/task-workflow.js';
 import {createPublicationReviewController} from '../public/review-native/publication-review.js';
+import {taskIssue} from '../public/review-native/task-field-limits.js';
+import {confirmPublicationFields} from '../public/review-native/publish-materials.js';
 
 const exploration = {id:'exploration',camp:'exploration',title:'培训任务',summary:'学习培训材料',completionMode:'learning',order:1,materials:[],badges:[],rubric:[],status:'published'};
 const novice = {...exploration,id:'novice',camp:'novice',title:'新手村任务'};
@@ -129,9 +131,9 @@ test('restored ordinary exploration editor contains no editable controls',()=>{
 function publishHarness(task,isSuperAdmin=true) {
   const state={forms:[],publishCalls:[],submitted:0,saves:0};
   const controls={'#publish-task':{disabled:false},'#confirm-publish':{disabled:true},'#cancel-publish':{},'#publish-error':{hidden:true}};
-  const modal={dataset:{},querySelectorAll:()=>[]};
+  const modal={dataset:{},querySelector:()=>null,querySelectorAll:()=>[]};
   const context=vm.createContext({canConfigureTask,EXPLORATION_CONFIGURATION_NOTICE,store:{data:{draft:task},members:[],async saveTask(value){state.saves++;return value;}},ui:{isSuperAdmin},materialUploadsPending:false,
-    draftPublication:()=>null,validateTask:()=>[],normalizeBadgeWeights:value=>value,isTaskUpdate:()=>false,taskResourceLinks:()=>[],crypto:globalThis.crypto,e:value=>value,renderPublishMaterials:()=>'',
+    draftPublication:()=>null,validateTask:()=>[],taskIssue,bindFieldFeedback(){},confirmPublicationFields,normalizeBadgeWeights:value=>value,isTaskUpdate:()=>false,taskResourceLinks:()=>[],crypto:globalThis.crypto,e:value=>value,icon:()=>'',renderPublishMaterials:()=>'',
     $:key=>controls[key],openModal(html,ready){state.forms.push(html);if(html.includes('native-publish-confirm'))ready(modal);},closeModal(){},openSubmitPublication(){state.submitted++;},toast(){},render(){},
     service:{tasks:{async publish(...args){state.publishCalls.push(args);return task;}}},sandbox:{retainForPublishedTask(){}},taskWorkflow:{async resetAfterPublish(){}}});
   vm.runInContext(source.slice(source.indexOf('async function publish()'),source.indexOf('onInviteSessionChange(render)')),context);

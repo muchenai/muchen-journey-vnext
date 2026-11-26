@@ -1,3 +1,4 @@
+import {isUploadVideo, uploadTaskVideo} from './course-asset-upload.js';
 export const EXPLORATION_MATERIAL_MAX_BYTES = 100 * 1024 * 1024;
 const rasterMimeByExtension = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', avif:'image/avif', bmp:'image/bmp' };
 const rasterMimes = new Set(Object.values(rasterMimeByExtension));
@@ -20,6 +21,11 @@ export function materialImagePreviewUrl(material) {
   return inline&&rasterMimes.has(inline[1].toLowerCase())?material.url:'';
 }
 
+export function materialVideoPreviewUrl(material) {
+  const local = localMaterialUrl(material?.url);
+  return local && Object.values(videoMimeByExtension).includes(material?.mime) ? `${local}?inline=1` : '';
+}
+
 export function localMaterialUrl(value) {
   const match = typeof value === 'string' && value.match(/^exploration-material:([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i);
   return match ? `/api/review-native/exploration/materials/${encodeURIComponent(match[1])}` : '';
@@ -27,6 +33,7 @@ export function localMaterialUrl(value) {
 
 export function materialSizeLabel(size) {
   const bytes = Number(size || 0);
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toLocaleString("zh-CN", { maximumFractionDigits: 2 })} GB`;
   return bytes >= 1024 * 1024
     ? `${(bytes / (1024 * 1024)).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} MB`
     : `${(bytes / 1024).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} KB`;
@@ -36,6 +43,7 @@ export function materialSizeLabel(size) {
 // occupy the browser's draft cache. Task records store only the authenticated file reference.
 export async function uploadExplorationMaterial(file, {label='学习材料'} = {}) {
   if (!file || !Number.isSafeInteger(file.size) || file.size < 1) throw new Error(`请选择非空的${label}文件。`);
+  if (isUploadVideo(file)) return uploadTaskVideo(file, 'exploration');
   if (file.size > EXPLORATION_MATERIAL_MAX_BYTES) throw new Error(`${file.name} 超过 100 MB，请选择不超过 100 MB 的文件。`);
   const response = await fetch(`/api/review-native/exploration/materials?name=${encodeURIComponent(file.name)}&type=${learningMaterialFileMime(file).startsWith('image/')?'image':'file'}`, {
     method: 'POST', credentials: 'same-origin', cache: 'no-store',

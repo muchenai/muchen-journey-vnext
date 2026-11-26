@@ -18,6 +18,17 @@ export async function GET(request: Request) {
     html[data-map-resetting] .universe,html[data-map-resetting] .universe *,html[data-map-resetting] .universe *::before,html[data-map-resetting] .universe *::after{transition:none!important;animation:none!important}
     html[data-map-departing] .universe,html[data-map-departing] .universe *{visibility:hidden!important;pointer-events:none!important}
     .universe-coordinate,.universe-fineprint{display:none}
+    .planet-detail .detail-return:not([data-village-task-link]){
+      justify-content:center;gap:10px;min-height:52px;padding:8px 16px;
+      border:1px solid #5798ba;border-radius:8px;background:#14334b;color:#e5f8ff;
+      font-size:18px!important;font-weight:600;line-height:1.4;letter-spacing:0;
+    }
+    .planet-detail .detail-return:not([data-village-task-link])::before{
+      content:"";width:9px;height:9px;flex:none;border:solid currentColor;border-width:0 0 2px 2px;transform:rotate(45deg);
+    }
+    .planet-detail .detail-return:not([data-village-task-link]) svg{display:none}
+    .planet-detail .detail-return:not([data-village-task-link]):hover{background:#1c4562;border-color:#85d7f0;color:white}
+    .planet-detail .detail-return:not([data-village-task-link]):focus-visible{outline:3px solid #7edfff;outline-offset:3px}
     .planet-detail .detail-return[data-village-task-link]{justify-content:center;text-align:center;min-height:38px;padding:8px 14px;border:1px solid #6ff2ff;border-radius:6px;background:linear-gradient(90deg,#2ed3e9,#56e7f8);color:#07334c;font-size:12px!important;line-height:20px;letter-spacing:0;box-shadow:0 0 16px #31def56b,inset 0 1px 0 #ffffff2e;transition:background .18s,box-shadow .18s}
     .planet-detail .detail-return[data-village-task-link]:hover{background:linear-gradient(90deg,#42dff2,#70efff);box-shadow:0 0 20px #31def580,inset 0 1px 0 #ffffff40}
     .map-fullscreen-intro{display:none;position:fixed;top:5%;left:4.6%;z-index:4;pointer-events:none;color:#eff6ff;font-family:Source Han Sans SC,Microsoft YaHei,sans-serif;text-shadow:0 2px 18px #02091c}

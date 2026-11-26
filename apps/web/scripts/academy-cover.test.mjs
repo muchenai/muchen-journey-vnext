@@ -18,6 +18,19 @@ function load(path, dependencies, extras = {}) {
     Request, Response, Headers, URL, Uint8Array, AbortSignal, setTimeout: fn => { fn(); return 0; }, ...extras });
   return compiledModule.exports;
 }
+test('the review editor can read a locally selected video under the actual page CSP', () => {
+  const { proxy: applyPolicy } = load('proxy.ts', {
+    'next/server': { NextResponse: { next: () => new Response() } },
+    '@/lib/auth/cookies': { STAFF_SESSION_COOKIE: 'staff-session' },
+  }, { Buffer, crypto, process });
+  for (const pathname of ['/review', '/review/login', '/app']) {
+    const result = applyPolicy({ nextUrl: { pathname }, headers: new Headers(), cookies: { get: () => ({value:'staff'}) } });
+    const directives = result.headers.get('Content-Security-Policy').split('; ');
+    const media = directives.find(value => value.startsWith('media-src ')) ?? directives.find(value => value.startsWith('default-src '));
+    assert.equal(media, pathname === '/review' ? "media-src 'self' blob:" : "default-src 'self'");
+  }
+});
+
 function proxy({ values = { 'learner-session': 'learner-token', 'staff-session': 'staff-token' }, env = {}, upstream } = {}) {
   const calls = [];
   const exports = load('lib/server/academy-cover.ts', {

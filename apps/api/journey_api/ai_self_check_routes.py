@@ -17,7 +17,7 @@ from journey_api.ai_self_check_rules import (
     RULE_VERSION, SYSTEM_PROMPT, evidence_for, protected_urls, references_for, render_feedback,
 )
 from journey_api.ai_task_alignment import TASK_NAMES, ensure_task_questions
-from journey_api.auth import Actor, get_learner_actor
+from journey_api.auth import Actor, get_assignment_learner_actor
 from journey_api.config import get_settings
 from journey_api.db import get_db
 from journey_api.errors import ApiError
@@ -90,7 +90,7 @@ def restart_changed_document(session: Session, row: AISelfCheck, document,
 
 
 @router.get("/{assignment_id}/ai-self-checks")
-def history(assignment_id: uuid.UUID, request: Request, actor: Actor = Depends(get_learner_actor),
+def history(assignment_id: uuid.UUID, request: Request, actor: Actor = Depends(get_assignment_learner_actor),
             session: Session = Depends(get_db)):
     exists = session.scalar(select(Assignment.id).join(Enrollment).where(
         Assignment.id == assignment_id, Assignment.organization_id == actor.organization_id,
@@ -195,7 +195,7 @@ def reuse_authorized_local_test_document(
 
 @router.post("/{assignment_id}/ai-self-checks")
 def self_check(assignment_id: uuid.UUID, command: SelfCheckCommand, request: Request,
-               actor: Actor = Depends(get_learner_actor), session: Session = Depends(get_db),
+               actor: Actor = Depends(get_assignment_learner_actor), session: Session = Depends(get_db),
                documents: FeishuDocuments = Depends(get_documents), reviewer: AIReviewer = Depends(get_reviewer)):
     if not get_settings().ai_self_check_enabled:
         raise ApiError(503, "AI_SELF_CHECK_DISABLED", "AI 自查尚未启用，请联系管理员。")

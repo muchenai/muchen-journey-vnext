@@ -79,3 +79,5 @@
 .pub-review-modal button:disabled, .pub-review-modal textarea:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 900px) { .pub-toolbar { align-items: flex-start; flex-direction: column; gap: 14px; } .pub-search { width: 100%; } }
 @media (max-width: 600px) { .pub-page-heading h1 { font-size: 21px; } .pub-tabs { gap: 20px; } .pub-task-meta { grid-template-columns: repeat(2, minmax(0,1fr)); } .pub-material { align-items: flex-start; } .pub-reviewed-meta { flex-direction: column; gap: 7px; } .pub-reward-summary { gap: 16px; } .pub-reward-summary > span:last-child { margin-left: 0; } .pub-decision-options button { flex: 1; justify-content: center; padding: 12px 9px; } .pub-modal-footer { bottom: 0; margin-bottom: 0; } }
+
+.pub-page-heading p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }

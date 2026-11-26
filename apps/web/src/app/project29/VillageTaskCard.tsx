@@ -11,11 +11,11 @@ export const pointNames: Record<string, string> = {
 }
 
 // The publication API owns allocation and rounding; task points are not badge points.
-export function VillageTaskCard({ task, onOpen }: { task: VillageTask; onOpen: () => void }) {
+export function VillageTaskCard({ task, onOpen, locked=false }: { task: VillageTask; onOpen: () => void; locked?:boolean }) {
   const rewards = task.rewardAllocations ?? []
   return <ModulePanel className="module-task-card">
-    <div className="module-row"><div className="task-department-labels" aria-label="发布部门"><span className="module-tag">{task.publishingDepartment || "部门待补充"}</span></div><ModuleStatus status={task.status} /></div>
-    <button className="module-card-title" onClick={onOpen}>{task.title}</button>
+    <div className="module-row"><div className="task-department-labels" aria-label="任务类型与适用部门"><span className="module-tag">普通任务</span><span className="module-tag">{task.publishingDepartment || "部门或分类待补充"}</span></div><ModuleStatus status={locked ? "locked" : task.status} /></div>
+    <button className="module-card-title" onClick={onOpen} disabled={locked}>{task.title}</button>
     <time className="module-small module-muted" dateTime={task.publishedAt}>{new Date(task.publishedAt).toLocaleString("zh-CN")}</time>
     <p className="module-card-description">{task.description}</p>
     <div className="module-meta"><span>{task.category}</span><span>{task.level}</span><span>{task.minutes} 分钟</span><span>{task.review}</span></div>
@@ -28,7 +28,7 @@ export function VillageTaskCard({ task, onOpen }: { task: VillageTask; onOpen: (
     </div>
     <div className="module-card-footer">
       <div className="module-author"><span className="module-avatar">{task.mentor[0]}</span><span>{task.mentor}<small>任务发布人</small></span></div>
-      <button onClick={onOpen}>查看任务 →</button>
+      <button onClick={onOpen} disabled={locked}>{locked ? "完成必修后解锁" : "查看任务 →"}</button>
     </div>
   </ModulePanel>
 }

@@ -26,7 +26,7 @@ def test_nickname_survives_relogin_without_changing_identity_or_progress(passwor
     assert save(client, "另一个昵称").status_code == 409
     other = client_for("nickname-return" + uuid.uuid4().hex)
     assert_ok(other.post("/api/v1/auth/password/login", json=credentials))
-    assert assert_ok(other.get(PATH)) == {"display_name": name, "needs_nickname": False}
+    assert assert_ok(other.get(PATH)) == {"display_name": name, "needs_nickname": False, "exploration_only": True}
     after = assert_ok(other.get("/api/v1/session"))
     assert after["user_id"] == principal["user_id"]
     assert after["display_name"] == name
@@ -46,7 +46,7 @@ def test_existing_phone_nickname_is_preserved(password_provider):
     user_id = uuid.UUID(assert_ok(client.get("/api/v1/session"))["user_id"])
     with SessionLocal.begin() as session:
         session.get(User, user_id).display_name = "原来的昵称"
-    assert assert_ok(client.get(PATH)) == {"display_name": "原来的昵称", "needs_nickname": False}
+    assert assert_ok(client.get(PATH)) == {"display_name": "原来的昵称", "needs_nickname": False, "exploration_only": True}
     assert save(client, "覆盖原昵称").status_code == 409
 
 

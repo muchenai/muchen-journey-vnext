@@ -18,12 +18,20 @@ export async function POST(request: NextRequest) {
   if (!request.headers.get("content-type")?.startsWith("application/json")) return NextResponse.json({ error: "请求格式不正确。" }, { status: 415, headers });
   try {
     const raw = await request.text();
-    if (Buffer.byteLength(raw) > 20000) return NextResponse.json({ error: "提交内容过长。" }, { status: 413, headers });
+    if (Buffer.byteLength(raw) > 40000) return NextResponse.json({ error: "提交内容过长。" }, { status: 413, headers });
     let body;
-    try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "请求格式不正确。" }, { status: 400, headers }); }
+    try { body = JSON.parse(raw); } catch {
+      if (Buffer.byteLength(raw)>20000) return NextResponse.json({error:"提交内容过长。"},{status:413,headers});
+      return NextResponse.json({ error: "请求格式不正确。" }, { status: 400, headers });
+    }
+    if (Buffer.byteLength(raw)>20000 && !["assessment","reflection"].includes(body?.command)) {
+      return NextResponse.json({error:"提交内容过长。"},{status:413,headers});
+    }
     if (!body || typeof body !== "object") return NextResponse.json({ error: "请求参数无效。" }, { status: 400, headers });
     let path = "", payload: Record<string, unknown> = {}, method = "POST";
-    if (body.command === "favorite" && uuid(body.id) && typeof body.saved === "boolean") {
+    if (["readMaterial","assessment","reflection"].includes(body.command) || body.command === "favorite" && body.enhanced === true) {
+      path = "/api/v1/me/course-workspace?camp=academy"; payload=body;
+    } else if (body.command === "favorite" && uuid(body.id) && typeof body.saved === "boolean") {
       path = `/api/v1/me/academy/courses/${body.id}/favorite`; payload = { saved: body.saved };
     } else if (body.command === "progress" && uuid(body.id) && typeof body.seconds === "number" && typeof body.duration === "number" && Number.isFinite(body.seconds) && Number.isFinite(body.duration) && body.seconds >= 0 && body.duration >= 0 && (body.completed === undefined || typeof body.completed === "boolean")) {
       if (body.revision !== undefined && !Number.isInteger(body.revision)) return NextResponse.json({ error: "课程版本参数无效。" }, { status: 400, headers });
@@ -34,6 +42,12 @@ export async function POST(request: NextRequest) {
       else if (uuid(body.id) && Number.isInteger(body.revision)) { path = `/api/v1/me/academy/shares/${body.id}`; method = "PATCH"; payload.expected_revision = body.revision; }
     }
     if (!path) return NextResponse.json({ error: "学院操作参数无效。" }, { status: 400, headers });
-    return NextResponse.json(await apiRequest(path, "LEARNER", { method, body: JSON.stringify(payload) }), { headers });
+    try {
+      return NextResponse.json(await apiRequest(path, "LEARNER", { method, body: JSON.stringify(payload) }), { headers });
+    } catch (error) {
+      if (body.command !== "favorite" || body.enhanced || !(error instanceof ApiRequestError) || error.status !== 404) throw error;
+      return NextResponse.json(await apiRequest("/api/v1/me/course-workspace?camp=academy", "LEARNER",
+        {method:"POST",body:JSON.stringify(body)}), {headers});
+    }
   } catch (error) { return fail(error); }
 }

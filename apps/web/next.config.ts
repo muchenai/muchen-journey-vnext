@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "6mb" },
   },
+  async redirects() {
+    return ["/review-native", "/review-native/index.html"].map(source => ({
+      source, destination: "/review", permanent: false,
+    }));
+  },
   async headers() {
     return [
       ...preloadAssets.filter(source => /^\/world-map\/[a-f0-9]{16}\.webp$/.test(source)).map(source => ({

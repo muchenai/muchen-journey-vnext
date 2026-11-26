@@ -38,7 +38,7 @@ function GrowthHistoryRow({ item, expanded, onToggle }: { item: GrowthEntry; exp
     : [item.xp ? `${formatGrowthDelta(item.xp)} XP` : "", pointTypes ? `${pointTypes} 类徽章点` : ""].filter(Boolean).join(" · ");
   return <li className="profile-growth-entry">
     <button type="button" className="profile-growth-toggle" aria-expanded={expanded} aria-controls={detailId} onClick={onToggle}>
-      <span className="profile-growth-entry-heading"><span className="module-tag">{item.module} · {item.kind === "task_reward" ? "任务奖励" : "获得徽章"}</span><time dateTime={item.occurredAt}>{at}</time></span>
+      <span className="profile-growth-entry-heading"><span className="module-tag">{item.module} · {{ task_reward: "任务奖励", medal_redemption: "获得徽章", offline_grant: "经验发放", course_reward: "学习奖励" }[item.kind]}</span><time dateTime={item.occurredAt}>{at}</time></span>
       <span className="profile-growth-summary"><strong>{item.title}</strong><span className="profile-growth-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></span>
       <span className="profile-growth-overview">{summary || "查看奖励明细"}<span>{expanded ? "收起详情" : "展开详情"}</span></span>
     </button>

@@ -21,7 +21,7 @@ def post(pair, path, body, key=None):
 
 
 @pytest.fixture
-def exploration(monkeypatch):
+def exploration(monkeypatch, request):
     """Each scenario owns its organization and leaves the default queue alone."""
     from journey_api.config import get_settings
     from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
@@ -44,7 +44,7 @@ def exploration(monkeypatch):
         token, csrf = uuid.uuid4().hex + uuid.uuid4().hex, uuid.uuid4().hex + uuid.uuid4().hex
         with SessionLocal.begin() as session:
             identity = ExternalIdentity(id=uuid.uuid4(), user_id=user_id, organization_id=organization_id,
-                provider='FEISHU' if role == Role.REVIEWER else 'NICKNAME_PHONE', subject=uuid.uuid4().hex,
+                provider='FEISHU' if role == Role.REVIEWER else getattr(request, 'param', 'NICKNAME_PHONE'), subject=uuid.uuid4().hex,
                 revision=1, verified_at=datetime.now(UTC))
             session.add(identity)
             session.flush()
@@ -111,6 +111,7 @@ def finish_for_unlock(learner, task_id):
     return assert_ok(command(learner, task, 'completeLearning', checkinConfirmed=task['completionMode'] == 'checkin'))
 
 
+@pytest.mark.parametrize('exploration', ['FEISHU'], indirect=True)
 def test_reading_complete_idempotency_and_novice_isolation(exploration):
     _, learner, _ = exploration
     task_id, _, _ = publish(exploration)

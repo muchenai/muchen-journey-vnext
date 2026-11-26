@@ -172,6 +172,7 @@ def test_cancel_rejects_historical_successful_idempotency_replay(exploration):
 
 
 @pytest.mark.parametrize('historical_replay', [False, True])
+@pytest.mark.parametrize('exploration', ['FEISHU'], indirect=True)
 def test_novice_cancel_endpoint_cannot_cancel_exploration_claim(exploration, historical_replay):
     from journey_api.idempotency import store_result
 

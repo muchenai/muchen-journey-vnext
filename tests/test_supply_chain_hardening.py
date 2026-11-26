@@ -14,15 +14,15 @@ RUNTIME_DOCKERFILES = (
 OPENSSL_PACKAGE_SHA256 = {
     "amd64": (
         "x86_64",
-        "6632d758d8f5e9ea3b650fe966f23bbf9a202f8b8dceecac93da135dec5e3689",
-        "05e3393fb95aa5751ca2f9d242f659f6cff82c1cc7767cc2df4a086f7ad01877",
-        "9358e8f38eb19a1e035355626570c76bda1e5a49084c768fb0edc1e607251e99",
+        "042026082cc9bc7872d1baa81755c50efa70b05f03b5369fdc5f0a1303009720",
+        "18c5778cbe52e1991303f8531970b05d4e6e036ea08349322f7422f42a689dc7",
+        "ed11241475e5757ce8eb9788b18116a804a579395d4813605df12989a2acbabf",
     ),
     "arm64": (
         "aarch64",
-        "2676a2b0b6e23ea2edccf3ee982b9842a665d52603d047de3d0a185dc316d983",
-        "20ac252b276d73f2c69c1d25f84537c7fba81caefc026c6be1094b394af2082e",
-        "aa27b9edfeffbf7ebafbcf29df3f02eef4bf50f793a4874ae2f52aba6b53e653",
+        "58ea027d8bd64fffac7d2106a9034341d6735387298a5e01b551429c73a13c71",
+        "4aff30f84e7ac922b026f8b2dd574d91bb3bb01d22767a8a9a0a10c5ef64a44b",
+        "4f5adffa94887a87807d9222cf26930e906ae47e6a15ee9b8d1da034d695614d",
     ),
 }
 
@@ -53,7 +53,7 @@ def test_python_runtime_images_use_the_reviewed_digest_and_non_root_user() -> No
         assert "USER journey" in content
         assert "python:3.14.6-slim" not in content
         assert "sha256sum -c -" in content
-        assert "openssl-3.5.9-r0.apk" in content
+        assert "openssl-3.5.9-r1.apk" in content
         assert "apk add --no-network" in content
         assert content.index("RUN python -m pip install --require-hashes") < content.index(
             "ARG VCS_REF=local"
@@ -68,7 +68,7 @@ def test_web_runtime_removes_package_manager_toolchain_before_non_root_user() ->
     content = (ROOT / "apps/web/Dockerfile").read_text(encoding="utf-8")
     runtime = content.split(" AS runtime\n", 1)[1]
     assert "sha256sum -c -" in runtime
-    assert "openssl-3.5.9-r0.apk" in runtime
+    assert "openssl-3.5.9-r1.apk" in runtime
     assert "apk add --no-network" in runtime
     removal = runtime.index("RUN rm -rf /usr/local/lib/node_modules/npm")
     user = runtime.index("USER nextjs")

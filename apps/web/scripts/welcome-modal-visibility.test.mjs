@@ -66,7 +66,7 @@ function createWelcomeFlow() {
     },
     './WelcomeNameDialog': { WelcomeNameDialog },
     './dashboardSearch': { DashboardSearchProvider: component },
-    './useVillageTasks': { isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available', useVillageTasks: () => ({ tasks: [], loading: false, error: null }) },
+    './useVillageTasks': { useVillageTasks: () => ({ tasks: [], loading: false, error: null, requiredCourses: [], electiveCourses: [], requiredTotal: 0, requiredRemaining: 0, ready: true }), isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available' },
     './useCanvasScale': { useCanvasScale: () => 1 },
     './sharedAsset': { sharedAsset: name => name },
     './taskDepartments': { filterDepartmentTasks: tasks => tasks, taskDepartmentName: name => name },
@@ -82,7 +82,7 @@ function createWelcomeFlow() {
     VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'], JourneyDialogSurface: ['JourneyDialogSurface'],
     AccountSwitchDialog: ['AccountSwitchDialog'], PersonalProfile: ['PersonalProfile'], WorldMap: ['WorldMap'],
     KnowledgeLibrary: ['KnowledgeLibrary'], FavoriteKnowledge: ['FavoriteKnowledge', 'KnowledgeSaveButton'],
-    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'], DeliveryLab: ['DeliveryLab'], GuildGrowthPage: ['GuildGrowthPage'],
+    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'], AcademyCourseEntry: ['AcademyCourseEntry'], VillageCourseCatalog: ['VillageCourseCatalog', 'VillageOrdinaryCourses'], DeliveryLab: ['DeliveryLab'], GuildGrowthPage: ['GuildGrowthPage'],
   })) dependencies[`./${file}`] = Object.fromEntries(names.map(name => [name, component]));
   const { ModuleHub } = loadComponent('ModuleHub.tsx', dependencies);
 

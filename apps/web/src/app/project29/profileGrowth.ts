@@ -8,7 +8,7 @@ export type ProfileWallet = {
 
 export type GrowthEntry = {
   id: string;
-  kind: "task_reward" | "medal_redemption";
+  kind: "task_reward" | "medal_redemption" | "offline_grant" | "course_reward";
   occurredAt: string;
   module: string;
   title: string;
@@ -63,7 +63,7 @@ export function parseGrowthPage(value: unknown): GrowthPage {
   }
   for (const item of value.items) {
     if (!record(item) || typeof item.id !== "string" || !item.id
-      || !["task_reward", "medal_redemption"].includes(String(item.kind))
+      || !["task_reward", "medal_redemption", "offline_grant", "course_reward"].includes(String(item.kind))
       || typeof item.occurredAt !== "string" || !Number.isFinite(Date.parse(item.occurredAt))
       || typeof item.title !== "string" || typeof item.module !== "string" || typeof item.method !== "string"
       || !integer(item.xp) || !Array.isArray(item.badgePoints)

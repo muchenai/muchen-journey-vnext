@@ -6,6 +6,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 const nativeRequire = createRequire(import.meta.url);
+const moduleAccess = { exports: {} };
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/lib/learner-module-access.ts', import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { module: moduleAccess, exports: moduleAccess.exports });
 
 function find(node, predicate) {
   if (!node || typeof node !== 'object') return null;
@@ -13,7 +17,7 @@ function find(node, predicate) {
   return predicate(node) ? node : find(node.props?.children, predicate);
 }
 
-function createFlow(initialScreen = 'dashboard', { configurableExploration = true, originalTasks = [], exploration: explorationOverrides = {} } = {}) {
+function createFlow(initialScreen = 'dashboard', { configurableExploration = true, originalTasks = [], explorationOnly = false, exploration: explorationOverrides = {} } = {}) {
   const slots = [];
   let cursor = 0;
   let changed = false;
@@ -61,6 +65,8 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
     'next/navigation': { useRouter: () => ({ refresh() { calls.refresh += 1; }, push() { calls.push += 1; } }) },
     './index.css': {}, './loader.css': {}, './retained-controls.css': {},
     '@/lib/text-length': {}, '@/lib/feishu-client-login': {}, '../actions': {},
+    '@/lib/learner-module-access': moduleAccess.exports,
+    '@/app/project-ui/CompanyLoginNotice': { default: component },
     '@/lib/phone-password-validation': {}, '../project-ui/PhonePasswordField': { PhonePasswordField: component },
     './ExecutionPages': { ExecutionDetail: component, ExecutionView: component, TaskCards: component,
       executionTasks: [{ id: 'first', label: '探索启航' }] },
@@ -77,7 +83,7 @@ function createFlow(initialScreen = 'dashboard', { configurableExploration = tru
     './useWorkspaceRecovery': { useWorkspaceRecovery: () => ({ record: '', updateRecord() {},
       selfCheckInFlight: { current: false }, beginSelfCheck() {}, finishSelfCheck() {} }) },
     './journey-context': { JourneyProvider: component,
-      useJourney: () => ({ learnerName: '真实学员', experience, initialScreen, configurableExploration, joinPhase: 'invite', joinError: '' }),
+      useJourney: () => ({ learnerName: '真实学员', experience, initialScreen, configurableExploration, explorationOnly, joinPhase: 'invite', joinError: '' }),
       useTaskStatus: () => () => 'active' },
     './EntryLoader': { ProjectResourceLoader: component },
   };
@@ -150,6 +156,20 @@ test('exploration task list returns to the retained dashboard without document o
     assert.equal(flow.calls.push, 0);
     assert.equal(flow.calls.refresh, 0);
   }
+});
+
+test('phone module navigation stays in exploration before the destination or its course media can mount', () => {
+  const flow = createFlow('dashboard', { explorationOnly: true });
+  for (const destination of ['village', 'academy', 'guild']) {
+    find(flow.render(), node => node.type === flow.ModuleHub).props.onNavigate(destination);
+    const hub = find(flow.render(), node => node.type === flow.ModuleHub);
+    assert.equal(hub.props.module, 'dashboard');
+    assert.equal(hub.props.explorationOnly, true);
+    assert.equal(hub.props.navigationNotice, '请用公司认证的飞书账号进行登录和使用');
+    assert.equal(new URL(flow.href).searchParams.get('view'), 'dashboard');
+  }
+  assert.deepEqual(flow.calls.replace, []);
+  assert.deepEqual(flow.calls.assign, []);
 });
 
 test('opening a real assignment still loads its server-backed execution route', async () => {
@@ -230,7 +250,7 @@ test('return navigation clears click ripples while ordinary in-page clicks retai
   }
 });
 
-function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, tasks = [] } = {}) {
+function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, tasks = [], explorationOnly = false } = {}) {
   const slots = [];
   let cursor = 0;
   let changed = false;
@@ -242,6 +262,8 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
   const scrolls = [];
   const ModuleSidebar = () => null;
   const ModuleHeader = () => null;
+  const ExplorationProfile = () => null;
+  const PersonalProfile = () => null;
   const DashboardSearchProvider = () => null;
   const DeliveryLab = () => null;
   const GuildGrowthPage = () => null;
@@ -283,7 +305,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
       useEffect(callback, dependencies) { registerEffect(effects, callback, dependencies); },
       useLayoutEffect(callback, dependencies) { registerEffect(layoutEffects, callback, dependencies); },
     },
-    './useVillageTasks': { useVillageTasks: () => ({ tasks, loading: false, error: null }),
+    './useVillageTasks': { useVillageTasks: () => ({ tasks, loading: false, error: null, requiredCourses: [], electiveCourses: [], requiredTotal: 0, requiredRemaining: 0, ready: true }),
       isVillageTaskClaimed: task => task.claimed ?? task.status !== 'available' },
     './useCanvasScale': { useCanvasScale: () => 0.8 },
     './sharedAsset': { sharedAsset: path => path },
@@ -302,11 +324,12 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
     VillageTaskCard: ['VillageTaskCard', 'VillageTaskRewards'], JourneyDialogSurface: ['JourneyDialogSurface'],
     AccountSwitchDialog: ['AccountSwitchDialog'], PersonalProfile: ['PersonalProfile'], WorldMap: ['WorldMap'],
     KnowledgeLibrary: ['KnowledgeLibrary'], FavoriteKnowledge: ['FavoriteKnowledge', 'KnowledgeSaveButton'],
-    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'],
+    ModuleCourseArtwork: ['ModuleCourseArtwork'], AcademyLearning: ['AcademyLearning'], AcademyCourseEntry: ['AcademyCourseEntry'], VillageCourseCatalog: ['VillageCourseCatalog','VillageOrdinaryCourses'],
     VillageTaskForm: ['VillageTaskForm'], VillageTaskMaterials: ['VillageTaskMaterials'],
   })) dependencies[`./${file}`] = Object.fromEntries(names.map(name => [name, component]));
   Object.assign(dependencies['./ModuleShell'], { ModuleSidebar, ModuleHeader });
   dependencies['./WorldMap'] = { WorldMap };
+  dependencies['./PersonalProfile'] = { ExplorationProfile, PersonalProfile };
   dependencies['./TaskClassifications'] = { TaskClassifications };
   const source = ts.transpileModule(readFileSync(new URL('../src/app/project29/ModuleHub.tsx', import.meta.url), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -321,7 +344,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
       changed = false;
       layoutEffects = [];
       effects = [];
-      const tree = loaded.exports.ModuleHub({ active, module: moduleName, identity: '真实学员',
+      const tree = loaded.exports.ModuleHub({ active, module: moduleName, identity: '真实学员', explorationOnly,
         onNavigate: destination => navigations.push(destination),
         onExplorationMenu: menu => calls.push(menu), decoration: null, activeNavigationDecoration: null,
         idleNavigationDecoration: null, dashboardContent: 'retained-dashboard' });
@@ -347,7 +370,7 @@ function createModuleFlow(moduleName = 'dashboard', { simulateEffects = false, t
     assert.fail('ModuleHub effects did not settle');
   };
   return { render, calls, navigations, scrolls, setModule(value) { moduleName = value; },
-    ModuleSidebar, ModuleHeader, DashboardSearchProvider, DeliveryLab, GuildGrowthPage, WorldMap, TaskClassifications };
+    ModuleSidebar, ModuleHeader, ExplorationProfile, PersonalProfile, DashboardSearchProvider, DeliveryLab, WorldMap, TaskClassifications, GuildGrowthPage };
 }
 
 const mapTasks = [
@@ -467,6 +490,21 @@ test('opening exploration tasks from a secondary section prepares the retained h
     assert.equal(dashboard.props.children.props.query, '');
   }
   assert.deepEqual(calls, ['tasks', 'tasks', 'tasks']);
+});
+
+test('exploration identity opens its profile without mounting company account and Academy favorites requests', () => {
+  for (const explorationOnly of [true, false]) {
+    const flow = createModuleFlow('dashboard', { explorationOnly });
+    find(flow.render(), node => node.type === flow.ModuleHeader).props.onProfile();
+    const tree = flow.render();
+    const allowedProfile = explorationOnly ? flow.ExplorationProfile : flow.PersonalProfile;
+    const otherProfile = explorationOnly ? flow.PersonalProfile : flow.ExplorationProfile;
+    const profile = find(tree, node => node.type === allowedProfile);
+    assert.equal(profile.props.name, '真实学员');
+    assert.equal(find(tree, node => node.type === otherProfile), null);
+    profile.props.onBack();
+    assert.equal(find(flow.render(), node => node.type === flow.ModuleHeader).props.menu, 'hall');
+  }
 });
 
 test('exploration header search reaches the retained dashboard and clear resets the same header query', () => {

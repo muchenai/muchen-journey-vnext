@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiRequest, ApiRequestError } from "@/lib/server/api";
 
+import { proxyContentFile } from "@/lib/server/exploration-material-proxy";
 export const dynamic = "force-dynamic";
 const uuid = (s: unknown): s is string => typeof s === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s);
 function fail(error: unknown) {
@@ -14,15 +15,20 @@ export async function GET(request: NextRequest) {
     if (task && !uuid(task)) return NextResponse.json({ error:"任务参数无效。" }, { status:400 });
     if (material !== null) {
       if (!task || !/^\d{1,2}$/.test(material)) return NextResponse.json({ error:"文件参数无效。" }, { status:400 });
+      if (request.nextUrl.searchParams.get("stream") === "1") return proxyContentFile(request, `/api/v1/me/novice/tasks/${task}/materials/${material}`, "LEARNER");
       const data = await apiRequest<{ name:string; mime:string; data:string }>(`/api/v1/me/novice/tasks/${task}/materials/${material}`, "LEARNER");
       return new NextResponse(Buffer.from(data.data, "base64"), { headers:{
         "Content-Type":data.mime, "Content-Disposition":`attachment; filename*=UTF-8''${encodeURIComponent(data.name)}`,
         "X-Content-Type-Options":"nosniff", "Cache-Control":"no-store" } });
     }
-    const data = await apiRequest(`/api/v1/me/novice/tasks${task ? `/${task}` : ""}`, "LEARNER");
+    const data = task ? await apiRequest(`/api/v1/me/novice/tasks/${task}`,"LEARNER") : await Promise.all([
+      apiRequest<Record<string, unknown>>("/api/v1/me/novice/tasks","LEARNER"),
+      apiRequest<Record<string, unknown>>("/api/v1/me/course-workspace/village-summary","LEARNER")
+    ]).then(([tasks,courses])=>({...tasks,...courses}));
     return NextResponse.json(data, { headers:{ "Cache-Control":"no-store" } });
   } catch (error) { return fail(error); }
 }
+export const HEAD = GET;
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   let sameOrigin = false;

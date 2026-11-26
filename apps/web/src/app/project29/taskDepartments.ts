@@ -4,6 +4,7 @@ import type { VillageTask } from "./useVillageTasks";
 export { badgePointTypes as taskBadgePointTypes } from "./badgeEconomy";
 
 export const taskDepartments = [
+  { id: "company-common", name: "公司通用常识", delivery: false },
   { id: "it", name: "IT部", delivery: false },
   { id: "talent-development", name: "人才开发部", delivery: false },
   { id: "talent-growth", name: "人才发展部", delivery: false },
@@ -34,7 +35,7 @@ export function belongsToDepartment(task: VillageTask, department: TaskDepartmen
   const departments = taskDepartments.filter(item => item.name === task.publishingDepartment).map(item => item.id);
   if (department === "all") return true;
   if (department === "delivery") return departments.some(id => taskDepartments.some(item => item.id === id && item.delivery));
-  if (department === "functional") return departments.some(id => taskDepartments.some(item => item.id === id && !item.delivery));
+  if (department === "functional") return departments.some(id => taskDepartments.some(item => item.id === id && !item.delivery && item.id !== "company-common"));
   return departments.includes(department);
 }
 export function filterDepartmentTasks(tasks: VillageTask[], department: TaskDepartmentFilter, level = "全部", review = "全部", query = "", badgeType = "全部") {

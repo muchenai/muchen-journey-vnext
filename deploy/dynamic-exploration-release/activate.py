@@ -66,9 +66,8 @@ def stream_sha(handle):
 
 
 def file_sha(path):
-    require(path.is_file() and not path.is_symlink(), "ARCHIVE_PATH")
-    with path.open("rb") as handle:
-        return stream_sha(handle)
+    from restore_backup import stable_file_digest
+    return stable_file_digest(path, require)
 
 
 def protected_containers():
@@ -100,6 +99,18 @@ def verify_protected_containers(expected):
 
 
 class Activation(ExplorationPreparation):
+    base_api = BASE
+    base_web = WEB_BASE
+    source_schema = SOURCE_SCHEMA
+    target_schema = TARGET_SCHEMA
+    new_tables = NEW_TABLES
+    seeds_curriculum = True
+    in_flight_sql = "select count(*) from ai_self_checks where status in ('RUNNING','SENDING')"
+    protected_endpoints = (
+        "/api/learner/guild", "/api/learner/profile/history", "/api/review-native/guild-requests",
+        "/api/learner/exploration", "/api/review-native",
+    )
+
     def __init__(self, manifest, package):
         Upgrade.__init__(self, manifest, package)
         self.base = Path(manifest["base_release"])
@@ -142,14 +153,14 @@ class Activation(ExplorationPreparation):
         require(all(digest(read_file(self.base / name)) == expected for name, expected in self.base_hashes.items()), "BASE_CONFIGURATION_CHANGED")
         deployment = env_values(read_file(self.base / ".deployment.env"))
         require(deployment["API_IMAGE"] == self.old_images["api"] and deployment["WEB_IMAGE"] == self.old_images["web"], "BASE_IMAGE_DRIFT")
-        require(env_values(read_file(self.base / "secrets/api.env"))["APP_RELEASE"] == BASE, "API_BASE_RELEASE")
-        require(env_values(read_file(self.base / "secrets/web.env"))["APP_RELEASE"] == WEB_BASE, "WEB_BASE_RELEASE")
+        require(env_values(read_file(self.base / "secrets/api.env"))["APP_RELEASE"] == self.base_api, "API_BASE_RELEASE")
+        require(env_values(read_file(self.base / "secrets/web.env"))["APP_RELEASE"] == self.base_web, "WEB_BASE_RELEASE")
 
     def verify_base(self):
         self.verify_base_configuration()
         super().verify_base()
         probe = "from sqlalchemy import text; from journey_api.db import SessionLocal; import json; s=SessionLocal(); s.execute(text('SET TRANSACTION READ ONLY')); print(json.dumps(list(s.execute(text('SELECT version_num FROM alembic_version')).scalars()))); s.rollback(); s.close()"
-        require(json.loads(compose(self.base, "exec", "-T", "api", "python", "-c", probe)) == [SOURCE_SCHEMA], "BASE_SCHEMA")
+        require(json.loads(compose(self.base, "exec", "-T", "api", "python", "-c", probe)) == [self.source_schema], "BASE_SCHEMA")
 
 
     def restore_encrypt_migrate(self, before, dump, encrypted, verify, backup_key):
@@ -159,13 +170,13 @@ class Activation(ExplorationPreparation):
     def healthy(self, release, candidate, images, *, public=True):
         for row in self.containers({name: {reference} for name, reference in images.items()}):
             service = row["Config"]["Labels"]["com.docker.compose.service"]
-            expected = WEB_BASE if release == self.base and service == "web" else candidate
+            expected = self.base_web if release == self.base and service == "web" else candidate
             values = dict(pair.split("=", 1) for pair in row["Config"]["Env"])
             require(row["State"]["Running"] and row["State"].get("Health", {}).get("Status") == "healthy", "UNHEALTHY")
             require(values.get("APP_RELEASE") == expected, "RUNTIME_RELEASE")
         if public:
             ready = json.loads(run(["curl", "-fsS", "--connect-timeout", "3", "--max-time", "10", "https://journey.muchenai.com/health/ready"]))
-            require(ready == {"status": "ready", "release": WEB_BASE if release == self.base else candidate}, "PUBLIC_HEALTH")
+            require(ready == {"status": "ready", "release": self.base_web if release == self.base else candidate}, "PUBLIC_HEALTH")
 
     def import_images(self):
         self.verify_base()
@@ -200,7 +211,7 @@ class Activation(ExplorationPreparation):
             self.manifest["images"][name] = loaded["Id"]
             self.image_check(name, self.images[name], self.manifest["candidate"])
         for name, reference in self.old_images.items():
-            self.image_check(name, reference, BASE if name == "api" else WEB_BASE)
+            self.image_check(name, reference, self.base_api if name == "api" else self.base_web)
         Upgrade.image_check(self, "dbrestore", self.images["dbrestore"])
         self.verify_runtime_dependencies()
         cleanup_verified_transports(self.package, self.manifest)
@@ -284,8 +295,8 @@ walk('/app'); console.log(JSON.stringify({braces:count}));
         require(env_file in {"secrets/api.env", "secrets/migration.env"}, "PROBE_ENV")
         if not read_only:
             allowed_write = env_file == "secrets/migration.env" and (
-                args in {("alembic", "upgrade", TARGET_SCHEMA), ("python", "/tmp/grant_runtime.py")}
-                or args == tuple(self.catalog_command(apply=True)))
+                args in {("alembic", "upgrade", self.target_schema), ("python", "/tmp/grant_runtime.py")}
+                or (self.seeds_curriculum and args == tuple(self.catalog_command(apply=True))))
             require(allowed_write, "PRODUCTION_WRITE_PROBE_FORBIDDEN")
         command = ["docker", "run", "--rm", "--network", "host", "--env-file", str(self.new / env_file)]
         if env_file == "secrets/api.env":
@@ -300,8 +311,8 @@ walk('/app'); console.log(JSON.stringify({braces:count}));
 
     def verify_runtime_schema(self):
         probe = "from sqlalchemy import text; from journey_api.db import SessionLocal; s=SessionLocal(); s.execute(text('SET TRANSACTION READ ONLY')); "
-        probe += "assert list(s.execute(text('SELECT version_num FROM alembic_version')).scalars()) == [" + repr(TARGET_SCHEMA) + "]; "
-        probe += "; ".join(f"assert s.execute(text('select count(*) from {name}')).scalar_one()>=0" for name in NEW_TABLES)
+        probe += "assert list(s.execute(text('SELECT version_num FROM alembic_version')).scalars()) == [" + repr(self.target_schema) + "]; "
+        probe += "; ".join(f"assert s.execute(text('select count(*) from {name}')).scalar_one()>=0" for name in self.new_tables)
         self.docker_api("secrets/api.env", "python", "-c", probe, read_only=True)
 
     def verify_login_configuration(self):
@@ -398,7 +409,7 @@ print(json.dumps({'login_config':'PASS','ai_config_preserved':True,'sms_sent':0}
         command = self.catalog_command(apply=True)
         raw = self.docker_api("secrets/migration.env", *command, timeout=600) if prefix is None else run(prefix + command, timeout=600)
         result = json.loads(raw)
-        require(result.get("mode") == "apply" and result.get("schema") == TARGET_SCHEMA
+        require(result.get("mode") == "apply" and result.get("schema") == self.target_schema
                 and result.get("business_records_preserved") is True
                 and result.get("legacy_progress_rewritten") is False
                 and result.get("independent_review") is False
@@ -410,22 +421,32 @@ print(json.dumps({'login_config':'PASS','ai_config_preserved':True,'sms_sent':0}
         # only the fixed source-controlled curriculum may add rows.
         return result
 
-    @staticmethod
-    def existing_facts(value):
-        return {name: row for name, row in value.items() if name not in NEW_TABLES}
+    def existing_facts(self, value):
+        return {name: row for name, row in value.items() if name not in self.new_tables}
 
     def validate_restored_database(self, network, restore_env):
-        event("REHEARSE_DYNAMIC_EXPLORATION_ON_RESTORED_COPY")
+        event("REHEARSE_SCHEMA_ON_RESTORED_COPY")
         prefix = ["docker", "run", "--rm", "--network", network, "--env-file", str(restore_env), self.images["api"]]
         guard = read_file(self.package / "facts_guard.py").decode()
         before = json.loads(run(prefix + ["python", "-c", guard], timeout=600))
-        require(run(prefix + ["alembic", "heads"], timeout=60).decode().strip() == TARGET_SCHEMA + " (head)", "CANDIDATE_SCHEMA_HEAD")
-        require(SOURCE_SCHEMA in run(prefix + ["alembic", "current"]).decode(), "RESTORE_SOURCE_SCHEMA")
-        run(prefix + ["alembic", "upgrade", TARGET_SCHEMA], timeout=600)
+        require(run(prefix + ["alembic", "heads"], timeout=60).decode().strip() == self.target_schema + " (head)", "CANDIDATE_SCHEMA_HEAD")
+        require(self.source_schema in run(prefix + ["alembic", "current"]).decode(), "RESTORE_SOURCE_SCHEMA")
+        run(prefix + ["alembic", "upgrade", self.target_schema], timeout=600)
         after = json.loads(run(prefix + ["python", "-c", guard], timeout=600))
         require(self.existing_facts(after) == self.existing_facts(before), "RESTORE_MIGRATION_CHANGED_BUSINESS_FACTS")
-        require(set(NEW_TABLES) <= after.keys() and all(after[name][0] == 0 for name in NEW_TABLES), "RESTORE_NEW_TABLES_NOT_EMPTY")
-        require(TARGET_SCHEMA in run(prefix + ["alembic", "current"]).decode(), "RESTORE_TARGET_SCHEMA")
+        require(set(self.new_tables) <= after.keys() and all(after[name][0] == 0 for name in self.new_tables), "RESTORE_NEW_TABLES_NOT_EMPTY")
+        require(self.target_schema in run(prefix + ["alembic", "current"]).decode(), "RESTORE_TARGET_SCHEMA")
+        if self.seeds_curriculum:
+            first, extra = self.rehearse_curriculum(prefix, guard)
+        else:
+            first, extra = after, {}
+        self.verify_old_application_on_restore(network, restore_env)
+        require(json.loads(run(prefix + ["python", "-c", guard], timeout=600)) == first, "OLD_APPLICATION_PROBE_WROTE_DATA")
+        write_new(self.backup / "migration-rehearsal.json", json.dumps({"candidate": self.manifest["candidate"],
+            "from": self.source_schema, "to": self.target_schema, "existing_business_rows_preserved": True,
+            **extra, "old_application_compatibility": "PASS"}).encode())
+
+    def rehearse_curriculum(self, prefix, guard):
         plan = json.loads(run(prefix + self.catalog_command(), timeout=600))
         require(plan.get("mode") == "plan" and not plan.get("inserted")
                 and plan.get("business_records_preserved") is True,
@@ -436,12 +457,7 @@ print(json.dumps({'login_config':'PASS','ai_config_preserved':True,'sms_sent':0}
         first = json.loads(run(prefix + ["python", "-c", guard], timeout=600))
         self.catalog_initialize(prefix=prefix)
         require(json.loads(run(prefix + ["python", "-c", guard], timeout=600)) == first, "RESTORE_IMPORT_NOT_IDEMPOTENT")
-        self.verify_old_application_on_restore(network, restore_env)
-        require(json.loads(run(prefix + ["python", "-c", guard], timeout=600)) == first, "OLD_APPLICATION_PROBE_WROTE_DATA")
-        write_new(self.backup / "migration-rehearsal.json", json.dumps({"candidate": self.manifest["candidate"],
-            "from": SOURCE_SCHEMA, "to": TARGET_SCHEMA, "existing_business_rows_preserved": True,
-            "curriculum_initialized": True, "curriculum_source_sha256": initialized["seed_sha256"],
-            "import_idempotent": True, "old_application_compatibility": "PASS"}).encode())
+        return first, {"curriculum_initialized": True, "curriculum_source_sha256": initialized["seed_sha256"], "import_idempotent": True}
 
     def verify_old_application_on_restore(self, network, restore_env):
         # TestClient without a lifespan context exercises real middleware and
@@ -478,16 +494,20 @@ print('OLD_APPLICATION_SCHEMA_COMPATIBLE')
         receipt = json.loads(read_file(self.backup / "backup-receipt.json"))
         require(receipt["restore"] == "PASS" and receipt["candidate"] == self.manifest["candidate"], "BACKUP_RECEIPT")
         require(file_sha(self.backup / "canary.dump.enc") == receipt["backup_sha256"], "BACKUP_CHANGED")
-        require(receipt["migration"] == SOURCE_SCHEMA and receipt["production_migration_applied"] is False, "BACKUP_SCHEMA")
+        require(receipt["migration"] == self.source_schema and receipt["production_migration_applied"] is False, "BACKUP_SCHEMA")
         rehearsal = json.loads(read_file(self.backup / "migration-rehearsal.json"))
-        require(rehearsal.get("candidate") == self.manifest["candidate"] and rehearsal.get("from") == SOURCE_SCHEMA
-                and rehearsal.get("to") == TARGET_SCHEMA and rehearsal.get("curriculum_initialized") is True
-                and rehearsal.get("import_idempotent") is True and rehearsal.get("existing_business_rows_preserved") is True
+        require(rehearsal.get("candidate") == self.manifest["candidate"] and rehearsal.get("from") == self.source_schema
+                and rehearsal.get("to") == self.target_schema and rehearsal.get("existing_business_rows_preserved") is True
+                and (not self.seeds_curriculum or (rehearsal.get("curriculum_initialized") is True
+                    and rehearsal.get("import_idempotent") is True))
                 and rehearsal.get("old_application_compatibility") == "PASS",
                 "RESTORE_SCHEMA_PROOF")
-        self.verify_catalog_actor()
+        if self.seeds_curriculum:
+            self.verify_catalog_actor()
         busy = self.docker_api("secrets/migration.env", "python", "-c",
-            "from sqlalchemy import text; from journey_api.db import SessionLocal; s=SessionLocal(); s.execute(text('SET TRANSACTION READ ONLY')); print(s.execute(text(\"select count(*) from ai_self_checks where status in ('RUNNING','SENDING')\")).scalar_one())", read_only=True)
+            "from sqlalchemy import text; from journey_api.db import SessionLocal; s=SessionLocal(); "
+            "s.execute(text('SET TRANSACTION READ ONLY')); print(s.execute(text(" + repr(self.in_flight_sql)
+            + ")).scalar_one())", read_only=True)
         require(busy.strip() == b"0", "AI_REQUEST_IN_PROGRESS_RETRY_AFTER_COMPLETION")
         event("BRIEF_JOURNEY_MAINTENANCE")
         post_initialization = None
@@ -495,18 +515,23 @@ print('OLD_APPLICATION_SCHEMA_COMPATIBLE')
         try:
             compose(self.base, "stop", "web", "api", timeout=90)
             before = self.guard()
-            require(SOURCE_SCHEMA in self.docker_api("secrets/migration.env", "alembic", "current", read_only=True).decode(), "SOURCE_SCHEMA")
-            event("UPGRADE_DYNAMIC_EXPLORATION_SCHEMA")
-            self.docker_api("secrets/migration.env", "alembic", "upgrade", TARGET_SCHEMA, timeout=600)
+            require(self.source_schema in self.docker_api("secrets/migration.env", "alembic", "current", read_only=True).decode(), "SOURCE_SCHEMA")
+            event("UPGRADE_SCHEMA")
+            self.docker_api("secrets/migration.env", "alembic", "upgrade", self.target_schema, timeout=600)
             after = self.guard()
             require(self.existing_facts(after) == self.existing_facts(before), "PRODUCTION_MIGRATION_CHANGED_BUSINESS_FACTS")
-            require(set(NEW_TABLES) <= after.keys() and all(after[name][0] == 0 for name in NEW_TABLES), "PRODUCTION_NEW_TABLES_NOT_EMPTY")
+            require(set(self.new_tables) <= after.keys() and all(after[name][0] == 0 for name in self.new_tables), "PRODUCTION_NEW_TABLES_NOT_EMPTY")
             self.docker_api("secrets/migration.env", "python", "/tmp/grant_runtime.py")
-            event("INITIALIZE_OWNER_APPROVED_CURRICULUM")
-            initialized = self.catalog_initialize()
-            require(initialized["seed_sha256"] == rehearsal["curriculum_source_sha256"], "CURRICULUM_SOURCE_CHANGED")
-            write_new(self.backup / "curriculum-initialization.json", json.dumps(initialized, sort_keys=True).encode())
-            post_initialization = self.guard()
+            extra = {}
+            if self.seeds_curriculum:
+                event("INITIALIZE_OWNER_APPROVED_CURRICULUM")
+                initialized = self.catalog_initialize()
+                require(initialized["seed_sha256"] == rehearsal["curriculum_source_sha256"], "CURRICULUM_SOURCE_CHANGED")
+                write_new(self.backup / "curriculum-initialization.json", json.dumps(initialized, sort_keys=True).encode())
+                extra = {"curriculum_source_sha256": initialized["seed_sha256"], "curriculum_initialized": True}
+                post_initialization = self.guard()
+            else:
+                post_initialization = after
             self.verify_runtime_schema()
             event("SWITCH_JOURNEY_API_AND_WEB")
             switched = True
@@ -517,14 +542,13 @@ print('OLD_APPLICATION_SCHEMA_COMPATIBLE')
             self.healthy(self.new, self.manifest["candidate"], {name: self.images[name] for name in ("api", "web")})
             for path in ("/join", "/review/login", "/ops/login"):
                 run(["curl", "-fsS", "--connect-timeout", "3", "--max-time", "15", "-o", "/dev/null", "https://journey.muchenai.com" + path])
-            for path in ("/api/learner/guild", "/api/learner/profile/history", "/api/review-native/guild-requests", "/api/learner/exploration", "/api/review-native"):
+            for path in self.protected_endpoints:
                 status = run(["curl", "-sS", "--connect-timeout", "3", "--max-time", "15", "-o", "/dev/null", "-w", "%{http_code}", "https://journey.muchenai.com" + path])
                 require(status.strip() == b"401", "UNAUTHENTICATED_ACCESS_NOT_PROTECTED")
             final = {"release": self.manifest["candidate"], "status": "PASS", "old_assignments_unchanged": True,
-                "schema": TARGET_SCHEMA, "database_schema_changed": True, "previous_web_release": WEB_BASE,
-                "previous_api_release": BASE, "package_run_id": self.manifest["package_run_id"],
-                "other_containers_unchanged": True, "curriculum_source_sha256": initialized["seed_sha256"],
-                "existing_business_rows_preserved": True, "curriculum_initialized": True}
+                "schema": self.target_schema, "database_schema_changed": True, "previous_web_release": self.base_web,
+                "previous_api_release": self.base_api, "package_run_id": self.manifest["package_run_id"],
+                "other_containers_unchanged": True, "existing_business_rows_preserved": True, **extra}
             write_new(self.new / "activation-receipt.json", json.dumps(final, sort_keys=True).encode())
             print(json.dumps(final, sort_keys=True), flush=True)
         except (Exception, KeyboardInterrupt):
@@ -558,12 +582,12 @@ print('OLD_APPLICATION_SCHEMA_COMPATIBLE')
             self.up(self.base)
             if self.current() != self.base:
                 self.pointer(self.base)
-            self.healthy(self.base, BASE, self.old_images)
+            self.healthy(self.base, self.base_api, self.old_images)
             verify_protected_containers(self.protected_runtime)
             raise
 
 
-def main():
+def main(activation=Activation):
     require(sys.platform == "linux" and os.geteuid() == 0, "LINUX_ROOT_REQUIRED")
     require(socket.gethostname() == "journey-next-staging", "UNEXPECTED_HOST")
     require(ROOT.resolve() == ROOT, "ROOT_SYMLINK")
@@ -572,20 +596,21 @@ def main():
     install_safe_command_reporting(sys.modules[__name__])
     package = Path(__file__).resolve().parent
     manifest = json.loads(read_file(package / "manifest.json"))
-    require(manifest["base_candidate"] == BASE and manifest["migrations"] == {"from": SOURCE_SCHEMA, "to": TARGET_SCHEMA}, "MANIFEST")
+    require(manifest["base_candidate"] == activation.base_api and manifest["migrations"] == {"from": activation.source_schema, "to": activation.target_schema}, "MANIFEST")
     payload = json.loads(sys.stdin.read(16384))
     import fcntl
     descriptor = os.open(ROOT / ".schema-upgrade.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        release = Activation(manifest, package)
+        release = activation(manifest, package)
         release.protected_runtime = protected_containers()
         event("VERIFY_AND_IMPORT_OFFLINE_IMAGES")
         release.import_images()
         event("STAGE_EXISTING_PRODUCTION_CONFIGURATION")
         release.stage(payload["migration_password"])
         release.verify_login_configuration()
-        release.verify_catalog_actor()
+        if release.seeds_curriculum:
+            release.verify_catalog_actor()
         release.verify_restore_space()
         event("BACKUP_AND_PROVE_RESTORE")
         release.backup_migrate(payload["backup_key"])
@@ -593,12 +618,16 @@ def main():
         event("RELEASE_COMPLETE")
 
 
-if __name__ == "__main__":
+def execute(activation):
     try:
-        main()
+        main(activation)
     except (Exception, KeyboardInterrupt) as error:
         category = str(error) if isinstance(error, (UpgradeError, DiskSpaceError)) else type(error).__name__
         if isinstance(error, AssertionError) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,95}", str(error)):
             category = str(error)
         print(json.dumps({"result": "STOP", "category": category, "do_not_retry_blindly": True}), flush=True)
         raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    execute(Activation)

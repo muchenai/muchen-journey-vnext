@@ -10,7 +10,7 @@ import { ApiStore, createJourneyService } from '../public/review-native/native-a
 import { learnerTaskTitles, learnerTaskTitle } from '../public/review-native/task-titles.js';
 import { renderPublishMaterials } from '../public/review-native/publish-materials.js';
 import { createTaskWorkflow, copyAsNewTask, hasUnsavedChanges, isTaskUpdate } from '../public/review-native/task-workflow.js';
-import {BADGES, rewardBreakdown, applyDifficultyPreset, validateTask} from '../public/review-native/core.js';
+import {BADGES, rewardBreakdown, applyDifficultyPreset, normalizeBadgeWeights, validateBadgeWeights, validateTask} from '../public/review-native/core.js';
 
 test('all eighteen reward types survive the server adapter and split preview',()=>{
   assert.equal(BADGES.length,18);
@@ -27,6 +27,14 @@ test('all eighteen reward types survive the server adapter and split preview',()
   assert.deepEqual(reward.allocations.map(b=>b.points),[6,9]);
 });
 
+test('equal remainders allocate the last badge point in the published category order', () => {
+  const reward = rewardBreakdown({
+    difficulty: '入门', rewardRulesVersion: 4, xp: 20,
+    badges: [{ id: 'data', weight: 4 }, { id: 'tech', weight: 73 }, { id: 'product', weight: 23 }],
+  });
+  assert.deepEqual(reward.allocations.map(badge => badge.points), [0, 2, 0]);
+});
+
 test('integer badge allocations preserve total at every ten percent split',()=>{
   for(const difficulty of ['入门','进阶','挑战']) for(let weight=10;weight<100;weight+=10){
     const reward=rewardBreakdown({difficulty,badges:[{id:'product',weight},{id:'data',weight:100-weight}]});
@@ -35,11 +43,24 @@ test('integer badge allocations preserve total at every ten percent split',()=>{
   }
   assert.deepEqual(rewardBreakdown({difficulty:'挑战',badges:[{id:'product',weight:50},{id:'data',weight:50}]}).allocations.map(b=>b.points),[8,7]);
 });
-test('new publications are free and use twenty-percent allocations',()=>{
+test('new publications are free and accept whole percentage allocations across reward types',()=>{
   const task=applyDifficultyPreset({difficulty:'挑战',unlockTaskPoints:50,badges:[{id:'product',weight:100}]});
   assert.equal(task.taskPoints,0);assert.equal(task.unlockTaskPoints,0);
   assert.equal(applyDifficultyPreset({...task,difficulty:'入门'}).unlockTaskPoints,0);
-  assert.ok(validateTask({...task,badges:[{id:'product',weight:55},{id:'data',weight:45}]}).some(e=>e.includes('20%')));
+  const pairs=[{id:'product',weight:55},{id:'data',weight:45}];
+  const thirds=[{id:'dev',weight:34},{id:'product',weight:33},{id:'talent-development',weight:33}];
+  const all=BADGES.map((badge,i)=>({id:badge.id,weight:i<10?6:5}));
+  for (const badges of [pairs,thirds,all]) {
+    assert.deepEqual(validateBadgeWeights(badges),[]);
+    assert.deepEqual(normalizeBadgeWeights(taskView(taskWrite({...task,badges}))).badges,badges);
+  }
+  const issue=(field,message,index)=>({field,index});
+  assert.deepEqual(validateBadgeWeights([],issue),[{field:'badges',index:undefined}]);
+  assert.deepEqual(validateBadgeWeights([{id:'data',weight:50},{id:'data',weight:50}],issue),[{field:'badges',index:undefined}]);
+  for (const weight of [0,1.5,101]) {
+    assert.deepEqual(validateBadgeWeights([{id:'data',weight:99},{id:'dev',weight}],issue),[{field:'weights',index:1}]);
+  }
+  assert.deepEqual(validateBadgeWeights([{id:'data',weight:99}],issue),[{field:'weights',index:undefined}]);
 });
 
 function workflowHarness(dirty=false) {
@@ -52,6 +73,21 @@ function workflowHarness(dirty=false) {
   const workflow=createTaskWorkflow({store,newDraft:()=>structuredClone(empty),openModal:(html,ready)=>{view.opens++;view.html=html;ready(modal);},closeModal:()=>view.closes++,showEditor:()=>view.shows++,toast(){}});
   return {workflow,store,view,controls,original,empty};
 }
+test('choosing a village task prompts only for edits to the current exploration draft', async()=>{
+  const blank=camp=>({id:crypto.randomUUID(),camp,title:'',order:camp==='exploration'?1:undefined});
+  for(const title of ['', '尚未保存的标题']){
+    const draft={...blank('exploration'),title};
+    const store={capabilities:{isSuperAdmin:true},data:{draft,tasks:[]},getTask:()=>undefined,save(){}};
+    const actions=[];
+    const workflow=createTaskWorkflow({store,newDraft:blank,openModal:()=>actions.push('confirm'),closeModal(){},
+      showEditor:()=>actions.push('editor'),toast(){}});
+    await workflow.start(null,'novice');
+    assert.deepEqual(actions,title?['confirm']:['editor']);
+    if(title) assert.equal(store.data.draft,draft);
+    else assert.equal(store.data.draft.camp,'novice');
+  }
+});
+
 test('new task opens immediately when published content is unchanged, without resaving or publishing it',()=>{
   const h=workflowHarness();h.workflow.start();
   assert.equal(h.view.opens,0);assert.equal(h.view.shows,1);
@@ -148,6 +184,19 @@ test('phone learners show name and phone, while Feishu keeps its employee number
   const corporate = renderReview(store,{reviewCamp:'exploration'});
   assert.match(corporate,/工号：MCE0042/);
   assert.doesNotMatch(corporate,/13900000042/);
+});
+
+test('both review lists distinguish a disabled account from a missing phone number', () => {
+  for (const camp of ['novice', 'exploration']) {
+    const store = {data: {submissions: []}, getTask: () => task};
+    selectReviewTab(store, 'pending', camp);
+    for (const disabled of [false, true]) {
+      store.data.submissions = [reviewView({...row, camp, learner_account_disabled: disabled})];
+      const html = renderReview(store, {reviewCamp: camp});
+      assert.match(html, disabled ? /原账号已停用，手机号不可用/ : /手机号未补充/);
+      assert.doesNotMatch(html, disabled ? /手机号未补充/ : /原账号已停用/);
+    }
+  }
 });
 
 test('actual reviewer and server time render safely, without falling back to an assignee', async () => {

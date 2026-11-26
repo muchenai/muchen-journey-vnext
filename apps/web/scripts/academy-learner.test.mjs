@@ -3,17 +3,39 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as React from 'react';
+import * as jsx from 'react/jsx-runtime';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const root = new URL('../src/', import.meta.url);
 const next = { NextResponse: { json: (data, init) => Response.json(data, init) } };
 class ApiRequestError extends Error { constructor(message, status) { super(message); this.status = status; } }
 function load(path, dependencies, extras = {}) {
-  const code = ts.transpileModule(readFileSync(new URL(path, root), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(readFileSync(new URL(path, root), 'utf8'), { fileName: path, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const compiledModule = { exports: {} };
   vm.runInNewContext(code, { module: compiledModule, exports: compiledModule.exports, require: name => dependencies[name], Request, Response, Headers, URL, Buffer, ...extras });
   return compiledModule.exports;
 }
+
+test('the academy catalog renders mixed courses in date order when a new course has no learning timestamp', () => {
+  const common = {type:'link', tags:[], author:{name:'导师'}, minutes:15, progress:0, seconds:0};
+  const courses = [
+    {...common, id:'fresh', title:'新课程', enhanced:true, updatedAt:null, createdAt:'2026-11-07T02:00:00Z'},
+    {...common, id:'unknown', title:'无日期', updatedAt:'invalid'},
+    {...common, id:'older', title:'旧课程', updatedAt:'2026-11-05T10:00:00+08:00'},
+    {...common, id:'edited', title:'刚更新', updatedAt:'2026-11-08T02:00:00Z', createdAt:'2026-11-01T02:00:00Z'},
+  ];
+  const useAcademyModule = load('app/project29/useAcademy.ts', {react:React});
+  const {AcademyLearning} = load('app/project29/AcademyLearning.tsx', {
+    react:React, 'react/jsx-runtime':jsx, './ModuleShell':{ ModuleIcon:() => null },
+    './AcademyCatalogCard':{ AcademyCatalogSection:({courses: items}) => items.map(item => item.title).join('，') },
+    './useAcademy':{...useAcademyModule, useAcademy:() => ({courses, shares:[], tags:[]})},
+  });
+  const html = renderToStaticMarkup(React.createElement(AcademyLearning, {active:true, savedOnly:false, query:''}));
+  assert.match(html, /刚更新，新课程，旧课程，无日期/);
+  assert.doesNotMatch(html, /学习码/);
+});
 function learnerRoute() {
   const calls = [];
   const route = load('app/api/learner/academy/route.ts', { 'next/server': next, '@/lib/server/api': { ApiRequestError, apiRequest: async (...args) => { calls.push(args); return { ok: true }; } } });
@@ -33,6 +55,7 @@ test('learner snapshot and favorites use only learner-scoped academy endpoints',
 
 test('cross-origin, malformed, oversized and invalid ID requests never reach backend', async () => {
   const h = learnerRoute();
+  assert.equal((await h.post({command:'identify',code:'AC-OLD'})).status,400);
   assert.equal((await h.post({ command: 'favorite', id, saved: true }, { Origin: 'https://unrelated.example' })).status, 403);
   assert.equal((await h.post({ command: 'favorite', id, saved: true }, { 'Sec-Fetch-Site': 'cross-site' })).status, 403);
   assert.equal((await h.post('{')).status, 400);

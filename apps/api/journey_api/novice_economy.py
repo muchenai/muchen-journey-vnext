@@ -5,7 +5,9 @@ their original reward schedule; updated publications opt into reward rules v2.
 """
 from decimal import Decimal, ROUND_FLOOR
 from sqlalchemy import select, func, literal, union_all, or_
-from journey_api.models import Assignment, AssignmentStatus, Enrollment, Evaluation, Decision
+from journey_api.models import Assignment, AssignmentStatus, CompletionCode, Enrollment, Evaluation, Decision
+from journey_api.management_access_models import OfflineExperienceGrant
+from journey_api.course_workspace_models import CourseStudyAward
 from journey_api.review_admin_models import PublishedTaskContent, MedalRedemption, NoviceUnlockDebit
 
 POINT_NAMES = {
@@ -25,6 +27,8 @@ def rewards(content):
         xp, points = 200, 20
     if content.get('rewardRulesVersion', 1) >= 3:
         points = 0
+    if content.get("rewardRulesVersion") == 4:
+        xp = content["xp"]
     total = xp // 10
     weights = content.get("badges", [])
     raw = [Decimal(total) * Decimal(str(b["weight"])) / 100 for b in weights]
@@ -65,6 +69,15 @@ def medal_redemptions_query(actor):
         MedalRedemption.organization_id == actor.organization_id)
 
 
+def learner_credits(model, actor):
+    # Phone-to-Feishu migration keeps both accounts' immutable credit records.
+    corporate = select(CompletionCode.migrated_to_user_id).where(
+        CompletionCode.organization_id == actor.organization_id, CompletionCode.user_id == actor.id,
+        CompletionCode.used_at.is_not(None))
+    return select(model).where(model.organization_id == actor.organization_id,
+                               or_(model.user_id == actor.id, model.user_id.in_(corporate)))
+
+
 def wallet(session, actor):
     contents = session.execute(completed_rewards_query(actor)).all()
     balances = dict.fromkeys(POINT_TYPES, 0)
@@ -80,6 +93,8 @@ def wallet(session, actor):
     redemptions = session.scalars(medal_redemptions_query(actor)).all()
     for redemption in redemptions:
         for item in redemption.content["costs"]: balances[item["badgeId"]] -= item["points"]
+    for model in (OfflineExperienceGrant, CourseStudyAward):
+        xp += int(session.scalar(learner_credits(model, actor).with_only_columns(func.coalesce(func.sum(model.xp), 0))))
     # XP exchange remains closed: the only existing debits spend task points or
     # badge points. Never subtract either currency from a learner's earned XP.
     return dict(taskPoints=task_points, xp=xp, badgeBalances=balances,
@@ -92,7 +107,17 @@ def growth_history(session, actor, *, offset=0, limit=20):
         MedalRedemption.id.label("source_id"), literal("medal_redemption").label("kind"),
         MedalRedemption.created_at.label("occurred_at"), MedalRedemption.medal_id.label("subject_id"),
         MedalRedemption.content.label("content"))
-    sources = union_all(completed_rewards_query(actor), redemptions).subquery()
+    # Keep all types in one ordered result so offset pagination remains consistent.
+    empty = (literal(None).label("credit_title"), literal(None).label("credit_xp"), literal(None).label("credit_detail"))
+    grants = learner_credits(OfflineExperienceGrant, actor).with_only_columns(
+        OfflineExperienceGrant.id, literal("offline_grant"), OfflineExperienceGrant.created_at,
+        OfflineExperienceGrant.user_id, OfflineExperienceGrant.content, OfflineExperienceGrant.reason,
+        OfflineExperienceGrant.xp, OfflineExperienceGrant.batch)
+    study = learner_credits(CourseStudyAward, actor).with_only_columns(
+        CourseStudyAward.id, literal("course_reward"), CourseStudyAward.created_at,
+        CourseStudyAward.course_id, literal(None), CourseStudyAward.title, CourseStudyAward.xp, CourseStudyAward.scope)
+    sources = union_all(completed_rewards_query(actor).add_columns(*empty), grants, study,
+                        redemptions.add_columns(*empty)).subquery()
     total = session.scalar(select(func.count()).select_from(sources))
     rows = session.execute(select(sources).order_by(sources.c.occurred_at.desc(),
         sources.c.kind, sources.c.source_id.desc()).offset(offset).limit(limit)).all()
@@ -104,6 +129,12 @@ def growth_history(session, actor, *, offset=0, limit=20):
             reward = rewards(row.content)
             item.update(title=row.content.get("title") or "历史新手村任务", taskId=str(row.subject_id),
                         xp=reward["xp"], badgePoints=reward["allocations"], method="任务审核通过")
+        elif row.kind == "offline_grant":
+            item.update(module="线下培训", title=row.credit_title, xp=row.credit_xp, badgePoints=[],
+                        method=" · ".join(filter(None, [row.credit_detail, row.content.get("by")])))
+        elif row.kind == "course_reward":
+            item.update(module="AI 学院" if row.credit_detail == "academy" else "新手村", title=row.credit_title,
+                        xp=row.credit_xp, badgePoints=[], method="课程学习奖励")
         else:
             name = row.content.get("medalName") or "历史徽章"
             item.update(title=name, xp=0, medal=dict(id=str(row.subject_id), name=name),

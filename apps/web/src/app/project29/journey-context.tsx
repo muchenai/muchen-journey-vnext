@@ -6,12 +6,14 @@ import type { ProjectExperienceData } from "../project-ui/types";
 export type JourneyContextValue = {
   learnerName: string;
   experience: ProjectExperienceData | null;
+  explorationOnly?: boolean;
   initialScreen: "login" | "welcome" | "dashboard" | "tasks" | "detail" | "view" | "village" | "academy" | "guild";
   joinPhase: "invite" | "identity" | "feishu" | "nickname";
   joinError: string;
   feishuClient?: boolean;
   initialNotice?: string;
   localVillagePreview?: boolean;
+  academyEntry?: { courseId?: string; section?: string; query?: string };
   configurableExploration?: boolean;
   explorationVariant?: "cards" | "list" | "path";
   explorationTaskId?: string;

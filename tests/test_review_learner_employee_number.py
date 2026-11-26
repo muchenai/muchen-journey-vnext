@@ -140,6 +140,7 @@ def test_review_queue_resolves_consumed_migration_after_code_expiry(inherited_re
         raise AssertionError('Review queue must use the cached identity profile')
     monkeypatch.setattr(feishu_directory, 'get_directory', forbid_remote)
     actual = row()
+    assert actual['learner_account_disabled'] is False
     assert actual['learner_is_feishu'] is True
     assert actual['learner_employee_no'] == 'MCE-INHERITED-42'
     assert actual['learner_phone'] == ''
