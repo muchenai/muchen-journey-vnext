@@ -49,3 +49,20 @@ class OfflineExperienceGrant(Base):
     xp: Mapped[int] = mapped_column(BigInteger)
     content: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MallPointExchange(Base):
+    """An immutable receipt, keyed to the signed-in company account even after migration."""
+    __tablename__ = "mall_point_exchanges"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id", "organization_id"], ["users.id", "users.organization_id"]),
+        UniqueConstraint("organization_id", "user_id", "request_key", name="uq_mall_point_exchange_request"),
+        CheckConstraint("points > 0 AND spent_xp > 0 AND spent_xp % points = 0", name="ck_mall_exchange_amounts"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    request_key: Mapped[str] = mapped_column(String(120))
+    points: Mapped[int] = mapped_column(BigInteger)
+    spent_xp: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

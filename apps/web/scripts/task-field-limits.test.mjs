@@ -61,7 +61,7 @@ test('valid boundary and empty drafts reach persistence intact', async () => {
   const fetchBefore = globalThis.fetch, writes = [];
   globalThis.fetch = async (_url, options) => {
     const body = JSON.parse(options.body);writes.push(body);
-    return Response.json({ok: true, data: {...body.task, revision: 1, status: 'draft'}});
+    return Response.json({ok: true, data: {...body.task, authorId: store.operatorId, revision: 1, status: 'draft'}});
   };
   try {
     for (const draft of [task('字'.repeat(60), '字'.repeat(400)), task('', '')]) {

@@ -140,7 +140,7 @@ def test_migration_check_rehearses_ai_through_exploration_release_range(
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges", "learner_notification_reads")},
         },
         "task_version_fingerprint": "fixed",
         "invalid_constraints": 0,
@@ -195,7 +195,7 @@ def test_migration_check_rehearses_ai_through_exploration_release_range(
     assert report["upgrade_to_head"] == "PASS"
     assert report["downgrade_to_base"] == "PASS"
     assert report["base_revision"] == "0035_phone_password_login"
-    assert report["head_revision"] == "0063_admin_video_storage"
+    assert report["head_revision"] == "0064_profile_mall_points"
     assert report["business_facts_preserved"] is True
     # The five tables exist at head and are dropped below 0057. Querying them
     # at the old baseline would fail; omitting them at head would hide data.
@@ -208,8 +208,9 @@ def test_migration_check_rehearses_ai_through_exploration_release_range(
 def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables():
     from scripts.wp07_candidate import migration
 
-    assert ops.EXPECTED_MIGRATION_HEAD == migration()["head"] == "0063_admin_video_storage"
+    assert ops.EXPECTED_MIGRATION_HEAD == migration()["head"] == "0064_profile_mall_points"
     assert set(ops.EXPLORATION_TABLES) == set(EXPLORATION_FACT_TABLES)
+    assert ops.PROFILE_TABLES == ("mall_point_exchanges",)
     assert set(ops.COURSE_WORKSPACE_TABLES) == set(COURSE_WORKSPACE_FACT_TABLES)
     assert set(ops.REVIEW_TABLES) == {
         "review_admin_tasks", "review_admin_decisions", "review_admin_certifications",
@@ -239,7 +240,7 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
-        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges",
         "learner_notification_reads",
     }.issubset(set(ops.CURRENT_FACT_TABLES))
     assert set(ops.ROLLBACK_OWNED_FACT_TABLES) == {
@@ -251,14 +252,14 @@ def test_current_ops_contract_tracks_review_head_and_all_protected_fact_tables()
         "phone_password_credentials",
         "ai_self_checks",
         *ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES,
-        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES,
+        *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges",
         "learner_notification_reads",
     }
 
 
 def test_schema_rollback_only_accepts_the_current_ai_head():
     facts = {
-        "migration_revision": "0063_admin_video_storage",
+        "migration_revision": "0064_profile_mall_points",
         "counts": {
             "outcomes": 1,
             "coaching_feedback": 0,
@@ -268,14 +269,14 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
             "completion_codes": 0,
             "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges", "learner_notification_reads")},
         },
     }
     ops.require_safe_schema_rollback(facts)
 
     for protected_fact in ops.ROLLBACK_OWNED_FACT_TABLES:
         populated = {
-            "migration_revision": "0063_admin_video_storage",
+            "migration_revision": "0064_profile_mall_points",
             "counts": {
                 "coaching_feedback": 0,
                 "ai_advisory_records": 0,
@@ -284,7 +285,7 @@ def test_schema_rollback_only_accepts_the_current_ai_head():
                 "completion_codes": 0,
                 "phone_password_credentials": 0,
             "ai_self_checks": 0,
-            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "learner_notification_reads")},
+            **{table: 0 for table in (*ops.REVIEW_TABLES, *ops.ADMIN_COMMUNITY_TABLES, *ops.ACADEMY_TABLES, *ops.GUILD_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges", "learner_notification_reads")},
                 protected_fact: 1,
             },
         }
@@ -305,7 +306,7 @@ ACADEMY_AND_GUILD_FACT_TABLES = (
 )
 
 
-@pytest.mark.parametrize("table", (*ACADEMY_AND_GUILD_FACT_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES))
+@pytest.mark.parametrize("table", (*ACADEMY_AND_GUILD_FACT_TABLES, *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges"))
 def test_current_schema_rollback_requires_all_later_owned_facts_to_be_empty(table):
     assert table in ops.CURRENT_FACT_TABLES
     assert table in ops.POST_AI_BASE_TABLES
@@ -323,7 +324,7 @@ def test_current_schema_rollback_requires_all_later_owned_facts_to_be_empty(tabl
         ops.require_safe_schema_rollback(facts)
 
 
-@pytest.mark.parametrize("table", ("academy_learning_records", "guild_task_submissions", *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES))
+@pytest.mark.parametrize("table", ("academy_learning_records", "guild_task_submissions", *EXPLORATION_FACT_TABLES, *COURSE_WORKSPACE_FACT_TABLES, "mall_point_exchanges"))
 def test_migration_drill_refuses_downgrade_before_touching_current_business_facts(
     monkeypatch, table
 ):
@@ -401,7 +402,7 @@ def test_application_rollback_requires_immutable_images_and_preserves_facts(
     candidate = "journey-c1-ops-api@sha256:" + "a" * 64
     rollback = "journey-c1-rollback-api@sha256:" + "b" * 64
     expected = {
-        "migration_revision": "0063_admin_video_storage",
+        "migration_revision": "0064_profile_mall_points",
         "counts": {"outcomes": 1},
     }
     probes: list[tuple[str, str, str, str]] = []

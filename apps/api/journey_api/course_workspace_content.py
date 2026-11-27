@@ -249,7 +249,7 @@ def edition(session, actor, row, input_course, rights, publish):
             fail("请选择有效的课程内容范围。")
         result["requiredTopic"] = topic
     if publish:
-        result["status"] = "published" if rights["assignments"]["ownerId"] == str(actor.id) else "pending"
+        result["status"] = "published" if rights["isSuperAdmin"] else "pending"
     return result
 
 

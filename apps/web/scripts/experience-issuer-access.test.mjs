@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { openCertificationCenter } from '../public/review-native/certification-center.js';
-import { canSaveIssuers, issuerSearchRows, issuerWarning } from '../public/review-native/experience-permissions.js';
+import { canSaveIssuers, issuerHistory, issuerSearchRows, issuerWarning } from '../public/review-native/experience-permissions.js';
 import { searchRows } from '../public/review-native/member-access.js';
 
 const person = (id, hasManagementAccess = true) => ({ id, openId:'ou_'+id, name:'张三', hasManagementAccess });
@@ -19,7 +19,9 @@ test('issuer results render the same directory profile card as member certificat
 
 test('both distinct selected identities must currently have management access, irrespective of matching names', () => {
   assert.equal(canSaveIssuers([person('1'),person('2')]),true);
-  for (const selections of [[],[person('1'),null],[person('1'),person('1')],[person('1'),person('2',false)],[person(null),person('2')]]) {
+  assert.equal(canSaveIssuers([person('1'),null]),true);
+  assert.equal(canSaveIssuers([null,null]),true);
+  for (const selections of [[],[person('1'),person('1')],[person('1'),person('2',false)],[person(null),person('2')]]) {
     assert.equal(canSaveIssuers(selections),false);
   }
   assert.equal(issuerWarning(person(null,false)), '「张三」尚未开通管理系统访问权限。请先在「成员认证」中为其开通权限');
@@ -29,15 +31,23 @@ test('both distinct selected identities must currently have management access, i
 
 test('the experience permission tab follows the server permission independent of ordinary super admin or issuer access', () => {
   function html(rights) {
-    let result;
+    let result='';
     openCertificationCenter({}, {...rights,openModal:markup=>{result=markup;}}, {preferred:'experience'});
     return result;
   }
   assert.match(html({isSuperAdmin:true,canConfigureExperience:true}), /data-cert-tab="experience"/);
   for (const rights of [{},{isSuperAdmin:true},{canGrantExperience:true},{isSuperAdmin:true,canGrantExperience:true}]) {
     assert.doesNotMatch(html(rights), /data-cert-tab="experience"/);
-    assert.match(html(rights), /data-cert-tab="courses"/);
+    assert.doesNotMatch(html(rights), /data-cert-tab="courses"|课程人员与权限/);
   }
+});
+
+test('permission history shows the operator, slot and previous and next assignee safely', () => {
+  assert.match(issuerHistory([]), /暂无权限变更记录/);
+  const html = issuerHistory([{time:'2026-11-27T00:00:00Z', operatorName:'<张>', slot:2, beforeName:null, afterName:'李四'}]);
+  assert.match(html, /&lt;张&gt;/);
+  assert.match(html, /发放管理员 2/);
+  assert.match(html, /未指定<\/td><td>李四/);
 });
 
 test('opening an experience deep link uses the server capabilities before constructing the workspace or opening a demo', () => {

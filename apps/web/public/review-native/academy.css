@@ -196,26 +196,7 @@
 .aw-modal { width: min(720px, calc(100vw - 28px)); }
 .aw-modal .ac-modal-body h3 { margin: 16px 0 6px; font-size: 15px; }
 .aw-modal .aw-table { min-width: 410px; }
-.course-permissions { display: grid; min-width: 0; gap: 18px; }
-.course-permissions-fields { display: grid; grid-template-columns: minmax(135px, 1fr) minmax(220px, 1.35fr); align-items: end; gap: 20px; }
-.course-permissions-fields form { display: flex; align-items: end; gap: 8px; }
-.course-permissions-fields form label { flex: 1; }
-.course-permissions-fields form button { flex: 0 0 auto; min-height: 43px; }
-.course-permissions-roles { display: grid; min-width: 0; gap: 8px; }
-.course-permissions-roles h3 { font-size: 15px; }
-.course-permissions-table { min-width: 475px; }
-.course-permissions-table tbody th { background: transparent; color: var(--text); font-size: 13px; }
-.course-permissions-table td, .course-permissions-table th { padding: 11px 12px; }
-.course-permissions-table [hidden] { display: none; }
-.course-permissions-table summary { overflow-wrap: anywhere; cursor: pointer; color: var(--primary); }
-.course-permissions-table .aw-scope { max-width: 280px; padding-top: 8px; }
-.course-permissions-table input { accent-color: var(--primary); }
-.course-permissions-roles .ac-form-footer { margin-top: 6px; }
-@media (max-width: 650px) {
-  .course-permissions-fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-}
-.aw-scope, .aw-inline-form, .aw-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.aw-scope label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.aw-inline-form, .aw-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .aw-inline-form { align-items: flex-end; margin: 15px 0; }
 .aw-inline-form label { display: grid; gap: 5px; font-size: 13px; }
 .aw-tags > span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }

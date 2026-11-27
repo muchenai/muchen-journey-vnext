@@ -1,4 +1,3 @@
-import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from './task-publication-access.js';
 // Compare editable content only, excluding versions, statistics and browser timestamps.
 import { nextExplorationOrder } from './exploration-order.js';
 const fields = ['title','summary','camp','domain','publishingDepartment','difficulty','unlockTaskPoints','badges','materials','reviewMode','passScore','rubric','rubricAttachments'];
@@ -50,7 +49,6 @@ export function createTaskWorkflow({store,newDraft,openModal,closeModal,showEdit
   }
   async function start(copy, camp) {
     if (transitionPending) return;
-    if (!canConfigureTask(copy, store.capabilities?.isSuperAdmin)) { toast(EXPLORATION_CONFIGURATION_NOTICE, 'error'); return; }
     const draft=store.data.draft;
     const empty=freshDraft(camp);
     const next=copy ? copyAsNewTask(copy,copy.camp==='exploration'?{...empty,order:nextExplorationOrder(store.data.tasks)}:empty) : empty;
@@ -61,7 +59,7 @@ export function createTaskWorkflow({store,newDraft,openModal,closeModal,showEdit
       finally { transitionPending=false; }
     };
     const currentCampDefaults = draft.camp === empty.camp ? empty : newDraft(draft.camp);
-    if (!canConfigureTask(draft, store.capabilities?.isSuperAdmin) || !hasUnsavedChanges(draft,store.getTask(draft.id),currentCampDefaults)) {
+    if (!hasUnsavedChanges(draft,store.getTask(draft.id),currentCampDefaults)) {
       try {await proceed();} catch(error) {toast(error.message,'error');}
       return;
     }

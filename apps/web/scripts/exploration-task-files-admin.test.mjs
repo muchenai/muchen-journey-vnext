@@ -132,11 +132,10 @@ test('draft persistence allows unfinished Yes tasks; final publication verifies 
     await store.saveTask(empty);
     assert.deepEqual(requests[0].task.taskFiles,[]);
     const draft=task({taskFiles:[link('题目','https://example.com/questions')]});
-    store.members=[{id:'reviewer',roles:['REVIEWER']}];
     const service=createJourneyService({store});
-    await assert.rejects(service.tasks.publish(draft,'reviewer',['https://example.com/learning'],'key'),/任务链接/);
+    await assert.rejects(service.tasks.publish(draft,['https://example.com/learning'],'key'),/任务链接/);
     assert.equal(requests.length,1);
-    await service.tasks.publish(draft,'reviewer',taskResourceLinks(draft),'key');
+    await service.tasks.publish(draft,taskResourceLinks(draft),'key');
     assert.deepEqual(requests[1].task.taskFiles,draft.taskFiles);
     assert.deepEqual(requests[1].payload.verified,taskResourceLinks(draft));
   }finally{globalThis.fetch=before;}

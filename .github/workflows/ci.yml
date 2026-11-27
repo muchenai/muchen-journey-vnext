@@ -54,7 +54,7 @@ jobs:
           docker compose exec -T db-test createdb -U journey_next journey_exploration_drill_test
           trap 'docker compose exec -T db-test dropdb -U journey_next --if-exists --force journey_exploration_drill_test' EXIT
           docker compose run --rm --no-deps --user root -v "$old_source:/app:ro" -e APP_ENV=test -e ALLOW_FIXTURE_IDENTITY=true -e ATTACHMENTS_ENABLED=true -e DATABASE_URL=postgresql+psycopg://journey_next:journey_next_test@db-test:5432/journey_exploration_drill_test api python deploy/dynamic-exploration-release/migration_drill.py
-      - name: Rehearse course workspace upgrade with existing learners and published content
+      - name: Rehearse course workspace and profile upgrades with existing learning and XP records
         run: |
           set -euo pipefail
           docker compose exec -T db-test createdb -U journey_next journey_course_workspace_drill_test

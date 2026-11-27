@@ -9,7 +9,7 @@
 .favorite-knowledge-row { display: flex; align-items: center; gap: 18px; padding: 18px 4px; border-top: 1px solid var(--m-border); }
 .favorite-knowledge-index { color: var(--m-dim); font-size: 11px; width: 25px; flex: none; font-variant-numeric: tabular-nums; }
 .favorite-knowledge-copy { min-width: 0; flex: 1; }
-.favorite-knowledge-copy > button { display: block; max-width: 100%; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
+.favorite-knowledge-copy > :is(button, a) { display: block; max-width: 100%; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .favorite-knowledge-copy p { margin-top: 7px; color: var(--m-muted); font-size: 10px; }
 .module-hub .favorite-knowledge-read { color: var(--m-cyan); font-size: 11px; padding: 8px 10px; white-space: nowrap; }
 .module-hub .knowledge-save-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 94px; min-height: 33px; padding: 7px 10px; border: 1px solid var(--m-border); border-radius: 6px; color: var(--m-muted); font-size: 11px; white-space: nowrap; flex: none; }

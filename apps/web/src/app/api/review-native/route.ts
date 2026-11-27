@@ -122,10 +122,10 @@ export async function POST(request: NextRequest) {
         if (command === "saveTask") return reply(await saveAdminTask(task as AdminTask));
         if (command === "archiveTask") return reply(await archiveAdminTask(task as AdminTask));
         if (!uuid(key) || !Array.isArray(payload?.verified)) break;
-        if (task.camp === "exploration" ? payload.reviewerId != null && !uuid(payload.reviewerId) : !uuid(payload.reviewerId)) break;
-        return reply(await publishAdminTask(task as AdminTask, payload.reviewerId, payload.verified, key));
+        if (payload.reviewerId != null && !uuid(payload.reviewerId)) break;
+        return reply(await publishAdminTask(task as AdminTask, payload.verified, key));
       case "deleteTask":
-        if (!uuid(task?.id) || !Number.isInteger(task.revision) || task.revision < 1 || !uuid(key)) break;
+        if (!uuid(task?.id) || !Number.isInteger(task.revision) || task.revision < 0 || !uuid(key)) break;
         try {
           const data = await apiRequest(`/api/v1/review-admin/tasks/${task.id}/delete`, "REVIEWER", {
             method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify({ expected_revision: task.revision }),

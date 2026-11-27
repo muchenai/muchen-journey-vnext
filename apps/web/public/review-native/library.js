@@ -1,6 +1,6 @@
 import {effectiveRubric, usesAnswerDocumentRubric} from './rubric-policy.js?v=20261118-document-rubric';
 import {renderRubricAttachments} from './rubric-link-editor.js?v=20261118-answer-link';
-import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from './task-publication-access.js';
+import {canEditTask, taskAvailabilityError} from './task-publication-access.js?v=20261127-task-management';
 import { BADGES, CERTIFICATION_LEVELS, normalizeCertificationRole, getCertificationLevel, escapeHtml as e, icon, rewardBreakdown, getReviewCamp } from './core.js?v=20261030-member-action-spacing';
 import { localMaterialUrl, materialVideoPreviewUrl } from './exploration-material-files.js';
 import { EXPLORATION_COMPLETION_MODES, explorationCompletionMode, requiresTaskAssessment, taskCompletionLabel, validAssessmentUrl, explorationTaskFiles } from './exploration-completion.js';
@@ -57,7 +57,7 @@ function tasksTable(store, ui) {
     <td><span class="tag ${requiresTaskAssessment(task)&&task.reviewMode === 'ai' ? 'tag-purple' : 'tag-neutral'}">${e(taskCompletionLabel(task))}</span></td>
     <td><strong>${fmt(task.completions)}</strong><span class="muted"> / ${fmt(task.participants)}</span></td>
     <td><span class="tag ${task.status === 'published' ? 'tag-success' : task.status === 'archived' ? 'tag-neutral' : 'tag-warning'}">${e(publicationLabel(task))}</span></td>
-    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button>${canConfigureTask(task,ui?.isSuperAdmin)?`<button class="text-btn" data-task-edit="${e(task.id)}">编辑</button><button class="text-btn" data-task-copy="${e(task.id)}">复制为新任务</button><button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button>${getReviewCamp({},task)==='exploration'?`<button class="text-btn task-delete-action" data-task-delete="${e(task.id)}">删除</button>`:''}`:''}</div></td>
+    <td><div class="table-actions"><button class="text-btn" data-task-view="${e(task.id)}">查看</button>${canEditTask(task,store)?`<button class="text-btn" data-task-edit="${e(task.id)}">编辑</button>`:''}<button class="text-btn" data-task-copy="${e(task.id)}">复制为新任务</button>${!taskAvailabilityError(task,store)?`<button class="text-btn muted" data-task-archive="${e(task.id)}">${task.status === 'archived' ? '恢复' : '归档'}</button>${getReviewCamp({},task)==='exploration'?`<button class="text-btn task-delete-action" data-task-delete="${e(task.id)}">删除</button>`:''}`:''}</div></td>
   </tr>`).join('')}</tbody></table></div><div class="table-footer">共 ${fmt(tasks.length)} 个任务<span>展示所有 NPC 与导师发布的任务</span></div>`;
 }
 
@@ -83,7 +83,7 @@ function badgeTab(store) {
 }
 
 export function renderLibrary(store, ui) {
-  return `<div class="content-actions">${state.camp==='exploration'&&!ui.isSuperAdmin?`<span class="muted">${EXPLORATION_CONFIGURATION_NOTICE}</span>`:`<button class="btn btn-primary" data-library-action="new">${icon('plus')} 发布新任务</button>`}</div>
+  return `<div class="content-actions"><button class="btn btn-primary" data-library-action="new">${icon('plus')} 发布新任务</button></div>
     <div class="tabs" role="tablist"><button class="tab ${state.tab === 'tasks' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'tasks'}" data-library-tab="tasks">任务总览</button><button class="tab ${state.tab === 'badges' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'badges'}" data-library-tab="badges">标签与徽章</button></div>
     ${state.tab === 'tasks' ? taskTab(store, ui) : badgeTab(store)}`;
 }
@@ -96,7 +96,6 @@ function attachTaskActions(root, store, ui) {
   root.querySelectorAll('[data-task-archive]').forEach(button => button.addEventListener('click', async () => {
     const task = store.getTask(button.dataset.taskArchive);
     if (!task || button.disabled) return;
-    if (!canConfigureTask(task,ui.isSuperAdmin)) { ui.toast(EXPLORATION_CONFIGURATION_NOTICE,'error'); return; }
     button.disabled = true;
     try { await store.archiveTask(task); ui.toast(task.status === 'archived' ? '任务已恢复' : '任务已归档'); ui.refresh(); }
     catch (error) { ui.toast(error.message, 'error'); button.disabled = false; }
@@ -104,8 +103,8 @@ function attachTaskActions(root, store, ui) {
 }
 
 function openDeleteTask(task, store, ui) {
-  if (!canConfigureTask(task,ui.isSuperAdmin)) { ui.toast(EXPLORATION_CONFIGURATION_NOTICE,'error'); return; }
-  if (!task) { ui.toast('任务不存在，请刷新任务库。', 'error'); return; }
+  const denied = taskAvailabilityError(task, store);
+  if (denied) { ui.toast(denied, 'error'); return; }
   ui.openModal(`<div class="modal-header"><div><div class="eyebrow">任务库</div><h2>删除任务</h2></div></div><div class="modal-body"><p>确认删除「${e(task.title || '未命名任务')}」？</p><div class="notice">删除后，任务会从任务库及学员任务列表移除。已经保存的学习成果、审核记录和已获得的宝藏会保留。</div><p class="inline-error" data-delete-error role="alert" hidden></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-delete-cancel>取消</button><button type="button" class="btn btn-danger" data-delete-confirm>确认删除</button></div>`, modal => {
     const root = modalRoot(modal);
     const confirm = root.querySelector('[data-delete-confirm]');
@@ -183,7 +182,7 @@ export function openTask(task, store, ui) {
     ${exploration&&assessment?`<section class="detail-section"><h3>任务文件 <span class="count-pill">${explorationTaskFiles(task).length}</span></h3>${materialHtml(explorationTaskFiles(task),'task-file')||'<p class="muted">使用已有培训测试链接完成任务</p>'}</section>`:''}
     ${assessment?`<section class="detail-section"><h3>任务要求</h3>${(task.questions || []).map((question, index) => `<article class="question-preview"><h4>${index + 1}. ${e(question.title || '任务要求')}</h4><p class="preserve-lines">${e(question.description || '')}</p><small class="muted">提交形式：${e(({text:'文字回答', file:'文件提交', both:'文字与文件'}[question.submission]) || question.submission || '文本')} · ${question.required === false ? '选答' : '必答'}</small></article>`).join('') || (task.requirements||[]).map(item=>`<p>${e(item)}</p>`).join('') || '<p class="muted">尚未添加任务要求</p>'}</section>`:''}
     ${assessment&&task.reviewMode === 'ai' ? `<section class="detail-section"><h3>AI 评分标准 <span class="tag tag-purple">共 ${fmt(scoringRubric.reduce((sum, item) => sum + Number(item.points || 0), 0))} 分</span></h3>${documentScoring?'<p class="notice">已按标准答案文档评分，满分 100 分。</p>':''}${scoringRubric.map(item => `<div class="rubric-preview"><div><strong>${e(item.name)}</strong><span>${fmt(item.points)} 分</span></div><p class="preserve-lines">${e(item.description || '')}</p></div>`).join('') || '<p class="muted">尚未配置评分标准</p>'}${renderRubricAttachments(task.rubricAttachments || [])}</section>` : ''}
-    <section class="detail-section"><h3>参与情况</h3><p class="muted">${fmt(task.participants)} 人次参与，${fmt(task.completions)} 人次完成，${fmt(taskSubmissions.length)} 份答案已提交。</p>${taskSubmissions.length ? '<button class="btn btn-secondary" data-task-review>前往审核任务</button>' : ''}</section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button>${canConfigureTask(task,ui.isSuperAdmin)?'<button class="btn btn-primary" data-detail-edit>编辑任务</button>':''}</div>`, modal => {
+    <section class="detail-section"><h3>参与情况</h3><p class="muted">${fmt(task.participants)} 人次参与，${fmt(task.completions)} 人次完成，${fmt(taskSubmissions.length)} 份答案已提交。</p>${taskSubmissions.length ? '<button class="btn btn-secondary" data-task-review>前往审核任务</button>' : ''}</section></div><div class="modal-footer"><button class="btn btn-secondary" data-close-modal>关闭</button>${canEditTask(task,store)?'<button class="btn btn-primary" data-detail-edit>编辑任务</button>':''}</div>`, modal => {
     const root = modalRoot(modal);
     root.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', ui.closeModal));
     root.querySelector('[data-detail-edit]')?.addEventListener('click', () => { ui.closeModal(); ui.editTask(task); });

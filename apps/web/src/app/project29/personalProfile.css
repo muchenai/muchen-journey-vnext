@@ -1,4 +1,10 @@
 .personal-profile { padding-bottom: 8px; }
+@media (min-width: 1101px) {
+  /* Keep the profile cards aligned with the header when the scroll pane has a visible thumb. */
+  .module-main:has(.personal-profile) { container-type: inline-size; }
+  .module-page-content:has(> .personal-profile) { padding-inline-end: 0; }
+  .module-page-content > .personal-profile { width: calc(100cqw - 120px); }
+}
 @media (max-width: 1100px) {
   .personal-profile > .module-page-heading {
     flex-direction: column;
@@ -180,3 +186,7 @@
 .profile-growth-dialog .profile-growth-error p { margin: 0; color: var(--m-gold); }
 .profile-growth-pagination { padding: 16px 0 4px; text-align: center; }
 .profile-growth-pagination > span { color: var(--m-dim); font-size: 10px; }
+.xp-exchange-form { display: grid; gap: .55rem; margin-top: 1rem; }
+.xp-exchange-form label { display: flex; gap: 1rem; justify-content: space-between; align-items: center; color: #dceaff; font-weight: 600; }
+.xp-exchange-form input { max-width: 7rem; padding: .4rem .6rem; border: 1px solid #355772; border-radius: 4px; color: #e9f5ff; background: #0c1b2f; }
+.xp-exchange-form small { color: #a4c2dc; }

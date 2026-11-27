@@ -29,10 +29,11 @@ def filter_staff_roles(session, user_id, organization_id, roles):
 
 def permissions(session, actor):
     row = access_for(session, actor.id, actor.organization_id)
-    active = row is not None and row.revoked_at is None
+    staff = actor.entry_role in STAFF_ROLES and actor.entry_role in actor.roles
+    active = staff and row is not None and row.revoked_at is None
     super_admin = active and row.access_role == "super_admin"
     # Existing Review staff become ordinary administrators, defaulting to entry level.
-    can_publish = active or (row is None and bool({Role.OPERATOR, Role.REVIEWER} & actor.roles))
+    can_publish = active or (staff and row is None and bool({Role.OPERATOR, Role.REVIEWER} & actor.roles))
     level = row.level if active else "初级"
     return {"isSuperAdmin": super_admin, "canPublish": can_publish,
             "canGrantSuperAdmins": bool(super_admin and row.can_grant_super_admin),
@@ -55,10 +56,10 @@ def require_publisher(session, actor, difficulty=None):
         raise ApiError(403, "PUBLISH_LEVEL_REQUIRED", "该任务难度超出当前认证等级，请联系超级管理员调整认证等级。")
 
 
-def require_camp_publisher(session, actor, camp, difficulty=None):
-    if camp == "exploration":
-        require_super(session, actor)
-    require_publisher(session, actor, difficulty)
+def can_manage_task(session, actor, definition):
+    return definition.organization_id == actor.organization_id and (
+        definition.created_by == actor.id or permissions(session, actor)["isSuperAdmin"]
+    )
 
 
 def require_version_publisher(session, actor, task_id):
@@ -67,12 +68,12 @@ def require_version_publisher(session, actor, task_id):
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
     profile = session.get(ReviewAdminTask, task_id)
-    if definition and definition.organization_id == actor.organization_id and task_camp(definition, profile) == "exploration":
-        require_super(session, actor)
     # Generic endpoints must not bypass the Review difficulty check.
     if profile and profile.organization_id == actor.organization_id:
         require_super(session, actor)
         require_publisher(session, actor, profile.content.get("difficulty", "入门"))
+    elif definition and definition.organization_id == actor.organization_id and task_camp(definition, profile) == "exploration":
+        require_super(session, actor)
     else:
         from journey_api.auth import require_role
         require_role(actor, Role.OPERATOR)

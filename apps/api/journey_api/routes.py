@@ -411,7 +411,8 @@ def publish_task_version(
     profile = session.get(ReviewAdminTask, task_definition_id)
     exploration = bool(camp_definition and camp_definition.organization_id == actor.organization_id
         and task_camp(camp_definition, profile) == "exploration")
-    if exploration:
+    managed_publication = exploration or (profile is not None and profile.organization_id == actor.organization_id)
+    if managed_publication:
         # The authorized publisher is the accountable person; no second reviewer
         # selection may impersonate a different staff member in the audit.
         command = command.model_copy(update={"reviewed_by": actor.id})
@@ -439,23 +440,23 @@ def publish_task_version(
             raise ApiError(409, "VERSION_CONFLICT", "幂等结果引用的任务版本已不可用。")
         return envelope(request, task_version_out(version, definition.stable_key, replay=True))
 
-    definition = session.scalar(
-        select(TaskDefinition)
-        .where(
-            TaskDefinition.id == task_definition_id,
-            TaskDefinition.organization_id == actor.organization_id,
-            (TaskDefinition.created_by == actor.id) | (TaskDefinition.id == getattr(request.state, 'approved_publication_task_id', None)),
-        )
-        .with_for_update()
-    )
+    definition_query = select(TaskDefinition).where(
+        TaskDefinition.id == task_definition_id, TaskDefinition.organization_id == actor.organization_id)
+    # require_version_publisher checked certified super-admin authority for a managed task.
+    # The separate operator workflow continues to publish only its own definitions.
+    if not managed_publication:
+        definition_query = definition_query.where(TaskDefinition.created_by == actor.id)
+    definition = session.scalar(definition_query.with_for_update())
     if definition is None:
         raise ApiError(404, "NOT_FOUND", "没有找到可发布的任务定义。")
+    if profile and profile.status == "deleted":
+        raise ApiError(404, "NOT_FOUND", "该任务已删除。")
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_definition_id)
     ensure_revision(definition.revision, command.expected_revision)
     if definition.status == TaskDefinitionStatus.WITHDRAWN:
         raise ApiError(409, "INVALID_STATE_TRANSITION", "已撤销的任务定义不能发布新版本。")
-    reviewer = session.get(User, actor.id) if exploration else session.scalar(
+    reviewer = session.get(User, actor.id) if managed_publication else session.scalar(
         select(User)
         .join(RoleAssignment, RoleAssignment.user_id == User.id)
         .where(

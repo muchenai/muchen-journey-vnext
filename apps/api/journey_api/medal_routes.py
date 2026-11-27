@@ -3,19 +3,22 @@ import base64
 import re
 import uuid
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from typing import Literal
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from journey_api.auth import Actor, get_actor, get_company_learner_actor, get_learner_actor, require_role
+from journey_api.auth import Actor, get_actor, get_company_learner_actor, get_learner_actor, inherited_learner_ids, require_company_learner, require_role
 from journey_api.db import get_db
 from journey_api.errors import ApiError
-from journey_api.models import User, Role
+from journey_api.models import ExternalIdentity, IdentitySession, User, UserStatus, Role
+from journey_api.identity import add_audit
+from journey_api.management_access_models import MallPointExchange
 from journey_api.review_admin_models import MedalDefinition, MedalRedemption
 from journey_api.review_admin_access import require_publisher
 from journey_api.review_admin_routes import envelope, audit
-from journey_api.novice_economy import POINT_TYPES, wallet, growth_history
+from journey_api.novice_economy import POINT_TYPES, XP_PER_MALL_POINT, wallet, growth_history, mall_exchange_available, medal_redemptions_query
 from journey_api.medal_catalog import BADGE_ARTWORKS
 
 router = APIRouter(prefix="/api/v1")
@@ -147,9 +150,65 @@ def read_wallet(request: Request, actor: Actor=Depends(get_learner_actor), sessi
 @router.get("/me/novice/growth")
 def read_growth_history(request: Request, offset: int=Query(default=0, ge=0, le=2147483647),
                         limit: int=Query(default=20, ge=1, le=100),
+                        kind: Literal["mall_exchange"] | None=None,
                         actor: Actor=Depends(get_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
-    return envelope(request, growth_history(session, actor, offset=offset, limit=limit))
+    return envelope(request, growth_history(session, actor, offset=offset, limit=limit, kind=kind))
+
+
+class ExchangeMallPoints(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    points: int = Field(strict=True, gt=0, le=(2**53-1) // XP_PER_MALL_POINT)
+
+
+@router.post("/me/profile/exchange")
+def exchange_mall_points(command: ExchangeMallPoints, request: Request,
+                         request_key: str=Header(alias="Idempotency-Key", min_length=8, max_length=120),
+                         actor: Actor=Depends(get_actor), session: Session=Depends(get_db)):
+    require_role(actor, Role.LEARNER)
+    require_company_learner(actor)
+    if not mall_exchange_available():
+        raise ApiError(403, "MALL_EXCHANGE_UNAVAILABLE", "暂未开放")
+    # Migration locks the same receiving account. Resolve its learning record only after
+    # taking this lock, so a simultaneous migration or second spend cannot use an old balance.
+    active_user = session.scalar(select(User.id).where(
+        User.id == actor.id, User.organization_id == actor.organization_id, User.status == UserStatus.ACTIVE
+    ).with_for_update())
+    authenticated = session.scalar(select(ExternalIdentity.id).join(
+        IdentitySession, IdentitySession.external_identity_id == ExternalIdentity.id).where(
+        IdentitySession.id == actor.session_id, IdentitySession.user_id == actor.id, IdentitySession.role == Role.LEARNER,
+        IdentitySession.organization_id == actor.organization_id, IdentitySession.revoked_at.is_(None),
+        IdentitySession.expires_at > func.now(), IdentitySession.external_identity_revision == ExternalIdentity.revision,
+        ExternalIdentity.organization_id == actor.organization_id, ExternalIdentity.user_id == actor.id,
+        ExternalIdentity.provider == "FEISHU", ExternalIdentity.revoked_at.is_(None)))
+    if not active_user or not authenticated:
+        raise ApiError(403, "COMPANY_ACCOUNT_REQUIRED", "请用公司认证的飞书账号进行登录和使用")
+    owner = inherited_learner_ids(session, actor.organization_id, [actor.id]).get(actor.id, actor.id)
+    balance = wallet(session, replace(actor, id=owner))
+    exchange = session.scalar(select(MallPointExchange).where(
+        MallPointExchange.organization_id == actor.organization_id,
+        MallPointExchange.user_id == actor.id, MallPointExchange.request_key == request_key))
+    if exchange:
+        if exchange.points != command.points:
+            raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "此兑换请求已用于其他数量，请重新确认。")
+    else:
+        cost = command.points * XP_PER_MALL_POINT
+        if cost > balance["availableXp"]:
+            raise ApiError(409, "INSUFFICIENT_XP", "可兑换经验不足，请核对兑换数量。")
+        exchange = MallPointExchange(organization_id=actor.organization_id, user_id=actor.id,
+                                     request_key=request_key, points=command.points, spent_xp=cost)
+        session.add(exchange)
+        session.flush()
+        add_audit(session, request_id=request.state.request_id, organization_id=actor.organization_id,
+                  actor_id=actor.id, action="profile.mall_exchange", resource_type="mall_point_exchange",
+                  resource_id=exchange.id, result="SUCCESS", details={"points":exchange.points, "spentXp":cost})
+        session.commit()
+        balance["availableXp"] -= cost
+        balance["redeemedXp"] += cost
+        balance["mallPoints"] += exchange.points
+    return envelope(request, {"id":str(exchange.id), "points":exchange.points, "spentXp":exchange.spent_xp,
+                              "xpPerPoint":exchange.spent_xp // exchange.points,
+                              "createdAt":exchange.created_at.isoformat(), "wallet":balance})
 
 
 @router.get("/me/novice/medals")
@@ -159,9 +218,7 @@ def learner_catalog(request: Request, actor: Actor=Depends(get_company_learner_a
         MedalDefinition.organization_id == actor.organization_id,
         MedalDefinition.content["status"].as_string() == "published")
         .order_by(MedalDefinition.created_at, MedalDefinition.id)).all()
-    records = session.scalars(select(MedalRedemption).where(
-        MedalRedemption.organization_id == actor.organization_id,
-        MedalRedemption.user_id == actor.id)
+    records = session.scalars(medal_redemptions_query(actor)
         .order_by(MedalRedemption.created_at.desc(), MedalRedemption.id)).all()
     # Keep owned medals visible even after delisting, using the redemption snapshot.
     owned = [dict(**r.content, id=str(r.id), medalId=str(r.medal_id),
@@ -177,8 +234,8 @@ def redeem(medal_id: uuid.UUID, command: RedeemMedal, request: Request,
            actor: Actor=Depends(get_company_learner_actor), session: Session=Depends(get_db)):
     require_role(actor, Role.LEARNER)
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
-    previous = session.scalar(select(MedalRedemption).where(MedalRedemption.user_id == actor.id,
-        MedalRedemption.organization_id == actor.organization_id, MedalRedemption.medal_id == medal_id))
+    previous = session.scalar(medal_redemptions_query(actor).where(MedalRedemption.medal_id == medal_id)
+                              .order_by(MedalRedemption.created_at, MedalRedemption.id).limit(1))
     if previous: return envelope(request, dict(alreadyRedeemed=True, id=str(previous.id)))
     medal = session.scalar(select(MedalDefinition).where(MedalDefinition.id == medal_id,
         MedalDefinition.organization_id == actor.organization_id).with_for_update())

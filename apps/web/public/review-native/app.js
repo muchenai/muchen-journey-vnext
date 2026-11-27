@@ -1,10 +1,9 @@
-import {canConfigureTask, EXPLORATION_CONFIGURATION_NOTICE} from './task-publication-access.js';
 import {createKnowledgeStore} from './knowledge-store.js?v=20261103-module-publication';
 import {createKnowledgeController} from './knowledge.js?v=20261103-module-publication';
 import {createGuildStore} from './guild-store.js?v=20261028-server';
 import {createGuildController} from './guild.js?v=20261028-server';
-import {createPublicationReviewController} from './publication-review.js?v=20261030-member-action-spacing';
-import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261127-village-new-publication';
+import {createPublicationReviewController} from './publication-review.js?v=20261127-task-management';
+import { createTaskWorkflow, isTaskUpdate } from './task-workflow.js?v=20261127-member-publication';
 import {createMedalsApi} from './medals-api.js?v=20261028-publication-local';
 import {createMedalsController} from './medals.js?v=20261103-badge-layout-fix';
 import { confirmPublicationFields, renderPublishMaterials } from './publish-materials.js';
@@ -17,16 +16,17 @@ import {createRubricLinkEditor, renderRubricAttachments} from './rubric-link-edi
 import { nextExplorationOrder, isPinnedExplorationTask, explorationDisplayOrder } from './exploration-order.js';
 import { EXPLORATION_COMPLETION_MODES, explorationCompletionMode, requiresTaskAssessment, taskCompletionLabel, explorationTaskFiles, explorationTaskResourceErrors, taskResourceLinks } from './exploration-completion.js';
 import { BADGES, DIFFICULTY_PRESETS, REVIEW_CAMPS, getReviewCamp, getSubmissionStatus, applyDifficultyPreset, normalizeBadgeWeights, escapeHtml as e, icon, rewardBreakdown, validateBadgeWeights, validateTask } from './core.js?v=20261118-document-rubric';
-import { ApiStore, newDraft, createJourneyService, request } from './native-api.js?v=20261118-publisher-ai-scoring';
+import {canEditTask} from './task-publication-access.js?v=20261127-task-management';
+import { ApiStore, newDraft, createJourneyService, request } from './native-api.js?v=20261127-task-management';
 import { createSandboxController } from './sandbox.js?v=20261118-document-rubric';
 import { renderReview, bindReview, openSubmission } from './review.js?v=20261026-passed-tab';
-import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261118-document-rubric';
-import { openCertificationCenter } from './certification-center.js';
-import { createAcademyWorkspace } from './academy-workspace.js?v=20261127-village-new-publication';
+import { renderLibrary, bindLibrary, openTask } from './library.js?v=20261127-task-management';
+import { openCertificationCenter } from './certification-center.js?v=20261127-member-publication';
+import { createAcademyWorkspace } from './academy-workspace.js?v=20261127-task-management';
 import { bindOfflineExperience } from './offline-experience.js?v=20261126-single';
 import { renderVillagePublishType } from './publish-content-type.js?v=20261126-task-delivery';
-import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261118-publisher-ai-scoring';
-import { createAcademyStore } from './native-api.js?v=20261118-publisher-ai-scoring';
+import { isInviteLoggedIn, getCurrentInviteUser, clearInviteSession, renderInviteLogin, bindInviteLogin, onInviteSessionChange } from './native-api.js?v=20261127-task-management';
+import { createAcademyStore } from './native-api.js?v=20261127-task-management';
 import { createAcademyController } from './academy.js?v=20261105-sources';
 
 import {taskCategoryOptions, departmentLabel, isTaskCategory} from './publishing-departments.js';
@@ -190,13 +190,11 @@ function navigate(next, courseAction, keepPosition = false) {
   if (!keepPosition) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function editTask(task) {
-  if (!canConfigureTask(task, ui.isSuperAdmin)) { toast(EXPLORATION_CONFIGURATION_NOTICE, 'error'); return; }
   if (!store.operatorId) { toast('当前账号没有任务配置权限。','error'); return; }
-  if (task.authorId && task.authorId !== store.operatorId) { taskWorkflow.start(task); return; }
+  if (!canEditTask(task, store)) { toast('当前账号没有编辑此任务的权限。','error'); return; }
   store.data.draft = normalizeBadgeWeights(task); store.save(); navigate('publish','saved-task');
 }
 function saveDraft() {
-  if (!canConfigureTask(store.data.draft, ui.isSuperAdmin)) { toast(EXPLORATION_CONFIGURATION_NOTICE, 'error'); return false; }
   Object.assign(store.data.draft, applyDifficultyPreset(store.data.draft));
   store.data.draft.updatedAt = new Date().toISOString();
   updateAside();
@@ -254,7 +252,7 @@ function shell(content) {
     const count = item.camp ? pendingInCamp(item.camp) : item.id==='publications' ? publicationReview.badgeCount() : 0;
     return navButton(item,active,count);
   }).join('');
-  return `<header class="topbar"><a href="#" class="brand" aria-label="JOURNEY首页"><img src="./journey-logo-119.svg" alt="" width="34" height="34"><span class="brand-wordmark">JOURNEY <span class="brand-sub">管理系统</span></span></a><div class="topbar-right"><a class="btn btn-secondary btn-sm" href="/app?view=village" target="_blank" rel="noopener">学员端 ${icon('external',14)}</a><button id="theme-toggle" class="theme-toggle" type="button" aria-label="${document.documentElement.dataset.theme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}" title="${document.documentElement.dataset.theme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}">${themeToggleContent()}</button><button id="cert-btn" class="cert-btn">${icon('shield',16)} 认证</button><button id="notification-btn" class="icon-btn notification-btn" aria-label="审核通知">${icon('bell',19)}${pending?'<i></i>':''}</button><div class="header-user"><div class="avatar avatar-small">${e((currentUser?.name || '成').slice(0,1))}</div><span>${e(currentUser?.name || '学院成员')}</span></div><button id="logout-btn" class="logout-btn" type="button">退出登录</button></div></header>
+  return `<header class="topbar"><a href="#" class="brand" aria-label="JOURNEY首页"><img src="./journey-logo-119.svg" alt="" width="34" height="34"><span class="brand-wordmark">JOURNEY <span class="brand-sub">管理系统</span></span></a><div class="topbar-right"><a class="btn btn-secondary btn-sm" href="/app?view=village" target="_blank" rel="noopener">学员端 ${icon('external',14)}</a><button id="theme-toggle" class="theme-toggle" type="button" aria-label="${document.documentElement.dataset.theme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}" title="${document.documentElement.dataset.theme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}">${themeToggleContent()}</button>${ui.isSuperAdmin || ui.canConfigureExperience ? `<button id="cert-btn" class="cert-btn">${icon('shield',16)} 认证</button>` : ''}<button id="notification-btn" class="icon-btn notification-btn" aria-label="审核通知">${icon('bell',19)}${pending?'<i></i>':''}</button><div class="header-user"><div class="avatar avatar-small">${e((currentUser?.name || '成').slice(0,1))}</div><span>${e(currentUser?.name || '学院成员')}</span><small class="muted">${ui.isSuperAdmin?'超级管理员':store.operatorId?'普通管理员':'审核员'}</small></div><button id="logout-btn" class="logout-btn" type="button">退出登录</button></div></header>
   <aside class="sidebar"><nav aria-label="主导航">${navigation}</nav><div class="sidebar-bottom"><button class="guide-entry" id="guide-btn" type="button">${icon('book',20)}<span>使用指南</span></button></div></aside>
   <div class="app-main"><main class="main-content" aria-label="${labels[navPage]}">${content}</main></div>`;
 }
@@ -283,14 +281,14 @@ function render() {
   document.querySelectorAll('[data-review-camp]').forEach(btn => btn.onclick = () => { reviewCamp=btn.dataset.reviewCamp; try { localStorage.setItem('journey_admin_review_camp',reviewCamp); } catch {} navigate('review'); });
   $('.brand').onclick = event => { event.preventDefault(); navigate('publish'); };
   $('#cert-btn')?.addEventListener('click', () => {
-    const preferred = page === 'experience' ? 'experience' : courseWorkspace(page) ? 'courses' : 'members';
+    const preferred = page === 'experience' ? 'experience' : 'members';
     openCertificationCenter(store,ui,{preferred,onPermissionsChanged:refreshPermissionViews});
   });
   $('#theme-toggle').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
   $('#notification-btn').onclick = () => { const submission=store.data.submissions.find(s=>!s.supersededBy&&getSubmissionStatus(s,store.getTask(s.taskId)||{})==='pending'); if(submission)reviewCamp=getReviewCamp(submission,store.getTask(submission.taskId)||{}); navigate('review'); };
   $('#logout-btn').onclick = async () => { try { await clearInviteSession(); academy.reset(); villageCourses.reset(); } catch (error) { toast(error.message,'error'); } };
-  $('#guide-btn').onclick = () => openModal(`<div class="modal-heading"><h2>使用指南</h2></div><div class="guide-list">${[['填写基础信息','填写任务标题与简述。新手村普通任务可选择多类徽章点，按整数百分比分配，合计为 100%。'],['添加学习材料','添加文档链接、图片或文件。'],['选择审核方式与评分标准','有固定答案选择 AI 自测并填写评分标准；无固定答案选择人工审核。'],['查看右侧预览','AI 自测任务可选用沙盒试测，探索营仅限超级管理员发布；新手村沿用原有发布流程。']].map(([title,description])=>`<div><section><strong>${title}</strong><p>${description}</p></section></div>`).join('')}</div><div class="notice">任务、提交和审核记录来自本地服务。编辑中的草稿保存在当前账号的浏览器中。探索营 AI 自测达到配置的通过分数后自动完成；人工审核任务由审核人确认，新手村沿用原有任务流程。</div>`);
-  if (page === 'publish') {if(canConfigureTask(store.data.draft,ui.isSuperAdmin)){bindEditor();bindVillagePublishType();}else $('#new-task').onclick=()=>taskWorkflow.start();if(canConfigureTask(store.data.draft,ui.isSuperAdmin)&&draftPublication()?.status==='pending'){$('.main-content').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=true);$('#new-task').disabled=false;$('#publish-task').textContent='待审核';}}
+  $('#guide-btn').onclick = () => openModal(`<div class="modal-heading"><h2>使用指南</h2></div><div class="guide-list">${[['填写基础信息','填写任务标题与简述。新手村普通任务可选择多类徽章点，按整数百分比分配，合计为 100%。'],['添加学习材料','添加文档链接、图片或文件。'],['选择审核方式与评分标准','有固定答案选择 AI 自测并填写评分标准；无固定答案选择人工审核。'],['查看右侧预览','AI 自测任务可选用沙盒试测，普通管理员提交后由超级管理员审核，超级管理员可直接发布。']].map(([title,description])=>`<div><section><strong>${title}</strong><p>${description}</p></section></div>`).join('')}</div><div class="notice">任务、提交和审核记录来自本地服务。编辑中的草稿保存在当前账号的浏览器中。探索营 AI 自测达到配置的通过分数后自动完成；人工审核任务由审核人确认，新手村沿用原有任务流程。</div>`);
+  if (page === 'publish') {bindEditor();bindVillagePublishType();if(draftPublication()?.status==='pending'){$('.main-content').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=true);$('#new-task').disabled=false;$('#publish-task').textContent='待审核';}}
   else if(page==='experience')void bindOfflineExperience($('.main-content'),ui);
   else if(page===villagePublishPage){bindVillagePublishType();villageCourses.bind($('.main-content'));}
   else if(page==='knowledge')knowledge.bind($('.main-content'));
@@ -386,7 +384,7 @@ function bindVillagePublishType() {
   const list = $('[data-village-course-list]');
   if(list) list.onclick = ()=>navigate(villagePublishPage,'list');
   const exploration = $('[data-course-camp][value="exploration"]');
-  if(exploration && ui.isSuperAdmin) exploration.onchange = () => {
+  if(exploration) exploration.onchange = () => {
     $('[data-course-camp][value="novice"]').checked = true;
     if(getReviewCamp({},store.data.draft)==='exploration') {shareCampFields(villageCourses.publicationCourse(),store.data.draft,false); navigate('publish','saved-task',true); document.querySelector('[data-field="camp"]:checked')?.focus({preventScroll:true});}
     else void taskWorkflow.start(null,'exploration');
@@ -394,7 +392,6 @@ function bindVillagePublishType() {
 }
 function draftPublication() {return store.getTask(store.data.draft.id)?.publication || store.data.draft.publication;}
 function renderEditor() {
-  if (!canConfigureTask(store.data.draft,ui.isSuperAdmin)) return `<section class="card empty-state exploration-config-restricted"><strong>${EXPLORATION_CONFIGURATION_NOTICE}</strong><p>你可以在任务库中查看探索营任务，或新建新手村任务。</p><button class="btn btn-primary" id="new-task">新建新手村任务</button></section>`;
   const publication=draftPublication();
   const publicationNote=publication?.status==='pending'?'任务已提交，等待超级管理员审核。审核期间暂不能编辑；已发布版本保持不变。':publication?.status==='rejected'?`发布申请已退回：${e(publication.comment)}。修改后可重新提交。`:!ui.isSuperAdmin?'普通管理员提交后，由超级管理员审核通过再发布。':'';
   return `${publicationNote?`<div class="notice publication-editor-note" role="status">${publicationNote}</div>`:""}<div class="editor-layout"><div class="editor-primary" id="editor-primary"><div class="notice" role="status">${isTaskUpdate(store.data.draft) ? (store.data.draft.status==='archived' ? '正在编辑已下架任务。发布更新后将重新开放领取。' : '正在编辑已发布任务。发布更新会更新现有任务，不会新增任务卡；保存草稿不影响当前已发布版本。') : publication?.status==='rejected' ? '正在修改退回的任务。重新提交仍使用原任务，不会创建重复任务。' : '正在创建新任务。发布后将在学员端新增一张任务卡。'}</div>${renderBasics()}${renderMaterials()}${renderTaskFiles()}${renderScoring()}</div><aside class="editor-aside" id="editor-aside">${renderAside()}</aside></div>
@@ -404,7 +401,7 @@ function cardHeader(title,right='') {
   return `<div class="card-header"><div class="section-title"><h2>${title}</h2></div>${right}</div>`;
 }
 function renderCampField(selected,attribute,busy=false) {
-  return `<fieldset class="form-field full camp-field"><legend class="field-label">所属营地</legend><div class="camp-options">${REVIEW_CAMPS.map(camp=>`<label class="camp-option"><input type="radio" name="task-camp" ${attribute} value="${camp.id}" ${selected===camp.id?'checked':''} ${busy || !canConfigureTask({camp:camp.id},ui.isSuperAdmin)?'disabled title="探索营任务仅限超级管理员配置"':''}><span>${camp.label}</span></label>`).join('')}</div></fieldset>`;
+  return `<fieldset class="form-field full camp-field"><legend class="field-label">所属营地</legend><div class="camp-options">${REVIEW_CAMPS.map(camp=>`<label class="camp-option"><input type="radio" name="task-camp" ${attribute} value="${camp.id}" ${selected===camp.id?'checked':''} ${busy?'disabled':''}><span>${camp.label}</span></label>`).join('')}</div></fieldset>`;
 }
 function renderPublicationFields(d, course = false) {
   const limit = course ? 150 : 60;
@@ -537,7 +534,6 @@ function bindEditor() {
   });
   function bindFields(root=document) { root.querySelectorAll('[data-field]').forEach(el=>el.addEventListener('input',()=>{
     const key=el.dataset.field;
-    if(key==='camp'&&!canConfigureTask({camp:el.value},ui.isSuperAdmin)){toast(EXPLORATION_CONFIGURATION_NOTICE,'error');render();return;}
     if(key==='camp' && el.value==='novice' && getReviewCamp({},d)==='exploration'){void switchToVillage(el,d);return;}
     if(key==='xp')d.rewardRulesVersion=4;
     d[key]=el.type==='number'?(el.value===''?'':Number(el.value)):el.value;
@@ -699,7 +695,6 @@ function openSubmitPublication(task) {
 }
 
 async function publish() {
-  if (!canConfigureTask(store.data.draft,ui.isSuperAdmin)) { toast(EXPLORATION_CONFIGURATION_NOTICE,'error'); return; }
   if(materialUploadsPending){toast('文件正在上传，请完成后再发布。','error');return;}
   if(draftPublication()?.status==='pending'){toast('任务正在等待审核');return;}
   const errors=validateTask(store.data.draft, taskIssue);
@@ -712,18 +707,16 @@ async function publish() {
     const publishingUpdate = isTaskUpdate(savedTask);
     if(!ui.isSuperAdmin){openSubmitPublication(savedTask);return;}
     const links = taskResourceLinks(savedTask);
-    const exploration = savedTask.camp === 'exploration';
-    const reviewers = store.members.filter(m=>m.roles.includes('REVIEWER'));
     let key = crypto.randomUUID(), keySelection;
-    openModal(`<div class="native-publish-confirm"><div class="modal-heading"><h2>${publishingUpdate?'确认发布更新':'确认发布任务'}</h2><p>${e(savedTask.title)}</p></div>${exploration ? '<div class="notice">探索营任务由超级管理员确认后直接发布，无需另行审核。</div>' : `<label class="form-field"><span class="field-label">内容复核人</span><select id="publish-reviewer"><option value="">请选择审核人</option>${reviewers.map(m=>`<option value="${e(m.id)}">${e(m.name)}</option>`).join('')}</select></label>`}${renderPublishMaterials(savedTask.materials,savedTask)}<div class="notice">${publishingUpdate?'本次更新现有任务，不会新增任务卡。已领取的学员保留原版本，未领取的学员将看到更新后的版本。':'本次发布将新增一张任务卡，学员可查看并领取。'}</div><p class="inline-error" id="publish-error" role="alert" hidden></p><div class="modal-actions"><button class="btn btn-secondary" id="cancel-publish">取消</button><button class="btn btn-primary" id="confirm-publish" disabled>${publishingUpdate?'确认更新':'确认发布'}</button></div></div>`, modal => {
-      const reviewer = $('#publish-reviewer',modal), confirm = $('#confirm-publish',modal);
+    openModal(`<div class="native-publish-confirm"><div class="modal-heading"><h2>${publishingUpdate?'确认发布更新':'确认发布任务'}</h2><p>${e(savedTask.title)}</p></div><div class="notice">超级管理员确认后直接发布。</div>${renderPublishMaterials(savedTask.materials,savedTask)}<div class="notice">${publishingUpdate?'本次更新现有任务，不会新增任务卡。已领取的学员保留原版本，未领取的学员将看到更新后的版本。':'本次发布将新增一张任务卡，学员可查看并领取。'}</div><p class="inline-error" id="publish-error" role="alert" hidden></p><div class="modal-actions"><button class="btn btn-secondary" id="cancel-publish">取消</button><button class="btn btn-primary" id="confirm-publish" disabled>${publishingUpdate?'确认更新':'确认发布'}</button></div></div>`, modal => {
+      const confirm = $('#confirm-publish',modal);
       const selected = () => [...modal.querySelectorAll('[data-verified-link]:checked')].map(el=>links[Number(el.dataset.verifiedLink)]);
       bindFieldFeedback(modal);
       confirm.disabled = false;
       $('#cancel-publish',modal).onclick = closeModal;
       confirm.onclick = async () => {
-        if (confirm.disabled || !confirmPublicationFields(modal,reviewer)) return;
-        const selection = JSON.stringify([reviewer?.value,selected()]);
+        if (confirm.disabled || !confirmPublicationFields(modal)) return;
+        const selection = JSON.stringify(selected());
         if (keySelection && keySelection !== selection) key = crypto.randomUUID();
         keySelection = selection;
         modal.dataset.operationPending = 'true';
@@ -731,7 +724,7 @@ async function publish() {
         confirm.textContent = '正在发布…';
         const error = $('#publish-error',modal); error.hidden = true;
         try {
-          const published = await service.tasks.publish(savedTask,reviewer?.value,selected(),key);
+          const published = await service.tasks.publish(savedTask,selected(),key);
           modal.dataset.operationPending = 'false';
           sandbox.retainForPublishedTask(savedTask,published);
           let draftSaveWarning='';

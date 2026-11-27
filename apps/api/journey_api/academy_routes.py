@@ -22,7 +22,7 @@ from journey_api.db import SessionLocal, get_db
 from journey_api.errors import ApiError
 from journey_api.identity import add_audit
 from journey_api.models import Role, User
-from journey_api.review_admin_access import require_publisher
+from journey_api.review_admin_access import require_publisher, require_super
 from journey_api.review_admin_routes import envelope
 
 def require_staff_entry(request: Request, actor: Actor = Depends(get_actor)):
@@ -238,8 +238,7 @@ def admin_listing(request: Request, actor: Actor = Depends(get_actor), session: 
 
 @admin_router.post('/courses')
 def create_course(command: CourseCreate, request: Request, background_tasks: BackgroundTasks, actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    # require_publisher locks this author's User row, serializing create retries.
-    require_publisher(session, actor)
+    require_super(session, actor)
     data = metadata(command.model_dump(), external=command.type != 'video')
     course_id = command.id or uuid.uuid4()
     existing = session.get(AcademyCourse, course_id)
@@ -270,7 +269,7 @@ def create_course(command: CourseCreate, request: Request, background_tasks: Bac
 @admin_router.patch('/courses/{course_id}')
 def update_course(course_id: uuid.UUID, command: CourseUpdate, request: Request, background_tasks: BackgroundTasks,
                   actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_publisher(session, actor)
+    require_super(session, actor)
     row = course_row(session, actor, course_id, lock=True)
     if row.kind == 'share' and row.review_status != 'approved':
         fail('待审核的分享请在分享审核中处理。', 409)
@@ -279,15 +278,14 @@ def update_course(course_id: uuid.UUID, command: CourseUpdate, request: Request,
     if command.type is not None and command.type != row.kind:
         fail('不能更改课程内容类型。')
     data = metadata(command.model_dump(exclude_unset=True), row.content, external=row.kind != 'video')
-    if command.uploadId:
-        if row.kind != 'video':
-            fail('外链课程不能绑定视频。')
+    if command.uploadId and row.kind != 'video':
+        fail('外链课程不能绑定视频。')
+    if command.uploadId and command.uploadId != row.video_id:
         video = bound_video(session, actor, command.uploadId, row.id)
-        if row.video_id != video.id:
-            session.execute(update(AcademyLearningRecord).where(
-                AcademyLearningRecord.organization_id == actor.organization_id,
-                AcademyLearningRecord.course_id == row.id).values(
-                    seconds=0, duration=0, progress=0, completed=False, updated_at=now()))
+        session.execute(update(AcademyLearningRecord).where(
+            AcademyLearningRecord.organization_id == actor.organization_id,
+            AcademyLearningRecord.course_id == row.id).values(
+                seconds=0, duration=0, progress=0, completed=False, updated_at=now()))
         row.video_id = video.id
         add_video_metadata(data, video)
     row.content = data
@@ -303,7 +301,7 @@ def update_course(course_id: uuid.UUID, command: CourseUpdate, request: Request,
 @admin_router.post('/courses/{course_id}/visibility')
 def visibility(course_id: uuid.UUID, command: Visibility, request: Request, background_tasks: BackgroundTasks,
                actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_publisher(session, actor)
+    require_super(session, actor)
     row = course_row(session, actor, course_id, lock=True)
     check_revision(row, command.expected_revision)
     if row.kind == 'share' and row.review_status != 'approved':
@@ -321,7 +319,7 @@ def visibility(course_id: uuid.UUID, command: Visibility, request: Request, back
 @admin_router.post('/shares/{course_id}/review')
 def review_share(course_id: uuid.UUID, command: Review, request: Request, background_tasks: BackgroundTasks,
                  actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_publisher(session, actor)
+    require_super(session, actor)
     row = course_row(session, actor, course_id, lock=True)
     check_revision(row, command.expected_revision)
     if row.kind != 'share' or row.review_status != 'pending':

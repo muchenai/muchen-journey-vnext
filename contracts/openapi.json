@@ -3516,7 +3516,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RevisionCommand"
+                "$ref": "#/components/schemas/TaskLibraryRevision"
               }
             }
           }
@@ -9095,6 +9095,23 @@
             }
           },
           {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "mall_exchange",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
             "name": "X-Fixture-Role",
             "in": "header",
             "required": false,
@@ -9111,6 +9128,71 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/profile/exchange": {
+      "post": {
+        "summary": "Exchange Mall Points",
+        "operationId": "exchange_mall_points_api_v1_me_profile_exchange_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120,
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Fixture-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fixture-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeMallPoints"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -11440,110 +11522,6 @@
         }
       }
     },
-    "/api/v1/ops/course-access": {
-      "get": {
-        "summary": "Read Roles",
-        "operationId": "read_roles_api_v1_ops_course_access_get",
-        "parameters": [
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Change Roles",
-        "operationId": "change_roles_api_v1_ops_course_access_post",
-        "parameters": [
-          {
-            "name": "X-Fixture-Role",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Fixture-Role"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/SaveRoles"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AddPerson"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/ops/experience/permissions": {
       "get": {
         "summary": "Read Issuer Settings",
@@ -13024,34 +13002,6 @@
         ],
         "title": "ActiveEvidenceRetestOut"
       },
-      "AddPerson": {
-        "properties": {
-          "action": {
-            "type": "string",
-            "const": "addPerson",
-            "title": "Action"
-          },
-          "revision": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Revision"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Name"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "action",
-          "revision",
-          "name"
-        ],
-        "title": "AddPerson"
-      },
       "AiAdvisoryRecordOut": {
         "properties": {
           "id": {
@@ -13601,40 +13551,6 @@
           "request_id"
         ],
         "title": "AssignmentResponse"
-      },
-      "Assignments": {
-        "properties": {
-          "ownerId": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Ownerid"
-          },
-          "adminIds": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "maxItems": 2000,
-            "title": "Adminids"
-          },
-          "reviewers": {
-            "items": {
-              "$ref": "#/components/schemas/Reviewer"
-            },
-            "type": "array",
-            "maxItems": 2000,
-            "title": "Reviewers"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "ownerId",
-          "adminIds",
-          "reviewers"
-        ],
-        "title": "Assignments"
       },
       "AttachmentOut": {
         "properties": {
@@ -16485,6 +16401,22 @@
           "created_at"
         ],
         "title": "EvaluationOut"
+      },
+      "ExchangeMallPoints": {
+        "properties": {
+          "points": {
+            "type": "integer",
+            "maximum": 900719925474099.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "points"
+        ],
+        "title": "ExchangeMallPoints"
       },
       "ExplorationAiEvaluationOut": {
         "properties": {
@@ -22916,32 +22848,6 @@
         ],
         "title": "ReviewQueueResponse"
       },
-      "Reviewer": {
-        "properties": {
-          "personId": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Personid"
-          },
-          "tagNames": {
-            "items": {
-              "type": "string",
-              "maxLength": 100,
-              "minLength": 1
-            },
-            "type": "array",
-            "maxItems": 100,
-            "title": "Tagnames"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "personId",
-          "tagNames"
-        ],
-        "title": "Reviewer"
-      },
       "ReviewerPolicy": {
         "properties": {
           "pool_ref": {
@@ -23928,31 +23834,6 @@
         ],
         "title": "SaveMedal"
       },
-      "SaveRoles": {
-        "properties": {
-          "action": {
-            "type": "string",
-            "const": "saveRoles",
-            "title": "Action"
-          },
-          "revision": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Revision"
-          },
-          "assignments": {
-            "$ref": "#/components/schemas/Assignments"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "action",
-          "revision",
-          "assignments"
-        ],
-        "title": "SaveRoles"
-      },
       "SaveSubmissionDraftCommand": {
         "properties": {
           "expected_revision": {
@@ -24208,8 +24089,15 @@
           },
           "issuers": {
             "items": {
-              "type": "string",
-              "format": "uuid"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "type": "array",
             "maxItems": 2,
@@ -25141,6 +25029,21 @@
           "request_id"
         ],
         "title": "TaskDefinitionResponse"
+      },
+      "TaskLibraryRevision": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "TaskLibraryRevision"
       },
       "TaskVersionOut": {
         "properties": {

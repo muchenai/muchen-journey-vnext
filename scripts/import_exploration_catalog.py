@@ -15,7 +15,7 @@ from journey_api.exploration_models import ExplorationMaterial
 from journey_api.exploration_service import default_requirements, publication_command, publish_catalog
 from journey_api.identity import add_audit
 from journey_api.models import Role, RoleAssignment, TaskDefinition, TaskDefinitionStatus, TaskVersion, User, UserStatus
-from journey_api.review_admin_access import require_publisher
+from journey_api.review_admin_access import require_super
 from journey_api.review_admin_models import PublishedTaskContent, ReviewAdminTask
 from journey_api.review_admin_routes import TaskContent, task_content_for_publish
 
@@ -36,8 +36,9 @@ def import_catalog(session, organization_id, author_id, reviewer_id):
         RoleAssignment.organization_id == organization_id)))
     if Role.REVIEWER not in roles or Role.REVIEWER not in reviewer_roles:
         raise ValueError("The task author and content reviewer must have the real Reviewer role.")
-    actor = Actor(id=author_id, organization_id=organization_id, roles=frozenset(roles), display_name=users[author_id].display_name)
-    require_publisher(session, actor)
+    actor = Actor(id=author_id, organization_id=organization_id, roles=frozenset(roles),
+                  display_name=users[author_id].display_name, entry_role=Role.REVIEWER)
+    require_super(session, actor)
     items = json.loads((SEED_ROOT / "exploration_seed.json").read_text(encoding="utf-8-sig"))
     inserted, preserved = [], []
     for index, item in enumerate(items, 1):

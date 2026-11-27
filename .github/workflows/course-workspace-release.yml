@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_commit:
-        description: Exact reviewed learner release commit
+        description: Exact reviewed learner and administrator release commit
         type: string
         required: true
       package_run:

@@ -7,7 +7,6 @@ import {renderLibrary, bindLibrary, openTask} from '../public/review-native/libr
 import {copyAsNewTask} from '../public/review-native/task-workflow.js';
 import {ApiStore} from '../public/review-native/native-api.js';
 import {getReviewCamp, escapeHtml, REVIEW_CAMPS} from '../public/review-native/core.js';
-import {canConfigureTask} from '../public/review-native/task-publication-access.js';
 import {EXPLORATION_COMPLETION_MODES, explorationCompletionMode, requiresTaskAssessment} from '../public/review-native/exploration-completion.js';
 import {TASK_FIELD_LIMITS, taskFieldLength} from '../public/review-native/task-field-limits.js';
 
@@ -37,7 +36,7 @@ test('new ordinary tasks append before sign-out even when historical stored posi
 const appSource=await readFile(new URL('../public/review-native/app.js',import.meta.url),'utf8');
 function basics(draft){
   const context=vm.createContext({store:{data:{draft}},ui:{isSuperAdmin:true},getReviewCamp,isPinnedExplorationTask,cardHeader:()=>'',icon:()=>'',e:escapeHtml,
-    REVIEW_CAMPS,canConfigureTask,TASK_FIELD_LIMITS,taskFieldLength,EXPLORATION_COMPLETION_MODES,explorationCompletionMode,requiresTaskAssessment});
+    REVIEW_CAMPS,TASK_FIELD_LIMITS,taskFieldLength,EXPLORATION_COMPLETION_MODES,explorationCompletionMode,requiresTaskAssessment});
   vm.runInContext(appSource.slice(appSource.indexOf('function renderCampField('),appSource.indexOf('function renderRatio()')),context);
   return vm.runInContext('renderBasics()',context);
 }

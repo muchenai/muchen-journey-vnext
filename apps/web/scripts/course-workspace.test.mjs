@@ -3,16 +3,14 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createAcademyWorkspace } from '../public/review-native/academy-workspace.js';
-import { chapterReflections, learnerRoster, renderWorkspace } from '../public/review-native/academy-workspace-views.js';
+import { permissions, chapterReflections, learnerRoster, renderWorkspace } from '../public/review-native/academy-workspace-views.js';
 import { createEditor } from '../public/review-native/academy-workspace-editor.js';
 import { courseIssues, materialControl } from '../public/review-native/academy-course-validation.js';
 import { renderVillagePublishType } from '../public/review-native/publish-content-type.js';
 import { REVIEW_CAMPS } from '../public/review-native/core.js';
-import { canConfigureTask } from '../public/review-native/task-publication-access.js';
 
 const ui = {refresh() {}, icon: () => ''};
-const catalog = {actorId:'owner',people:[{id:'owner',name:'课程负责人'}],
-  assignments:{ownerId:'owner',adminIds:[],reviewers:[]},learners:[],tags:[],courses:[],progress:[],canManageLegacy:true};
+const catalog = {actorId:'owner',actorName:'成员张三',isSuperAdmin:true,canPublish:true,learners:[],tags:[],courses:[],progress:[],canManageLegacy:true};
 
 test('only the academy progress toolbar opens the read-only learner roster',()=>{
   const data={...catalog,learners:[{id:'current',name:'示例学员',code:'AC-OLD'}]};
@@ -163,7 +161,8 @@ test('authenticated workspace renders the catalog, registered account and retain
   assert.equal(calls[0].path,'/api/review-native/course-workspace');
   assert.equal(calls[0].options.credentials,'same-origin');
   const html=workspace.render();
-  assert.match(html,/课程负责人/);
+  assert.match(html,/成员张三/);
+  assert.match(html,/超级管理员/);
   assert.match(html,/发布审核/);
   assert.match(html,/学习情况/);
   assert.match(html,/原有课程与员工分享记录/);
@@ -194,7 +193,7 @@ test('village management keeps the publishing controls behind the new publicatio
     assert.ok(match,`Missing application function ${name}`);
     return match[0];
   }
-  const context=vm.createContext({ui:{...ui,isSuperAdmin:true},REVIEW_CAMPS,canConfigureTask,renderVillagePublishType});
+  const context=vm.createContext({ui:{...ui,isSuperAdmin:true},REVIEW_CAMPS,renderVillagePublishType});
   for(const name of ['renderVillageCoursePublication','renderCampField','openVillagePublicationChooser']){
     vm.runInContext(appFunction(name),context);
   }
@@ -235,5 +234,27 @@ test('village management keeps the publishing controls behind the new publicatio
     type.onchange();
     assert.equal(opened,false);
     assert.deepEqual(actions.pop(),type.value==='required' ? ['navigate','publish/village-courses','required'] : ['start',null,'novice']);
+  }
+});
+
+
+test('member certification controls publishing and approval in academy and village',()=>{
+  const pending = {id:'p',title:'普通管理员提交',tags:[],author:{id:'author'}, status:'pending'};
+  const list = {...catalog, courses:[pending]};
+  const ordinary = {...list, isSuperAdmin:false, actorId:'author', canManageLegacy:false};
+  for(const camp of ['academy','village']) {
+    const state={tab:'reviews',tag:'',status:'',search:''};
+    const superPage=renderWorkspace(list,state,ui.icon,camp);
+    const ordinaryPage=renderWorkspace(ordinary,state,ui.icon,camp);
+    assert.match(superPage,/超级管理员/);
+    assert.match(superPage,/data-aw-decide="p"/);
+    assert.match(ordinaryPage,/普通管理员/);
+    assert.match(ordinaryPage,/我的提交/);
+    assert.match(ordinaryPage,/data-aw-new/);
+    assert.doesNotMatch(ordinaryPage,/data-aw-decide|data-aw-legacy/);
+    const promoted={...list,actorId:'author'};
+    assert.match(renderWorkspace(promoted,state,ui.icon,camp),/data-aw-decide="p"/);
+    assert.equal(permissions(ordinary).canReview(pending),false);
+    assert.equal(permissions(promoted).canReview({...pending,status:'published'}),false);
   }
 });

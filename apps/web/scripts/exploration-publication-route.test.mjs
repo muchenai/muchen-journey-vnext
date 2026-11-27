@@ -21,6 +21,7 @@ function loadRoute(result = { ok: true, data: { id: taskId } }) {
   const calls = [];
   const route = compile('app/api/review-native/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
+    '@/lib/server/api': { apiRequest: async (...args) => { calls.push(args); return result.data; } },
     '@/app/review/admin-actions': { publishAdminTask: async (...args) => { calls.push(args); return result; } },
   });
   return { ...route, calls };
@@ -35,37 +36,51 @@ test('exploration publication reaches backend without choosing another reviewer 
   const route = loadRoute();
   assert.equal((await route.POST(publish('exploration'))).status, 200);
   assert.equal(route.calls.length, 1);
-  assert.equal(route.calls[0][1], undefined);
-  assert.equal(route.calls[0][3], key);
+  assert.deepEqual(Array.from(route.calls[0][1]), []);
+  assert.equal(route.calls[0][2], key);
   const denied = loadRoute({ ok: false, status: 403, error: '仅超级管理员可以执行此操作。' });
   const response = await denied.POST(publish('exploration'));
   assert.equal(response.status, 403);
   assert.match((await response.json()).error, /超级管理员/);
 });
-test('novice publication still requires a reviewer and all publication requests retain origin checks', async () => {
+test('novice publication needs no named reviewer and cross-origin requests are rejected', async () => {
   const route = loadRoute();
-  assert.equal((await route.POST(publish('novice'))).status, 400);
+  assert.equal((await route.POST(publish('novice'))).status, 200);
   assert.equal((await route.POST(publish('exploration', { verified: [], reviewerId: 'invalid' }))).status, 400);
   assert.equal((await route.POST(publish('exploration', { verified: [] }, 'https://other.example'))).status, 403);
-  assert.equal(route.calls.length, 0);
+  assert.equal(route.calls.length, 1);
   assert.equal((await route.POST(publish('novice', { verified: [], reviewerId }))).status, 200);
-  assert.equal(route.calls[0][1], reviewerId);
+  assert.deepEqual(Array.from(route.calls[1][1]), []);
 });
-test('server publication adapter omits exploration reviewer identity and retains novice reviewer identity', async () => {
+test('the delete gateway forwards revision zero for legacy exploration tasks', async () => {
+  const route = loadRoute();
+  const remove = revision => new Request('http://localhost:3000/api/review-native', {
+    method: 'POST', headers: {origin: 'http://localhost:3000', host: 'localhost:3000', 'Content-Type': 'application/json'},
+    body: JSON.stringify({command: 'deleteTask', task: {id: taskId, revision}, key}),
+  });
+  assert.equal((await route.POST(remove(0))).status, 200);
+  assert.equal((await route.POST(remove(-1))).status, 400);
+  assert.equal((await route.POST(remove('0'))).status, 400);
+  assert.equal(route.calls.length, 1);
+  const [path, role, options] = route.calls[0];
+  assert.equal(path, `/api/v1/review-admin/tasks/${taskId}/delete`);
+  assert.equal(role, 'REVIEWER');
+  assert.deepEqual(JSON.parse(options.body), {expected_revision: 0});
+  assert.equal(options.headers['Idempotency-Key'], key);
+});
+
+test('server publication adapter leaves reviewer attribution to the server for both camps', async () => {
   const calls = [];
   const actions = compile('app/review/admin-actions.ts', {
     '@/lib/server/api': { apiRequest: async (...args) => { calls.push(args); return { id: taskId }; } },
   });
   const task = { id: taskId, revision: 4, camp: 'exploration' };
-  assert.equal((await actions.publishAdminTask(task, undefined, ['https://example.com'], key)).ok, true);
-  // Even legacy callers cannot attribute an exploration publication to another person.
-  await actions.publishAdminTask(task, reviewerId, [], key);
-  await actions.publishAdminTask({ ...task, camp: 'novice' }, reviewerId, [], key);
+  assert.equal((await actions.publishAdminTask(task, ['https://example.com'], key)).ok, true);
+  await actions.publishAdminTask({ ...task, camp: 'novice' }, [], key);
   for (const call of calls) {
     assert.equal(call[0], `/api/v1/review-admin/tasks/${taskId}/publish`);
     assert.equal(call[2].headers['Idempotency-Key'], key);
   }
   assert.deepEqual(JSON.parse(calls[0][2].body), { expected_revision: 4, verified_material_urls: ['https://example.com'] });
   assert.equal('reviewed_by' in JSON.parse(calls[1][2].body), false);
-  assert.equal(JSON.parse(calls[2][2].body).reviewed_by, reviewerId);
 });

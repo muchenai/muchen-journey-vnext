@@ -1,11 +1,9 @@
 import { mountMemberCertification } from './member-access.js?v=20261125-certification';
-import { mountCoursePermissions } from './academy-course-permissions.js';
-import { bindExperiencePermissions } from './experience-permissions.js';
+import { bindExperiencePermissions } from './experience-permissions.js?v=20261127-member-publication';
 
 export function openCertificationCenter(store, ui, { preferred = 'members', memberSearch = '', onPermissionsChanged } = {}) {
   const tabs = [
     ...(ui.isSuperAdmin ? [{ id: 'members', label: '成员认证' }] : []),
-    { id: 'courses', label: '课程人员与权限' },
     ...(ui.canConfigureExperience === true ? [{ id: 'experience', label: '经验发放权限' }] : []),
   ];
   if (!tabs.length) return;
@@ -45,7 +43,6 @@ export function openCertificationCenter(store, ui, { preferred = 'members', memb
       panel.setAttribute('aria-labelledby', 'cert-tab-' + id);
       body.replaceChildren(panel);
       if (id === 'members') mountMemberCertification(panel, store, panelUI, memberSearch);
-      else if (id === 'courses') void mountCoursePermissions(panel, panelUI);
       else void bindExperiencePermissions(panel, panelUI, onPermissionsChanged);
     }
     for (const [index, button] of buttons.entries()) {

@@ -12,10 +12,10 @@ from journey_api.db import SessionLocal
 from journey_api.errors import ApiError
 from journey_api.management_access import course_scope
 from journey_api.management_access_routes import (
-    AddPerson, Grant, MatchNames, SaveRoles, SetIssuers, change_experience,
-    change_roles, configure_issuers, match_directory, read_experience, read_issuer_settings,
+    Grant, MatchNames, SetIssuers, change_experience,
+    configure_issuers, match_directory, read_experience, read_issuer_settings,
 )
-from journey_api.management_access_models import ExperienceRosterSnapshot
+from journey_api.management_access_models import CourseManagementSettings, ExperienceRosterSnapshot
 from journey_api.models import CompletionCode, ExternalIdentity, Organization, Role, RoleAssignment, User, UserStatus
 from journey_api.novice_economy import growth_history, wallet
 from journey_api.review_admin_models import ReviewAdminAccess
@@ -66,13 +66,8 @@ def lookup(actor, names):
         return match_directory(MatchNames(names=names), request(), actor, session)["data"]
 
 
-def test_only_owner_manages_real_members_and_assignment_revisions(accounts):
+def test_course_and_issuer_rights_are_independent_of_retired_assignments(accounts):
     owner, issuer, other, learner = accounts
-    with SessionLocal() as session:
-        scope = course_scope(session, owner)
-        assert scope["assignments"]["ownerId"] == str(owner.id)
-        assert set(scope["assignments"]["adminIds"]) == {str(issuer.id), str(other.id)}
-        assert str(learner.id) not in {p["id"] for p in scope["people"]}
     with pytest.raises(ApiError) as denied:
         configure(issuer, issuer, other)
     assert denied.value.status_code == 403
@@ -82,23 +77,17 @@ def test_only_owner_manages_real_members_and_assignment_revisions(accounts):
     with pytest.raises(ApiError) as stale:
         configure(owner, issuer, other)
     assert stale.value.status_code == 409
+    with SessionLocal.begin() as session:
+        state = session.get(CourseManagementSettings, owner.organization_id)
+        state.assignments = {"ownerId": str(issuer.id), "adminIds": [str(learner.id)], "reviewers": []}
     with SessionLocal() as session:
+        assert course_scope(session, owner)["isSuperAdmin"]
+        assert not course_scope(session, issuer)["isSuperAdmin"]
         assert read_experience(request(), issuer, session)["data"]["canGrant"]
-        scope = course_scope(session, owner)
-        without_issuer = {**scope["assignments"], "adminIds": [str(other.id)],
-                          "reviewers": [{"personId": str(issuer.id), "tagNames": scope["tags"][:1]}]}
-        result = change_roles(SaveRoles(action="saveRoles", assignments=without_issuer, revision=1),
-                              request(), owner, session)["data"]
-        assert result["assignments"] == without_issuer
-        assert read_experience(request(), issuer, session)["data"]["canGrant"]  # Independent of course role.
-    new_admin = person(owner.organization_id, "新增管理员", "admin")
-    with SessionLocal() as session:
-        result = change_roles(AddPerson(action="addPerson", revision=2, name=new_admin.display_name),
-                              request(), owner, session)["data"]
-        assert str(new_admin.id) in {p["id"] for p in result["people"]}
-        assert str(new_admin.id) not in result["assignments"]["adminIds"]
         with pytest.raises(ApiError):
-            change_roles(AddPerson(action="addPerson", revision=3, name=learner.display_name), request(), owner, session)
+            course_scope(session, learner)
+        with pytest.raises(ApiError):
+            read_issuer_settings(request(), issuer, session)
 
 
 def test_racing_same_batch_posts_credit_once_and_visible_in_history(accounts):
@@ -181,23 +170,22 @@ def test_only_protected_admin_configures_and_invalid_selection_does_not_replace_
     with SessionLocal.begin() as session:
         ordinary_super = session.get(ReviewAdminAccess, issuer.id)
         ordinary_super.access_role = "super_admin"
-    # A course owner who is also a standard super admin still cannot see issuance settings.
+        state = session.get(CourseManagementSettings, owner.organization_id)
+        state.assignments = {"ownerId": str(issuer.id), "adminIds": [], "reviewers": []}
+    # A previous course owner who is also a standard super admin cannot configure issuers.
     with SessionLocal() as session:
-        scope = course_scope(session, owner)
-        change_roles(SaveRoles(action="saveRoles", revision=1, assignments={**scope["assignments"],
-            "ownerId":str(issuer.id), "adminIds":[]}), request(), owner, session)
         with pytest.raises(ApiError) as denied:
             read_issuer_settings(request(), issuer, session)
         assert denied.value.status_code == 403
-    invalid = SetIssuers(action="configure", issuers=[learner.id, other.id], revision=2)
+    invalid = SetIssuers(action="configure", issuers=[learner.id, other.id], revision=1)
     with pytest.raises(ApiError) as blocked:
         change(owner, invalid)
     assert blocked.value.message == f"「{learner.display_name}」尚未开通管理系统访问权限。请先在「成员认证」中为其开通权限"
     with SessionLocal() as session:
         saved = read_issuer_settings(request(), owner, session)["data"]
-        assert saved["issuers"] == [str(issuer.id),str(other.id)] and saved["revision"] == 2
+        assert saved["issuers"] == [str(issuer.id),str(other.id)] and saved["revision"] == 1
         assert all(person["hasManagementAccess"] for person in saved["selected"])
-        granted = change(owner, SetIssuers(action="configure", issuers=[owner.id,other.id], revision=2))
+        granted = change(owner, SetIssuers(action="configure", issuers=[owner.id,other.id], revision=1))
         assert granted["configured"]
         with pytest.raises(ApiError) as replaced:
             read_experience(request(), issuer, session)

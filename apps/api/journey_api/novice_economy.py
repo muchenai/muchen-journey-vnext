@@ -4,9 +4,10 @@ No demo balance or browser state is authoritative. Old published snapshots keep
 their original reward schedule; updated publications opt into reward rules v2.
 """
 from decimal import Decimal, ROUND_FLOOR
-from sqlalchemy import select, func, literal, union_all, or_
+from sqlalchemy import BigInteger, select, func, literal, union_all, or_
+from journey_api.config import get_settings
 from journey_api.models import Assignment, AssignmentStatus, CompletionCode, Enrollment, Evaluation, Decision
-from journey_api.management_access_models import OfflineExperienceGrant
+from journey_api.management_access_models import MallPointExchange, OfflineExperienceGrant
 from journey_api.course_workspace_models import CourseStudyAward
 from journey_api.review_admin_models import PublishedTaskContent, MedalRedemption, NoviceUnlockDebit
 
@@ -19,6 +20,7 @@ POINT_NAMES = {
     "workplace": "行政职场", "business-operations": "综合经营",
 }
 POINT_TYPES = frozenset(POINT_NAMES)
+XP_PER_MALL_POINT = 10
 PRESETS = {"入门": (30, 50, 5), "进阶": (60, 100, 10), "挑战": (90, 150, 15)}
 
 def rewards(content):
@@ -45,6 +47,13 @@ def unlock_cost(content):
     # immutable debit records stay available for audit and are never rewritten.
     return 0
 
+def learner_owns(column, actor):
+    corporate = select(CompletionCode.migrated_to_user_id).where(
+        CompletionCode.organization_id == actor.organization_id, CompletionCode.user_id == actor.id,
+        CompletionCode.used_at.is_not(None))
+    return or_(column == actor.id, column.in_(corporate))
+
+
 def completed_rewards_query(actor):
     # One immutable approval time per assignment. A repeated PASS must neither
     # duplicate a reward nor move its original earned time in the history.
@@ -59,23 +68,22 @@ def completed_rewards_query(actor):
         Enrollment.id == Assignment.enrollment_id).join(approvals,
         approvals.c.assignment_id == Assignment.id).where(
         Assignment.organization_id == actor.organization_id, Enrollment.organization_id == actor.organization_id,
-        PublishedTaskContent.organization_id == actor.organization_id, Enrollment.learner_id == actor.id,
+        PublishedTaskContent.organization_id == actor.organization_id, learner_owns(Enrollment.learner_id, actor),
         or_(PublishedTaskContent.content["camp"].as_string() == "novice", PublishedTaskContent.content["camp"].as_string().is_(None)),
         Enrollment.novice_task_id.is_not(None), Assignment.status == AssignmentStatus.COMPLETED)
 
 
 def medal_redemptions_query(actor):
-    return select(MedalRedemption).where(MedalRedemption.user_id == actor.id,
-        MedalRedemption.organization_id == actor.organization_id)
+    return learner_credits(MedalRedemption, actor)
 
 
 def learner_credits(model, actor):
     # Phone-to-Feishu migration keeps both accounts' immutable credit records.
-    corporate = select(CompletionCode.migrated_to_user_id).where(
-        CompletionCode.organization_id == actor.organization_id, CompletionCode.user_id == actor.id,
-        CompletionCode.used_at.is_not(None))
-    return select(model).where(model.organization_id == actor.organization_id,
-                               or_(model.user_id == actor.id, model.user_id.in_(corporate)))
+    return select(model).where(model.organization_id == actor.organization_id, learner_owns(model.user_id, actor))
+
+
+def mall_exchange_available():
+    return get_settings().app_env == "local"
 
 
 def wallet(session, actor):
@@ -88,21 +96,23 @@ def wallet(session, actor):
         xp += reward["xp"]
         for item in reward["allocations"]:
             if item["id"] in balances: balances[item["id"]] += item["points"]
-    task_points -= session.scalar(select(func.coalesce(func.sum(NoviceUnlockDebit.amount), 0)).where(
-        NoviceUnlockDebit.user_id == actor.id, NoviceUnlockDebit.organization_id == actor.organization_id))
+    task_points -= session.scalar(learner_credits(NoviceUnlockDebit, actor).with_only_columns(
+        func.coalesce(func.sum(NoviceUnlockDebit.amount), 0)))
     redemptions = session.scalars(medal_redemptions_query(actor)).all()
     for redemption in redemptions:
         for item in redemption.content["costs"]: balances[item["badgeId"]] -= item["points"]
     for model in (OfflineExperienceGrant, CourseStudyAward):
         xp += int(session.scalar(learner_credits(model, actor).with_only_columns(func.coalesce(func.sum(model.xp), 0))))
-    # XP exchange remains closed: the only existing debits spend task points or
-    # badge points. Never subtract either currency from a learner's earned XP.
+    spent, points = session.execute(learner_credits(MallPointExchange, actor).with_only_columns(
+        func.coalesce(func.sum(MallPointExchange.spent_xp), 0), func.coalesce(func.sum(MallPointExchange.points), 0)
+    )).one()
     return dict(taskPoints=task_points, xp=xp, badgeBalances=balances,
-                availableXp=xp, redeemedXp=0,
+                availableXp=xp-int(spent), redeemedXp=int(spent), mallPoints=int(points),
+                mallExchangeAvailable=mall_exchange_available(),
                 ownedMedalCount=len({redemption.medal_id for redemption in redemptions}))
 
 
-def growth_history(session, actor, *, offset=0, limit=20):
+def growth_history(session, actor, *, offset=0, limit=20, kind=None):
     redemptions = medal_redemptions_query(actor).with_only_columns(
         MedalRedemption.id.label("source_id"), literal("medal_redemption").label("kind"),
         MedalRedemption.created_at.label("occurred_at"), MedalRedemption.medal_id.label("subject_id"),
@@ -116,8 +126,16 @@ def growth_history(session, actor, *, offset=0, limit=20):
     study = learner_credits(CourseStudyAward, actor).with_only_columns(
         CourseStudyAward.id, literal("course_reward"), CourseStudyAward.created_at,
         CourseStudyAward.course_id, literal(None), CourseStudyAward.title, CourseStudyAward.xp, CourseStudyAward.scope)
-    sources = union_all(completed_rewards_query(actor).add_columns(*empty), grants, study,
-                        redemptions.add_columns(*empty)).subquery()
+    exchanges = learner_credits(MallPointExchange, actor).with_only_columns(
+        MallPointExchange.id, literal("mall_exchange"), MallPointExchange.created_at,
+        MallPointExchange.user_id, literal(None), literal(None), -MallPointExchange.spent_xp,
+        literal(None), MallPointExchange.points)
+    no_points = literal(None, type_=BigInteger).label("mall_points")
+    sources = union_all(completed_rewards_query(actor).add_columns(*empty, no_points),
+                        grants.add_columns(no_points), study.add_columns(no_points),
+                        redemptions.add_columns(*empty, no_points), exchanges).subquery()
+    if kind:
+        sources = select(sources).where(sources.c.kind == kind).subquery()
     total = session.scalar(select(func.count()).select_from(sources))
     rows = session.execute(select(sources).order_by(sources.c.occurred_at.desc(),
         sources.c.kind, sources.c.source_id.desc()).offset(offset).limit(limit)).all()
@@ -135,6 +153,9 @@ def growth_history(session, actor, *, offset=0, limit=20):
         elif row.kind == "course_reward":
             item.update(module="AI 学院" if row.credit_detail == "academy" else "新手村", title=row.credit_title,
                         xp=row.credit_xp, badgePoints=[], method="课程学习奖励")
+        elif row.kind == "mall_exchange":
+            item.update(module="沐晨商城", title="经验兑换商城积分", xp=row.credit_xp, badgePoints=[],
+                        mallPoints=row.mall_points, xpPerPoint=-row.credit_xp // row.mall_points, method="经验兑换")
         else:
             name = row.content.get("medalName") or "历史徽章"
             item.update(title=name, xp=0, medal=dict(id=str(row.subject_id), name=name),

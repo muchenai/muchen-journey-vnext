@@ -136,7 +136,7 @@ def test_package_workflow_pins_restore_image_and_migration_range():
 
 def test_migration_head_parser_handles_merge_revision():
     assert migration_heads(Path("migrations/versions")) == [
-        "0063_admin_video_storage"
+        "0064_profile_mall_points"
     ]
 
 

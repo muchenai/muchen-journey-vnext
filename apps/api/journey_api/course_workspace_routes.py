@@ -33,7 +33,6 @@ from journey_api.idempotency import find_replay, store_result
 from journey_api.management_access import course_scope, set_course_tags
 from journey_api.management_access_models import CourseManagementSettings
 from journey_api.models import Role, RoleAssignment, User, UserStatus
-from journey_api.review_admin_access import permissions as legacy_permissions
 from journey_api.review_admin_routes import cached_directory_profiles, envelope
 
 router = APIRouter()
@@ -56,32 +55,15 @@ def learner_directory(actor):
     )
 
 
-def owner(rights):
-    return rights["actorId"] == rights["assignments"]["ownerId"]
-
-
-def writer(rights):
-    return owner(rights) or rights["actorId"] in rights["assignments"]["adminIds"]
-
-
-def reviewer(rights, c):
-    if owner(rights):
-        return True
-    scope = next(
-        (r["tagNames"] for r in rights["assignments"]["reviewers"] if r["personId"] == rights["actorId"]), None
-    )
-    return scope is not None and (not scope or (bool(c["tags"]) and set(c["tags"]) <= set(scope)))
-
-
 def can_view_staff_asset(session, actor, asset_id):
     rights = course_scope(session, actor)
     rows = session.scalars(
         select(WorkspaceCourse).where(WorkspaceCourse.organization_id == actor.organization_id)
     )
     for row in rows:
-        for course in (row.draft, row.live):
-            if course and (writer(rights) or reviewer(rights, course)) and str(asset_id) in asset_ids(course):
-                return True
+        editions = (row.draft, row.live) if rights["isSuperAdmin"] or row.author_id == actor.id else (row.live,)
+        if any(course and str(asset_id) in asset_ids(course) for course in editions):
+            return True
     return False
 
 
@@ -117,17 +99,15 @@ def staff_snapshot(session, actor, scope):
         .where(WorkspaceCourse.organization_id == actor.organization_id, WorkspaceCourse.scope == scope)
         .order_by(WorkspaceCourse.id)
     ).all()
-    visible = [r for r in rows if writer(rights) or reviewer(rights, r.draft)]
-    staff_access = legacy_permissions(session, actor)
     # Approving or administering a course does not make the reviewer its publisher.
-    report_courses = [r for r in rows if can_view_course_report(r, actor, staff_access)]
+    report_courses = [r for r in rows if can_view_course_report(r, actor, rights)]
     records = {
         (r.course_id, r.user_id, r.revision): r.state
         for r in session.scalars(
             select(CourseStudyRecord).where(CourseStudyRecord.course_id.in_([r.id for r in report_courses]))
         )
     }
-    people = session.scalars(learner_directory(actor)).all() if writer(rights) or report_courses else []
+    people = session.scalars(learner_directory(actor)).all() if report_courses else []
     person_ids = [p.id for p in people]
     inherited = inherited_learner_ids(session, actor.organization_id, person_ids) if report_courses else {}
     roster = [{"id": str(p.id), "name": p.display_name} for p in people]
@@ -172,11 +152,12 @@ def staff_snapshot(session, actor, scope):
             )
     catalog = [
         {
-            **presented(row.draft, staff=True),
+            **presented(version, staff=True),
             "liveRevision": row.live["revision"] if row.live else None,
-            "liveTitle": row.live["title"] if row.live and writer(rights) else None,
+            "liveTitle": row.live["title"] if row.live else None,
         }
-        for row in visible
+        for row in rows
+        if (version := row.draft if rights["isSuperAdmin"] or row.author_id == actor.id else row.live)
     ]
     return {
         **rights,
@@ -185,7 +166,7 @@ def staff_snapshot(session, actor, scope):
         "progressCourses": [{"id": str(r.id), "title": r.live["title"]} for r in report_courses],
         "progress": progress_rows,
         "shares": [],
-        "canManageLegacy": staff_access["canPublish"],
+        "canManageLegacy": rights["isSuperAdmin"],
     }
 
 
@@ -208,9 +189,9 @@ def village_reflections(
     actor: Actor = Depends(get_actor),
     session: Session = Depends(get_db),
 ):
-    course_scope(session, actor)
+    rights = course_scope(session, actor)
     course = lookup(session, actor, "village", course_id, live=True)
-    if not can_view_course_report(course, actor, legacy_permissions(session, actor)):
+    if not can_view_course_report(course, actor, rights):
         fail("无权查看这门课程的学习情况。", 403)
     if course_revision is not None:
         check_revision(course_revision, course.live["revision"])
@@ -245,6 +226,8 @@ def admin_command(
     action = body.get("action")
     resource = actor.organization_id
     if action == "saveTags":
+        if not rights["isSuperAdmin"]:
+            fail("仅超级管理员可以管理课程标签。", 403)
         tags = body.get("tags")
         if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
             fail("课程标签列表格式无效。")
@@ -255,8 +238,6 @@ def admin_command(
             fail("标签已被课程引用，请先编辑引用该标签的课程。", 409)
         set_course_tags(session, actor, tags)
     elif action == "saveCourse":
-        if not writer(rights):
-            fail("无课程编辑权限。", 403)
         data = obj(body.get("course"))
         create_key = (
             str(identifier(data["creationId"])) if not data.get("id") and data.get("creationId") else None
@@ -268,7 +249,7 @@ def admin_command(
             return envelope(request, staff_snapshot(session, actor, camp))
         if data.get("id"):
             row = lookup(session, actor, camp, data["id"], lock=True)
-            if not owner(rights) and row.author_id != actor.id:
+            if not rights["isSuperAdmin"] and row.author_id != actor.id:
                 fail("只能编辑自己负责的课程。", 403)
             if row.draft["status"] == "pending":
                 fail("课程正在审核中。", 409)
@@ -300,7 +281,7 @@ def admin_command(
         check_revision(body.get("revision"), c["revision"])
         c["revision"] += 1
         if action == "unpublish":
-            if not (owner(rights) or writer(rights) and row.author_id == actor.id):
+            if not rights["isSuperAdmin"] and row.author_id != actor.id:
                 fail("无课程下架权限。", 403)
             if not row.live:
                 fail("课程已经下架。", 409)
@@ -309,8 +290,8 @@ def admin_command(
             c["_retiredLearning"] = retired_learning(row.live)
             row.live = None
         else:
-            if not reviewer(rights, c) or row.author_id == actor.id:
-                fail("无该课程的审核权限，或不能审核自己发布的课程。", 403)
+            if not rights["isSuperAdmin"]:
+                fail("仅超级管理员可以审核课程。", 403)
             if c["status"] != "pending":
                 fail("课程未处于待审核状态。", 409)
             if body.get("decision") == "return":

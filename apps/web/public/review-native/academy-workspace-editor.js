@@ -47,15 +47,15 @@ function materialInput(editor, icon) {
     <small class="ac-muted">视频直链需能在浏览器中直接播放，以便记录观看进度。</small></details></div>`;
 }
 
-export function renderCourseActions(editor,owner,external = false) {
+export function renderCourseActions(editor,isSuperAdmin,external = false) {
   const attr = external ? 'form="village-publication-form"' : '';
   const disabled = editor.busy ? 'disabled' : '';
   const buttonClass = external ? 'btn' : 'ac-btn';
-  const buttons = `<button ${attr} class="${buttonClass} ${buttonClass}-secondary" type="submit" value="draft" ${disabled}>保存草稿</button><button ${attr} class="${buttonClass} ${buttonClass}-primary" type="submit" value="publish" ${disabled}>${owner?(editor.scope==='village'?'确认发布':'发布课程'):'提交发布审核'}</button>`;
+  const buttons = `<button ${attr} class="${buttonClass} ${buttonClass}-secondary" type="submit" value="draft" ${disabled}>保存草稿</button><button ${attr} class="${buttonClass} ${buttonClass}-primary" type="submit" value="publish" ${disabled}>${isSuperAdmin?(editor.scope==='village'?'确认发布':'发布课程'):'提交发布审核'}</button>`;
   return external ? `<div class="editor-actionbar village-course-actions"><div class="action-buttons">${buttons}</div></div>` : `<div class="ac-form-footer">${buttons}</div>`;
 }
 
-export function renderEditor(editor,tags,owner,icon,externalControls = false) {
+export function renderEditor(editor,tags,isSuperAdmin,icon,externalControls = false) {
   const c=editor.course;
   const village=editor.scope==='village';
   const reward=publicationReward(editor.scope,c.required);
@@ -69,14 +69,14 @@ export function renderEditor(editor,tags,owner,icon,externalControls = false) {
     <label class="ac-field"><span data-reward-label>${reward.label}经验值</span><input name="rewardXp" type="number" required min="0" max="1000000" step="1" value="${e(c.rewardXp ?? 20)}"><small data-reward-hint>${reward.hint}</small></label>
     ${village && c.required?`<label class="ac-field"><span>课程内容范围</span><select name="requiredTopic">${['公司通用常识','公司文化','公司制度',...(c.requiredTopic==='全员通识'?['全员通识']:[])].map(t=>`<option ${c.requiredTopic===t?'selected':''}>${t}</option>`).join('')}</select></label>`:''}</div>
     <fieldset class="ac-tag-options"><legend>课程标签</legend><div>${tags.map(tag=>`<label><input type="checkbox" name="tags" value="${e(tag)}" ${c.tags.includes(tag)?'checked':''}>${e(tag)}</label>`).join('')}
-      ${owner?'<button type="button" class="ac-btn ac-btn-ghost" data-aw-tags aria-haspopup="dialog">管理标签</button>':''}</div></fieldset>
+      ${isSuperAdmin?'<button type="button" class="ac-btn ac-btn-ghost" data-aw-tags aria-haspopup="dialog">管理标签</button>':''}</div></fieldset>
     ${structureFields(editor,materialInput(editor,icon))}
     ${renderCourseCover(editor)}
     <section class="aw-section"><h2>章节心得评审${village?' <small class="tag tag-neutral">暂未开放</small>':''}</h2><p>${village?'AI 评审开放后可配置讲义和评分细则。现有内容可查看，可直接发布。':'心得按章评审。以下讲义和评分细则适用于本课程各章。'}</p><fieldset class="ac-form-fields" aria-label="章节心得评审设置" ${village?'disabled':''}>${field('课程正文、讲义或视频字幕',area('contentText',c.contentText,village?'暂未开放填写':'填写课程要点，或导入讲义和字幕。AI 将结合这些内容与评分细则评审学员心得。'))}
     <label class="ac-field"><span>导入文字材料</span><input type="file" accept=".txt,.md,.vtt,.srt" data-aw-transcript><small>可将 TXT、Markdown、VTT 或 SRT 追加到上方文本框。已上传的 TXT、Markdown 和 DOCX 材料会自动提取正文。视频和网页课程请补充讲义或字幕。</small></label>
     ${field('评分细则与通过条件',area('rubric',c.rubric,village?'暂未开放填写':'列出心得需覆盖的关键点、评分标准和通过条件'))}</fieldset></section>
     </fieldset>${editor.progress?.upload ? '' : progressStatus(editor.progress)}
-    ${externalControls ? '' : renderCourseActions(editor,owner)}</${externalControls?'div':'form'}></section>`;
+    ${externalControls ? '' : renderCourseActions(editor,isSuperAdmin)}</${externalControls?'div':'form'}></section>`;
 }
 
 function resourceUrl(value) {

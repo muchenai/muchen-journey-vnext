@@ -24,8 +24,8 @@ def candidate_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(candidate, "git_sha", lambda *, clean: FULL_SHA)
     expected_migration = {
         "root": "0001_initial",
-        "head": "0063_admin_video_storage",
-        "revision_count": 65,
+        "head": "0064_profile_mall_points",
+        "revision_count": 66,
     }
     monkeypatch.setattr(candidate, "migration", lambda: expected_migration)
     monkeypatch.setattr(candidate, "config_schema", lambda: 3)
@@ -95,15 +95,15 @@ def candidate_manifest(tmp_path, monkeypatch):
 def test_wp07_manifest_inputs_match_candidate_contract():
     assert migration() == {
         "root": "0001_initial",
-        "head": "0063_admin_video_storage",
-        "revision_count": 65,
+        "head": "0064_profile_mall_points",
+        "revision_count": 66,
     }
     assert config_schema() == 3
     assert (ROOT / "contracts" / "openapi.json").is_file()
 
 
 def test_manifest_inputs_form_one_connected_migration_graph():
-    assert migration()["head"] == "0063_admin_video_storage"
+    assert migration()["head"] == "0064_profile_mall_points"
     assert config_schema() == 3
 
 
