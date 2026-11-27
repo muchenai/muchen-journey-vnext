@@ -17,8 +17,7 @@ from journey_api.auth import Actor, get_actor
 from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.exploration_models import ExplorationMaterial, ExplorationMaterialChunk
-from journey_api.management_access import course_scope
-from journey_api.review_admin_access import require_publisher, require_super
+from journey_api.review_admin_access import require_publisher
 from journey_api.review_admin_routes import envelope
 from journey_api.video_limits import MAX_VIDEO_SIZE, VIDEO_TYPES, media_signature
 
@@ -39,18 +38,6 @@ class Upload(BaseModel):
     purpose: Literal["course", "exploration", "novice"]
 
 
-def check_grant(session, actor, purpose):
-    if purpose == "exploration":
-        require_super(session, actor)
-    elif purpose == "novice":
-        require_publisher(session, actor)
-    else:
-        scope = course_scope(session, actor)
-        grants = scope["assignments"]
-        if scope["actorId"] != grants["ownerId"] and scope["actorId"] not in grants["adminIds"]:
-            raise ApiError(403, "FORBIDDEN", "当前账号没有课程资料管理权限。")
-
-
 def require_course_asset(session, actor, asset_id):
     row = session.get(ExplorationMaterial, uuid.UUID(str(asset_id)))
     if not row or row.organization_id != actor.organization_id or row.purpose != "course" or not row.complete:
@@ -65,7 +52,7 @@ def description(row):
 
 @router.post("")
 def begin(command: Upload, request: Request, actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    check_grant(session, actor, command.purpose)
+    require_publisher(session, actor)
     name = command.name.strip()
     ext = name.rsplit(".", 1)[-1].lower()
     if not name or re.search(r"[\\/\x00-\x1f\x7f]", name):
@@ -95,7 +82,7 @@ def upload_row(session, actor, asset_id):
         ExplorationMaterial.chunked.is_(True)).with_for_update())
     if not row:
         raise ApiError(404, "ASSET_NOT_FOUND", "上传记录不存在。")
-    check_grant(session, actor, row.purpose)
+    require_publisher(session, actor)
     return row
 
 

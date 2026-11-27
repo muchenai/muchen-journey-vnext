@@ -12,6 +12,7 @@ from journey_api.academy_routes import now
 from journey_api.config import get_settings
 from journey_api.course_learning import new_state
 from journey_api.course_workspace_models import CourseRosterCode, CourseStudyRecord
+from journey_api.management_access_models import CourseManagementSettings
 from journey_api.db import SessionLocal
 from journey_api.directory_cache_models import DirectoryMember
 from journey_api.identity import (
@@ -228,8 +229,10 @@ def test_progress_visible_only_to_course_author_or_organization_super_admin(peop
     super_admin, course_owner, student, uid = people
     path = f"{OPS}?camp={camp}"
     access_path = "/api/v1/ops/course-access"
-    course_owner_id = data(course_owner.get(access_path))["actorId"]
-    super_id = uuid.UUID(data(super_admin.get(access_path))["actorId"])
+    assert super_admin.get(access_path).status_code == 404
+    assert super_admin.post(access_path, json={"action": "saveRoles"}).status_code == 404
+    course_owner_id = data(course_owner.get(path))["actorId"]
+    super_id = uuid.UUID(data(super_admin.get(path))["actorId"])
     with SessionLocal.begin() as session:
         org = session.get(User, uid).organization_id
         # An ordinary super admin has full report access without grant authority or a course assignment.
@@ -240,13 +243,15 @@ def test_progress_visible_only_to_course_author_or_organization_super_admin(peop
     publisher, publisher_id = identity(org, Role.REVIEWER, "发布人", "admin")
     reviewer_client, reviewer_id = identity(org, Role.REVIEWER, "仅负责审核", "admin")
     foreign_super, _ = identity(other_org, Role.REVIEWER, "另一组织超级管理员", "super_admin")
-    in_scope = data(super_admin.get(access_path))
-    data(super_admin.post(access_path, json={
-        "action": "saveRoles", "revision": in_scope["revision"],
-        "assignments": {"ownerId": course_owner_id, "adminIds": [str(publisher_id)], "reviewers": [
-            {"personId": str(publisher_id), "tagNames": []}, {"personId": str(reviewer_id), "tagNames": []},
-        ]},
-    }))
+    with SessionLocal.begin() as session:
+        # Persisted assignments from older releases must not change member certification.
+        session.add(CourseManagementSettings(organization_id=org, revision=2, tags=[], issuers=[],
+            assignments={"ownerId": course_owner_id, "adminIds": [str(publisher_id)],
+                         "reviewers": [{"personId": str(reviewer_id), "tagNames": []}]}))
+    assert data(super_admin.get(path))["isSuperAdmin"]
+    assert not data(course_owner.get(path))["isSuperAdmin"]
+    assert course_owner.post(path, json={"action": "saveTags", "tags": ["草稿"]}).status_code == 403
+    assert data(super_admin.post(path, json={"action": "saveTags", "tags": ["测试标签"]}))["tags"] == ["测试标签"]
 
     def publish(client, title):
         catalog = data(client.post(path, json={
@@ -257,13 +262,22 @@ def test_progress_visible_only_to_course_author_or_organization_super_admin(peop
     owner_course = publish(course_owner, "负责人发布")
     pending = publish(publisher, "兼任审核的发布人发布")
     foreign_course = publish(foreign_super, "另一组织课程")
-    assert pending["status"] == "pending"
-    assert pending["id"] in {course["id"] for course in data(reviewer_client.get(path))["courses"]}
+    assert owner_course["status"] == pending["status"] == "pending"
+    assert foreign_course["status"] == "published"
     assert data(publisher.get(path))["progress"] == []
-    reviewed = data(course_owner.post(path, json={
-        "action": "reviewCourse", "id": pending["id"], "revision": pending["revision"], "decision": "approve",
-    }))
-    assert reviewed["progressCourses"] == [{"id": owner_course["id"], "title": owner_course["title"]}]
+    for item in (owner_course, pending):
+        decision = {"action": "reviewCourse", "id": item["id"], "revision": item["revision"], "decision": "approve"}
+        assert reviewer_client.post(path, json=decision).status_code == 403
+        assert course_owner.post(path, json=decision).status_code == 403
+        assert foreign_super.post(path, json=decision).status_code == 404
+        data(super_admin.post(path, json=decision))
+    # Other administrators can see published editions but not a pending change to someone else's course.
+    visible_course = next(c for c in data(reviewer_client.get(path))["courses"] if c["id"] == pending["id"])
+    assert visible_course["status"] == "published"
+    revised = data(publisher.post(path, json={"action": "saveCourse", "intent": "draft",
+        "course": {**visible_course, "title": "内部修订草稿"}}))["courses"]
+    assert any(c["title"] == "内部修订草稿" for c in revised)
+    assert all(c["title"] != "内部修订草稿" for c in data(reviewer_client.get(path))["courses"])
     for course in data(student.get(f"{ME}?camp={camp}"))["courses"]:
         data(student.post(f"{ME}?camp={camp}", json={
             "id": course["id"], "revision": course["revision"], "command": "readMaterial", "materialId": "m1",
@@ -300,6 +314,50 @@ def test_progress_visible_only_to_course_author_or_organization_super_admin(peop
         _, foreign_learner = identity(other_org, Role.LEARNER, "同名学员")
         for ineligible in (foreign_learner, super_id):
             assert super_admin.get(endpoint, params={**params, "learnerId": str(ineligible)}).status_code == 404
+
+
+@pytest.mark.parametrize("camp", ["academy", "village"])
+def test_super_admin_manages_another_publishers_course(people, camp):
+    manager, publisher, learner, learner_id = people
+    path = f"{OPS}?camp={camp}"
+    with SessionLocal.begin() as session:
+        org = session.get(User, learner_id).organization_id
+        foreign_org = uuid.uuid4()
+        session.add(Organization(id=foreign_org, name="独立组织"))
+    ordinary, _ = identity(org, Role.REVIEWER, "另一发布人", "admin")
+    foreign_super, _ = identity(foreign_org, Role.REVIEWER, "管理员", "super_admin")
+    created = data(publisher.post(path, json={"action": "saveCourse", "intent": "draft", "course": draft()}))["courses"][0]
+    publish = {"action": "saveCourse", "intent": "publish", "course": {**created, "title": "更新后的课程"}}
+    assert ordinary.post(path, json=publish).status_code == 403
+    assert foreign_super.post(path, json=publish).status_code == 404
+    published = data(manager.post(path, json=publish))["courses"][0]
+    assert published["status"] == "published" and published["author"] == created["author"]
+    retire = {"action": "unpublish", "id": created["id"], "revision": published["revision"]}
+    assert ordinary.post(path, json=retire).status_code == 403
+    assert foreign_super.post(path, json=retire).status_code == 404
+    retired = data(manager.post(path, json=retire))["courses"][0]
+    assert not data(learner.get(f"{ME}?camp={camp}"))["courses"]
+    restored = data(manager.post(path, json={**publish, "course": retired}))["courses"][0]
+    assert restored["status"] == "published" and restored["author"] == created["author"]
+    assert data(learner.get(f"{ME}?camp={camp}"))["courses"][0]["id"] == created["id"]
+
+
+@pytest.mark.parametrize("camp", ["village", "academy"])
+def test_pending_course_follows_role_changes_and_records_a_required_return_reason(people, camp):
+    supervisor, publisher, _, _ = people
+    path = f"{OPS}?camp={camp}"
+    submitted = data(publisher.post(path, json={"action": "saveCourse", "intent": "publish", "course": draft()}))
+    course = submitted["courses"][0]
+    command = {"action": "reviewCourse", "id": course["id"], "revision": course["revision"], "decision": "return"}
+    assert publisher.post(path, json={**command, "reason": "补充讲义"}).status_code == 403
+    with SessionLocal.begin() as session:
+        staff = session.get(ReviewAdminAccess, uuid.UUID(submitted["actorId"]))
+        staff.access_role = "super_admin"
+    assert supervisor.post(path, json={**command, "reason": " "}).status_code == 422
+    returned = data(publisher.post(path, json={**command, "reason": "请补充章节讲义"}))["courses"][0]
+    assert returned["status"] == "returned" and returned["returnReason"] == "请补充章节讲义"
+    republication = data(publisher.post(path, json={"action": "saveCourse", "intent": "publish", "course": returned}))
+    assert republication["isSuperAdmin"] and republication["courses"][0]["status"] == "published"
 
 
 def test_village_required_and_verified_video(people):

@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session
 from journey_api.academy_routes import TAGS, require_staff_entry
 from journey_api.auth import Actor, get_actor
 from journey_api.db import get_db
-from journey_api.experience_permissions import eligible_issuer_ids, require_issuer, require_issuer_configurator, settings_for
-from journey_api.management_access import course_scope, fail, staff_directory, writable_settings
+from journey_api.experience_permissions import (
+    ISSUER_CHANGE, eligible_issuer_ids, issuer_history, issuer_names, require_issuer,
+    require_issuer_configurator, settings_for,
+)
+from journey_api.management_access import fail
 from journey_api.management_access_models import CourseManagementSettings, ExperienceRosterSnapshot, OfflineExperienceGrant
 from journey_api.models import CompletionCode, ExternalIdentity, Role, RoleAssignment, User, UserStatus
 from journey_api.review_admin_routes import audit, cached_directory_profiles, directory_for, directory_subject, envelope
@@ -26,33 +29,10 @@ class Command(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Reviewer(Command):
-    personId: uuid.UUID
-    tagNames: list[Name] = Field(max_length=100)
-
-
-class Assignments(Command):
-    ownerId: uuid.UUID
-    adminIds: list[uuid.UUID] = Field(max_length=2000)
-    reviewers: list[Reviewer] = Field(max_length=2000)
-
-
-class SaveRoles(Command):
-    action: Literal["saveRoles"]
-    revision: int = Field(ge=0, strict=True)
-    assignments: Assignments
-
-
-class AddPerson(Command):
-    action: Literal["addPerson"]
-    revision: int = Field(ge=0, strict=True)
-    name: Name
-
-
 class SetIssuers(Command):
     action: Literal["configure"]
     revision: int = Field(ge=0, strict=True)
-    issuers: list[uuid.UUID] = Field(min_length=2, max_length=2)
+    issuers: list[uuid.UUID | None] = Field(min_length=2, max_length=2)
 
 
 class MatchNames(Command):
@@ -75,50 +55,13 @@ class Grant(Command):
     snapshotId: uuid.UUID | None = None
 
 
-@router.get("/course-access")
-def read_roles(request: Request, actor: Actor=Depends(get_actor), session: Session=Depends(get_db)):
-    return envelope(request, course_scope(session, actor))
-
-
-@router.post("/course-access")
-def change_roles(body: SaveRoles | AddPerson, request: Request, actor: Actor=Depends(get_actor), session: Session=Depends(get_db)):
-    scope = course_scope(session, actor, lock=True)
-    row = writable_settings(session, actor, scope, body.revision)
-    members = [p["id"] for p in scope["people"]]
-    current = scope["assignments"]
-    if isinstance(body, AddPerson):
-        candidates = [str(user.id) for user, _ in staff_directory(session, actor) if user.display_name == body.name]
-        if len(candidates) != 1:
-            fail("请先认证该成员的真实管理账号，再使用唯一的成员姓名。")
-        if candidates[0] in members:
-            fail("该成员已在权限表中，可直接设置角色。", 409)
-        members.append(candidates[0])
-    else:
-        current = body.assignments.model_dump(mode="json")
-        admins = current["adminIds"]
-        reviewers = [r["personId"] for r in current["reviewers"]]
-        if any(pid not in members for pid in [current["ownerId"], *admins, *reviewers]):
-            fail("部分成员已停用或尚未添加，请重新打开后选择。", 409)
-        if len(set(admins)) != len(admins) or len(set(reviewers)) != len(reviewers):
-            fail("成员角色不能重复。")
-        for reviewer in current["reviewers"]:
-            tags = reviewer["tagNames"]
-            if len(set(tags)) != len(tags) or any(tag not in scope["tags"] for tag in tags):
-                fail("请选择有效的审核标签。")
-    row.assignments = {**current, "memberIds": members}
-    row.revision += 1
-    audit(session, request, actor, "course.permissions_changed", actor.organization_id, {"revision":row.revision})
-    session.flush()
-    result = course_scope(session, actor)
-    session.commit()
-    return envelope(request, result)
-
-
 @router.get("/experience/permissions")
 def read_issuer_settings(request: Request, actor: Actor=Depends(get_actor), session: Session=Depends(get_db)):
     require_issuer_configurator(session, actor)
     state = settings_for(session, actor)
-    ids = [uuid.UUID(value) for value in (state.issuers if state else [])]
+    slots = state.issuers if state else []
+    revision = state.revision if state else 0
+    ids = [uuid.UUID(value) for value in slots if value]
     names = dict(session.execute(select(User.id, User.display_name).where(User.id.in_(ids),
         User.organization_id == actor.organization_id)).all()) if ids else {}
     profiles = cached_directory_profiles(session, actor, list(names))
@@ -128,8 +71,8 @@ def read_issuer_settings(request: Request, actor: Actor=Depends(get_actor), sess
         profile = profiles.get(pid) or {}
         selected.append({"id": str(pid), "name": profile.get("name") or names.get(pid, "已失效成员"),
             "employeeNo": profile.get("employee_no") or "", "hasManagementAccess": pid in eligible})
-    return envelope(request, {"revision": state.revision if state else 0,
-                              "issuers": [str(pid) for pid in ids], "selected": selected})
+    return envelope(request, {"revision": revision, "issuers": slots, "selected": selected,
+                              "history": issuer_history(session, actor.organization_id, revision)})
 
 
 @router.get("/experience/permissions/search")
@@ -161,22 +104,30 @@ def configure_issuers(body: SetIssuers, request: Request, actor: Actor=Depends(g
     row = settings_for(session, actor, lock=True)
     if (row.revision if row else 0) != body.revision:
         fail("配置已被更新，请重新打开后再保存。", 409)
-    if len(set(body.issuers)) != 2:
+    occupied = [pid for pid in body.issuers if pid is not None]
+    if len(set(occupied)) != len(occupied):
         fail("请选择两位不同的发放管理员。")
-    eligible = eligible_issuer_ids(session, actor.organization_id, body.issuers)
-    for pid in body.issuers:
+    eligible = eligible_issuer_ids(session, actor.organization_id, occupied)
+    for pid in occupied:
         if pid not in eligible:
             name = session.scalar(select(User.display_name).where(User.id == pid, User.organization_id == actor.organization_id))
             if name:
                 fail(f"「{name}」尚未开通管理系统访问权限。请先在「成员认证」中为其开通权限")
             fail("所选成员已失效，请重新搜索选择。")
+    before = list(row.issuers) if row and row.issuers else [None, None]
+    after = [str(pid) if pid else None for pid in body.issuers]
+    if before == after:
+        return envelope(request, {"configured": True})
+    names = issuer_names(session, actor.organization_id, {pid for pid in before + after if pid})
+    names[str(actor.id)] = actor.display_name
     if row is None:
-        # Empty assignments leave the course permission defaults in force.
         row = CourseManagementSettings(organization_id=actor.organization_id, revision=0, assignments={}, tags=list(TAGS))
         session.add(row)
-    row.issuers = [str(pid) for pid in body.issuers]
+    row.issuers = after
     row.revision += 1
-    audit(session, request, actor, "experience.issuers_changed", actor.organization_id, {"revision": row.revision, "issuers": row.issuers})
+    audit(session, request, actor, ISSUER_CHANGE, actor.organization_id, {
+        "revision": row.revision, "beforeIssuers": before, "issuers": after, "names": names,
+    })
     session.commit()
     return envelope(request, {"configured": True})
 

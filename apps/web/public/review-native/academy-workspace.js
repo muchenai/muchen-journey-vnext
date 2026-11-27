@@ -1,7 +1,7 @@
 import { escapeHtml as e } from './core.js?v=20261030-member-action-spacing';
-import { bindEditor, createEditor, renderCourseActions, renderEditor } from './academy-workspace-editor.js?v=20261126-task-delivery';
+import { bindEditor, createEditor, renderCourseActions, renderEditor } from './academy-workspace-editor.js?v=20261127-member-publication';
 import { renderCoursePreview } from './village-course-preview.js?v=20261126-task-delivery';
-import { chapterReflections, courseDetail, learnerRoster, permissions, renderWorkspace } from './academy-workspace-views.js?v=20261126-village-progress-toolbar';
+import { chapterReflections, courseDetail, learnerRoster, permissions, renderWorkspace } from './academy-workspace-views.js?v=20261127-task-management';
 import { bindFieldFeedback, showFieldError } from './field-feedback.js';
 
 const initialFilters=()=>({tab:'courses',tag:'',status:'',search:'',progressCourse:''});
@@ -51,7 +51,7 @@ export function createAcademyWorkspace({ui,legacy,scope='academy',onNewPublicati
       data=result;error='';
       const rights=permissions(data);
       const canEdit=id=>{
-        if(!id)return rights.admin;
+        if(!id)return rights.canPublish;
         const course=data.courses.find(item=>item.id===id);
         return course && course.status!=='pending' && rights.editable(course);
       };
@@ -59,7 +59,7 @@ export function createAcademyWorkspace({ui,legacy,scope='academy',onNewPublicati
       for(const id of suspendedEditors.keys())if(!canEdit(id))suspendedEditors.delete(id);
       if(historyView && !data.canManageLegacy){historyView=false;legacy.deactivate();}
       if(requestedRequired!==null){
-        if(rights.admin) {
+        if(rights.canPublish) {
           editor=takeEditor(null);
           editor.course.required=requestedRequired;
         }
@@ -125,7 +125,7 @@ export function createAcademyWorkspace({ui,legacy,scope='academy',onNewPublicati
   function render({externalControls = false} = {}) {
     if(historyView) return `<div class="aw-legacy"><button type="button" class="ac-btn ac-btn-secondary" data-aw-current>返回学院工作台</button>${legacy.render()}</div>`;
     const warning=error?`<div class="ac-notice ac-notice-warning" role="alert">${e(error)} <button type="button" class="ac-btn ac-btn-secondary" data-aw-reload>重试</button></div>`:'';
-    const content=!data || requestedRequired!==null?(!error?`<div class="ac-empty" role="status">正在加载${title}…</div>`:''):editor?renderEditor(editor,data.tags,permissions(data).owner,ui.icon,externalControls):renderWorkspace(data,state,ui.icon,scope);
+    const content=!data || requestedRequired!==null?(!error?`<div class="ac-empty" role="status">正在加载${title}…</div>`:''):editor?renderEditor(editor,data.tags,permissions(data).isSuperAdmin,ui.icon,externalControls):renderWorkspace(data,state,ui.icon,scope);
     return `<div class="academy-page">${warning}${content}</div>`;
   }
   function dialog(html,onReady){
@@ -220,7 +220,7 @@ export function createAcademyWorkspace({ui,legacy,scope='academy',onNewPublicati
       bindEditor(root,editor,{refresh,cancel,icon:ui.icon,manageTags:()=>tagsDialog(),save:async(course,intent)=>{
         await mutate({action:'saveCourse',course,intent});
         editor=null;state=initialFilters();
-        ui.toast(intent==='draft'?'草稿已保存':permissions(data).owner?(village?(course.required?'必修课程已发布':'普通任务已发布'):'课程已发布'):'已提交发布审核');
+        ui.toast(intent==='draft'?'草稿已保存':permissions(data).isSuperAdmin?(village?(course.required?'必修课程已发布':'普通任务已发布'):'课程已发布'):'已提交发布审核');
         window.scrollTo({top:0});
       }});return;
     }
@@ -269,6 +269,6 @@ export function createAcademyWorkspace({ui,legacy,scope='academy',onNewPublicati
     return (editor ? editor.course.required : requestedRequired) ? 'required' : 'elective';
   }
   function renderPublishPreview(){return editor ? renderCoursePreview(editor.course,ui.icon) : '';}
-  function renderPublishActions(){return editor && data ? renderCourseActions(editor,permissions(data).owner,true) : '';}
+  function renderPublishActions(){return editor && data ? renderCourseActions(editor,permissions(data).isSuperAdmin,true) : '';}
   return {publicationCourse:()=>editor?.course,render,bind,activate,refreshPermissions,startPublishing,resumePublishing,showCourseList,publishingCourse,currentCourseKind,renderPublishPreview,renderPublishActions,deactivate,reset,canRefresh,isBusy};
 }

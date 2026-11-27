@@ -17,7 +17,7 @@ from journey_api.exploration_service import (MAX_MATERIAL_BYTES, catalog, claim,
     effective_catalog_positions, lock_catalog, progress_for, task_view, treasure_view, unlocked_task_ids, unlock_graduation)
 from journey_api.idempotency import find_replay, store_result
 from journey_api.models import Assignment, AssignmentStatus, Enrollment, EnrollmentStatus, Role, User
-from journey_api.review_admin_access import require_super
+from journey_api.review_admin_access import require_publisher
 from journey_api.review_admin_models import ReviewAdminTask
 from journey_api.review_admin_routes import audit, envelope
 
@@ -279,7 +279,7 @@ def complete_scored_attempt(session, actor, body, request, row):
 @router.post("/review-admin/exploration/materials")
 async def upload_material(request: Request, name: str, type: str = "file",
     actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_super(session, actor)
+    require_publisher(session, actor)
     name = name.strip()
     if not name or len(name) > 240 or re.search(r"[\\/\x00-\x1f\x7f]", name) or type not in {"file", "image"}:
         raise ApiError(422, "INVALID_MATERIAL", "请提供有效文件名。")

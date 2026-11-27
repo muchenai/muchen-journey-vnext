@@ -1,17 +1,20 @@
-"""Roll the live exploration release forward to the learner/administrator course workspace."""
+"""Activate the reviewed learner and administrator release against the live course workspace."""
 import json
 import re
 
-from dynamic_release import Activation, BASE as PRIOR_API, WEB_BASE as PRIOR_WEB, SECRET_FILES, PACKAGE_FILES
-from dynamic_release import execute
+from dynamic_release import Activation, SECRET_FILES, PACKAGE_FILES
+from dynamic_release import event, execute
 from canary_schema_upgrade import COPY_FILES, ENV_FILES, ROOT, Upgrade, read_file, require
 from grant_runtime import TABLES
 
 
+PRIOR_API = PRIOR_WEB = "cf5615788d5d44608c9b9e317ee2b0761a8075b0"
+
+
 class CourseWorkspaceActivation(Activation):
-    base_api = base_web = "cf5615788d5d44608c9b9e317ee2b0761a8075b0"
-    source_schema = "0060_migrated_ai_ownership"
-    target_schema = "0063_admin_video_storage"
+    base_api = base_web = "947a3a40ecb91ecfd8c19e51ceeeefc192d431a0"
+    source_schema = "0063_admin_video_storage"
+    target_schema = "0064_profile_mall_points"
     new_tables = TABLES
     seeds_curriculum = False
     in_flight_sql = (
@@ -19,11 +22,11 @@ class CourseWorkspaceActivation(Activation):
         "where status = 'RUNNING' and created_at >= current_timestamp - interval '10 minutes')"
     )
     protected_endpoints = (*Activation.protected_endpoints, "/api/review-native/course-workspace",
-                           "/api/review-native/experience/permissions")
+                           "/api/review-native/experience/permissions", "/api/learner/profile")
 
     def __init__(self, manifest, package):
         Upgrade.__init__(self, manifest, package)
-        self.base = ROOT / "releases" / (self.base_api + "-dynamic-exploration")
+        self.base = ROOT / "releases" / (self.base_api + "-course-workspace")
         require(manifest["base_release"] == self.base.as_posix()
                 and manifest["base_candidate"] == manifest["base_web_candidate"] == self.base_api, "BASE_PATH")
         require(manifest.get("schema_version") == 4
@@ -38,9 +41,10 @@ class CourseWorkspaceActivation(Activation):
         prepared = json.loads(read_file(self.base / "schema-upgrade-prepared.json"))
         previous = prepared["manifest"]
         require(receipt.get("status") == "PASS" and receipt.get("release") == self.base_api
-                and receipt.get("schema") == self.source_schema and receipt.get("package_run_id") == "44357590475"
+                and receipt.get("schema") == self.source_schema and receipt.get("package_run_id") == "45867910596"
                 and receipt.get("previous_api_release") == PRIOR_API and receipt.get("previous_web_release") == PRIOR_WEB
-                and receipt.get("existing_business_rows_preserved") is True and receipt.get("curriculum_initialized") is True
+                and receipt.get("existing_business_rows_preserved") is True and receipt.get("old_assignments_unchanged") is True
+                and receipt.get("database_schema_changed") is True
                 and receipt.get("other_containers_unchanged") is True, "BASE_ACTIVATION_RECEIPT")
         require(previous["candidate"] == self.base_api and previous["package_run_id"] == receipt["package_run_id"]
                 and previous["base_candidate"] == PRIOR_API and previous["base_web_candidate"] == PRIOR_WEB
@@ -60,18 +64,23 @@ class CourseWorkspaceActivation(Activation):
     def verify_login_configuration(self):
         super().verify_login_configuration()
         probe = """
+from journey_api.config import get_settings
 from journey_api.main import app
+from journey_api.novice_economy import mall_exchange_available
 from journey_api.content_assets import CHUNK_SIZE
 from journey_api.video_limits import MAX_VIDEO_SIZE
+assert get_settings().app_env == 'production' and mall_exchange_available() is False
 assert CHUNK_SIZE == 2 * 1024**2 and MAX_VIDEO_SIZE == 2 * 1024**3
 paths = app.openapi()["paths"]
 for path in ("/api/v1/ops/course-workspace", "/api/v1/me/course-workspace",
-             "/api/v1/review-admin/content-assets", "/api/v1/ops/experience/permissions"):
+             "/api/v1/review-admin/content-assets", "/api/v1/ops/experience/permissions",
+             "/api/v1/me/novice/wallet", "/api/v1/me/profile/exchange"):
     assert path in paths
 print("COURSE_RUNTIME_READY")
 """
         require(self.docker_api("secrets/api.env", "python", "-c", probe, read_only=True).strip()
                 == b"COURSE_RUNTIME_READY", "COURSE_RUNTIME_CONFIG")
+        event("PRODUCTION_MALL_EXCHANGE_DISABLED_VERIFIED")
 
 
 if __name__ == "__main__":

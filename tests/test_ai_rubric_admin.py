@@ -52,7 +52,7 @@ def sandbox_harness(monkeypatch, response):
         def review(self, system, evidence):
             calls.append((system, evidence))
             return response
-    monkeypatch.setattr(routes, "require_camp_publisher", lambda *args: None)
+    monkeypatch.setattr(routes, "require_publisher", lambda *args: None)
     monkeypatch.setattr(config, "get_settings", lambda: SimpleNamespace(ai_self_check_enabled=True, ai_model="configured"))
     monkeypatch.setattr(clients, "get_reviewer", lambda: Reviewer())
     request = SimpleNamespace(state=SimpleNamespace(request_id="sandbox-test"))

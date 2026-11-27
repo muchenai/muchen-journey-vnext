@@ -1,3 +1,4 @@
+import { escapeHtml as e } from './core.js?v=20261030-member-action-spacing';
 import { searchRows } from './member-access.js?v=20261125-certification';
 import { experienceRequest } from './experience-request.js';
 
@@ -14,7 +15,7 @@ function samePerson(first, second) {
 }
 
 export function canSaveIssuers(people) {
-  return people.length === 2 && people.every(person => person?.id && person.hasManagementAccess === true) &&
+  return people.length === 2 && people.every(person => person == null || (person.id && person.hasManagementAccess === true)) &&
     !samePerson(people[0], people[1]);
 }
 
@@ -23,6 +24,16 @@ export function issuerSearchRows(people) {
     name: person.name, avatar: person.avatar, employee_no: person.employeeNo, job_title: person.jobTitle,
     department_paths: person.departmentPaths, departments: person.departments,
   })));
+}
+
+export function issuerHistory(history) {
+  const rows = history.map(item => {
+    const time = new Date(item.time);
+    const displayTime = Number.isFinite(time.getTime()) ? time.toLocaleString('zh-CN', {hour12:false}) : '—';
+    return `<tr><td>${e(displayTime)}</td><td>${e(item.operatorName || '—')}</td><td>发放管理员 ${e(item.slot)}</td><td>${e(item.beforeName || '未指定')}</td><td>${e(item.afterName || '未指定')}</td></tr>`;
+  }).join('');
+  const content = rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">变更时间</th><th scope="col">操作人</th><th scope="col">发放岗位</th><th scope="col">变更前</th><th scope="col">变更后</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="field-hint">暂无权限变更记录</p>';
+  return `<section class="xp-permission-history" aria-label="权限变更记录"><h3>权限变更记录</h3>${content}</section>`;
 }
 
 function issuerSlot(index) {
@@ -54,13 +65,13 @@ export async function bindExperiencePermissions(root, ui, onChange) {
       return;
     }
     if (!panel.isConnected) return;
-    const selected = data.issuers.map(id => data.selected.find(person => person.id === id));
-    const people = [selected[0], selected[1]];
+    const original = [data.issuers[0] ?? null, data.issuers[1] ?? null];
+    const people = original.map(id => id ? data.selected.find(person => person.id === id) ?? {id, name:'原管理员'} : null);
     panel.innerHTML = '<h3>发放管理员</h3><p class="field-hint">按姓名或工号搜索公司成员，指定两位经验发放管理员。</p>' +
       '<form id="xp-roles"><div class="form-grid">' + issuerSlot(0) + issuerSlot(1) +
       '</div><div id="xp-issuer-results" data-issuer-results class="member-search-results" aria-live="polite" hidden></div>' +
       '<p data-save-error class="inline-error" role="alert" hidden></p>' +
-      '<div class="modal-actions"><button type="submit" class="btn btn-primary" disabled>保存发放权限</button></div></form>';
+      '<div class="modal-actions"><button type="submit" class="btn btn-primary" disabled>保存发放权限</button></div></form>' + issuerHistory(data.history || []);
     const form = panel.querySelector('form');
     const submit = form.querySelector('[type=submit]');
     const notice = form.querySelector('[data-save-error]');
@@ -77,6 +88,12 @@ export async function bindExperiencePermissions(root, ui, onChange) {
     }
     root.addEventListener('review-close', clearResults, {once:true});
 
+    function readyToSave() {
+      const changed = people.some((person, index) => (person?.id ?? null) !== original[index]);
+      const resolved = slots.every((slot, index) => people[index] || !slot.querySelector('input').value.trim());
+      return changed && resolved && canSaveIssuers(people);
+    }
+
     function update() {
       const duplicate = samePerson(...people);
       slots.forEach((slot, index) => {
@@ -89,7 +106,7 @@ export async function bindExperiencePermissions(root, ui, onChange) {
         input.setAttribute('aria-invalid', String(!warning.hidden));
         slot.querySelector('[data-issuer-info]').textContent = person?.employeeNo ? '工号：' + person.employeeNo : '';
       });
-      submit.disabled = saving || !canSaveIssuers(people);
+      submit.disabled = saving || !readyToSave();
     }
 
     slots.forEach((slot, index) => {
@@ -141,15 +158,15 @@ export async function bindExperiencePermissions(root, ui, onChange) {
     update();
     form.onsubmit = async event => {
       event.preventDefault();
-      if (saving || !canSaveIssuers(people)) return;
+      if (saving || !readyToSave()) return;
       saving = true;
       root.dataset.operationPending = 'true';
       notice.hidden = true;
       update();
       try {
-        await experienceRequest({action:'configure', issuers:people.map(p => p.id), revision:data.revision}, endpoint);
+        await experienceRequest({action:'configure', issuers:people.map(person => person?.id ?? null), revision:data.revision}, endpoint);
         ui.toast('发放权限已保存');
-        onChange?.({issuers:people.map(p => p.id)});
+        onChange?.({issuers:people.map(person => person?.id ?? null)});
         if (panel.isConnected) await load();
       } catch (error) {
         if (!panel.isConnected) return;

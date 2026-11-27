@@ -139,7 +139,7 @@ def test_new_assessment_requires_questions_and_verifies_all_resource_links(explo
     assert response.status_code == 422 and '请上传任务文件' in response.text
     submitted = post(staff, f'review-admin/tasks/{task_id}/submit-publication', {
         'expected_revision': draft['revision'], 'verified_material_urls': ['https://example.com/read']})
-    assert submitted.status_code == 409 and 'EXPLORATION_DIRECT_PUBLISH_ONLY' in submitted.text
+    assert submitted.status_code == 409 and 'DIRECT_PUBLISH_ONLY' in submitted.text
     content.update(taskFiles=[{'id': 'questions', 'name': '任务题目', 'type': 'link',
         'url': 'https://example.com/questions'}], assessmentUrl='https://example.com/test')
     draft = assert_ok(save(staff, task_id, draft['revision'], content))

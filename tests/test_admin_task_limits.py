@@ -116,7 +116,7 @@ def request_fixture(monkeypatch, action, content):
     profile = SimpleNamespace(content=content, revision=1, status="draft")
     owner = SimpleNamespace(status=UserStatus.ACTIVE, display_name="测试发布者")
     approval = SimpleNamespace(id=uuid.uuid4(), task_id=definition.id, content=deepcopy(content),
-                               revision=1, task_revision=1, status="pending", submitted_by=actor.id)
+                               revision=1, task_revision=1, status="pending", submitted_by=uuid.uuid4())
     results = {"save": [], "publish": [definition, actor.id], "submit": [definition, None],
                "approve": [approval, definition], "read": [None]}
     session = ReadOnlySession({ReviewAdminTask: profile, User: owner}, results[action])
@@ -127,6 +127,7 @@ def request_fixture(monkeypatch, action, content):
     monkeypatch.setattr(admin, "find_replay", lambda *args, **kwargs: None)
     monkeypatch.setattr(publications, "ensure_editable", lambda *args: None)
     monkeypatch.setattr(publications, "access_for", lambda *args: None)
+    monkeypatch.setattr(publications, "permissions", lambda *args: {"isSuperAdmin": False})
     return actor, definition, profile, approval, session
 
 

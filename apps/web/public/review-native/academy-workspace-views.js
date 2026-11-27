@@ -16,13 +16,10 @@ const table = (headings, rows) => `<div class="ac-table-wrap"><table class="ac-t
 const empty = message => `<div class="ac-empty"><strong>${e(message)}</strong></div>`;
 
 export function permissions(data) {
-  const { assignments, actorId } = data;
-  const owner = assignments.ownerId === actorId;
-  const admin = owner || assignments.adminIds.includes(actorId);
-  const reviewer = assignments.reviewers.find(person => person.personId === actorId);
-  return { owner, admin, reviewer,
-    editable: course => owner || (admin && course.author?.id === actorId),
-    canReview: course => course.status === 'pending' && course.author?.id !== actorId && (owner || Boolean(reviewer && (!reviewer.tagNames.length || (course.tags?.length && course.tags.every(tag => reviewer.tagNames.includes(tag)))))),
+  const { actorId, isSuperAdmin, canPublish } = data;
+  return { isSuperAdmin, canPublish,
+    editable: course => isSuperAdmin || (canPublish && course.author?.id === actorId),
+    canReview: course => isSuperAdmin && course.status === 'pending',
   };
 }
 
@@ -30,11 +27,10 @@ export function renderWorkspace(data, state, icon, scope='academy') {
   const village=scope==='village';
   const title=village?'新手村任务管理':'AI 学院';
   const rights = permissions(data);
-  const tabs = [['courses',village?'任务管理':'课程管理'], ['reviews','发布审核'], ['progress','学习情况']];
+  const tabs = [['courses',village?'任务管理':'课程管理'], ['reviews',rights.isSuperAdmin?'发布审核':'我的提交'], ['progress','学习情况']];
   const count = data.courses.filter(rights.canReview).length;
-  const roleSummary=rights.owner?'课程负责人':[rights.admin?'普通管理员':'',rights.reviewer?(rights.reviewer.tagNames.length?`审核范围 · ${rights.reviewer.tagNames.join('、')}`:'全课程审核人'):''].filter(Boolean).join(' / ')||'尚未分配课程权限';
-  const actor = `<span class="aw-actor">${e(data.people.find(p=>p.id===data.actorId)?.name||'当前账号')}</span> <span class="aw-role-label">${e(roleSummary)}</span>`;
-  const tools = rights.admin ? `<button type="button" class="ac-btn ac-btn-primary" data-aw-new>${icon('plus',15)} ${village?'新建发布':'新增课程'}</button>` : '';
+  const actor = `<span class="aw-actor">${e(data.actorName||'当前账号')}</span> <span class="aw-role-label">${rights.isSuperAdmin?'超级管理员':'普通管理员'}</span>`;
+  const tools = rights.canPublish ? `<button type="button" class="ac-btn ac-btn-primary" data-aw-new>${icon('plus',15)} ${village?'新建发布':'新增课程'}</button>` : '';
   return `<header class="ac-heading"><div><h1>${title}</h1><p>${actor}</p></div><div class="ac-actions">${tools}</div></header>
     <nav class="ac-admin-tabs" aria-label="${title}管理">${tabs.map(([key,label]) => `<button type="button" data-aw-tab="${key}" aria-current="${key===state.tab?'page':'false'}" class="${key===state.tab?'active':''}">${label}${key==='reviews' && count ? ` <span class="ac-badge">${count}</span>` : ''}</button>`).join('')}</nav>
     ${state.tab==='progress' ? progressView(data,state,village) : catalogView(data,state,rights,village)}
@@ -43,7 +39,7 @@ export function renderWorkspace(data, state, icon, scope='academy') {
 
 function catalogView(data,state,rights,village) {
   const reviewing = state.tab==='reviews';
-  const list = data.courses.filter(c=>(!reviewing || c.status==='pending') && (!state.tag || c.tags?.includes(state.tag)) && (!state.status || c.status===state.status));
+  const list = data.courses.filter(c=>(!reviewing || (c.status==='pending' && (rights.isSuperAdmin || c.author?.id===data.actorId))) && (!state.tag || c.tags?.includes(state.tag)) && (!state.status || c.status===state.status));
   const rows = list.map(c=>{
     const reward = publicationReward(village?'village':'academy',c.required);
     const actions = [action('detail',c.id,'查看')];
@@ -84,7 +80,7 @@ function progressView(data,state,village) {
   }).join('');
   const columns = ['学员','课程','学习进度','有效观看','学习状态','最近学习'];
   if (village) columns.push('操作');
-  const rosterButton = !village && permissions(data).admin ? action('learners','','学员名单','secondary') : '';
+  const rosterButton = !village && permissions(data).canPublish ? action('learners','','学员名单','secondary') : '';
   return `<div class="ac-toolbar aw-filters"><input type="search" data-aw-search value="${e(state.search)}" aria-label="搜索学员或课程" placeholder="搜索学员或课程"><select aria-label="选择进度课程" data-aw-filter="progressCourse">${selectOption('','全部课程',selectedCourse)}${[...options].map(([id,title])=>selectOption(id,title,selectedCourse)).join('')}</select>${action('reload','','刷新','secondary')}${rosterButton}</div>
     ${records.length ? table(columns,rows) + '<p data-aw-no-match hidden class="ac-empty">暂无匹配的学习记录</p>' : empty('暂无学员学习记录')}`;
 }

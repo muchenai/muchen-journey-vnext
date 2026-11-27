@@ -29,7 +29,7 @@ from journey_api.review_admin_access import permissions, require_super
 from journey_api.review_admin_models import PublishedTaskContent, ReviewAdminTask
 from journey_api.review_admin_routes import TaskContent, task_content_for_publish
 
-TARGET_SCHEMA = "0063_admin_video_storage"
+TARGET_SCHEMA = "0064_profile_mall_points"
 SEED_ROOT = Path(journey_api.__file__).resolve().parent
 STABLE_KEYS = tuple(f"EXPLORATION-DYNAMIC-20261117-{index:02}" for index in range(1, 9))
 NEW_TABLES = frozenset({"exploration_catalog_tasks", "exploration_work", "exploration_progress",
@@ -61,7 +61,8 @@ def authorized_author(session, organization_id, author_id, *, lock):
         RoleAssignment.user_id == author_id, RoleAssignment.organization_id == organization_id)))
     if user is None or Role.REVIEWER not in roles:
         raise ValueError("ACTIVE_REAL_REVIEWER_REQUIRED")
-    actor = Actor(id=author_id, organization_id=organization_id, roles=roles, display_name=user.display_name)
+    actor = Actor(id=author_id, organization_id=organization_id, roles=roles,
+                  display_name=user.display_name, entry_role=Role.REVIEWER)
     if lock:
         require_super(session, actor)
     elif not permissions(session, actor)["isSuperAdmin"]:

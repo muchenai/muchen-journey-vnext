@@ -257,7 +257,7 @@ test('entry scripts fetch the updated shared policy rather than old cached valid
   assert.ok(Number(appVersion) >= 20261126);
   assert.match(source('app.js'), /core.js\?v=20261118-document-rubric/);
   assert.match(source('app.js'), /sandbox.js\?v=20261118-document-rubric/);
-  assert.match(source('app.js'), /library.js\?v=20261118-document-rubric/);
+  assert.match(source('app.js'), /library.js\?v=20261127-task-management/);
   assert.match(source('core.js'), /rubric-policy.js\?v=20261118-document-rubric/);
   assert.match(source('sandbox.js'), /rubric-policy.js\?v=20261118-document-rubric/);
 });

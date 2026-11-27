@@ -9,9 +9,10 @@ from sqlalchemy import event, func, select, text
 
 from journey_api.db import SessionLocal, engine
 from journey_api.exploration_models import ExplorationWork
-from journey_api.models import Assignment, Enrollment, TaskDefinition
+from journey_api.models import Assignment, Enrollment, Role, TaskDefinition
 from journey_api.review_admin_models import PublishedTaskContent, ReviewAdminTask
 from test_dynamic_exploration import command, exploration, post, publish, read
+from test_course_workspace import identity
 from test_wp09_feishu_identity import assert_ok
 
 
@@ -134,13 +135,17 @@ def test_waiting_first_claim_cannot_overtake_archive_or_delete(exploration, monk
 @pytest.mark.parametrize('original_camp', ['exploration', 'novice'])
 @pytest.mark.parametrize('exploration', ['FEISHU'], indirect=True)
 def test_published_camp_stays_fixed_after_saving_an_editable_draft(exploration, original_camp):
-    staff, learner, _ = exploration
+    _, learner, _ = exploration
     configuration = {}
     if original_camp == 'novice':
         configuration = dict(camp='novice', domain='产品开发', difficulty='入门',
             publishingDepartment='开发部', badges=[{'id': 'product', 'weight': 100}])
     task_id, live, content = publish(exploration, **configuration)
     changed_camp = 'novice' if original_camp == 'exploration' else 'exploration'
+    with SessionLocal() as session:
+        org = session.get(TaskDefinition, uuid.UUID(task_id)).organization_id
+    manager, _ = identity(org, Role.REVIEWER, '跨发布人管理任务的超级管理员', 'super_admin')
+    staff = (manager, manager.headers['X-CSRF-Token'])
 
     edited = {**content, 'title': '已保存但尚未发布的课程修改'}
     draft = assert_ok(save(staff, task_id, live['revision'], edited))
@@ -164,7 +169,8 @@ def test_published_camp_stays_fixed_after_saving_an_editable_draft(exploration, 
     if original_camp == 'exploration':
         assert read(learner, task_id)['title'] == content['title']
     else:
-        current = assert_ok(learner[0].get(f'/api/v1/me/novice/tasks/{task_id}'))
+        corporate, _ = identity(org, Role.LEARNER, '新手村学员')
+        current = assert_ok(corporate.get(f'/api/v1/me/novice/tasks/{task_id}'))
         assert current['title'] == content['title']
 
 

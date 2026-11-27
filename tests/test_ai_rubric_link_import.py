@@ -220,11 +220,11 @@ def route_fixture(monkeypatch):
 
 def test_import_route_releases_permission_lock_then_rechecks_after_external_io(monkeypatch):
     routes, command, request, actor, session, events = route_fixture(monkeypatch)
-    monkeypatch.setattr(routes, "require_camp_publisher",
-        lambda db, user, camp, difficulty: events.append(("authorize", db is session, user is actor, camp, difficulty)))
+    monkeypatch.setattr(routes, "require_publisher",
+        lambda db, user, difficulty: events.append(("authorize", db is session, user is actor, difficulty)))
     result = routes.import_rubric_document_route(command, request, actor, session)
-    assert events == [("authorize", True, True, "exploration", None), "commit",
-        ("read", WIKI_URL), ("authorize", True, True, "exploration", None)]
+    assert events == [("authorize", True, True, None), "commit",
+        ("read", WIKI_URL), ("authorize", True, True, None)]
     assert result == {"data": {"material": {"id": "frozen"}}, "request_id": "rubric-import-test"}
 
 
@@ -232,13 +232,13 @@ def test_import_route_releases_permission_lock_then_rechecks_after_external_io(m
 def test_import_route_denies_unauthorized_publisher_before_client_or_database_mutation(monkeypatch, camp, difficulty):
     routes, command, request, actor, session, events = route_fixture(monkeypatch)
     command = routes.ImportRubricDocument(url=WIKI_URL, camp=camp, difficulty=difficulty)
-    def deny(db, user, actual_camp, actual_difficulty):
-        events.append(("authorize", actual_camp, actual_difficulty))
+    def deny(db, user, actual_difficulty):
+        events.append(("authorize", actual_difficulty))
         raise ApiError(403, "FORBIDDEN", "当前账号没有任务发布权限。")
-    monkeypatch.setattr(routes, "require_camp_publisher", deny)
+    monkeypatch.setattr(routes, "require_publisher", deny)
     with pytest.raises(ApiError, match="没有任务发布权限"):
         routes.import_rubric_document_route(command, request, actor, session)
-    assert events == [("authorize", camp, difficulty or None)]
+    assert events == [("authorize", difficulty or None)]
 
 
 def test_import_route_does_not_return_attachment_when_access_is_revoked_during_read(monkeypatch):
@@ -247,7 +247,7 @@ def test_import_route_does_not_return_attachment_when_access_is_revoked_during_r
         if events:
             raise ApiError(403, "FORBIDDEN", "当前账号没有任务发布权限。")
         events.append("authorized")
-    monkeypatch.setattr(routes, "require_camp_publisher", check)
+    monkeypatch.setattr(routes, "require_publisher", check)
     with pytest.raises(ApiError, match="没有任务发布权限"):
         routes.import_rubric_document_route(command, request, actor, session)
     assert events == ["authorized", "commit", ("read", WIKI_URL)]

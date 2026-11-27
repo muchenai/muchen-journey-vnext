@@ -20,7 +20,7 @@ from journey_api.models import (Assignment, AssignmentStatus, EnrollmentStatus,
     TaskDefinitionStatus, TaskVersion, User, UserStatus, ExternalIdentity, IdentitySession, Organization, CompletionCode)
 from journey_api.review_admin_models import ReviewAdminTask, ReviewAdminDecision, ReviewAdminCertification, ReviewAdminAccess, ReviewClaim
 from journey_api.review_claims import LEASE_SECONDS, live_claim, busy, check_write, claim_views
-from journey_api.review_admin_access import access_for, permissions, require_super, require_publisher, require_camp_publisher, STAFF_ROLES
+from journey_api.review_admin_access import access_for, can_manage_task, permissions, require_super, require_publisher, STAFF_ROLES
 from journey_api.review_camps import task_camp
 from journey_api.review_routes import (ReviewContext, scoped_context_query, get_scoped_context,
     queue_item, review_detail, start_review, finalize_review, effective_review_rubric, lock_scoped_context)
@@ -321,12 +321,12 @@ class ImportRubricDocument(BaseModel):
 def import_rubric_document_route(command: ImportRubricDocument, request: Request,
         actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     difficulty = command.difficulty or None
-    require_camp_publisher(session, actor, command.camp, difficulty)
+    require_publisher(session, actor, difficulty)
     # Publication access checks take a user-row lock. Release it before slow
     # Feishu I/O, then recheck access in case it was revoked while reading.
     session.commit()
     material = import_rubric_document(command.url)
-    require_camp_publisher(session, actor, command.camp, difficulty)
+    require_publisher(session, actor, difficulty)
     return envelope(request, {"material": material})
 
 
@@ -432,18 +432,16 @@ class SaveTask(BaseModel):
 @router.put("/tasks/{task_id}")
 def save_task(task_id: uuid.UUID, command: SaveTask, request: Request,
               actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_camp_publisher(session, actor, command.content.camp, command.content.difficulty or None)
+    require_publisher(session, actor, command.content.difficulty or None)
     if task_id != command.id:
         raise ApiError(422, "VALIDATION_FAILED", "任务编号不一致。")
     session.scalar(select(User.id).where(User.id == actor.id).with_for_update())
     definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
-    if definition and (definition.organization_id != actor.organization_id or definition.created_by != actor.id):
+    if definition and not can_manage_task(session, actor, definition):
         raise ApiError(403, "FORBIDDEN", "只能编辑当前账号创建的任务；可以复制为新任务。")
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_id)
     row = session.get(ReviewAdminTask, task_id)
-    if definition and task_camp(definition, row) == "exploration":
-        require_super(session, actor)
     if row and row.status == "deleted":
         raise ApiError(404, "NOT_FOUND", "该任务已删除。")
     if definition:
@@ -551,17 +549,14 @@ def publish_task(task_id: uuid.UUID, command: PublishTask, request: Request,
     idempotency_key: str = Header(alias="Idempotency-Key"), actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     from journey_api.routes import publish_task_version
     require_super(session, actor)
-    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id).with_for_update())
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
+        TaskDefinition.organization_id == actor.organization_id).with_for_update())
     from journey_api.publication_routes import ensure_editable
-    ensure_editable(session, task_id)
     row = session.get(ReviewAdminTask, task_id)
-    if not definition or definition.organization_id != actor.organization_id or definition.created_by != actor.id or not row:
+    if not definition or not row or row.status == "deleted":
         raise ApiError(404, "NOT_FOUND", "任务草稿不存在。")
-    exploration = task_camp(definition, row) == "exploration"
-    if not exploration and command.reviewed_by is None:
-        raise ApiError(422, "VALIDATION_FAILED", "请选择内容复核人。")
-    if exploration:
-        command = command.model_copy(update={"reviewed_by": actor.id})
+    ensure_editable(session, task_id)
+    command = command.model_copy(update={"reviewed_by": actor.id})
     require_publisher(session, actor, row.content.get("difficulty", "入门"))
     if row.revision != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "任务草稿已更新，请重新打开。")
@@ -585,22 +580,36 @@ def publish_task(task_id: uuid.UUID, command: PublishTask, request: Request,
     return envelope(request, task_data(session, definition))
 
 
+class TaskLibraryRevision(RevisionCommand):
+    expected_revision: int = Field(ge=0)
+
+
 class ArchiveTask(BaseModel):
     expected_revision: int = Field(ge=0)
     archived: bool
+
+
+def legacy_task_profile(session, definition, data):
+    # Preserve old version content when a task is first managed in the task library.
+    row = ReviewAdminTask(task_definition_id=definition.id, organization_id=definition.organization_id,
+        revision=0, content=_TaskContentFields.model_validate(data).model_dump(mode="json"))
+    session.add(row)
+    return row
 
 
 @router.post("/tasks/{task_id}/archive")
 def archive_task(task_id: uuid.UUID, command: ArchiveTask, request: Request,
                  actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
     require_publisher(session, actor)
-    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id==task_id,
-        TaskDefinition.organization_id==actor.organization_id, TaskDefinition.created_by==actor.id).with_for_update())
-    if not definition:
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
+        TaskDefinition.organization_id == actor.organization_id).with_for_update())
+    if not definition or not can_manage_task(session, actor, definition):
         raise ApiError(404, "NOT_FOUND", "无法管理此任务。")
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_id)
     data = task_data(session, definition)
+    if data.get("status") == "deleted":
+        raise ApiError(404, "NOT_FOUND", "该任务已删除。")
     if data.get("camp") == "exploration":
         require_super(session, actor)
     if not command.archived:
@@ -609,10 +618,7 @@ def archive_task(task_id: uuid.UUID, command: ArchiveTask, request: Request,
         raise ApiError(409, "VERSION_CONFLICT", "任务已更新，请刷新。")
     row = session.get(ReviewAdminTask, task_id)
     if not row:
-        # Archiving/restoring existing versions does not edit their legacy content.
-        row = ReviewAdminTask(task_definition_id=task_id, organization_id=actor.organization_id, revision=0,
-                              content=_TaskContentFields.model_validate(data).model_dump(mode="json"))
-        session.add(row)
+        row = legacy_task_profile(session, definition, data)
     row.status = "archived" if command.archived else "published" if data["version"] else "draft"
     row.revision += 1
     if row.content.get("camp") == "exploration":
@@ -624,21 +630,22 @@ def archive_task(task_id: uuid.UUID, command: ArchiveTask, request: Request,
 
 
 @router.post("/tasks/{task_id}/delete")
-def delete_exploration_task(task_id: uuid.UUID, command: RevisionCommand, request: Request,
+def delete_exploration_task(task_id: uuid.UUID, command: TaskLibraryRevision, request: Request,
     actor: Actor = Depends(get_actor), session: Session = Depends(get_db)):
-    require_publisher(session, actor)
-    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
-        TaskDefinition.organization_id == actor.organization_id, TaskDefinition.created_by == actor.id).with_for_update())
-    row = session.get(ReviewAdminTask, task_id) if definition else None
-    if not row or row.content.get("camp") != "exploration":
-        raise ApiError(404, "NOT_FOUND", "没有找到可删除的探索营任务。")
     require_super(session, actor)
-    if row.status == "deleted":
+    definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
+        TaskDefinition.organization_id == actor.organization_id).with_for_update())
+    row = session.get(ReviewAdminTask, task_id) if definition else None
+    if not definition or task_camp(definition, row) != "exploration":
+        raise ApiError(404, "NOT_FOUND", "没有找到可删除的探索营任务。")
+    if row and row.status == "deleted":
         return envelope(request, {"id": str(task_id), "deleted": True, "revision": row.revision})
     from journey_api.publication_routes import ensure_editable
     ensure_editable(session, task_id)
-    if row.revision != command.expected_revision:
+    if (row.revision if row else 0) != command.expected_revision:
         raise ApiError(409, "VERSION_CONFLICT", "任务已更新，请刷新。")
+    if not row:
+        row = legacy_task_profile(session, definition, task_data(session, definition))
     row.status, row.revision = "deleted", row.revision + 1
     from journey_api.exploration_service import publish_catalog
     publish_catalog(session, definition, row, move=False)
@@ -1111,7 +1118,7 @@ class SandboxCommand(BaseModel):
 def sandbox(command:SandboxCommand,request:Request,actor:Actor=Depends(get_actor),session:Session=Depends(get_db)):
     from journey_api.ai_self_check_clients import get_reviewer
     from journey_api.config import get_settings
-    require_camp_publisher(session,actor,command.task.camp,command.task.difficulty)
+    require_publisher(session, actor, command.task.difficulty)
     task_content_for_publish(command.task.model_dump(mode="json"))
     if not get_settings().ai_self_check_enabled:
         raise ApiError(503,"AI_UNAVAILABLE","AI 服务未启用。")

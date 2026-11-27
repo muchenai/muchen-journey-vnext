@@ -18,7 +18,7 @@ from journey_api.identity import CSRF_COOKIE, SESSION_COOKIE, credential_hash
 from journey_api.models import ExternalIdentity, IdentitySession, Organization, Role, RoleAssignment, User, UserStatus
 from journey_api.review_admin_models import ReviewAdminAccess
 from test_exploration_review_access import administrator
-from test_reviewer_workbench import client_for, create_linked_reviewer
+from test_reviewer_workbench import client_for, client_for_linked_reviewer, create_linked_reviewer
 from test_wp09_feishu_identity import assert_ok, create_role_user
 
 OPS = '/api/v1/ops/academy'
@@ -34,7 +34,7 @@ def no_external_cover_io(monkeypatch):
 
 @pytest.fixture
 def academy():
-    staff = administrator(create_linked_reviewer('学院管理员'), ORGANIZATION_ID, 'admin')
+    staff = administrator(create_linked_reviewer('学院管理员'), ORGANIZATION_ID, 'super_admin')
     return staff, academy_learner()
 
 
@@ -99,6 +99,18 @@ def test_real_course_publication_edit_visibility_and_revision(academy):
     restored = assert_ok(write(staff, 'post', url + '/visibility', dict(expected_revision=hidden['revision'], visible=True)))
     assert restored['visibility'] == 'published'
     assert any(c['id'] == course['id'] for c in published(learner))
+
+
+def test_legacy_direct_course_writes_require_super_admin(academy):
+    staff, _ = academy
+    regular = administrator(create_linked_reviewer('普通课程管理员'), ORGANIZATION_ID, 'admin')
+    course = new_course(staff)
+    path = OPS + '/courses/' + course['id']
+    assert_ok(regular[0].get(OPS))
+    assert write(regular, 'post', OPS + '/courses', dict(type='link', title='直接发布', summary='待审核课程',
+        url='https://example.com/course')).status_code == 403
+    assert write(regular, 'patch', path, dict(expected_revision=1, title='修改')).status_code == 403
+    assert write(regular, 'post', path + '/visibility', dict(expected_revision=1, visible=True)).status_code == 403
 
 
 def test_video_integrity_chunk_retry_and_authenticated_range_delivery(academy):
@@ -281,10 +293,17 @@ def test_video_checkpoint_resume_and_completion_threshold(academy):
     complete = assert_ok(write(learner,'post',progress_path,dict(seconds=90,duration=100)))
     assert complete['completed'] is True and complete['progress'] == 100
     assert_ok(write(learner,'post',ME+'/courses/'+course['id']+'/favorite',dict(saved=True)))
-    replacement = upload(staff,b'\x00\x00\x00\x18ftypmp42' + b'b'*40)
-    assert_ok(write(staff,'post',OPS+'/uploads/'+replacement['id']+'/complete',{}))
-    replaced = assert_ok(write(staff,'patch',OPS+'/courses/'+course['id'],dict(
-        expected_revision=course['revision'],uploadId=replacement['id'])))
+    manager = administrator(create_linked_reviewer('另一位超级管理员'), ORGANIZATION_ID, 'super_admin')
+    edit_path = OPS+'/courses/'+course['id']
+    edited = assert_ok(write(manager,'patch',edit_path,dict(
+        expected_revision=course['revision'],title='编辑原视频课程',uploadId=started['id'])))
+    assert edited['author'] == course['author']
+    assert assert_ok(learner[0].get(ME+'/courses/'+course['id']))['completed'] is True
+    replacement = upload(manager,b'\x00\x00\x00\x18ftypmp42' + b'b'*40)
+    assert_ok(write(manager,'post',OPS+'/uploads/'+replacement['id']+'/complete',{}))
+    replacement_command = dict(expected_revision=edited['revision'],uploadId=replacement['id'])
+    assert write(staff,'patch',edit_path,replacement_command).status_code == 403
+    replaced = assert_ok(write(manager,'patch',edit_path,replacement_command))
     reset = assert_ok(learner[0].get(ME+'/courses/'+course['id']))
     assert reset['completed'] is False and reset['progress'] == 0 and reset['favorite'] is True
     assert write(learner,'post',progress_path,dict(seconds=99,duration=100,expected_revision=course['revision'])).status_code == 409
@@ -311,7 +330,7 @@ def test_permissions_csrf_own_shares_and_cross_organization(academy, monkeypatch
     import test_reviewer_workbench
     with monkeypatch.context() as patch:
         patch.setattr(test_reviewer_workbench,'ORGANIZATION_ID',org)
-        other = administrator(user,org,'admin')
+        other = administrator(user,org,'super_admin')
     assert not any(c['id'] == course['id'] for c in assert_ok(other[0].get(OPS))['courses'])
     assert write(other,'patch',OPS+'/courses/'+course['id'],dict(expected_revision=course['revision'],title='越权')).status_code == 404
     pending = assert_ok(write(staff,'post',OPS+'/uploads',dict(fileName='private.mp4',size=12)))
@@ -353,3 +372,15 @@ def test_dual_role_user_must_use_staff_entry_for_academy_management(academy):
     assert write(learner,'post',OPS+'/courses',dict(type='link',title='禁止跨入口发布',summary='不能使用学员会话管理',url='https://example.com')).status_code == 403
     assert learner[0].get(OPS+'/courses/'+course['id']+'/video').status_code == 403
     assert any(c['id'] == course['id'] for c in published(learner))
+    with SessionLocal.begin() as session:
+        if not session.scalar(select(ExternalIdentity.id).where(ExternalIdentity.user_id == learner_id)):
+            session.add(ExternalIdentity(id=uuid.uuid4(), organization_id=ORGANIZATION_ID, user_id=learner_id,
+                provider='FEISHU', subject=uuid.uuid4().hex, verified_at=datetime.now(UTC), revision=1))
+    management_session = client_for_linked_reviewer(learner_id)
+    review_path = OPS+'/shares/'+share['id']+'/review'
+    decision = dict(expected_revision=share['revision'], decision='approved')
+    assert write(management_session,'post',review_path,decision).status_code == 403
+    with SessionLocal.begin() as session:
+        session.get(ReviewAdminAccess,learner_id).access_role = 'super_admin'
+    approved = assert_ok(write(management_session,'post',review_path,decision))
+    assert approved['status'] == 'approved' and approved['reviewedBy'] == str(learner_id)

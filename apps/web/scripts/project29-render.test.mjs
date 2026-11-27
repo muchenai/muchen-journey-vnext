@@ -56,7 +56,7 @@ test('retained original exploration tasks are linked from header tools without s
   }
 });
 
-test('personal profile shows actual rewards and growth levels with mall exchange still unavailable',()=>{
+test('personal profile still shows rewards when an older wallet has no mall points field',()=>{
   const props={name:'真实学员',wallet:{xp:200,availableXp:200,redeemedXp:0,ownedMedalCount:0,badgeBalances:{product:20,data:5}},badges:[],error:'',onRetry(){},onBack(){},onAcademy(){},onAcademyFavorites(){},onBadgeShop(){},onBadgeCatalog(){},onBadgeOwned(){}};
   const html=renderToStaticMarkup(React.createElement(PersonalProfileView,props));
   assert.match(html,/真实学员/);assert.match(html,/200/);assert.match(html,/20 点/);assert.match(html,/5 点/);
@@ -65,6 +65,7 @@ test('personal profile shows actual rewards and growth levels with mall exchange
   assert.match(html,/可兑换经验<\/span><strong>200/);assert.match(html,/已用于兑换<\/span><strong>0/);
   assert.match(html,/<strong>0 <small>枚<\/small><\/strong>/);
   assert.match(html,/查看成长明细/);assert.match(html,/经验兑换暂未开放/);assert.match(html,/商城积分 · 暂未开放/);
+  assert.doesNotMatch(html,/class="xp-exchange-form"/);
   assert.doesNotMatch(html,/1,250|Lv\.3|洞察新星|演示成长|预览身份/);
   const failed=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,badges:null,error:'读取失败'}));
   assert.match(failed,/读取失败/);assert.match(failed,/重新加载/);assert.doesNotMatch(failed,/200|20 点/);
@@ -72,6 +73,37 @@ test('personal profile shows actual rewards and growth levels with mall exchange
   assert.match(failed,/等级数据读取失败/);assert.doesNotMatch(failed,/<progress|Lv\.1/);
   const loading=renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet:null,badges:null,error:''}));
   assert.match(loading,/正在读取成长等级/);assert.doesNotMatch(loading,/<progress|Lv\.1/);
+});
+
+test('personal profile places exchange beside growth and favorites before the badge wall',()=>{
+  const props={name:'真实学员',wallet:{xp:520,availableXp:410,redeemedXp:110,mallPoints:11,mallExchangeAvailable:true,ownedMedalCount:0,badgeBalances:{}},badges:[],error:''};
+  const render=wallet=>renderToStaticMarkup(React.createElement(PersonalProfileView,{...props,wallet}));
+  const html=render(props.wallet);
+  const sections=['MY GROWTH SPACE','我的经验与等级','沐晨商城积分','我的收藏','我的徽章墙','成长补给站'];
+  let previous=-1;
+  for(const section of sections){
+    const position=html.indexOf(section);
+    assert.ok(position>previous,section+' missing or out of order');
+    previous=position;
+  }
+  assert.match(html,/<strong>520<\/strong><span>累计成长经验<\/span>/);
+  assert.match(html,/<strong>11<\/strong><span>商城积分<\/span>/);
+  assert.match(html,/class="profile-mall-number"><strong>11<\/strong><span>积分余额/);
+  assert.match(html,/可兑换经验<\/span><strong>410/);
+  assert.match(html,/已用于兑换<\/span><strong>110/);
+  assert.match(html,/10 经验 = 1 商城积分/);
+  assert.match(html,/当前最多可兑换 41 积分/);
+  assert.match(html,/<button class="module-primary">使用 10 经验兑换 1 积分<\/button>/);
+  assert.match(html,/查看成长与兑换记录/);
+  const closed=render({...props.wallet,mallExchangeAvailable:false});
+  assert.match(closed,/<div class="xp-exchange-form"><label>兑换积分数<input [^>]*readOnly=""/i);
+  assert.match(closed,/当前最多可兑换 41 积分/);
+  assert.match(closed,/<button type="button" class="module-primary">经验兑换商城积分<\/button>/);
+  assert.doesNotMatch(closed,/<form[^>]*class="xp-exchange-form"/);
+  const insufficient=render({...props.wallet,xp:9,availableXp:9,redeemedXp:0,mallPoints:0});
+  assert.match(insufficient,/当前最多可兑换 0 积分/);
+  assert.match(insufficient,/<button class="module-primary" disabled="">兑换商城积分<\/button>/);
+  assert.doesNotMatch(insufficient,/商城积分 · 暂未开放/);
 });
 
 test('profile growth levels follow cumulative XP boundaries and ignore spendable balance',()=>{
@@ -144,15 +176,17 @@ test('profile badge wall previews six owned artworks and offers all owned naviga
   assert.doesNotMatch(one,/查看全部/);
 });
 
-test('growth details show task origins and signed badge costs without presenting mall exchange as enabled',()=>{
+test('growth details show task origins, signed badge costs and mall exchanges',()=>{
   const page={items:[
     {id:'reward-1',kind:'task_reward',occurredAt:'2026-11-09T08:41:11Z',module:'新手村',title:'学习任务 <script>',taskId:'task-1',xp:100,badgePoints:[{id:'product',points:10}],method:'任务审核通过'},
     {id:'medal-1',kind:'medal_redemption',occurredAt:'2026-11-08T08:41:11Z',module:'新手村',title:'洞察者',xp:0,badgePoints:[{id:'product',points:-5}],medal:{id:'medal-1',name:'洞察者'},method:'徽章点兑换'},
-  ],total:3,hasMore:true,nextOffset:2};
+    {id:'exchange-1',kind:'mall_exchange',occurredAt:'2026-11-07T08:41:11Z',module:'沐晨商城',title:'兑换 3 商城积分',xp:-30,mallPoints:3,badgePoints:[],method:'每 10 经验兑换 1 商城积分'},
+  ],total:4,hasMore:true,nextOffset:3};
   const html=renderToStaticMarkup(React.createElement(GrowthHistoryContent,{page,loading:false,error:'',onRetry(){},onMore(){}}));
   assert.match(html,/学习任务 &lt;script&gt;/);assert.doesNotMatch(html,/<script>/);
   assert.match(html,/新手村/);assert.match(html,/任务审核通过/);assert.match(html,/\+100 XP/);assert.match(html,/\+10 点/);
   assert.match(html,/产品开发徽章点/);assert.match(html,/−5 点/);assert.match(html,/已获得「洞察者」/);assert.match(html,/徽章点兑换/);
+  assert.match(html,/沐晨商城 · 积分兑换/);assert.match(html,/−30 XP/);assert.match(html,/兑换 3 商城积分/);
   assert.match(html,/dateTime="2026-11-09T08:41:11Z"|datetime="2026-11-09T08:41:11Z"/);
   assert.match(html,/16:41/);assert.match(html,/加载更多/);assert.doesNotMatch(html,/\+0 XP|确认兑换|经验兑换商城积分/);
 });

@@ -24,7 +24,7 @@ Activation = workspace.CourseWorkspaceActivation
 def inputs():
     candidate = json.loads((ROOT / "deploy/course-workspace-release/baseline.json").read_text())
     candidate.update(candidate="a" * 40, package_run_id="5555")
-    previous = {"candidate": Activation.base_api, "package_run_id": "44357590475",
+    previous = {"candidate": Activation.base_api, "package_run_id": "45867910596",
                 "base_candidate": workspace.PRIOR_API, "base_web_candidate": workspace.PRIOR_WEB,
                 "migrations": {"to": Activation.source_schema}, "database": candidate["database"],
                 "images": {"api": API_IMAGE, "web": WEB_IMAGE, **candidate["images"]}}
@@ -33,14 +33,14 @@ def inputs():
     raw["secrets/api.env"] = raw["secrets/web.env"] = ("APP_RELEASE=" + Activation.base_api + "\n").encode()
     prepared = {"manifest": previous, "hashes": {key: release.digest(data) for key, data in raw.items()}}
     receipt = {"release": Activation.base_api, "status": "PASS", "schema": Activation.source_schema,
-               "package_run_id": "44357590475", "previous_api_release": workspace.PRIOR_API,
+               "package_run_id": "45867910596", "previous_api_release": workspace.PRIOR_API,
                "previous_web_release": workspace.PRIOR_WEB, "existing_business_rows_preserved": True,
-               "curriculum_initialized": True, "other_containers_unchanged": True}
+               "old_assignments_unchanged": True, "database_schema_changed": True, "other_containers_unchanged": True}
     return candidate, prepared, receipt, raw
 
 
 def instantiate(candidate, prepared, receipt, raw):
-    base_dir = release.ROOT / "releases" / (Activation.base_api + "-dynamic-exploration")
+    base_dir = release.ROOT / "releases" / (Activation.base_api + "-course-workspace")
     def read(path):
         if path.name == "schema-upgrade-prepared.json":
             return json.dumps(prepared).encode()
@@ -54,11 +54,11 @@ def instantiate(candidate, prepared, receipt, raw):
 def test_course_activation_uses_previous_loaded_image_ids_and_hashes():
     app = instantiate(*inputs())
     assert app.old_images == {"api": API_IMAGE, "web": WEB_IMAGE}
-    assert app.base.name == Activation.base_api + "-dynamic-exploration"
+    assert app.base.name == Activation.base_api + "-course-workspace"
     assert app.new.name == "a" * 40 + "-course-workspace"
     assert not app.seeds_curriculum
-    assert app.source_schema == "0060_migrated_ai_ownership" and app.target_schema == "0063_admin_video_storage"
-    assert set(app.new_tables) == set(load("wp06", "scripts/wp06_ops.py").COURSE_WORKSPACE_TABLES)
+    assert app.source_schema == "0063_admin_video_storage" and app.target_schema == "0064_profile_mall_points"
+    assert set(app.new_tables) == set(load("wp06", "scripts/wp06_ops.py").PROFILE_TABLES)
 
 
 @pytest.mark.parametrize("changed", ["receipt", "schema", "images", "configuration", "path", "role", "package", "database"])
@@ -88,7 +88,7 @@ def test_new_cutover_requires_proven_backup_and_overlay_does_not_run_prior_impor
     app = instantiate(*inputs())
     with pytest.raises(release.UpgradeError, match="PRODUCTION_WRITE_PROBE_FORBIDDEN"):
         app.docker_api("secrets/migration.env", "python", "scripts/upgrade_exploration_catalog.py", "--apply")
-    extra = ("/api/review-native/course-workspace", "/api/review-native/experience/permissions")
+    extra = ("/api/review-native/course-workspace", "/api/review-native/experience/permissions", "/api/learner/profile")
     assert all(route in app.protected_endpoints for route in extra)
     assert "exploration_self_checks" in app.in_flight_sql
     flow = (ROOT / ".github/workflows/course-workspace-release.yml").read_text()
@@ -96,6 +96,17 @@ def test_new_cutover_requires_proven_backup_and_overlay_does_not_run_prior_impor
     assert "run['head_sha']==p['candidate']" in flow and "run['conclusion']=='success'" in flow
     assert "wp08_security_group close" in flow and "if: always() && steps.runner.outputs.cidr != ''" in flow
     assert "RELEASE_PROFILE: course-workspace" in flow and "catalog_actor.py" not in flow
+
+
+def test_package_rejects_candidate_with_another_migration_before_processing_images(tmp_path, monkeypatch):
+    packager = load("course_release_packager", "deploy/dynamic-exploration-release/package.py")
+    monkeypatch.setenv("CANDIDATE", "a" * 40)
+    monkeypatch.setenv("PACKAGE_RUN", "5555")
+    (tmp_path / "SHA256SUMS").write_text("")
+    (tmp_path / "release-manifest.json").write_text(json.dumps({"migration": {"head": Activation.source_schema}}))
+    with pytest.raises(AssertionError, match="CANDIDATE_SCHEMA"):
+        packager.package(tmp_path, tmp_path / "package", course_workspace=True)
+    assert not (tmp_path / "package").exists()
 
 
 def restore_verifier():
@@ -149,7 +160,7 @@ def test_backup_receipt_binds_the_dump_that_was_restored(tmp_path, truncate_afte
     root = tmp_path.resolve()
     dump, encrypted, verify = (root / name for name in ("canary.dump", "encrypted", "verify"))
     dump.write_bytes(b"original dump")
-    before = {"migration": "0060_migrated_ai_ownership"}
+    before = {"migration": "0063_admin_video_storage"}
     app = Mock(manifest={"candidate": "1" * 40}, backup=root, new=root, package=root,
                images={"dbrestore": "database", "api": "api"})
     module = Mock(require=release.require)

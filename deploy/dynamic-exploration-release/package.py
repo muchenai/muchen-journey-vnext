@@ -33,7 +33,10 @@ def package(build, output, *, course_workspace=False):
         expected, name = line.split(maxsplit=1)
         path = (build / name).resolve()
         assert path.parent == build.resolve() and sha(path) == expected, "HANDOFF_SHA"
-    binding = build_binding(build / "release-manifest.json", manifest["package_run_id"])
+    build_manifest = build / "release-manifest.json"
+    if course_workspace:
+        assert json.loads(build_manifest.read_text())["migration"]["head"] == manifest["migrations"]["to"], "CANDIDATE_SCHEMA"
+    binding = build_binding(build_manifest, manifest["package_run_id"])
     assert binding == json.loads((build / "candidate-binding.json").read_text()), "BINDING_CHANGED"
     assert binding["application_candidate_sha"] == manifest["candidate"], "CANDIDATE_CHANGED"
     verify_files(build / "release-manifest.json", build / "image-archives.json", build / "images")

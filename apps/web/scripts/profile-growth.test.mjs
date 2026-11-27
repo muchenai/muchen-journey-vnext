@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as jsxRuntime from 'react/jsx-runtime';
 
 class ApiRequestError extends Error { constructor(status,message){super(message);this.status=status;} }
 function load(relative,globals={}){
   const filename=new URL(relative,import.meta.url);
-  const code=ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  const compiledModule ={exports:{}};
-  vm.runInNewContext(code,{module: compiledModule,exports:compiledModule.exports,URL,Response,AbortController,...globals});
+  const code=ts.transpileModule(readFileSync(filename,'utf8'),{fileName:filename.pathname,compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
+  const compiledModule={exports:{}};
+  vm.runInNewContext(code,{module:compiledModule,exports:compiledModule.exports,URL,Response,AbortController,...globals});
   return compiledModule.exports;
 }
 const helper=()=>load('../src/app/project29/profileGrowth.ts');
@@ -51,6 +53,120 @@ test('wallet requires authoritative XP and badge counts rather than filling miss
     for(const invalid of [-1,1.5,'0',null,Infinity])assert.throws(()=>parseProfileWallet({...wallet,[field]:invalid}));
   }
   assert.throws(()=>parseProfileWallet({...wallet,badgeBalances:{product:'10'}}));
+  assert.equal(parseProfileWallet(wallet).mallPoints,undefined);
+  assert.equal(parseProfileWallet({...wallet,mallPoints:0}).mallPoints,0);
+  for(const mallPoints of ['1',null,-1,1.5,Number.MAX_SAFE_INTEGER+1])
+    assert.throws(()=>parseProfileWallet({...wallet,mallPoints}));
+});
+
+test('growth history preserves prior reward types and verifies the debited XP against the credited mall points',()=>{
+  const {parseGrowthPage}=helper();
+  const page=item=>parseGrowthPage({items:[item],total:1,hasMore:false,nextOffset:null});
+  for(const kind of ['task_reward','course_reward','offline_grant','medal_redemption']){
+    assert.equal(page({...entry,kind}).items[0].kind,kind);
+  }
+  const exchange={...entry,kind:'mall_exchange',module:'沐晨商城',xp:-20,mallPoints:2,badgePoints:[]};
+  assert.equal(page(exchange).items[0].xp,-20);
+  for(const override of [{mallPoints:undefined},{mallPoints:0},{mallPoints:-2},{mallPoints:'2'},{xp:-10},{xp:20}]){
+    assert.throws(()=>page({...exchange,...override}));
+  }
+});
+
+test('exchange proxy forwards the learner request and retry key, rejecting malformed input before any write',async()=>{
+  const calls=[];
+  const apiRequest=async(...args)=>{calls.push(args);return {wallet:{...wallet,mallPoints:1}};};
+  const target=load('../src/app/api/learner/experience/route.ts',{require:name=>name==='next/server'?{NextResponse:Response}:{apiRequest,ApiRequestError}});
+  const key=randomUUID();
+  const send=(body,headers={})=>target.POST(new Request('http://localhost:3000/api/learner/experience',{
+    method:'POST',body:JSON.stringify(body),headers:{host:'localhost:3000',origin:'http://localhost:3000','Content-Type':'application/json','Idempotency-Key':key,...headers},
+  }));
+  for(const points of [null,0,-1,1.1,'1',Number.MAX_SAFE_INTEGER+1])assert.equal((await send({points})).status,400);
+  assert.equal((await send({points:1,learnerId:'another-learner'})).status,400);
+  assert.equal((await send({points:1},{'Idempotency-Key':'bad'})).status,400);
+  assert.equal((await send({points:1},{origin:'http://different.example'})).status,403);
+  assert.equal(calls.length,0);
+  for(let attempt=0;attempt<2;attempt++){
+    const result=await send({points:1});
+    assert.equal(result.status,200);assert.equal((await result.json()).wallet.mallPoints,1);
+    const [path,role,init]=calls[attempt];
+    assert.equal(path,'/api/v1/me/profile/exchange');assert.equal(role,'LEARNER');
+    assert.equal(init.method,'POST');assert.equal(init.headers['Idempotency-Key'],key);
+    assert.deepEqual(JSON.parse(init.body),{points:1});
+  }
+});
+
+// Render the form's event handlers with the same hook slots across a retry.
+function exchangeForm(fetch, mallExchangeAvailable = true) {
+  const slots=[];
+  let cursor=0;
+  const react={
+    useRef(initial){const i=cursor++;return slots[i]??={current:initial};},
+    useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=value;}];},
+  };
+  const modules={react,'react/jsx-runtime':jsxRuntime,'./profileGrowth':helper(),'./ModuleShell':{ModuleIcon:'icon',ModulePanel:'section'}};
+  const {ProfileExchange}=load('../src/app/project29/ProfileExchange.tsx',{require:name=>modules[name],fetch,crypto});
+  const receipts=[];
+  function find(tree,type){
+    if(!tree || typeof tree!=='object')return;
+    if(tree.type===type)return tree;
+    for(const child of [tree.props?.children].flat(Infinity)){const result=find(child,type);if(result)return result;}
+  }
+  return {receipts,render(){
+    cursor=0;
+    const tree=ProfileExchange({wallet:{...wallet,mallPoints:0,mallExchangeAvailable},refresh(){},onExchanged:updated=>receipts.push(updated),showHistory(){}});
+    const form=find(tree,'form');
+    if (!form) return {form,entry:find(tree,'button').props,status:find(tree,'p')?.props?.children};
+    return {input:find(form,'input').props,button:find(form,'button').props,submit:()=>form.props.onSubmit({preventDefault(){}})};
+  }};
+}
+
+test('closed exchange keeps the entry clickable and reports 暂未开放 without posting',()=>{
+  let posts=0;
+  const view=exchangeForm(()=>{posts++;},false);
+  const panel=view.render();
+  assert.equal(panel.form,undefined);
+  assert.equal(panel.entry.children,'经验兑换商城积分');
+  panel.entry.onClick();
+  assert.equal(view.render().status,'暂未开放');
+  assert.equal(posts,0);
+});
+
+test('exchange form blocks invalid and in-flight submissions, reuses the uncertain request key and applies the confirmed wallet',async()=>{
+  const calls=[];
+  let finish;
+  const receipt={wallet:{...wallet,availableXp:80,redeemedXp:20,mallPoints:2}};
+  const view=exchangeForm((url,init)=>{
+    calls.push({url,init});
+    return new Promise(resolve=>{finish=resolve;});
+  });
+  for(const value of ['', '0', '-1', '1.5', '11']){
+    view.render().input.onChange({target:{value}});
+    const invalid=view.render();assert.equal(invalid.button.disabled,true);
+    await invalid.submit();
+  }
+  assert.equal(calls.length,0);
+  view.render().input.onChange({target:{value:'2'}});
+  const first=view.render().submit();
+  assert.equal(view.render().button.disabled,true);
+  await view.render().submit();
+  assert.equal(calls.length,1);
+  finish(Response.json({error:'暂时无法确认这笔兑换'},{status:503}));await first;
+  assert.equal(view.receipts.length,0);assert.equal(view.render().button.disabled,false);
+  const second=view.render().submit();
+  assert.equal(calls.length,2);
+  const retryKey=calls[0].init.headers['Idempotency-Key'];
+  assert.match(retryKey,/^[\da-f-]{36}$/);
+  for(const {url,init} of calls){
+    assert.equal(url,'/api/learner/experience');assert.equal(init.method,'POST');
+    assert.equal(init.credentials,'same-origin');assert.equal(init.headers['Idempotency-Key'],retryKey);
+    assert.deepEqual(JSON.parse(init.body),{points:2});
+  }
+  finish(Response.json(receipt));await second;
+  assert.deepEqual(view.receipts,[receipt.wallet]);assert.equal(view.render().button.disabled,true);
+  view.render().input.onChange({target:{value:'1'}});
+  const next=view.render().submit();
+  assert.notEqual(calls[2].init.headers['Idempotency-Key'],retryKey);
+  finish(Response.json({wallet:{...receipt.wallet,availableXp:70,redeemedXp:30,mallPoints:3}}));await next;
 });
 
 test('growth history fetch stays in authenticated context and honors cancellation',async()=>{

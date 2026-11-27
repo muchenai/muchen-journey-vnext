@@ -37,3 +37,6 @@
 .xp-issuer-field .inline-error { margin: 6px 0 0; }
 .xp-issuer-field [hidden] { display: none; }
 .xp-issuer-field [data-issuer-info]:empty { display: none; }
+
+.xp-permission-history { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.xp-permission-history h3 { margin: 0 0 12px; }

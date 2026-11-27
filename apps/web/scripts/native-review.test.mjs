@@ -420,20 +420,21 @@ test('real API adapter rejects approval with return reasons without sending a re
     assert.doesNotMatch(renderReview({ data: { submissions: [reviewView(row)] }, getTask: () => task }, { reviewCamp: 'exploration' }), /<th>未通过原因<\/th>/);
   } finally { globalThis.fetch = originalFetch; }
 });
-test('publication requires a chosen reviewer and every material confirmation', async () => {
+test('direct publication requires super admin and every material confirmation', async () => {
   const originalFetch=globalThis.fetch;
   const draft={...task,materials:[{id:'m',type:'link',url:'https://example.com/reference',name:'材料'}]};
   let calls=[];
-  const store={members:[{id:'reviewer',roles:['REVIEWER']}],data:{tasks:[],draft},save(){},async refresh(){}};
+  const store={capabilities:{isSuperAdmin:false},data:{tasks:[],draft},save(){},async refresh(){}};
   const service=createJourneyService({store});
   try {
     globalThis.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return {ok:true,json:async()=>({ok:true,data:{...draft,status:'published'}})};};
-    await assert.rejects(()=>service.tasks.publish(draft,'',[],id),/复核人/);
-    await assert.rejects(()=>service.tasks.publish(draft,'reviewer',[],id),/全部学习材料/);
+    await assert.rejects(()=>service.tasks.publish(draft,[],id),/超级管理员/);
+    store.capabilities.isSuperAdmin=true;
+    await assert.rejects(()=>service.tasks.publish(draft,[],id),/全部学习材料/);
     assert.equal(calls.length,0);
-    await service.tasks.publish(draft,'reviewer',['https://example.com/reference'],id);
+    await service.tasks.publish(draft,['https://example.com/reference'],id);
     assert.equal(calls[0].command,'publishTask'); assert.equal(calls[0].task.revision,4);
-    assert.deepEqual(calls[0].payload,{reviewerId:'reviewer',verified:['https://example.com/reference']});
+    assert.deepEqual(calls[0].payload,{verified:['https://example.com/reference']});
     assert.equal(store.data.draft.status,'published');
   } finally {globalThis.fetch=originalFetch;}
 });

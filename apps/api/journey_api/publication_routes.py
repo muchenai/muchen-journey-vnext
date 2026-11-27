@@ -11,8 +11,8 @@ from journey_api.db import get_db
 from journey_api.errors import ApiError
 from journey_api.models import TaskDefinition, User, UserStatus, RoleAssignment, Role
 from journey_api.review_admin_models import TaskPublicationRequest, ReviewAdminTask
-from journey_api.review_admin_access import require_publisher, require_super, access_for, permissions
-from journey_api.review_camps import task_camp
+from journey_api.review_admin_access import require_publisher, require_super, access_for, can_manage_task, permissions
+from journey_api.ai_rubric_materials import canonicalize_ai_rubric
 from journey_api.review_admin_routes import envelope, audit, task_data, task_content_for_publish
 
 router = APIRouter(prefix='/api/v1/review-admin')
@@ -52,14 +52,16 @@ def submit(task_id: uuid.UUID, command: SubmitPublication, request: Request,
            actor: Actor=Depends(get_actor), session: Session=Depends(get_db)):
     require_publisher(session, actor)
     definition = session.scalar(select(TaskDefinition).where(TaskDefinition.id == task_id,
-        TaskDefinition.organization_id == actor.organization_id, TaskDefinition.created_by == actor.id).with_for_update())
-    if not definition: raise ApiError(404, 'NOT_FOUND', '任务草稿不存在。')
+        TaskDefinition.organization_id == actor.organization_id).with_for_update())
+    if not definition or not can_manage_task(session, actor, definition):
+        raise ApiError(404, 'NOT_FOUND', '任务草稿不存在。')
     row = session.get(ReviewAdminTask, task_id)
+    if row and row.status == 'deleted':
+        raise ApiError(404, 'NOT_FOUND', '该任务已删除。')
     if not row or row.revision != command.expected_revision:
         raise ApiError(409, 'VERSION_CONFLICT', '草稿已更新，请重新打开。')
-    if task_camp(definition, row) == 'exploration':
-        require_super(session, actor)
-        raise ApiError(409, 'EXPLORATION_DIRECT_PUBLISH_ONLY', '探索营任务由超级管理员直接发布，无需提交发布审核。')
+    if permissions(session, actor)['isSuperAdmin']:
+        raise ApiError(409, 'DIRECT_PUBLISH_ONLY', '超级管理员可以直接发布，无需提交发布审核。')
     require_publisher(session, actor, row.content.get('difficulty'))
     previous = session.scalar(select(TaskPublicationRequest).where(TaskPublicationRequest.task_id == task_id,
         TaskPublicationRequest.task_revision == row.revision))
@@ -104,8 +106,6 @@ def decide(publication_id: uuid.UUID, command: DecidePublication, request: Reque
     profile = session.get(ReviewAdminTask, row.task_id)
     if not profile or profile.revision != row.task_revision or profile.content != row.content:
         raise ApiError(409, 'VERSION_CONFLICT', '提交版本已变化，不能发布。')
-    if command.decision == 'approved' and task_camp(definition, profile) == 'exploration':
-        raise ApiError(409, 'EXPLORATION_DIRECT_PUBLISH_ONLY', '探索营任务由超级管理员直接发布，请退回旧申请后按直接发布流程处理。')
     if command.decision == 'approved':
         owner = session.get(User, row.submitted_by)
         access = access_for(session, row.submitted_by, actor.organization_id)
@@ -118,14 +118,13 @@ def decide(publication_id: uuid.UUID, command: DecidePublication, request: Reque
     audit(session, request, actor, 'task.publication_'+command.decision, row.id, {'task_id':str(row.task_id)})
     if command.decision == 'approved':
         from journey_api.routes import publish_task_version
-        from journey_api.schemas import PublishTaskVersionCommand
         body = task_content_for_publish(row.content)
         from journey_api.exploration_service import ensure_published_camp
         ensure_published_camp(session, definition, row.content.get('camp', 'novice'))
+        profile.content = canonicalize_ai_rubric(row.content)
         profile.status = 'published'
-        request.state.approved_publication_task_id = row.task_id
         from journey_api.exploration_service import publication_command
-        publish_task_version(row.task_id, publication_command(row.content, **body, expected_revision=definition.revision,
+        publish_task_version(row.task_id, publication_command(profile.content, **body, expected_revision=definition.revision,
             reviewed_by=actor.id, verified_material_urls=row.verified_material_urls), request,
             idempotency_key='publication-'+str(row.id), actor=actor, session=session)
     else:

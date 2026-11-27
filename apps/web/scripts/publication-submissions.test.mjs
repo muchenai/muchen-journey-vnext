@@ -25,7 +25,10 @@ test('ordinary pending detail is read-only; super administrator retains decision
   ordinary.click({pubOpen:'pending'});
   assert.match(ordinary.observed.modal,/等待超级管理员审核/);
   assert.doesNotMatch(ordinary.observed.modal,/data-pub-submit|data-pub-decision=/);
-  const boss=harness([record('pending','pending','23')],true);
+  const own=harness([record('pending','pending','23')],true);
+  own.click({pubOpen:'pending'});
+  assert.match(own.observed.modal,/data-pub-submit/);
+  const boss=harness([record('pending','pending','23','another')],true);
   boss.click({pubOpen:'pending'});
   assert.match(boss.observed.modal,/data-pub-submit/);
 });

@@ -36,7 +36,7 @@ LOCAL_DATABASE = "journey_next_dev"
 LOCAL_DATABASE_USER = "journey_next"
 TEST_DATABASE_USER = "journey_next"
 TEST_DATABASE_PASSWORD = "journey_next_test"
-EXPECTED_MIGRATION_HEAD = "0063_admin_video_storage"
+EXPECTED_MIGRATION_HEAD = "0064_profile_mall_points"
 AI_BASE_REVISION = "0035_phone_password_login"
 AI_TABLES = ("ai_self_checks",)
 REVIEW_TABLES = (
@@ -63,9 +63,10 @@ COURSE_WORKSPACE_TABLES = (
     "workspace_courses", "course_study_records", "course_study_preferences", "course_roster_codes",
     "course_study_awards", "exploration_material_chunks",
 )
+PROFILE_TABLES = ("mall_point_exchanges",)
 POST_AI_BASE_TABLES = (
     *AI_TABLES, *REVIEW_TABLES, "learner_notification_reads",
-    *ADMIN_COMMUNITY_TABLES, *ACADEMY_TABLES, *GUILD_TABLES, *EXPLORATION_TABLES, *COURSE_WORKSPACE_TABLES,
+    *ADMIN_COMMUNITY_TABLES, *ACADEMY_TABLES, *GUILD_TABLES, *EXPLORATION_TABLES, *COURSE_WORKSPACE_TABLES, *PROFILE_TABLES,
 )
 SAFE_ROLLBACK_REVISION = "0025_formal_result_gate"
 PHONE_LOGIN_TABLES = (
@@ -78,7 +79,7 @@ ROLLBACK_OWNED_FACT_TABLES = (
     *ACADEMY_TABLES,
     *GUILD_TABLES,
     *EXPLORATION_TABLES,
-    *COURSE_WORKSPACE_TABLES,
+    *COURSE_WORKSPACE_TABLES, *PROFILE_TABLES,
     "learner_notification_reads",
     "coaching_feedback",
     "ai_advisory_records",
@@ -92,7 +93,7 @@ CURRENT_FACT_TABLES = (
     *ACADEMY_TABLES,
     *GUILD_TABLES,
     *EXPLORATION_TABLES,
-    *COURSE_WORKSPACE_TABLES,
+    *COURSE_WORKSPACE_TABLES, *PROFILE_TABLES,
     "learner_notification_reads",
     *PHONE_LOGIN_TABLES,
     *AI_TABLES,

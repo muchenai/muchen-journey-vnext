@@ -16,7 +16,7 @@ export function GrowthHistoryContent({ page, loading, error, onRetry, onMore }: 
     <div className="profile-growth-scroll" role="region" aria-label="成长记录，可上下滚动" tabIndex={0}>
     {error && <div className="profile-growth-error" role="alert"><p>{error}</p><button className="module-secondary" disabled={loading} onClick={onRetry}>重新读取</button></div>}
     {!page && loading && <p className="profile-growth-empty" role="status">正在读取成长明细…</p>}
-    {page && page.items.length === 0 && !error && <div className="profile-growth-empty"><h3>还没有成长记录</h3><p>新手村任务审核通过或兑换徽章后，相关记录会显示在这里。</p></div>}
+    {page && page.items.length === 0 && !error && <div className="profile-growth-empty"><h3>还没有成长记录</h3><p>获得学习奖励、兑换商城积分或徽章后，相关记录会显示在这里。</p></div>}
     {page && page.items.length > 0 && <>
       <ol className="profile-growth-list">{page.items.map(item => <GrowthHistoryRow key={item.id} item={item}
         expanded={expandedId === item.id} onToggle={() => setExpandedId(current => current === item.id ? null : item.id)} />)}</ol>
@@ -35,10 +35,10 @@ function GrowthHistoryRow({ item, expanded, onToggle }: { item: GrowthEntry; exp
   const pointTypes = new Set(item.badgePoints.filter(point => point.points !== 0).map(point => point.id)).size;
   const summary = item.kind === "medal_redemption"
     ? `获得 1 枚徽章${pointTypes ? ` · 消耗 ${pointTypes} 类徽章点` : ""}`
-    : [item.xp ? `${formatGrowthDelta(item.xp)} XP` : "", pointTypes ? `${pointTypes} 类徽章点` : ""].filter(Boolean).join(" · ");
+    : [item.xp ? `${formatGrowthDelta(item.xp)} XP` : "", item.mallPoints ? `${formatGrowthDelta(item.mallPoints)} 商城积分` : "", pointTypes ? `${pointTypes} 类徽章点` : ""].filter(Boolean).join(" · ");
   return <li className="profile-growth-entry">
     <button type="button" className="profile-growth-toggle" aria-expanded={expanded} aria-controls={detailId} onClick={onToggle}>
-      <span className="profile-growth-entry-heading"><span className="module-tag">{item.module} · {{ task_reward: "任务奖励", medal_redemption: "获得徽章", offline_grant: "经验发放", course_reward: "学习奖励" }[item.kind]}</span><time dateTime={item.occurredAt}>{at}</time></span>
+      <span className="profile-growth-entry-heading"><span className="module-tag">{item.module} · {{ task_reward: "学习奖励", medal_redemption: "获得徽章", offline_grant: "经验发放", course_reward: "学习奖励", mall_exchange: "积分兑换" }[item.kind]}</span><time dateTime={item.occurredAt}>{at}</time></span>
       <span className="profile-growth-summary"><strong>{item.title}</strong><span className="profile-growth-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></span>
       <span className="profile-growth-overview">{summary || "查看奖励明细"}<span>{expanded ? "收起详情" : "展开详情"}</span></span>
     </button>
@@ -46,6 +46,7 @@ function GrowthHistoryRow({ item, expanded, onToggle }: { item: GrowthEntry; exp
     <p className="profile-growth-method">{item.method}{item.medal ? ` · 已获得「${item.medal.name}」` : ""}</p>
     <div className="profile-growth-changes">
       {item.xp !== 0 && <span data-direction={item.xp > 0 ? "gain" : "cost"}><b>{formatGrowthDelta(item.xp)} XP</b><small>经验值</small></span>}
+      {item.kind === "mall_exchange" && <span data-direction="gain"><b>{formatGrowthDelta(item.mallPoints!)} 积分</b><small>商城积分</small></span>}
       {item.badgePoints.filter(point => point.points !== 0).map(point => <span key={point.id} data-direction={point.points > 0 ? "gain" : "cost"}><b>{formatGrowthDelta(point.points)} 点</b><small>{pointNames[point.id] || point.id}徽章点</small></span>)}
     </div>
     </div>
@@ -91,7 +92,7 @@ export function GrowthHistoryDialog({ onClose, onRefreshSummary }: { onClose: ()
     <JourneyDialogSurface>
       <div className="module-dialog-heading"><span className="badge-eyebrow">MY GROWTH RECORDS</span><button onClick={onClose} aria-label="关闭成长明细">关闭 ×</button></div>
       <div className="profile-growth-heading"><h2 id="profile-growth-title">成长明细</h2><button className="module-secondary" disabled={loading} onClick={refresh}>刷新记录</button></div>
-      <p id="profile-growth-description">查看经验、徽章点的来源与徽章获取记录。商城积分与经验兑换暂未开放。</p>
+      <p id="profile-growth-description">查看经验和徽章点的来源，以及商城积分和徽章的兑换记录。</p>
       <GrowthHistoryContent page={page} loading={loading} error={error} onRetry={() => void load(requestedOffset.current)} onMore={() => void load(nextOffset.current)} />
     </JourneyDialogSurface>
   </dialog>;

@@ -1,12 +1,16 @@
-"""Exploration editing is super-admin only and publication has no reviewer hop."""
+"""Certified administrators submit exploration tasks and super administrators publish them."""
 import uuid
+from datetime import UTC, datetime
+
+import pytest
 from sqlalchemy import delete, func, select
 
 from journey_api.db import SessionLocal
-from journey_api.models import TaskDefinition, TaskVersion
-from journey_api.review_admin_models import ReviewAdminAccess, ReviewAdminTask, TaskPublicationRequest
+from journey_api.models import Assignment, Organization, Role, RoleAssignment, TaskDefinition, TaskDefinitionStatus, TaskVersion
+from journey_api.review_admin_models import ReviewAdminAccess, TaskPublicationRequest
 from journey_api.review_admin_routes import task_content_for_publish
-from test_dynamic_exploration import exploration, post, read
+from test_dynamic_exploration import command as learner_command, exploration, post, read
+from test_course_workspace import identity
 from test_review_admin import content as novice_content
 from test_wp09_feishu_identity import assert_ok
 
@@ -28,48 +32,141 @@ def demote(author):
         row.access_role, row.level = 'admin', '高级'
 
 
-def test_ordinary_cannot_create_upload_or_switch_novice_to_exploration(exploration):
-    staff, _, author = exploration
+def test_ordinary_exploration_publisher_submits_to_another_certified_super(exploration):
+    staff, learner, author = exploration
     demote(author)
     task_id = str(uuid.uuid4())
-    assert save(staff, task_id, 0, content()).status_code == 403
-    with SessionLocal() as session:
-        assert session.get(TaskDefinition, uuid.UUID(task_id)) is None
+    draft = assert_ok(save(staff, task_id, 0, content()))
     upload = staff[0].post('/api/v1/review-admin/exploration/materials', params={'name': 'questions.txt'},
         headers={'X-CSRF-Token': staff[1], 'Content-Type': 'text/plain'}, content=b'Questions')
-    assert upload.status_code == 403
-    assert post(staff, 'review-admin/sandbox', {'task': content(), 'answer': '已经阅读材料并完成这次学习。'}).status_code == 403
-    novice = assert_ok(save(staff, task_id, 0, novice_content()))
-    assert save(staff, task_id, novice['revision'], content()).status_code == 403
-    assert_ok(post(staff, f'review-admin/tasks/{task_id}/submit-publication', {
-        'expected_revision': novice['revision'], 'verified_material_urls': ['https://example.com/material']}))
-
-
-def test_demoted_owner_cannot_modify_rename_camp_archive_delete_or_publish_existing_exploration(exploration):
-    staff, _, author = exploration
-    task_id = str(uuid.uuid4())
-    data = content()
-    draft = assert_ok(save(staff, task_id, 0, data))
-    demote(author)
-    assert save(staff, task_id, draft['revision'], {**data, 'title': '不允许更新'}).status_code == 403
-    assert save(staff, task_id, draft['revision'], novice_content()).status_code == 403
-    assert post(staff, f'review-admin/tasks/{task_id}/publish', {'expected_revision': draft['revision'],
-        'verified_material_urls': ['https://example.com/learning']}).status_code == 403
-    assert post(staff, f'review-admin/tasks/{task_id}/submit-publication', {'expected_revision': draft['revision'],
-        'verified_material_urls': ['https://example.com/learning']}).status_code == 403
+    assert_ok(upload)
+    draft = assert_ok(save(staff, task_id, draft['revision'], {**content(), 'title': '普通管理员发布的课程'}))
+    links = {'expected_revision': draft['revision'], 'verified_material_urls': ['https://example.com/learning']}
+    assert post(staff, f'review-admin/tasks/{task_id}/publish', links).status_code == 403
+    generic = task_content_for_publish(content())
+    assert post(staff, f'ops/task-definitions/{task_id}/publish', {**generic, **links,
+        'expected_revision': draft['definitionRevision'], 'reviewed_by': str(author)}).status_code == 403
     assert post(staff, f'review-admin/tasks/{task_id}/archive', {
         'expected_revision': draft['revision'], 'archived': True}).status_code == 403
     assert post(staff, f'review-admin/tasks/{task_id}/delete', {
         'expected_revision': draft['revision']}).status_code == 403
-    generic = task_content_for_publish(data)
-    assert post(staff, f'ops/task-definitions/{task_id}/publish', {**generic,
-        'expected_revision': draft['definitionRevision'], 'reviewed_by': str(author),
-        'verified_material_urls': ['https://example.com/learning']}).status_code == 403
+    assert_ok(post(staff, f'review-admin/tasks/{task_id}/submit-publication', links))
+    pending = assert_ok(staff[0].get('/api/v1/review-admin/publications'))['items'][0]
+    endpoint = f"/api/v1/review-admin/publications/{pending['id']}/decision"
+    decision = {'expected_revision': 1, 'decision': 'approved'}
+    assert staff[0].post(endpoint, json=decision, headers={'X-CSRF-Token': staff[1]}).status_code == 403
     with SessionLocal() as session:
-        row = session.get(ReviewAdminTask, uuid.UUID(task_id))
-        assert row.revision == draft['revision'] and row.content['camp'] == 'exploration'
-        assert row.content['title'] == data['title'] and row.status == 'draft'
+        org = session.get(ReviewAdminAccess, author).organization_id
         assert session.scalar(select(func.count(TaskVersion.id)).where(TaskVersion.task_definition_id == uuid.UUID(task_id))) == 0
+    other_super, reviewer_id = identity(org, Role.REVIEWER, '另一位超级管理员', 'super_admin')
+    assert_ok(other_super.post(endpoint, json=decision))
+    assert read(learner, task_id)['title'] == '普通管理员发布的课程'
+    with SessionLocal() as session:
+        version = session.scalar(select(TaskVersion).where(TaskVersion.task_definition_id == uuid.UUID(task_id)))
+        assert version.reviewed_by == reviewer_id
+
+
+@pytest.mark.parametrize('decision', ['approved', 'rejected'])
+def test_super_can_decide_own_pending_request_after_promotion(exploration, decision):
+    staff, _, author = exploration
+    demote(author)
+    task_id = str(uuid.uuid4())
+    draft = assert_ok(save(staff, task_id, 0, content()))
+    submitted = assert_ok(post(staff, f'review-admin/tasks/{task_id}/submit-publication',
+        {'expected_revision': draft['revision'], 'verified_material_urls': ['https://example.com/learning']}))
+    path = f"review-admin/publications/{submitted['publication']['id']}/decision"
+    command = {'expected_revision': 1, 'decision': decision, 'comment': '请补充材料。' if decision == 'rejected' else ''}
+    assert post(staff, path, command).status_code == 403
+    with SessionLocal.begin() as session:
+        session.get(ReviewAdminAccess, author).access_role = 'super_admin'
+    result = assert_ok(post(staff, path, command))
+    assert result['status'] == decision
+    assert result['submittedBy']['id'] == result['reviewedBy']['id'] == str(author)
+    assert post(staff, path, command).status_code == 409
+    with SessionLocal() as session:
+        versions = session.scalars(select(TaskVersion).where(TaskVersion.task_definition_id == uuid.UUID(task_id))).all()
+        assert [v.published_by for v in versions] == ([author] if decision == 'approved' else [])
+
+
+@pytest.mark.parametrize('data', [content(), novice_content()], ids=['exploration', 'novice'])
+def test_super_manages_other_publishers_task_without_changing_authorship(exploration, data):
+    staff, learner, author = exploration
+    task_id = str(uuid.uuid4())
+    draft = assert_ok(save(staff, task_id, 0, data))
+    verified = [material['url'] for material in data['materials']]
+    first = assert_ok(post(staff, f'review-admin/tasks/{task_id}/publish',
+        {'expected_revision': draft['revision'], 'verified_material_urls': verified}))
+    if data['camp'] == 'exploration':
+        work = assert_ok(learner_command(learner, read(learner, task_id), 'claim'))
+    other_org = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        access = session.get(ReviewAdminAccess, author)
+        org = access.organization_id
+        access.revoked_at = datetime.now(UTC)
+        session.add(Organization(id=other_org, name='独立的外部组织'))
+    ordinary, _ = identity(org, Role.REVIEWER, '普通管理员', 'admin')
+    foreign, _ = identity(other_org, Role.REVIEWER, '其他组织超级管理员', 'super_admin')
+    manager, manager_id = identity(org, Role.REVIEWER, '超级管理员', 'super_admin')
+    with SessionLocal.begin() as session:
+        session.get(ReviewAdminAccess, manager_id).can_grant_super_admin = False
+    path = f'review-admin/tasks/{task_id}'
+    rev = first['revision']
+    for client in [ordinary, foreign]:
+        credential = (client, client.headers['X-CSRF-Token'])
+        assert save(credential, task_id, rev, data).status_code == 403
+        assert post(credential, path + '/archive', {'expected_revision': rev, 'archived': True}).status_code == 404
+        assert post(credential, path + '/submit-publication', {'expected_revision': rev}).status_code == 404
+        assert post(credential, path + '/publish', {'expected_revision': rev}).status_code == (403 if client is ordinary else 404)
+        if data['camp'] == 'exploration':
+            assert post(credential, path + '/delete', {'expected_revision': rev}).status_code == (403 if client is ordinary else 404)
+    manager = (manager, manager.headers['X-CSRF-Token'])
+    updated = assert_ok(save(manager, task_id, rev, {**data, 'title': '编辑他人发布的任务'}))
+    assert save(manager, task_id, rev, data).status_code == 409
+    live = assert_ok(post(manager, path + '/publish',
+        {'expected_revision': updated['revision'], 'verified_material_urls': verified}))
+    assert live['authorId'] == str(author) and live['version'] == 2 and live['status'] == 'published'
+    archived = assert_ok(post(manager, path + '/archive', {'expected_revision': live['revision'], 'archived': True}))
+    assert archived['status'] == 'archived'
+    restored = assert_ok(post(manager, path + '/archive', {'expected_revision': archived['revision'], 'archived': False}))
+    assert restored['status'] == 'published'
+    if data['camp'] == 'exploration':
+        deleted = assert_ok(post(manager, path + '/delete', {'expected_revision': restored['revision']}))
+        assert deleted['deleted']
+        assert post(manager, path + '/archive', {'expected_revision': deleted['revision'], 'archived': False}).status_code == 404
+    with SessionLocal() as session:
+        versions = session.scalars(select(TaskVersion).where(TaskVersion.task_definition_id == uuid.UUID(task_id))
+            .order_by(TaskVersion.version)).all()
+        assert [v.published_by for v in versions] == [author, manager_id]
+        assert [v.reviewed_by for v in versions] == [author, manager_id]
+        if data['camp'] == 'exploration':
+            assignment = session.get(Assignment, uuid.UUID(work['assignmentId']))
+            assert assignment.task_version_id == versions[0].id
+
+
+def test_super_can_delete_another_authors_legacy_exploration_task(exploration):
+    _, _, author = exploration
+    task_id = uuid.uuid4()
+    with SessionLocal.begin() as session:
+        org = session.get(ReviewAdminAccess, author).organization_id
+        session.add(TaskDefinition(id=task_id, organization_id=org, created_by=author,
+            stable_key='DAY-0', status=TaskDefinitionStatus.DRAFT, revision=1))
+    client, _ = identity(org, Role.REVIEWER, '超级管理员', 'super_admin')
+    deleted = assert_ok(post((client, client.headers['X-CSRF-Token']), f'review-admin/tasks/{task_id}/delete',
+        {'expected_revision': 0}))
+    assert deleted['deleted'] and deleted['revision'] == 1
+    assert str(task_id) not in {t['id'] for t in assert_ok(client.get('/api/v1/review-admin/tasks'))['items']}
+
+
+def test_company_learner_session_cannot_publish_with_same_users_staff_role(exploration):
+    _, learner, author = exploration
+    with SessionLocal.begin() as session:
+        org = session.get(ReviewAdminAccess, author).organization_id
+        uid = session.scalar(select(RoleAssignment.user_id).where(
+            RoleAssignment.organization_id == org, RoleAssignment.role == Role.LEARNER))
+        session.add(RoleAssignment(id=uuid.uuid4(), user_id=uid, organization_id=org, role=Role.REVIEWER))
+        session.add(ReviewAdminAccess(user_id=uid, organization_id=org, access_role="super_admin", granted_by=author))
+    # The same account has certified staff access, but this cookie represents its learner login.
+    assert save(learner, str(uuid.uuid4()), 0, content()).status_code == 403
 
 
 def test_super_direct_publish_requires_no_reviewer_and_audits_actual_publisher(exploration):
@@ -101,37 +198,18 @@ def test_super_generic_exploration_publish_also_records_actual_publisher(explora
     assert result['reviewed_by'] == result['published_by'] == str(author)
 
 
-def test_exploration_has_no_new_approval_requests_and_legacy_pending_cannot_publish(exploration):
+def test_super_uses_direct_publish_in_both_camps(exploration):
     staff, _, author = exploration
-    task_id = str(uuid.uuid4())
-    draft = assert_ok(save(staff, task_id, 0, content()))
-    response = post(staff, f'review-admin/tasks/{task_id}/submit-publication', {'expected_revision': draft['revision'],
-        'verified_material_urls': ['https://example.com/learning']})
-    assert response.status_code == 409 and response.json()['error']['code'] == 'EXPLORATION_DIRECT_PUBLISH_ONLY'
-    request_id = uuid.uuid4()
-    with SessionLocal.begin() as session:
-        row = session.get(ReviewAdminTask, uuid.UUID(task_id))
-        session.add(TaskPublicationRequest(id=request_id, organization_id=row.organization_id, task_id=uuid.UUID(task_id),
-            submitted_by=author, task_revision=row.revision, revision=1, status='pending', content=dict(row.content),
-            verified_material_urls=['https://example.com/learning'], comment=''))
-    response = post(staff, f'review-admin/publications/{request_id}/decision', {
-        'expected_revision': 1, 'decision': 'approved', 'comment': ''})
-    assert response.status_code == 409 and response.json()['error']['code'] == 'EXPLORATION_DIRECT_PUBLISH_ONLY'
-    assert_ok(post(staff, f'review-admin/publications/{request_id}/decision', {
-        'expected_revision': 1, 'decision': 'rejected', 'comment': '请使用超级管理员直接发布。'}))
-    assert_ok(post(staff, f'review-admin/tasks/{task_id}/publish', {'expected_revision': draft['revision'],
-        'verified_material_urls': ['https://example.com/learning']}))
-
-
-def test_novice_super_still_requires_explicit_content_reviewer(exploration):
-    staff, _, author = exploration
-    task_id = str(uuid.uuid4())
-    draft = assert_ok(save(staff, task_id, 0, novice_content()))
-    response = post(staff, f'review-admin/tasks/{task_id}/publish', {'expected_revision': draft['revision'],
-        'verified_material_urls': ['https://example.com/material']})
-    assert response.status_code == 422
-    assert_ok(post(staff, f'review-admin/tasks/{task_id}/publish', {'expected_revision': draft['revision'],
-        'reviewed_by': str(author), 'verified_material_urls': ['https://example.com/material']}))
+    for task, url in ((content(), 'https://example.com/learning'), (novice_content(), 'https://example.com/material')):
+        task_id = str(uuid.uuid4())
+        draft = assert_ok(save(staff, task_id, 0, task))
+        command = {'expected_revision': draft['revision'], 'verified_material_urls': [url]}
+        submitted = post(staff, f'review-admin/tasks/{task_id}/submit-publication', command)
+        assert submitted.status_code == 409 and submitted.json()['error']['code'] == 'DIRECT_PUBLISH_ONLY'
+        assert_ok(post(staff, f'review-admin/tasks/{task_id}/publish', command))
+        with SessionLocal() as session:
+            version = session.scalar(select(TaskVersion).where(TaskVersion.task_definition_id == uuid.UUID(task_id)))
+            assert version.reviewed_by == version.published_by == author
 
 
 def test_legacy_content_apis_cannot_bypass_exploration_super_authority(exploration):

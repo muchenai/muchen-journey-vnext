@@ -2,18 +2,21 @@ export type ProfileWallet = {
   xp: number;
   availableXp: number;
   redeemedXp: number;
+  mallPoints?: number;
+  mallExchangeAvailable?: boolean;
   ownedMedalCount: number;
   badgeBalances: Record<string, number>;
 };
 
 export type GrowthEntry = {
   id: string;
-  kind: "task_reward" | "medal_redemption" | "offline_grant" | "course_reward";
+  kind: "task_reward" | "medal_redemption" | "offline_grant" | "course_reward" | "mall_exchange";
   occurredAt: string;
   module: string;
   title: string;
   taskId?: string;
   xp: number;
+  mallPoints?: number;
   badgePoints: { id: string; points: number }[];
   medal?: { id: string; name: string };
   method: string;
@@ -31,6 +34,7 @@ const count = (value: unknown): value is number => typeof value === "number" && 
 const integer = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
 
 export const XP_PER_GROWTH_LEVEL = 500;
+export const XP_PER_MALL_POINT = 10;
 
 // Levels use lifetime task rewards, independently of any spendable XP balance.
 export function profileGrowthLevel(lifetimeXp: number | undefined) {
@@ -49,6 +53,7 @@ export function profileGrowthLevel(lifetimeXp: number | undefined) {
 
 export function parseProfileWallet(value: unknown): ProfileWallet {
   if (!record(value) || !count(value.xp) || !count(value.availableXp) || !count(value.redeemedXp)
+    || (value.mallPoints !== undefined && !count(value.mallPoints))
     || !count(value.ownedMedalCount) || !record(value.badgeBalances)
     || !Object.values(value.badgeBalances).every(integer)) {
     throw new Error("成长数据不完整，请重新加载。");
@@ -63,7 +68,8 @@ export function parseGrowthPage(value: unknown): GrowthPage {
   }
   for (const item of value.items) {
     if (!record(item) || typeof item.id !== "string" || !item.id
-      || !["task_reward", "medal_redemption", "offline_grant", "course_reward"].includes(String(item.kind))
+      || !["task_reward", "medal_redemption", "offline_grant", "course_reward", "mall_exchange"].includes(String(item.kind))
+      || (item.kind === "mall_exchange" && (!count(item.mallPoints) || item.mallPoints < 1 || item.xp !== -item.mallPoints * XP_PER_MALL_POINT))
       || typeof item.occurredAt !== "string" || !Number.isFinite(Date.parse(item.occurredAt))
       || typeof item.title !== "string" || typeof item.module !== "string" || typeof item.method !== "string"
       || !integer(item.xp) || !Array.isArray(item.badgePoints)
